@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+package(default_visibility = ["//:__subpackages__"])  # keep
+
+licenses(["notice"])  # keep
+
+go_library(
+    name = "monitoring",
+    srcs = ["monitoring.go"],
+    importpath = "github.com/tink-crypto/tink-go/monitoring",
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":monitoring",
+    visibility = ["//visibility:public"],
+)

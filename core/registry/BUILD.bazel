@@ -1,0 +1,46 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+package(default_visibility = ["//:__subpackages__"])  # keep
+
+licenses(["notice"])  # keep
+
+go_library(
+    name = "registry",
+    srcs = [
+        "key_manager.go",
+        "kms_client.go",
+        "private_key_manager.go",
+        "registry.go",
+    ],
+    importpath = "github.com/tink-crypto/tink-go/core/registry",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//proto/tink_go_proto",
+        "//tink",
+        "@org_golang_google_protobuf//proto",
+    ],
+)
+
+go_test(
+    name = "registry_test",
+    srcs = ["registry_test.go"],
+    deps = [
+        ":registry",
+        "//aead",
+        "//mac",
+        "//mac/subtle",
+        "//proto/aes_gcm_go_proto",
+        "//proto/common_go_proto",
+        "//proto/hmac_go_proto",
+        "//proto/tink_go_proto",
+        "//testing/fakekms",
+        "//testutil",
+        "@org_golang_google_protobuf//proto",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":registry",
+    visibility = ["//visibility:public"],
+)

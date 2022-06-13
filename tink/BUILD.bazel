@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+package(default_visibility = ["//:__subpackages__"])  # keep
+
+licenses(["notice"])  # keep
+
+go_library(
+    name = "tink",
+    srcs = [
+        "aead.go",
+        "deterministic_aead.go",
+        "hybrid_decrypt.go",
+        "hybrid_encrypt.go",
+        "mac.go",
+        "signer.go",
+        "streamingaead.go",
+        "tink.go",
+        "verifier.go",
+        "version.go",
+    ],
+    importpath = "github.com/tink-crypto/tink-go/tink",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":tink",
+    visibility = ["//visibility:public"],
+)

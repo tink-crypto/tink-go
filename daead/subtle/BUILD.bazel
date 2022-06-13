@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+package(default_visibility = ["//:__subpackages__"])  # keep
+
+go_library(
+    name = "subtle",
+    srcs = ["aes_siv.go"],
+    importpath = "github.com/tink-crypto/tink-go/daead/subtle",
+)
+
+go_test(
+    name = "subtle_test",
+    srcs = ["aes_siv_test.go"],
+    data = ["@wycheproof//testvectors:all"],
+    deps = [
+        ":subtle",
+        "//subtle/random",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":subtle",
+    visibility = ["//visibility:public"],
+)

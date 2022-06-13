@@ -1,0 +1,69 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+package(default_visibility = ["//:__subpackages__"])  # keep
+
+licenses(["notice"])  # keep
+
+go_library(
+    name = "streamingaead",
+    srcs = [
+        "aes_ctr_hmac_key_manager.go",
+        "aes_gcm_hkdf_key_manager.go",
+        "decrypt_reader.go",
+        "streamingaead.go",
+        "streamingaead_factory.go",
+        "streamingaead_key_templates.go",
+    ],
+    importpath = "github.com/tink-crypto/tink-go/streamingaead",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//aead/subtle",
+        "//core/primitiveset",
+        "//core/registry",
+        "//keyset",
+        "//mac/subtle",
+        "//proto/aes_ctr_hmac_streaming_go_proto",
+        "//proto/aes_gcm_hkdf_streaming_go_proto",
+        "//proto/common_go_proto",
+        "//proto/hmac_go_proto",
+        "//proto/tink_go_proto",
+        "//streamingaead/subtle",
+        "//subtle/random",
+        "//tink",
+        "@org_golang_google_protobuf//proto",
+    ],
+)
+
+go_test(
+    name = "streamingaead_test",
+    srcs = [
+        "aes_ctr_hmac_key_manager_test.go",
+        "aes_gcm_hkdf_key_manager_test.go",
+        "decrypt_reader_test.go",
+        "streamingaead_factory_test.go",
+        "streamingaead_key_templates_test.go",
+        "streamingaead_test.go",
+    ],
+    embed = [":streamingaead"],
+    deps = [
+        "//core/registry",
+        "//keyset",
+        "//mac",
+        "//proto/aes_ctr_hmac_streaming_go_proto",
+        "//proto/aes_gcm_hkdf_streaming_go_proto",
+        "//proto/common_go_proto",
+        "//proto/tink_go_proto",
+        "//streamingaead/subtle",
+        "//subtle/random",
+        "//testkeyset",
+        "//testutil",
+        "//tink",
+        "@org_golang_google_protobuf//proto",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":streamingaead",
+    visibility = ["//visibility:public"],
+)

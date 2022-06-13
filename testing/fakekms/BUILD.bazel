@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+licenses(["notice"])
+
+package(default_visibility = ["//:__subpackages__"])  # keep
+
+go_library(
+    name = "fakekms",
+    testonly = 1,
+    srcs = ["fakekms.go"],
+    importpath = "github.com/tink-crypto/tink-go/testing/fakekms",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//aead",
+        "//core/registry",
+        "//keyset",
+        "//testkeyset",
+        "//tink",
+    ],
+)
+
+go_test(
+    name = "fakekms_test",
+    srcs = ["fakekms_test.go"],
+    deps = [":fakekms"],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":fakekms",
+    visibility = ["//visibility:public"],
+)
