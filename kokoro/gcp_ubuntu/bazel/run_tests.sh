@@ -26,7 +26,7 @@ source ./kokoro/testutils/install_go.sh
 echo "Using go binary from $(which go): $(go version)"
 
 if [[ -n "${KOKORO_ROOT:-}" ]]; then
-  use_bazel.sh "$(cat go/.bazelversion)"
+  use_bazel.sh "$(cat .bazelversion)"
 fi
 
 # Check that build files are up-to-date.
