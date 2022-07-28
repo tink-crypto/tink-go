@@ -33,11 +33,8 @@ readonly TINK_GO_MODULE_URL="github.com/tink-crypto/tink-go"
 readonly TINK_VERSION="$(cat ${TINK_GO_PROJECT_PATH}/tink_version.bzl \
                         | grep ^TINK \
                         | cut -f 2 -d \")"
-# Create a temporary directory for performing module tests.
-readonly TMP_DIR="$(mktemp -dt go-module-test.XXXXXX)"
-
 ./kokoro/testutils/run_go_mod_tests.sh \
   "${TINK_GO_MODULE_URL}" \
   "${TINK_GO_PROJECT_PATH}" \
-  "${TMP_DIR}" \
-  "${TINK_VERSION}"
+  "${TINK_VERSION}" \
+  "main"
