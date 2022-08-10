@@ -24,7 +24,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/signature/internal"
+	internal "github.com/tink-crypto/tink-go/internal/signature"
 	"github.com/tink-crypto/tink-go/subtle/random"
 	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
 	rsassapkcs1pb "github.com/tink-crypto/tink-go/proto/rsa_ssa_pkcs1_go_proto"

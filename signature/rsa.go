@@ -19,7 +19,7 @@ package signature
 import (
 	"math/big"
 
-	"github.com/tink-crypto/tink-go/signature/internal"
+	internal "github.com/tink-crypto/tink-go/internal/signature"
 	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
 )
 

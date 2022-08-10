@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-package internal_test
+package signature_test
 
 import (
 	"crypto/rand"
@@ -23,7 +23,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/signature/internal"
+	internal "github.com/tink-crypto/tink-go/internal/signature"
 	"github.com/tink-crypto/tink-go/subtle/random"
 	"github.com/tink-crypto/tink-go/subtle"
 	"github.com/tink-crypto/tink-go/testutil"
