@@ -18,7 +18,8 @@ set -euo pipefail
 
 TINK_GO_PROJECT_PATH="$(pwd)"
 if [[ -n "${KOKORO_ROOT:-}" ]]; then
-  TINK_GO_PROJECT_PATH="${KOKORO_ARTIFACTS_DIR}/git/tink_go"
+  TINK_BASE_DIR="$(echo "${KOKORO_ARTIFACTS_DIR}"/git*)"
+  TINK_GO_PROJECT_PATH="${TINK_BASE_DIR}/tink_go"
   cd "${TINK_GO_PROJECT_PATH}"
 fi
 readonly TINK_GO_PROJECT_PATH
