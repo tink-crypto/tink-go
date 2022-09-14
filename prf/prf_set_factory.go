@@ -21,7 +21,10 @@ import (
 
 	"github.com/tink-crypto/tink-go/core/primitiveset"
 	"github.com/tink-crypto/tink-go/core/registry"
+	"github.com/tink-crypto/tink-go/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/keyset"
+	"github.com/tink-crypto/tink-go/monitoring"
 )
 
 // NewPRFSet creates a prf.Set primitive from the given keyset handle.
@@ -66,6 +69,24 @@ func wrapPRFset(ps *primitiveset.PrimitiveSet) (*Set, error) {
 		}
 		set.PRFs[entry.KeyID] = prf
 	}
-
+	set.logger, err = createLogger(ps)
+	if err != nil {
+		return nil, err
+	}
 	return set, nil
+}
+
+func createLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, error) {
+	if len(ps.Annotations) == 0 {
+		return &monitoringutil.DoNothingLogger{}, nil
+	}
+	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
+	if err != nil {
+		return nil, err
+	}
+	return internalregistry.GetMonitoringClient().NewLogger(&monitoring.Context{
+		KeysetInfo:  keysetInfo,
+		Primitive:   "prf",
+		APIFunction: "compute",
+	})
 }
