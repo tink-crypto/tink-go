@@ -19,6 +19,9 @@
 package keyderivation
 
 import (
+	"fmt"
+
+	"github.com/tink-crypto/tink-go/core/registry"
 	"github.com/tink-crypto/tink-go/keyset"
 )
 
@@ -32,4 +35,10 @@ import (
 // salt which the attacker attacks.
 type KeysetDeriver interface {
 	DeriveKeyset(salt []byte) (*keyset.Handle, error)
+}
+
+func init() {
+	if err := registry.RegisterKeyManager(new(prfBasedDeriverKeyManager)); err != nil {
+		panic(fmt.Sprintf("keyderivation.init() failed: %v", err))
+	}
 }
