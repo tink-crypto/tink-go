@@ -22,7 +22,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/aead/subtle"
-	"github.com/tink-crypto/tink-go/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/core/registry"
 	"github.com/tink-crypto/tink-go/keyset"
 	"github.com/tink-crypto/tink-go/subtle/random"
 	gcmpb "github.com/tink-crypto/tink-go/proto/aes_gcm_go_proto"
@@ -42,8 +42,8 @@ var errInvalidAESGCMKeyFormat = fmt.Errorf("aes_gcm_key_manager: invalid key for
 // It generates new AESGCMKey keys and produces new instances of AESGCM subtle.
 type aesGCMKeyManager struct{}
 
-// Assert that aesGCMKeyManager implements the DerivableKeyManager interface.
-var _ internalregistry.DerivableKeyManager = (*aesGCMKeyManager)(nil)
+// Assert that aesGCMKeyManager implements the KeyManager interface.
+var _ registry.KeyManager = (*aesGCMKeyManager)(nil)
 
 // Primitive creates an AESGCM subtle for the given serialized AESGCMKey proto.
 func (km *aesGCMKeyManager) Primitive(serializedKey []byte) (interface{}, error) {
