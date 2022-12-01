@@ -22,9 +22,9 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/aead"
-	"github.com/tink-crypto/tink-go/keyderivation/internal/streamingprf"
 	"github.com/tink-crypto/tink-go/keyderivation"
 	"github.com/tink-crypto/tink-go/keyset"
+	"github.com/tink-crypto/tink-go/prf"
 	"github.com/tink-crypto/tink-go/subtle/random"
 	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
 )
@@ -38,11 +38,7 @@ func TestPRFBasedKeyTemplateDerivesAESGCMKeyset(t *testing.T) {
 	}{
 		{
 			name:     "HKDF-SHA256",
-			template: streamingprf.HKDFSHA256RawKeyTemplate(),
-		},
-		{
-			name:     "HKDF-SHA512",
-			template: streamingprf.HKDFSHA512RawKeyTemplate(),
+			template: prf.HKDFSHA256PRFKeyTemplate(),
 		},
 	}
 	derivations := []struct {
@@ -122,7 +118,7 @@ func TestInvalidPRFBasedDeriverKeyTemplates(t *testing.T) {
 		},
 		{
 			name:           "nil derived key template",
-			prfKeyTemplate: streamingprf.HKDFSHA256RawKeyTemplate(),
+			prfKeyTemplate: prf.HKDFSHA256PRFKeyTemplate(),
 		},
 		{
 			name:               "malformed PRF key template",
@@ -143,7 +139,7 @@ func TestInvalidPRFBasedDeriverKeyTemplates(t *testing.T) {
 		},
 		{
 			name:               "unsupported derived key template",
-			prfKeyTemplate:     streamingprf.HKDFSHA256RawKeyTemplate(),
+			prfKeyTemplate:     prf.HKDFSHA256PRFKeyTemplate(),
 			derivedKeyTemplate: aead.AES128CTRHMACSHA256KeyTemplate(),
 		},
 	} {
