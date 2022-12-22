@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/core/registry"
+	"github.com/tink-crypto/tink-go/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/monitoring"
 )
 
@@ -100,6 +101,9 @@ func init() {
 		panic(fmt.Sprintf("prf.init() failed: %v", err))
 	}
 	if err := registry.RegisterKeyManager(new(hkdfprfKeyManager)); err != nil {
+		panic(fmt.Sprintf("prf.init() failed: %v", err))
+	}
+	if err := internalregistry.AllowKeyDerivation(hkdfprfTypeURL); err != nil {
 		panic(fmt.Sprintf("prf.init() failed: %v", err))
 	}
 	if err := registry.RegisterKeyManager(new(aescmacprfKeyManager)); err != nil {
