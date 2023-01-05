@@ -27,6 +27,7 @@ import (
 	"github.com/tink-crypto/tink-go/core/registry"
 	"github.com/tink-crypto/tink-go/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/prf"
+	"github.com/tink-crypto/tink-go/signature"
 	aesgcmpb "github.com/tink-crypto/tink-go/proto/aes_gcm_go_proto"
 	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
 	hkdfpb "github.com/tink-crypto/tink-go/proto/hkdf_prf_go_proto"
@@ -58,6 +59,10 @@ func TestPRFBasedDeriver(t *testing.T) {
 		{
 			name:     "AES256GCMNoPrefix",
 			template: aead.AES256GCMNoPrefixKeyTemplate(),
+		},
+		{
+			name:     "ED25519",
+			template: signature.ED25519KeyTemplate(),
 		},
 		{
 			name:     "HKDFSHA256PRF",
