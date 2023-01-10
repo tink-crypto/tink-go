@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/aead"
 	"github.com/tink-crypto/tink-go/core/registry"
+	"github.com/tink-crypto/tink-go/daead"
 	"github.com/tink-crypto/tink-go/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/prf"
 	"github.com/tink-crypto/tink-go/signature"
@@ -65,6 +66,10 @@ func TestPRFBasedDeriver(t *testing.T) {
 		{
 			name:     "XCHACHA20_POLY1305",
 			template: aead.XChaCha20Poly1305KeyTemplate(),
+		},
+		{
+			name:     "AES256_SIV",
+			template: daead.AESSIVKeyTemplate(),
 		},
 		{
 			name:     "HKDF_SHA256",
