@@ -25,10 +25,14 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/core/registry"
+	"github.com/tink-crypto/tink-go/internal/internalregistry"
 )
 
 func init() {
 	if err := registry.RegisterKeyManager(new(hmacKeyManager)); err != nil {
+		panic(fmt.Sprintf("mac.init() failed: %v", err))
+	}
+	if err := internalregistry.AllowKeyDerivation(hmacTypeURL); err != nil {
 		panic(fmt.Sprintf("mac.init() failed: %v", err))
 	}
 	if err := registry.RegisterKeyManager(new(aescmacKeyManager)); err != nil {
