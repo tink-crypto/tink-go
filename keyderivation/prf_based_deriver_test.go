@@ -29,6 +29,7 @@ import (
 	"github.com/tink-crypto/tink-go/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/prf"
 	"github.com/tink-crypto/tink-go/signature"
+	"github.com/tink-crypto/tink-go/streamingaead"
 	aesgcmpb "github.com/tink-crypto/tink-go/proto/aes_gcm_go_proto"
 	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
 	hkdfpb "github.com/tink-crypto/tink-go/proto/hkdf_prf_go_proto"
@@ -78,6 +79,22 @@ func TestPRFBasedDeriver(t *testing.T) {
 		{
 			name:     "ED25519",
 			template: signature.ED25519KeyTemplate(),
+		},
+		{
+			name:     "AES128_GCM_HKDF_4KB",
+			template: streamingaead.AES128GCMHKDF4KBKeyTemplate(),
+		},
+		{
+			name:     "AES128_GCM_HKDF_1MB",
+			template: streamingaead.AES128GCMHKDF1MBKeyTemplate(),
+		},
+		{
+			name:     "AES256_GCM_HKDF_4KB",
+			template: streamingaead.AES256GCMHKDF4KBKeyTemplate(),
+		},
+		{
+			name:     "AES256_GCM_HKDF_1MB",
+			template: streamingaead.AES256GCMHKDF1MBKeyTemplate(),
 		},
 	}
 	salts := [][]byte{nil, []byte("salt")}
