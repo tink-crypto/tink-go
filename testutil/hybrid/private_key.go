@@ -23,8 +23,8 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/keyset"
+	"github.com/tink-crypto/tink-go/testkeyset"
 	hpkepb "github.com/tink-crypto/tink-go/proto/hpke_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
 )
@@ -88,8 +88,7 @@ func KeysetHandleFromSerializedPrivateKey(privKeyBytes, pubKeyBytes []byte, temp
 			},
 		},
 	}
-
-	return insecurecleartextkeyset.Read(&keyset.MemReaderWriter{Keyset: ks})
+	return testkeyset.NewHandle(ks)
 }
 
 // hpkeParamsFromTemplate returns HPKE params after verifying that template is

@@ -22,9 +22,9 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/hybrid"
-	"github.com/tink-crypto/tink-go/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/keyset"
 	"github.com/tink-crypto/tink-go/subtle/random"
+	"github.com/tink-crypto/tink-go/testkeyset"
 	testutilhybrid "github.com/tink-crypto/tink-go/testutil/hybrid"
 	hpkepb "github.com/tink-crypto/tink-go/proto/hpke_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
@@ -111,17 +111,12 @@ func TestKeysetHandleFromSerializedPrivateKeyInvalidTemplateFails(t *testing.T) 
 func privPubKeyBytes(t *testing.T, handle *keyset.Handle) ([]byte, []byte) {
 	t.Helper()
 
-	// Write Handle to MemReaderWriter.
-	got := &keyset.MemReaderWriter{}
-	if err := insecurecleartextkeyset.Write(handle, got); err != nil {
-		t.Fatalf("Write(%v) err = %v, want nil", handle, err)
-	}
-	if len(got.Keyset.GetKey()) != 1 {
-		t.Fatalf("len(gotPriv.Keyset) = %d", len(got.Keyset.GetKey()))
+	ks := testkeyset.KeysetMaterial(handle)
+	if len(ks.GetKey()) != 1 {
+		t.Fatalf("got len(ks.GetKey()) = %d, want 1", len(ks.GetKey()))
 	}
 
-	// Extract HpkePrivateKey from MemReaderWriter.
-	serializedPrivKey := got.Keyset.GetKey()[0].GetKeyData().GetValue()
+	serializedPrivKey := ks.GetKey()[0].GetKeyData().GetValue()
 	privKey := &hpkepb.HpkePrivateKey{}
 	if err := proto.Unmarshal(serializedPrivKey, privKey); err != nil {
 		t.Fatalf("Unmarshal(%v) = err %v, want nil", serializedPrivKey, err)
