@@ -17,12 +17,11 @@
 package signature
 
 import (
+	"crypto/ed25519"
 	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
-
-	"golang.org/x/crypto/ed25519"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/keyset"

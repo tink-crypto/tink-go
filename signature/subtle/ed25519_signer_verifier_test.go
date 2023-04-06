@@ -18,12 +18,11 @@ package subtle_test
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"testing"
-
-	"golang.org/x/crypto/ed25519"
 
 	subtleSignature "github.com/tink-crypto/tink-go/signature/subtle"
 	"github.com/tink-crypto/tink-go/subtle/random"
