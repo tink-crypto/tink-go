@@ -1,0 +1,31 @@
+package(default_visibility = ["//:__subpackages__"])
+
+licenses(["notice"])
+
+sh_binary(
+    name = "test_utils",
+    srcs = ["test_utils.sh"],
+)
+
+sh_binary(
+    name = "github_release_util",
+    srcs = ["github_release_util.sh"],
+)
+
+sh_test(
+    name = "github_release_util_test",
+    size = "small",
+    srcs = ["github_release_util_test.sh"],
+    args = [
+        "$(rlocationpath :github_release_util.sh)",
+        "$(rlocationpath :test_utils)",
+    ],
+    data = [
+        ":github_release_util.sh",
+        ":test_utils",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
