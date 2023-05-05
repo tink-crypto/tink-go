@@ -24,7 +24,6 @@ if [[ -n "${KOKORO_ROOT:-}" ]]; then
 fi
 readonly TINK_GO_PROJECT_PATH
 
-./kokoro/testutils/update_certs.sh
 # Sourcing required to update callers environment.
 source ./kokoro/testutils/install_go.sh
 

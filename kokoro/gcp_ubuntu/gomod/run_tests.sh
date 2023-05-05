@@ -24,8 +24,6 @@ if [[ -n "${KOKORO_ROOT:-}" ]]; then
 fi
 readonly TINK_GO_PROJECT_PATH
 
-./kokoro/testutils/update_certs.sh
-
 echo "Using go binary from $(which go): $(go version)"
 
 readonly TINK_GO_MODULE_URL="github.com/tink-crypto/tink-go"
