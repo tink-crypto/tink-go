@@ -21,7 +21,6 @@ import (
 
 	"github.com/tink-crypto/tink-go/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/core/primitiveset"
-	"github.com/tink-crypto/tink-go/core/registry"
 	"github.com/tink-crypto/tink-go/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/keyset"
@@ -31,18 +30,10 @@ import (
 
 // New returns an AEAD primitive from the given keyset handle.
 func New(h *keyset.Handle) (tink.AEAD, error) {
-	return NewWithKeyManager(h, nil /*keyManager*/)
-}
-
-// NewWithKeyManager returns an AEAD primitive from the given keyset handle and custom key manager.
-//
-// Deprecated: Use [New].
-func NewWithKeyManager(h *keyset.Handle, km registry.KeyManager) (tink.AEAD, error) {
-	ps, err := h.PrimitivesWithKeyManager(km)
+	ps, err := h.Primitives()
 	if err != nil {
 		return nil, fmt.Errorf("aead_factory: cannot obtain primitive set: %s", err)
 	}
-
 	return newWrappedAead(ps)
 }
 
