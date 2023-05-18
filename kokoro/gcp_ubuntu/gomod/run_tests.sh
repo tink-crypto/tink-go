@@ -14,21 +14,35 @@
 # limitations under the License.
 ################################################################################
 
+# By default when run locally this script runs the command below directly on the
+# host. The CONTAINER_IMAGE variable can be set to run on a custom container
+# image for local testing. E.g.:
+#
+# CONTAINER_IMAGE="s-docker.pkg.dev/tink-test-infrastructure/linux-tink-go-base:latest" \
+#  sh ./kokoro/gcp_ubuntu/gomod/run_tests.sh
 set -euo pipefail
 
-TINK_GO_PROJECT_PATH="$(pwd)"
-if [[ -n "${KOKORO_ROOT:-}" ]]; then
-  TINK_BASE_DIR="$(echo "${KOKORO_ARTIFACTS_DIR}"/git*)"
-  TINK_GO_PROJECT_PATH="${TINK_BASE_DIR}/tink_go"
-  cd "${TINK_GO_PROJECT_PATH}"
+RUN_COMMAND_ARGS=()
+if [[ -n "${KOKORO_ARTIFACTS_DIR:-}" ]]; then
+  readonly TINK_BASE_DIR="$(echo "${KOKORO_ARTIFACTS_DIR}"/git*)"
+  cd "${TINK_BASE_DIR}/tink_go"
+  readonly C_PREFIX="us-docker.pkg.dev/tink-test-infrastructure/tink-ci-images"
+  readonly C_NAME="linux-tink-go-base"
+  readonly C_HASH="2fddb51977a951759ab3b87643b672d590f277fe6ade5787fa8721dd91ea839a"
+  CONTAINER_IMAGE="${C_PREFIX}/${C_NAME}@sha256:${C_HASH}"
+  RUN_COMMAND_ARGS+=( -k "${TINK_GCR_SERVICE_KEY}" )
 fi
-readonly TINK_GO_PROJECT_PATH
+readonly CONTAINER_IMAGE
 
-echo "Using go binary from $(which go): $(go version)"
+if [[ -n "${CONTAINER_IMAGE:-}" ]]; then
+  RUN_COMMAND_ARGS+=( -c "${CONTAINER_IMAGE}" )
+fi
 
 readonly TINK_GO_MODULE_URL="github.com/tink-crypto/tink-go"
-readonly TINK_VERSION="$(cat ${TINK_GO_PROJECT_PATH}/tink/version.go \
+readonly TINK_VERSION="$(cat tink/version.go \
                         | grep 'Version =' \
                         | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')"
-./kokoro/testutils/run_go_mod_tests.sh "${TINK_GO_MODULE_URL}" \
-  "${TINK_GO_PROJECT_PATH}" "${TINK_VERSION}" "main"
+
+./kokoro/testutils/run_command.sh "${RUN_COMMAND_ARGS[@]}" \
+  ./kokoro/testutils/run_go_mod_tests.sh "${TINK_GO_MODULE_URL}" \
+    . "${TINK_VERSION}" "main"
