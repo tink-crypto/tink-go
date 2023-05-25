@@ -80,6 +80,7 @@ main() {
     set -x
     local -r path_to_mount="$(dirname "$(pwd)")"
     local -r library_to_test="$(basename "$(pwd)")"
+    time docker pull "${CONTAINER_IMAGE_NAME}"
     time docker run \
       --mount type=bind,src="${path_to_mount}",dst=/deps \
       --workdir=/deps/"${library_to_test}" \
