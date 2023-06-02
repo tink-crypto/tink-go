@@ -40,5 +40,4 @@ fi
 
 ./kokoro/testutils/run_command.sh "${RUN_COMMAND_ARGS[@]}" \
   ./kokoro/testutils/check_go_generated_files_up_to_date.sh . \
-  "&&" ./kokoro/testutils/run_bazel_tests.sh .
-
+  "&&" ./kokoro/testutils/run_bazel_tests.sh -t --test_arg=--test.v .

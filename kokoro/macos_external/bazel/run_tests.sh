@@ -27,4 +27,4 @@ source ./kokoro/testutils/install_go.sh
 echo "Using go binary from $(which go): $(go version)"
 
 ./kokoro/testutils/check_go_generated_files_up_to_date.sh .
-./kokoro/testutils/run_bazel_tests.sh .
+./kokoro/testutils/run_bazel_tests.sh -t --test_arg=--test.v .
