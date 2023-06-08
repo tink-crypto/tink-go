@@ -1,4 +1,4 @@
-# Tink Golang
+# Tink Go
 
 <!-- GCP Ubuntu --->
 
@@ -15,6 +15,9 @@
 Tink (Bazel) | [![Bazel_GcpUbuntu][tink_go_bazel_badge_gcp_ubuntu]](#) | [![Bazel_MacOs][tink_go_bazel_badge_macos]](#)
 Tink Gomod   | [![Gomod_GcpUbuntu][tink_go_gomod_badge_gcp_ubuntu]](#) | [![Gomod_MacOs][tink_go_gomod_badge_macos]](#)
 
+> **NOTE**: **Versions of Tink Go prior to v2.0.0 are located at
+> https://github.com/google/tink
+> ([godoc](https://pkg.go.dev/github.com/google/tink/go)).**
 
 Using crypto in your application [shouldn't have to][devs_are_users_too_slides]
 feel like juggling chainsaws in the dark. Tink is a crypto library written by a
