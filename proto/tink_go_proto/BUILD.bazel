@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "tink_go_proto",
     srcs = ["tink.pb.go"],
-    importpath = "github.com/tink-crypto/tink-go/proto/tink_go_proto",
+    importpath = "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto",
     visibility = ["//visibility:public"],
     deps = [
         "@org_golang_google_protobuf//reflect/protoreflect",

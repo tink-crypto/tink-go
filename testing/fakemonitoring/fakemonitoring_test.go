@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/tink-crypto/tink-go/monitoring"
-	"github.com/tink-crypto/tink-go/testing/fakemonitoring"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
+	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
 )
 
 func TestCreateNewClient(t *testing.T) {

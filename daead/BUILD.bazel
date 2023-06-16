@@ -12,7 +12,7 @@ go_library(
         "daead_factory.go",
         "daead_key_templates.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/daead",
+    importpath = "github.com/tink-crypto/tink-go/v2/daead",
     visibility = ["//visibility:public"],
     deps = [
         "//core/cryptofmt",

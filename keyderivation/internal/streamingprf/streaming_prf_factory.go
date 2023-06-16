@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/tink-crypto/tink-go/core/primitiveset"
-	"github.com/tink-crypto/tink-go/keyset"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // New generates a new instance of the Streaming PRF primitive.

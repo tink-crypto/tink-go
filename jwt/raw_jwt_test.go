@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/tink-crypto/tink-go/jwt"
+	"github.com/tink-crypto/tink-go/v2/jwt"
 )
 
 const (

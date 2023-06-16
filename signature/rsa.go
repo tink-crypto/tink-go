@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"math/big"
 
-	internal "github.com/tink-crypto/tink-go/internal/signature"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
+	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 )
 
 func bytesToBigInt(val []byte) *big.Int {

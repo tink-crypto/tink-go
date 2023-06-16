@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "ecdsa_go_proto",
     srcs = ["ecdsa.pb.go"],
-    importpath = "github.com/tink-crypto/tink-go/proto/ecdsa_go_proto",
+    importpath = "github.com/tink-crypto/tink-go/v2/proto/ecdsa_go_proto",
     visibility = ["//visibility:public"],
     deps = [
         "//proto/common_go_proto",

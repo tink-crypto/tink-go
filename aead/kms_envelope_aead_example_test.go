@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/tink-crypto/tink-go/aead"
-	"github.com/tink-crypto/tink-go/testing/fakekms"
+	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/testing/fakekms"
 )
 
 // The fake KMS should only be used in tests. It is not secure.

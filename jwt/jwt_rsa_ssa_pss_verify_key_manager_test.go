@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	jrsppb "github.com/tink-crypto/tink-go/proto/jwt_rsa_ssa_pss_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	jrsppb "github.com/tink-crypto/tink-go/v2/proto/jwt_rsa_ssa_pss_go_proto"
 )
 
 const testJWTPSVerifierKeyType = "type.googleapis.com/google.crypto.tink.JwtRsaSsaPssPublicKey"

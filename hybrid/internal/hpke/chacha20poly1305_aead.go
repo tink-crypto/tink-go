@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"golang.org/x/crypto/chacha20poly1305"
-	internalaead "github.com/tink-crypto/tink-go/internal/aead"
+	internalaead "github.com/tink-crypto/tink-go/v2/internal/aead"
 )
 
 // chaCha20Poly1305AEAD is a ChaCha20-Poly1305 HPKE AEAD variant that

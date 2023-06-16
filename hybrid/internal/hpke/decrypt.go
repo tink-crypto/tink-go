@@ -20,8 +20,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/tink"
-	pb "github.com/tink-crypto/tink-go/proto/hpke_go_proto"
+	"github.com/tink-crypto/tink-go/v2/tink"
+	pb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
 // Decrypt for HPKE implements interface HybridDecrypt.

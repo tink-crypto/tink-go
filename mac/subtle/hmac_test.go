@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/mac/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/mac/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
 )
 
 var key, _ = hex.DecodeString("000102030405060708090a0b0c0d0e0f")

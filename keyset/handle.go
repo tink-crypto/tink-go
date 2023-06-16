@@ -23,10 +23,10 @@ import (
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/tink-crypto/tink-go/core/primitiveset"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/tink"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/tink"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 var errInvalidKeyset = fmt.Errorf("keyset.Handle: invalid keyset")

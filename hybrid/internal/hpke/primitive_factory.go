@@ -19,7 +19,7 @@ package hpke
 import (
 	"fmt"
 
-	pb "github.com/tink-crypto/tink-go/proto/hpke_go_proto"
+	pb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
 // newPrimitivesFromProto constructs new KEM, KDF, AEADs from HpkeParams.

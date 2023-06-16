@@ -20,10 +20,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/keyderivation/internal/streamingprf"
-	"github.com/tink-crypto/tink-go/keyset"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/streamingprf"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const hkdfPRFTypeURL = "type.googleapis.com/google.crypto.tink.HkdfPrfKey"

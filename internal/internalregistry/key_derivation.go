@@ -22,8 +22,8 @@ import (
 	"sync"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/core/registry"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 var (

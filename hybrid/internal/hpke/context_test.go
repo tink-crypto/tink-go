@@ -21,8 +21,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/subtle"
-	pb "github.com/tink-crypto/tink-go/proto/hpke_go_proto"
+	"github.com/tink-crypto/tink-go/v2/subtle"
+	pb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
 // TODO(b/201070904): Write tests using baseModeX25519HKDFSHA256Vectors.

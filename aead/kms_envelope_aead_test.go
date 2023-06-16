@@ -21,9 +21,9 @@ import (
 	"log"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/aead"
-	"github.com/tink-crypto/tink-go/testing/fakekms"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/testing/fakekms"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestKMSEnvelopeWorksWithTinkKeyTemplatesAsDekTemplate(t *testing.T) {

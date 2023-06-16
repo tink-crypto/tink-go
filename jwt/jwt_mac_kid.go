@@ -19,7 +19,7 @@ package jwt
 import (
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/tink"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 // macWithKID implements the JWTMAC internal interface.

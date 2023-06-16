@@ -22,8 +22,8 @@ import (
 	"crypto/rsa"
 	"hash"
 
-	"github.com/tink-crypto/tink-go/subtle"
-	"github.com/tink-crypto/tink-go/tink"
+	"github.com/tink-crypto/tink-go/v2/subtle"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 // RSA_SSA_PKCS1_Signer is an implementation of Signer for RSA-SSA-PKCS1.

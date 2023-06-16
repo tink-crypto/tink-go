@@ -9,7 +9,7 @@ go_library(
         "aes_gcm_insecure_iv.go",
         "chacha20poly1305_insecure_nonce.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/internal/aead",
+    importpath = "github.com/tink-crypto/tink-go/v2/internal/aead",
     deps = ["@org_golang_x_crypto//chacha20poly1305"],
 )
 

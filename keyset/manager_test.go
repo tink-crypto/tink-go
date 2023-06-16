@@ -20,12 +20,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/keyset"
-	"github.com/tink-crypto/tink-go/mac"
-	"github.com/tink-crypto/tink-go/testkeyset"
-	"github.com/tink-crypto/tink-go/testutil"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/mac"
+	"github.com/tink-crypto/tink-go/v2/testkeyset"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestKeysetManagerBasic(t *testing.T) {

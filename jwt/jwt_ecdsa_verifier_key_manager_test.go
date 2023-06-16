@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/core/registry"
-	jepb "github.com/tink-crypto/tink-go/proto/jwt_ecdsa_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	jepb "github.com/tink-crypto/tink-go/v2/proto/jwt_ecdsa_go_proto"
 )
 
 const testECDSAVerifierKeyType = "type.googleapis.com/google.crypto.tink.JwtEcdsaPublicKey"

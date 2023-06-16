@@ -23,8 +23,8 @@ import (
 	"fmt"
 	"hash"
 
-	"github.com/tink-crypto/tink-go/subtle"
-	"github.com/tink-crypto/tink-go/tink"
+	"github.com/tink-crypto/tink-go/v2/subtle"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 // RSA_SSA_PSS_Signer is an implementation of Signer for RSA-SSA-PSS.

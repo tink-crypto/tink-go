@@ -19,9 +19,9 @@ package hybrid_test
 import (
 	"testing"
 
-	"github.com/tink-crypto/tink-go/aead"
-	"github.com/tink-crypto/tink-go/hybrid"
-	"github.com/tink-crypto/tink-go/keyset"
+	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/hybrid"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 )
 
 /* This test demonstrates buggy behavior of Tink. Please do not rely on it. */

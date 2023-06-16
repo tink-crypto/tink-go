@@ -20,9 +20,9 @@ package prf
 import (
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/monitoring"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
 )
 
 // The PRF interface is an abstraction for an element of a pseudo random

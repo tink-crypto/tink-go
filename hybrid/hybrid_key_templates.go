@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/aead"
-	"github.com/tink-crypto/tink-go/internal/tinkerror"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
-	eciespb "github.com/tink-crypto/tink-go/proto/ecies_aead_hkdf_go_proto"
-	hpkepb "github.com/tink-crypto/tink-go/proto/hpke_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/internal/tinkerror"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	eciespb "github.com/tink-crypto/tink-go/v2/proto/ecies_aead_hkdf_go_proto"
+	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // This file contains pre-generated KeyTemplates for HybridEncrypt keys. One

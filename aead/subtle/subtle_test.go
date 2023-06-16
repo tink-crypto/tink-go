@@ -19,8 +19,8 @@ package subtle_test
 import (
 	"testing"
 
-	"github.com/tink-crypto/tink-go/aead/subtle"
-	"github.com/tink-crypto/tink-go/testutil"
+	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 type AEADSuite struct {

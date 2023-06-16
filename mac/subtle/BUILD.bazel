@@ -8,7 +8,7 @@ go_library(
         "cmac.go",
         "hmac.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/mac/subtle",
+    importpath = "github.com/tink-crypto/tink-go/v2/mac/subtle",
     deps = [
         "//prf/subtle",
         "//subtle",

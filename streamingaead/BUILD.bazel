@@ -14,7 +14,7 @@ go_library(
         "streamingaead_factory.go",
         "streamingaead_key_templates.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/streamingaead",
+    importpath = "github.com/tink-crypto/tink-go/v2/streamingaead",
     visibility = ["//visibility:public"],
     deps = [
         "//aead/subtle",

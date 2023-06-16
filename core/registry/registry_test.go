@@ -20,16 +20,16 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/aead"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/mac"
-	"github.com/tink-crypto/tink-go/mac/subtle"
-	"github.com/tink-crypto/tink-go/testing/fakekms"
-	"github.com/tink-crypto/tink-go/testutil"
-	gcmpb "github.com/tink-crypto/tink-go/proto/aes_gcm_go_proto"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
-	hmacpb "github.com/tink-crypto/tink-go/proto/hmac_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/mac"
+	"github.com/tink-crypto/tink-go/v2/mac/subtle"
+	"github.com/tink-crypto/tink-go/v2/testing/fakekms"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestRegisterKeyManager(t *testing.T) {

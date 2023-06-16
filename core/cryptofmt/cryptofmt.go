@@ -22,7 +22,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (

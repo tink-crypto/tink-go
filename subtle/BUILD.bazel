@@ -9,7 +9,7 @@ go_library(
         "subtle.go",
         "x25519.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/subtle",
+    importpath = "github.com/tink-crypto/tink-go/v2/subtle",
     deps = [
         "@org_golang_x_crypto//curve25519",
         "@org_golang_x_crypto//hkdf",

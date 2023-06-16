@@ -22,8 +22,8 @@ package aead
 import (
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 )
 
 func init() {

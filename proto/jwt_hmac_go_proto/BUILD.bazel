@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "jwt_hmac_go_proto",
     srcs = ["jwt_hmac.pb.go"],
-    importpath = "github.com/tink-crypto/tink-go/proto/jwt_hmac_go_proto",
+    importpath = "github.com/tink-crypto/tink-go/v2/proto/jwt_hmac_go_proto",
     visibility = ["//visibility:public"],
     deps = [
         "@org_golang_google_protobuf//reflect/protoreflect",

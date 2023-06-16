@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/core/registry"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 )
 
 // A generic error returned when something went wrong before validation

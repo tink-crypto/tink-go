@@ -5,7 +5,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "mactest",
     srcs = ["mactest.go"],
-    importpath = "github.com/tink-crypto/tink-go/mac/internal/mactest",
+    importpath = "github.com/tink-crypto/tink-go/v2/mac/internal/mactest",
     visibility = ["//mac:__subpackages__"],
     deps = ["//tink"],
 )

@@ -21,7 +21,7 @@ import (
 	"crypto/sha512"
 	"testing"
 
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 )
 
 const hkdfPRFTypeURL = "type.googleapis.com/google.crypto.tink.HkdfPrfKey"

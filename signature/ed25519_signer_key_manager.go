@@ -24,10 +24,10 @@ import (
 	"io"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/keyset"
-	"github.com/tink-crypto/tink-go/signature/subtle"
-	ed25519pb "github.com/tink-crypto/tink-go/proto/ed25519_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/signature/subtle"
+	ed25519pb "github.com/tink-crypto/tink-go/v2/proto/ed25519_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (

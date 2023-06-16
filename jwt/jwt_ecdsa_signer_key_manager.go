@@ -23,12 +23,12 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/keyset"
-	subtlesign "github.com/tink-crypto/tink-go/signature/subtle"
-	"github.com/tink-crypto/tink-go/subtle"
-	jepb "github.com/tink-crypto/tink-go/proto/jwt_ecdsa_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	subtlesign "github.com/tink-crypto/tink-go/v2/signature/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle"
+	jepb "github.com/tink-crypto/tink-go/v2/proto/jwt_ecdsa_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (

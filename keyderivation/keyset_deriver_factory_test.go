@@ -20,11 +20,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/aead"
-	"github.com/tink-crypto/tink-go/core/cryptofmt"
-	"github.com/tink-crypto/tink-go/core/primitiveset"
-	"github.com/tink-crypto/tink-go/keyset"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // invalidDeriver returns two keys, but wrappedKeysetDeriver accepts only one.

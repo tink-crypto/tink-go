@@ -20,7 +20,7 @@ import (
 	"crypto/subtle"
 	"fmt"
 
-	subtleprf "github.com/tink-crypto/tink-go/prf/subtle"
+	subtleprf "github.com/tink-crypto/tink-go/v2/prf/subtle"
 
 	// Placeholder for internal crypto/subtle allowlist, please ignore.
 )

@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/daead"
-	"github.com/tink-crypto/tink-go/keyset"
+	"github.com/tink-crypto/tink-go/v2/daead"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestKeyTemplates(t *testing.T) {

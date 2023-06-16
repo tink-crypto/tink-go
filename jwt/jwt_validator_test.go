@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tink-crypto/tink-go/jwt"
+	"github.com/tink-crypto/tink-go/v2/jwt"
 )
 
 type validationTestCase struct {

@@ -25,15 +25,15 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/internal/internalregistry"
-	subtleMac "github.com/tink-crypto/tink-go/mac/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/subtle"
-	"github.com/tink-crypto/tink-go/testutil"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
-	hmacpb "github.com/tink-crypto/tink-go/proto/hmac_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	subtleMac "github.com/tink-crypto/tink-go/v2/mac/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/subtle"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestGetPrimitiveBasic(t *testing.T) {

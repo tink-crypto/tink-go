@@ -16,7 +16,7 @@
 
 package subtle_test
 
-import "github.com/tink-crypto/tink-go/testutil"
+import "github.com/tink-crypto/tink-go/v2/testutil"
 
 type ecdhSuite struct {
 	testutil.WycheproofSuite

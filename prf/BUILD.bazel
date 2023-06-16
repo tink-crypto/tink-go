@@ -14,7 +14,7 @@ go_library(
         "prf_set.go",
         "prf_set_factory.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/prf",
+    importpath = "github.com/tink-crypto/tink-go/v2/prf",
     visibility = ["//visibility:public"],
     deps = [
         "//core/primitiveset",

@@ -24,15 +24,15 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/prf"
-	"github.com/tink-crypto/tink-go/prf/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/testutil"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
-	hkdfpb "github.com/tink-crypto/tink-go/proto/hkdf_prf_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/prf"
+	"github.com/tink-crypto/tink-go/v2/prf/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	hkdfpb "github.com/tink-crypto/tink-go/v2/proto/hkdf_prf_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestGetPrimitiveHKDFBasic(t *testing.T) {

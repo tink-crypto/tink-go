@@ -23,9 +23,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/tink-crypto/tink-go/insecurecleartextkeyset"
-	"github.com/tink-crypto/tink-go/keyset"
-	"github.com/tink-crypto/tink-go/signature"
+	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/signature"
 )
 
 func Example() {

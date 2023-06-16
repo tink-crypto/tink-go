@@ -20,9 +20,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/keyset"
-	"github.com/tink-crypto/tink-go/prf"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/prf"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestKeyTemplates(t *testing.T) {

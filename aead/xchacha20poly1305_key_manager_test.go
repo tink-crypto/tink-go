@@ -25,14 +25,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/crypto/chacha20poly1305"
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/testutil"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 
-	"github.com/tink-crypto/tink-go/aead/subtle"
-	tpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
-	xpb "github.com/tink-crypto/tink-go/proto/xchacha20_poly1305_go_proto"
+	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+	xpb "github.com/tink-crypto/tink-go/v2/proto/xchacha20_poly1305_go_proto"
 )
 
 func TestXChaCha20Poly1305GetPrimitive(t *testing.T) {

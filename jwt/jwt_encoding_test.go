@@ -23,7 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	tpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestKIDForNonTinkKeysIsNil(t *testing.T) {

@@ -22,13 +22,13 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/signature/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/testutil"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
-	ecdsapb "github.com/tink-crypto/tink-go/proto/ecdsa_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/signature/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	ecdsapb "github.com/tink-crypto/tink-go/v2/proto/ecdsa_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 type ecdsaParams struct {

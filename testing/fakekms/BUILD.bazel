@@ -8,7 +8,7 @@ go_library(
     name = "fakekms",
     testonly = 1,
     srcs = ["fakekms.go"],
-    importpath = "github.com/tink-crypto/tink-go/testing/fakekms",
+    importpath = "github.com/tink-crypto/tink-go/v2/testing/fakekms",
     visibility = ["//visibility:public"],
     deps = [
         "//aead",

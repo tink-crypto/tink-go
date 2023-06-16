@@ -31,7 +31,7 @@ go_library(
         "raw_jwt.go",
         "verified_jwt.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/jwt",
+    importpath = "github.com/tink-crypto/tink-go/v2/jwt",
     visibility = ["//visibility:public"],
     deps = [
         "//core/primitiveset",

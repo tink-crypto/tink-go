@@ -24,7 +24,7 @@ import (
 	"hash"
 	"math/big"
 
-	"github.com/tink-crypto/tink-go/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle"
 )
 
 // ECDSASigner is an implementation of Signer for ECDSA.

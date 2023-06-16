@@ -24,14 +24,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/streamingaead/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/testutil"
-	gcmhkdfpb "github.com/tink-crypto/tink-go/proto/aes_gcm_hkdf_streaming_go_proto"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+	gcmhkdfpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_hkdf_streaming_go_proto"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 var aesGCMHKDFKeySizes = []uint32{16, 32}

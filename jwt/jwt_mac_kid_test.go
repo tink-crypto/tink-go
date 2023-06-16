@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tink-crypto/tink-go/mac/subtle"
+	"github.com/tink-crypto/tink-go/v2/mac/subtle"
 )
 
 func TestNewMACwithNilMACFails(t *testing.T) {

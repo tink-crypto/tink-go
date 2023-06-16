@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	"golang.org/x/crypto/chacha20poly1305"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/tink"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 const (

@@ -7,7 +7,7 @@ licenses(["notice"])  # keep
 go_library(
     name = "internal",
     srcs = ["internal.go"],
-    importpath = "github.com/tink-crypto/tink-go/internal",
+    importpath = "github.com/tink-crypto/tink-go/v2/internal",
     visibility = [
         "//insecurecleartextkeyset:__pkg__",
         "//keyderivation:__pkg__",

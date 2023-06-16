@@ -15,7 +15,7 @@ go_library(
         "subtle.go",
         "xchacha20poly1305.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/aead/subtle",
+    importpath = "github.com/tink-crypto/tink-go/v2/aead/subtle",
     deps = [
         "//internal/aead",
         "//subtle/random",

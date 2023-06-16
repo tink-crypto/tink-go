@@ -18,7 +18,7 @@ go_library(
         "kms_envelope_aead_key_manager.go",
         "xchacha20poly1305_key_manager.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/aead",
+    importpath = "github.com/tink-crypto/tink-go/v2/aead",
     visibility = ["//visibility:public"],
     deps = [
         "//aead/subtle",

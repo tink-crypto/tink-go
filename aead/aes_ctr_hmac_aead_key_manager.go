@@ -21,15 +21,15 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/aead/subtle"
-	"github.com/tink-crypto/tink-go/keyset"
-	subtleMac "github.com/tink-crypto/tink-go/mac/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	ctrpb "github.com/tink-crypto/tink-go/proto/aes_ctr_go_proto"
-	aeadpb "github.com/tink-crypto/tink-go/proto/aes_ctr_hmac_aead_go_proto"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
-	hmacpb "github.com/tink-crypto/tink-go/proto/hmac_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	subtleMac "github.com/tink-crypto/tink-go/v2/mac/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	ctrpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_go_proto"
+	aeadpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (

@@ -20,7 +20,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/streamingaead/subtle"
+	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle"
 )
 
 func TestAESGCMHKDFEncryptDecrypt(t *testing.T) {

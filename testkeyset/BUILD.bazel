@@ -8,7 +8,7 @@ go_library(
     name = "testkeyset",
     testonly = 1,
     srcs = ["testkeyset.go"],
-    importpath = "github.com/tink-crypto/tink-go/testkeyset",
+    importpath = "github.com/tink-crypto/tink-go/v2/testkeyset",
     visibility = ["//visibility:public"],
     deps = [
         "//internal",

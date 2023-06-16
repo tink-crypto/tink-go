@@ -22,12 +22,12 @@ import (
 	"io"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/keyset"
-	"github.com/tink-crypto/tink-go/mac/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
-	hmacpb "github.com/tink-crypto/tink-go/proto/hmac_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/mac/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (

@@ -21,8 +21,8 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/aead/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
 )
 
 // These test vectors have been taken from Appendix C in go/rfc/8452.

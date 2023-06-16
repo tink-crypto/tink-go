@@ -16,7 +16,7 @@
 
 package registry
 
-import "github.com/tink-crypto/tink-go/tink"
+import "github.com/tink-crypto/tink-go/v2/tink"
 
 // KMSClient knows how to produce primitives backed by keys stored in remote KMS services.
 type KMSClient interface {

@@ -22,9 +22,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/tink-crypto/tink-go/insecurecleartextkeyset"
-	"github.com/tink-crypto/tink-go/jwt"
-	"github.com/tink-crypto/tink-go/keyset"
+	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/jwt"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 )
 
 func Example_signAndVerify() {

@@ -26,9 +26,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/tink-crypto/tink-go/insecurecleartextkeyset"
-	"github.com/tink-crypto/tink-go/keyset"
-	"github.com/tink-crypto/tink-go/streamingaead"
+	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/streamingaead"
 )
 
 func Example() {

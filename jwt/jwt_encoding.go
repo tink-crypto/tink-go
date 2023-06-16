@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	spb "google.golang.org/protobuf/types/known/structpb"
-	tpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // keyID returns the keyID in big endian format base64 encoded if the key output prefix is of type Tink or nil otherwise.

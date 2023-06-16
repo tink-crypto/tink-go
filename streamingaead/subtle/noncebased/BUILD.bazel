@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "noncebased",
     srcs = ["noncebased.go"],
-    importpath = "github.com/tink-crypto/tink-go/streamingaead/subtle/noncebased",
+    importpath = "github.com/tink-crypto/tink-go/v2/streamingaead/subtle/noncebased",
     visibility = ["//visibility:public"],
 )
 

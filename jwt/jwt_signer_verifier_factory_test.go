@@ -24,13 +24,13 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/jwt"
-	"github.com/tink-crypto/tink-go/keyset"
-	"github.com/tink-crypto/tink-go/signature"
-	"github.com/tink-crypto/tink-go/testkeyset"
-	"github.com/tink-crypto/tink-go/testutil"
-	jepb "github.com/tink-crypto/tink-go/proto/jwt_ecdsa_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/jwt"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/signature"
+	"github.com/tink-crypto/tink-go/v2/testkeyset"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+	jepb "github.com/tink-crypto/tink-go/v2/proto/jwt_ecdsa_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestSignerVerifierFactoryWithInvalidPrimitiveSetType(t *testing.T) {

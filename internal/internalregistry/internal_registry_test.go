@@ -19,8 +19,8 @@ package internalregistry_test
 import (
 	"testing"
 
-	"github.com/tink-crypto/tink-go/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/testing/fakemonitoring"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
 )
 
 func TestRegisterMonitoringClient(t *testing.T) {

@@ -6,7 +6,7 @@ go_library(
     name = "hybrid",
     testonly = 1,
     srcs = ["private_key.go"],
-    importpath = "github.com/tink-crypto/tink-go/testutil/hybrid",
+    importpath = "github.com/tink-crypto/tink-go/v2/testutil/hybrid",
     deps = [
         "//keyset",
         "//proto/hpke_go_proto",

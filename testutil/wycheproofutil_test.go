@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/testutil"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 func TestPopulateSuite(t *testing.T) {

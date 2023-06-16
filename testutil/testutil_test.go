@@ -21,9 +21,9 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/testutil"
-	"github.com/tink-crypto/tink-go/tink"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 func TestDummyAEAD(t *testing.T) {

@@ -5,7 +5,7 @@ package(default_visibility = ["//:__subpackages__"])  # keep
 go_library(
     name = "monitoringutil",
     srcs = ["monitoring_util.go"],
-    importpath = "github.com/tink-crypto/tink-go/internal/monitoringutil",
+    importpath = "github.com/tink-crypto/tink-go/v2/internal/monitoringutil",
     deps = [
         "//core/primitiveset",
         "//monitoring",

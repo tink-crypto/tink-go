@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/internal/tinkerror"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
-	ecdsapb "github.com/tink-crypto/tink-go/proto/ecdsa_go_proto"
-	rsppb "github.com/tink-crypto/tink-go/proto/rsa_ssa_pkcs1_go_proto"
-	rspsspb "github.com/tink-crypto/tink-go/proto/rsa_ssa_pss_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/internal/tinkerror"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	ecdsapb "github.com/tink-crypto/tink-go/v2/proto/ecdsa_go_proto"
+	rsppb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pkcs1_go_proto"
+	rspsspb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pss_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // This file contains pre-generated KeyTemplates for Signer and Verifier.

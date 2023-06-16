@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tink-crypto/tink-go/core/primitiveset"
-	"github.com/tink-crypto/tink-go/monitoring"
-	tpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
+	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const keytypeURLPrefix = "type.googleapis.com/google.crypto."

@@ -11,7 +11,7 @@ nogo(
     visibility = ["//visibility:public"],
 )
 
-# gazelle:prefix github.com/tink-crypto/tink-go
+# gazelle:prefix github.com/tink-crypto/tink-go/v2
 gazelle(
     name = "gazelle",
     args = [

@@ -22,8 +22,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/signature/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/signature/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
 )
 
 type paramsTestECDSA struct {

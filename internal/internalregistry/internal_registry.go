@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/tink-crypto/tink-go/monitoring"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
 )
 
 var (

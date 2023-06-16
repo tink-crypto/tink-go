@@ -22,7 +22,7 @@ import (
 	"math/big"
 	"testing"
 
-	internal "github.com/tink-crypto/tink-go/internal/signature"
+	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
 )
 
 func TestValidatePublicExponent(t *testing.T) {

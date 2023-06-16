@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/aead/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/testutil"
+	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 func TestAESGCMSIVRejectsInvalidKeyLength(t *testing.T) {

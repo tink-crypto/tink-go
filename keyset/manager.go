@@ -20,10 +20,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
 
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // Manager manages a Keyset-proto, with convenience methods that rotate, disable, enable or destroy keys.

@@ -19,8 +19,8 @@ package mac_test
 import (
 	"testing"
 
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/testutil"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 func TestMacInit(t *testing.T) {

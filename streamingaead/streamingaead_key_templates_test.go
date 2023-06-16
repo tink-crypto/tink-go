@@ -21,9 +21,9 @@ import (
 	"io"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/keyset"
-	"github.com/tink-crypto/tink-go/streamingaead"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/streamingaead"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestKeyTemplates(t *testing.T) {

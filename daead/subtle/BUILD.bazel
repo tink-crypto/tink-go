@@ -5,7 +5,7 @@ package(default_visibility = ["//:__subpackages__"])  # keep
 go_library(
     name = "subtle",
     srcs = ["aes_siv.go"],
-    importpath = "github.com/tink-crypto/tink-go/daead/subtle",
+    importpath = "github.com/tink-crypto/tink-go/v2/daead/subtle",
 )
 
 go_test(

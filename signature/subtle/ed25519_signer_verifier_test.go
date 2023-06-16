@@ -24,9 +24,9 @@ import (
 	"fmt"
 	"testing"
 
-	subtleSignature "github.com/tink-crypto/tink-go/signature/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/testutil"
+	subtleSignature "github.com/tink-crypto/tink-go/v2/signature/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 func TestED25519Deterministic(t *testing.T) {

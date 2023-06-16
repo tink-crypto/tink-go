@@ -23,14 +23,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/aead"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/keyderivation"
-	"github.com/tink-crypto/tink-go/prf"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	aesgcmpb "github.com/tink-crypto/tink-go/proto/aes_gcm_go_proto"
-	prfderpb "github.com/tink-crypto/tink-go/proto/prf_based_deriver_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/keyderivation"
+	"github.com/tink-crypto/tink-go/v2/prf"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	aesgcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
+	prfderpb "github.com/tink-crypto/tink-go/v2/proto/prf_based_deriver_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (

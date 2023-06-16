@@ -11,7 +11,7 @@ go_library(
         "internal_registry.go",
         "key_derivation.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/internal/internalregistry",
+    importpath = "github.com/tink-crypto/tink-go/v2/internal/internalregistry",
     deps = [
         "//core/registry",
         "//monitoring",

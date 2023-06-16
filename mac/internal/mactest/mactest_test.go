@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/mac/internal/mactest"
+	"github.com/tink-crypto/tink-go/v2/mac/internal/mactest"
 )
 
 func TestAlwaysFailingMACAlwayFails(t *testing.T) {

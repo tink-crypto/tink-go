@@ -8,7 +8,7 @@ go_library(
     name = "kmsaead",
     testonly = 1,
     srcs = ["key_manager.go"],
-    importpath = "github.com/tink-crypto/tink-go/aead/internal/testing/kmsaead",
+    importpath = "github.com/tink-crypto/tink-go/v2/aead/internal/testing/kmsaead",
     visibility = ["//visibility:public"],
     deps = [
         "//core/registry",

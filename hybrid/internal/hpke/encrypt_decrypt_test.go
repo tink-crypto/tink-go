@@ -21,9 +21,9 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/subtle"
-	pb "github.com/tink-crypto/tink-go/proto/hpke_go_proto"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/subtle"
+	pb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
 func TestNewEncryptDecryptUnknownKEM(t *testing.T) {

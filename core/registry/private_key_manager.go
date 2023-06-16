@@ -17,7 +17,7 @@
 package registry
 
 import (
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // PrivateKeyManager is a special type of KeyManager that understands private key types.

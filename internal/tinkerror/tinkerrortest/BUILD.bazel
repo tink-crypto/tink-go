@@ -11,7 +11,7 @@ go_library(
         "doc.go",
         "tinkerrortest.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/internal/tinkerror/tinkerrortest",
+    importpath = "github.com/tink-crypto/tink-go/v2/internal/tinkerror/tinkerrortest",
 )
 
 alias(

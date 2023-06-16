@@ -19,8 +19,8 @@ package jwt
 import (
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/core/primitiveset"
-	"github.com/tink-crypto/tink-go/keyset"
+	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 )
 
 // NewVerifier generates a new instance of the JWT Verifier primitive.

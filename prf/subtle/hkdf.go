@@ -22,7 +22,7 @@ import (
 	"io"
 
 	"golang.org/x/crypto/hkdf"
-	"github.com/tink-crypto/tink-go/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle"
 )
 
 const (

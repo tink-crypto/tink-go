@@ -22,13 +22,13 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/aead/subtle"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/keyset"
-	"github.com/tink-crypto/tink-go/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
 
-	tpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
-	xpb "github.com/tink-crypto/tink-go/proto/xchacha20_poly1305_go_proto"
+	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+	xpb "github.com/tink-crypto/tink-go/v2/proto/xchacha20_poly1305_go_proto"
 )
 
 const (

@@ -23,11 +23,11 @@ import (
 
 	spb "google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/keyset"
-	jepb "github.com/tink-crypto/tink-go/proto/jwt_ecdsa_go_proto"
-	jrsppb "github.com/tink-crypto/tink-go/proto/jwt_rsa_ssa_pkcs1_go_proto"
-	jrpsspb "github.com/tink-crypto/tink-go/proto/jwt_rsa_ssa_pss_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	jepb "github.com/tink-crypto/tink-go/v2/proto/jwt_ecdsa_go_proto"
+	jrsppb "github.com/tink-crypto/tink-go/v2/proto/jwt_rsa_ssa_pkcs1_go_proto"
+	jrpsspb "github.com/tink-crypto/tink-go/v2/proto/jwt_rsa_ssa_pss_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (

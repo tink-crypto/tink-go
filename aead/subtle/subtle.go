@@ -17,7 +17,7 @@
 // Package subtle provides subtle implementations of the AEAD primitive.
 package subtle
 
-import internalaead "github.com/tink-crypto/tink-go/internal/aead"
+import internalaead "github.com/tink-crypto/tink-go/v2/internal/aead"
 
 const (
 	intSize = 32 << (^uint(0) >> 63) // 32 or 64

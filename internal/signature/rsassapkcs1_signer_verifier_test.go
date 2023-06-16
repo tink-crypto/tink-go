@@ -23,10 +23,10 @@ import (
 	"math/big"
 	"testing"
 
-	internal "github.com/tink-crypto/tink-go/internal/signature"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/subtle"
-	"github.com/tink-crypto/tink-go/testutil"
+	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/subtle"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 func TestRSASSAPKCS1SignVerify(t *testing.T) {

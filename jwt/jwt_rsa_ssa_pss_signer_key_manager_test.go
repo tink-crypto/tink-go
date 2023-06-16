@@ -23,9 +23,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/core/registry"
-	jrsppb "github.com/tink-crypto/tink-go/proto/jwt_rsa_ssa_pss_go_proto"
-	tpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	jrsppb "github.com/tink-crypto/tink-go/v2/proto/jwt_rsa_ssa_pss_go_proto"
+	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const testJWTPSSignerKeyType = "type.googleapis.com/google.crypto.tink.JwtRsaSsaPssPrivateKey"

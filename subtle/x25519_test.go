@@ -23,8 +23,8 @@ import (
 	"testing"
 
 	"golang.org/x/crypto/curve25519"
-	"github.com/tink-crypto/tink-go/subtle"
-	"github.com/tink-crypto/tink-go/testutil"
+	"github.com/tink-crypto/tink-go/v2/subtle"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 func TestComputeSharedSecretX25519WithRFCTestVectors(t *testing.T) {

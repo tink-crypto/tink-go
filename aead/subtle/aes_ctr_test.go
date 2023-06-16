@@ -23,8 +23,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/aead/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
 )
 
 func TestNewAESCTR(t *testing.T) {

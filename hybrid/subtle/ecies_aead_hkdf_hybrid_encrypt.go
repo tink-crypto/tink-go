@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/tink-crypto/tink-go/tink"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 // ECIESAEADHKDFHybridEncrypt is an instance of ECIES encryption with HKDF-KEM (key encapsulation mechanism)

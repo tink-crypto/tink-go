@@ -24,11 +24,11 @@ import (
 	"io"
 
 	// Placeholder for internal crypto/cipher allowlist, please ignore.
-	subtleaead "github.com/tink-crypto/tink-go/aead/subtle"
-	subtlemac "github.com/tink-crypto/tink-go/mac/subtle"
-	"github.com/tink-crypto/tink-go/streamingaead/subtle/noncebased"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/subtle"
+	subtleaead "github.com/tink-crypto/tink-go/v2/aead/subtle"
+	subtlemac "github.com/tink-crypto/tink-go/v2/mac/subtle"
+	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle/noncebased"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/subtle"
 )
 
 const (

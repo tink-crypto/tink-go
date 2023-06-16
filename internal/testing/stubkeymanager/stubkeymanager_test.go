@@ -23,9 +23,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/internal/testing/stubkeymanager"
-	agpb "github.com/tink-crypto/tink-go/proto/aes_gcm_go_proto"
-	tpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager"
+	agpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
+	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 type fakePrimitive struct {

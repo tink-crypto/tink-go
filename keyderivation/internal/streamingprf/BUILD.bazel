@@ -12,7 +12,7 @@ go_library(
         "streaming_prf.go",
         "streaming_prf_factory.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/keyderivation/internal/streamingprf",
+    importpath = "github.com/tink-crypto/tink-go/v2/keyderivation/internal/streamingprf",
     visibility = ["//visibility:public"],
     deps = [
         "//core/primitiveset",

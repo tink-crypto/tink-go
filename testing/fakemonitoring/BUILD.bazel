@@ -8,7 +8,7 @@ go_library(
     name = "fakemonitoring",
     testonly = 1,
     srcs = ["fakemonitoring.go"],
-    importpath = "github.com/tink-crypto/tink-go/testing/fakemonitoring",
+    importpath = "github.com/tink-crypto/tink-go/v2/testing/fakemonitoring",
     visibility = ["//visibility:public"],
     deps = ["//monitoring"],
 )

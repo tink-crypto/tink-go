@@ -10,7 +10,7 @@ go_library(
         "rsassapss_verifier.go",
         "signature.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/internal/signature",
+    importpath = "github.com/tink-crypto/tink-go/v2/internal/signature",
     visibility = ["//:__subpackages__"],
     deps = [
         "//subtle",

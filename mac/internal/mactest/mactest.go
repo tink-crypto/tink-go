@@ -18,7 +18,7 @@
 package mactest
 
 import (
-	"github.com/tink-crypto/tink-go/tink"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 // AlwaysFailingMAC fails compute and verify operations.

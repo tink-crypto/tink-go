@@ -13,7 +13,7 @@ go_library(
         "hybrid_encrypt_factory.go",
         "hybrid_key_templates.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/hybrid",
+    importpath = "github.com/tink-crypto/tink-go/v2/hybrid",
     visibility = ["//visibility:public"],
     deps = [
         "//aead",

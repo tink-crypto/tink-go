@@ -13,7 +13,7 @@ go_library(
         "encoding.go",
         "subtle.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/signature/subtle",
+    importpath = "github.com/tink-crypto/tink-go/v2/signature/subtle",
     deps = ["//subtle"],
 )
 

@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "chacha20_poly1305_go_proto",
     srcs = ["chacha20_poly1305.pb.go"],
-    importpath = "github.com/tink-crypto/tink-go/proto/chacha20_poly1305_go_proto",
+    importpath = "github.com/tink-crypto/tink-go/v2/proto/chacha20_poly1305_go_proto",
     visibility = ["//visibility:public"],
     deps = [
         "@org_golang_google_protobuf//reflect/protoreflect",

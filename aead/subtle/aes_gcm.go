@@ -19,9 +19,9 @@ package subtle
 import (
 	"fmt"
 
-	internalaead "github.com/tink-crypto/tink-go/internal/aead"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/tink"
+	internalaead "github.com/tink-crypto/tink-go/v2/internal/aead"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 const (

@@ -14,7 +14,7 @@ go_library(
         "prf_based_deriver.go",
         "prf_based_deriver_key_manager.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/keyderivation",
+    importpath = "github.com/tink-crypto/tink-go/v2/keyderivation",
     visibility = ["//visibility:public"],
     deps = [
         "//core/primitiveset",

@@ -18,7 +18,7 @@ package registry
 
 import (
 	"google.golang.org/protobuf/proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // KeyManager "understands" keys of a specific key types: it can generate keys of a supported type

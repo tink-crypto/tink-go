@@ -20,7 +20,7 @@ package fakemonitoring
 import (
 	"sync"
 
-	"github.com/tink-crypto/tink-go/monitoring"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
 )
 
 // Logger implements a fake monitoring.Logger

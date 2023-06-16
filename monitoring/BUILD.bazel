@@ -7,7 +7,7 @@ licenses(["notice"])  # keep
 go_library(
     name = "monitoring",
     srcs = ["monitoring.go"],
-    importpath = "github.com/tink-crypto/tink-go/monitoring",
+    importpath = "github.com/tink-crypto/tink-go/v2/monitoring",
 )
 
 alias(

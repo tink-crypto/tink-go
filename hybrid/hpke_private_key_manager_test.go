@@ -23,11 +23,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/hybrid/internal/hpke"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	hpkepb "github.com/tink-crypto/tink-go/proto/hpke_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/hybrid/internal/hpke"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestPrivateKeyManagerPrimitiveRejectsInvalidKeyVersion(t *testing.T) {

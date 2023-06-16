@@ -24,8 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/subtle/random"
-	"github.com/tink-crypto/tink-go/testutil"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 func TestNewHKDFStreamingPRF(t *testing.T) {

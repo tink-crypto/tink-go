@@ -4,7 +4,7 @@ go_library(
     name = "stubkeymanager",
     testonly = 1,
     srcs = ["stubkeymanager.go"],
-    importpath = "github.com/tink-crypto/tink-go/internal/testing/stubkeymanager",
+    importpath = "github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager",
     visibility = ["//:__subpackages__"],
     deps = [
         "//core/registry",

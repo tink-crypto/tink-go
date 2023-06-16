@@ -24,11 +24,11 @@ import (
 	"math/big"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/core/registry"
-	internal "github.com/tink-crypto/tink-go/internal/signature"
-	"github.com/tink-crypto/tink-go/keyset"
-	rsassapkcs1pb "github.com/tink-crypto/tink-go/proto/rsa_ssa_pkcs1_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	rsassapkcs1pb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pkcs1_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (

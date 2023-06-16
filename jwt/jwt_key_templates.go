@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/internal/tinkerror"
-	jepb "github.com/tink-crypto/tink-go/proto/jwt_ecdsa_go_proto"
-	jwtmacpb "github.com/tink-crypto/tink-go/proto/jwt_hmac_go_proto"
-	jrsppb "github.com/tink-crypto/tink-go/proto/jwt_rsa_ssa_pkcs1_go_proto"
-	jrpsspb "github.com/tink-crypto/tink-go/proto/jwt_rsa_ssa_pss_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/internal/tinkerror"
+	jepb "github.com/tink-crypto/tink-go/v2/proto/jwt_ecdsa_go_proto"
+	jwtmacpb "github.com/tink-crypto/tink-go/v2/proto/jwt_hmac_go_proto"
+	jrsppb "github.com/tink-crypto/tink-go/v2/proto/jwt_rsa_ssa_pkcs1_go_proto"
+	jrpsspb "github.com/tink-crypto/tink-go/v2/proto/jwt_rsa_ssa_pss_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func createJWTHMACKeyTemplate(keySize uint32, algorithm jwtmacpb.JwtHmacAlgorithm, outputPrefixType tinkpb.OutputPrefixType) *tinkpb.KeyTemplate {

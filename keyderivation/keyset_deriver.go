@@ -17,7 +17,7 @@
 package keyderivation
 
 import (
-	"github.com/tink-crypto/tink-go/keyset"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 )
 
 // KeysetDeriver is the interface used to derive new keysets based on an

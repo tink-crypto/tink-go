@@ -19,8 +19,8 @@ package tinkerror_test
 import (
 	"testing"
 
-	"github.com/tink-crypto/tink-go/internal/tinkerror"
-	"github.com/tink-crypto/tink-go/internal/tinkerror/tinkerrortest"
+	"github.com/tink-crypto/tink-go/v2/internal/tinkerror"
+	"github.com/tink-crypto/tink-go/v2/internal/tinkerror/tinkerrortest"
 )
 
 func TestFail(t *testing.T) {

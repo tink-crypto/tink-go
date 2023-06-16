@@ -20,15 +20,15 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/internal/tinkerror"
-	ctrpb "github.com/tink-crypto/tink-go/proto/aes_ctr_go_proto"
-	ctrhmacpb "github.com/tink-crypto/tink-go/proto/aes_ctr_hmac_aead_go_proto"
-	gcmpb "github.com/tink-crypto/tink-go/proto/aes_gcm_go_proto"
-	gcmsivpb "github.com/tink-crypto/tink-go/proto/aes_gcm_siv_go_proto"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
-	hmacpb "github.com/tink-crypto/tink-go/proto/hmac_go_proto"
-	kmsenvpb "github.com/tink-crypto/tink-go/proto/kms_envelope_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/internal/tinkerror"
+	ctrpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_go_proto"
+	ctrhmacpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
+	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
+	gcmsivpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_siv_go_proto"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_go_proto"
+	kmsenvpb "github.com/tink-crypto/tink-go/v2/proto/kms_envelope_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // This file contains pre-generated KeyTemplates for AEAD keys. One can use these templates

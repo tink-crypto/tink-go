@@ -24,15 +24,15 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/tink-crypto/tink-go/insecurecleartextkeyset"
-	"github.com/tink-crypto/tink-go/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/keyset"
-	"github.com/tink-crypto/tink-go/mac"
-	"github.com/tink-crypto/tink-go/monitoring"
-	"github.com/tink-crypto/tink-go/prf"
-	"github.com/tink-crypto/tink-go/testing/fakemonitoring"
-	"github.com/tink-crypto/tink-go/testutil"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/mac"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
+	"github.com/tink-crypto/tink-go/v2/prf"
+	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (

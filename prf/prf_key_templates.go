@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/internal/tinkerror"
-	cmacpb "github.com/tink-crypto/tink-go/proto/aes_cmac_prf_go_proto"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
-	hkdfpb "github.com/tink-crypto/tink-go/proto/hkdf_prf_go_proto"
-	hmacpb "github.com/tink-crypto/tink-go/proto/hmac_prf_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/internal/tinkerror"
+	cmacpb "github.com/tink-crypto/tink-go/v2/proto/aes_cmac_prf_go_proto"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	hkdfpb "github.com/tink-crypto/tink-go/v2/proto/hkdf_prf_go_proto"
+	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_prf_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // This file contains pre-generated KeyTemplate for PRF.

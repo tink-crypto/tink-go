@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/tink-crypto/tink-go/keyset"
-	"github.com/tink-crypto/tink-go/prf"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/prf"
 )
 
 func Example() {

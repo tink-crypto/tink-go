@@ -22,7 +22,7 @@ go_library(
         "signer_factory.go",
         "verifier_factory.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/signature",
+    importpath = "github.com/tink-crypto/tink-go/v2/signature",
     visibility = ["//visibility:public"],
     deps = [
         "//core/cryptofmt",

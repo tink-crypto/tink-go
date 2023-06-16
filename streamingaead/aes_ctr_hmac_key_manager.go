@@ -21,14 +21,14 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	subtleaead "github.com/tink-crypto/tink-go/aead/subtle"
-	"github.com/tink-crypto/tink-go/keyset"
-	subtlemac "github.com/tink-crypto/tink-go/mac/subtle"
-	"github.com/tink-crypto/tink-go/streamingaead/subtle"
-	"github.com/tink-crypto/tink-go/subtle/random"
-	chpb "github.com/tink-crypto/tink-go/proto/aes_ctr_hmac_streaming_go_proto"
-	commonpb "github.com/tink-crypto/tink-go/proto/common_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	subtleaead "github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	subtlemac "github.com/tink-crypto/tink-go/v2/mac/subtle"
+	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	chpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_streaming_go_proto"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (

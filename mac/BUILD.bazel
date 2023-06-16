@@ -13,7 +13,7 @@ go_library(
         "mac_factory.go",
         "mac_key_templates.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/mac",
+    importpath = "github.com/tink-crypto/tink-go/v2/mac",
     visibility = ["//visibility:public"],
     deps = [
         "//core/cryptofmt",

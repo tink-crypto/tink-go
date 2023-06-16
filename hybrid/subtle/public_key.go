@@ -22,9 +22,9 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/keyset"
-	hpkepb "github.com/tink-crypto/tink-go/proto/hpke_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (

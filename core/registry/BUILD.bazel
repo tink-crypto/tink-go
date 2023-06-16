@@ -12,7 +12,7 @@ go_library(
         "private_key_manager.go",
         "registry.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/core/registry",
+    importpath = "github.com/tink-crypto/tink-go/v2/core/registry",
     visibility = ["//visibility:public"],
     deps = [
         "//proto/tink_go_proto",

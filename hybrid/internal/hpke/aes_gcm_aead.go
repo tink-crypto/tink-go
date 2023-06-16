@@ -19,7 +19,7 @@ package hpke
 import (
 	"fmt"
 
-	internalaead "github.com/tink-crypto/tink-go/internal/aead"
+	internalaead "github.com/tink-crypto/tink-go/v2/internal/aead"
 )
 
 // aesGCMAEAD is an AES GCM HPKE AEAD variant that implements interface

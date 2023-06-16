@@ -20,9 +20,9 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/internal/tinkerror"
-	aspb "github.com/tink-crypto/tink-go/proto/aes_siv_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/internal/tinkerror"
+	aspb "github.com/tink-crypto/tink-go/v2/proto/aes_siv_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // AESSIVKeyTemplate is a KeyTemplate that generates a AES-SIV key.

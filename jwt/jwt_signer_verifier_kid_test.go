@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tink-crypto/tink-go/signature/subtle"
-	"github.com/tink-crypto/tink-go/tink"
+	"github.com/tink-crypto/tink-go/v2/signature/subtle"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 func createTinkECVerifier() (tink.Verifier, error) {

@@ -7,7 +7,7 @@ licenses(["notice"])  # keep
 go_library(
     name = "primitiveset",
     srcs = ["primitiveset.go"],
-    importpath = "github.com/tink-crypto/tink-go/core/primitiveset",
+    importpath = "github.com/tink-crypto/tink-go/v2/core/primitiveset",
     visibility = ["//visibility:public"],
     deps = [
         "//core/cryptofmt",

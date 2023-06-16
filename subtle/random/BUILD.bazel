@@ -5,7 +5,7 @@ package(default_visibility = ["//:__subpackages__"])  # keep
 go_library(
     name = "random",
     srcs = ["random.go"],
-    importpath = "github.com/tink-crypto/tink-go/subtle/random",
+    importpath = "github.com/tink-crypto/tink-go/v2/subtle/random",
     visibility = ["//visibility:public"],
 )
 

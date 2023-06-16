@@ -10,7 +10,7 @@ go_library(
         "doc.go",
         "tinkerror.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/internal/tinkerror",
+    importpath = "github.com/tink-crypto/tink-go/v2/internal/tinkerror",
 )
 
 go_test(

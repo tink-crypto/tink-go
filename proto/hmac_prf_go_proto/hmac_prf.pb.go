@@ -23,7 +23,7 @@
 package hmac_prf_go_proto
 
 import (
-	common_go_proto "github.com/tink-crypto/tink-go/proto/common_go_proto"
+	common_go_proto "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"

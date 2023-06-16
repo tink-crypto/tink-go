@@ -19,7 +19,7 @@ package hpke
 import (
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle"
 )
 
 var (

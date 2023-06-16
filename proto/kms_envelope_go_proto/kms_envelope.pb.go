@@ -23,7 +23,7 @@
 package kms_envelope_go_proto
 
 import (
-	tink_go_proto "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	tink_go_proto "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"

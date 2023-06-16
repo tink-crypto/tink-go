@@ -23,7 +23,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle"
 )
 
 // TODO(b/201070904): Write tests using baseModeX25519HKDFSHA256Vectors.

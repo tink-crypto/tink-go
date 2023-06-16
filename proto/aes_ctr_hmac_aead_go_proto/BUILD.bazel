@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "aes_ctr_hmac_aead_go_proto",
     srcs = ["aes_ctr_hmac_aead.pb.go"],
-    importpath = "github.com/tink-crypto/tink-go/proto/aes_ctr_hmac_aead_go_proto",
+    importpath = "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto",
     visibility = ["//visibility:public"],
     deps = [
         "//proto/aes_ctr_go_proto",

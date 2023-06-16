@@ -25,10 +25,10 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/core/registry"
-	"github.com/tink-crypto/tink-go/keyset"
-	kmsaeadpb "github.com/tink-crypto/tink-go/proto/kms_aead_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	kmsaeadpb "github.com/tink-crypto/tink-go/v2/proto/kms_aead_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const kmsAEADTypeURL = "type.googleapis.com/google.crypto.tink.KmsAeadKey"

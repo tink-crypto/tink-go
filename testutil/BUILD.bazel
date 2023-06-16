@@ -10,7 +10,7 @@ go_library(
         "testutil.go",
         "wycheproofutil.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/testutil",
+    importpath = "github.com/tink-crypto/tink-go/v2/testutil",
     deps = [
         "//core/registry",
         "//daead/subtle",

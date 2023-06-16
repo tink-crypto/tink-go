@@ -14,7 +14,7 @@ go_library(
         "public_key.go",
         "subtle.go",
     ],
-    importpath = "github.com/tink-crypto/tink-go/hybrid/subtle",
+    importpath = "github.com/tink-crypto/tink-go/v2/hybrid/subtle",
     visibility = ["//visibility:public"],  # keep; used by non-Tink library
     deps = [
         "//keyset",

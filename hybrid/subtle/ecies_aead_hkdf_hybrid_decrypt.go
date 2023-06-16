@@ -19,7 +19,7 @@ package subtle
 import (
 	"errors"
 
-	"github.com/tink-crypto/tink-go/tink"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 // ECIESAEADHKDFHybridDecrypt is an instance of ECIES decryption with HKDF-KEM (key encapsulation mechanism)

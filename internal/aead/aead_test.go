@@ -19,8 +19,8 @@ package aead_test
 import (
 	"testing"
 
-	"github.com/tink-crypto/tink-go/internal/aead"
-	"github.com/tink-crypto/tink-go/testutil"
+	"github.com/tink-crypto/tink-go/v2/internal/aead"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 type AEADSuite struct {

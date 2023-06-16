@@ -28,8 +28,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/hybrid/subtle"
-	"github.com/tink-crypto/tink-go/testutil"
+	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 // The tests are from
