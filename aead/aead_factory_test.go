@@ -29,6 +29,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -104,6 +105,59 @@ func TestFactoryMultipleKeys(t *testing.T) {
 	err = validateAEADFactoryCipher(a2, a, expectedPrefix)
 	if err == nil || !strings.Contains(err.Error(), "decryption failed") {
 		t.Errorf("expect decryption to fail with random key: %s", err)
+	}
+}
+
+type fakeAEAD struct{}
+
+func (a *fakeAEAD) Encrypt(_, _ []byte) ([]byte, error) {
+	return []byte("fakeAEAD Encrypt"), nil
+}
+func (a *fakeAEAD) Decrypt(_, _ []byte) ([]byte, error) {
+	return []byte("fakeAEAD Decrypt"), nil
+}
+
+type fakeConfig struct{}
+
+func (tc *fakeConfig) RegisterKeyManager(_ registry.KeyManager, _ internalapi.Token) error {
+	return nil // not needed in the test
+}
+func (tc *fakeConfig) PrimitiveFromKeyData(_ *tinkpb.KeyData, _ internalapi.Token) (any, error) {
+	return new(fakeAEAD), nil
+}
+
+func TestNewWithConfig(t *testing.T) {
+	ks := testutil.NewTestAESGCMKeyset(tinkpb.OutputPrefixType_RAW)
+	keysetHandle, err := testkeyset.NewHandle(ks)
+	if err != nil {
+		t.Fatalf("testkeyset.NewHandle(keyset) err = %v, want nil", err)
+	}
+
+	config := &fakeConfig{}
+	a, err := aead.New(keysetHandle, aead.WithConfig(config))
+	if err != nil {
+		t.Fatalf("aead.New(keysetHandle, aead.WithConfig(config)) err = %v, want nil", err)
+	}
+	ct, err := a.Encrypt([]byte("plaintext"), []byte("aad"))
+	if err != nil {
+		t.Fatalf("aead.Encrypt() err = %v, want nil", err)
+	}
+
+	if wantCT := "fakeAEAD Encrypt"; !bytes.Equal(ct, []byte(wantCT)) {
+		t.Errorf("aead.Encrypt() = %q, want %q", ct, wantCT)
+	}
+}
+
+func TestNewFailsWithMultipleConfigs(t *testing.T) {
+	ks := testutil.NewTestAESGCMKeyset(tinkpb.OutputPrefixType_RAW)
+	keysetHandle, err := testkeyset.NewHandle(ks)
+	if err != nil {
+		t.Fatalf("testkeyset.NewHandle(keyset) err = %v, want nil", err)
+	}
+
+	config := &fakeConfig{}
+	if _, err := aead.New(keysetHandle, aead.WithConfig(config), aead.WithConfig(config)); err == nil { // if NO error
+		t.Errorf("aead.New() with multiple configs err = nil, want error")
 	}
 }
 
