@@ -27,8 +27,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
-	"github.com/tink-crypto/tink-go/v2/tink"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 var errInvalidKeyset = fmt.Errorf("keyset.Handle: invalid keyset")
@@ -200,6 +200,11 @@ func WithConfig(c Config) PrimitivesOption {
 	}
 }
 
+// isEnabled returns true if k is enabled.
+func isEnabled(k *tinkpb.Keyset_Key) bool {
+	return k.Status == tinkpb.KeyStatusType_ENABLED
+}
+
 // Primitives creates a set of primitives corresponding to the keys with
 // status=ENABLED in the keyset of the given keyset handle. It uses the
 // key managers that are present in the global Registry or in the Config,
@@ -213,7 +218,7 @@ func WithConfig(c Config) PrimitivesOption {
 // The returned set is usually later "wrapped" into a class that implements
 // the corresponding Primitive-interface.
 func (h *Handle) Primitives(opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
-	p, err := h.primitives(nil, opts...)
+	p, err := h.primitives(nil, isEnabled, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("handle.Primitives: %v", err)
 	}
@@ -233,14 +238,50 @@ func (h *Handle) Primitives(opts ...PrimitivesOption) (*primitiveset.PrimitiveSe
 // The returned set is usually later "wrapped" into a class that implements
 // the corresponding Primitive-interface.
 func (h *Handle) PrimitivesWithKeyManager(km registry.KeyManager) (*primitiveset.PrimitiveSet, error) {
-	p, err := h.primitives(km)
+	p, err := h.primitives(km, isEnabled)
 	if err != nil {
 		return nil, fmt.Errorf("handle.PrimitivesWithKeyManager: %v", err)
 	}
 	return p, nil
 }
 
-func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
+// trueFilter returns true to allow all keys.
+func trueFilter(_ *tinkpb.Keyset_Key) bool {
+	return true
+}
+
+// AllPrimitives returns a set containing all the of primitives in the keyset of
+// the given keysetHandle, regardless of status, using the given key manager
+// (instead of registered key managers) for keys supported by it. This contrasts
+// with [PrimitivesWithKeyManager], which returns only enabled keys. Key
+// implementations may use this method to gather additional information about
+// keys to display over and above that available from [KeysetInfo], or for other
+// key management functions, but must instead use [PrimitivesWithKeyManager] to
+// reliably retrieve only enabled keys for encryption.
+func (h *Handle) AllPrimitives(opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
+	p, err := h.primitives(nil, trueFilter, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("handle.AllPrimitives: %v", err)
+	}
+	return p, nil
+}
+
+// AllPrimitives returns a set containing all the of primitives in the keyset of
+// the given keysetHandle, regardless of status. This contrasts with
+// [Primitives], which returns only enabled keys. Key implementations may use
+// this method to gather additional information about keys to display over and
+// above that available from [KeysetInfo], or for other key management
+// functions, but must instead use [Primitives] to reliably retrieve only
+// enabled keys for encryption.
+func (h *Handle) AllPrimitivesWithKeyManager(km registry.KeyManager) (*primitiveset.PrimitiveSet, error) {
+	p, err := h.primitives(km, trueFilter)
+	if err != nil {
+		return nil, fmt.Errorf("handle.AllPrimitivesWithKeyManager: %v", err)
+	}
+	return p, nil
+}
+
+func (h *Handle) primitives(km registry.KeyManager, filter func(*tinkpb.Keyset_Key) bool, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
 	args := new(primitiveOptions)
 	for _, opt := range opts {
 		if err := opt(args); err != nil {
@@ -258,7 +299,7 @@ func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*
 	primitiveSet := primitiveset.New()
 	primitiveSet.Annotations = h.annotations
 	for _, key := range h.ks.Key {
-		if key.Status != tinkpb.KeyStatusType_ENABLED {
+		if !filter(key) {
 			continue
 		}
 		var primitive interface{}

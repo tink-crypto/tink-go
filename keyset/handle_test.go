@@ -20,17 +20,17 @@ import (
 	"bytes"
 	"testing"
 
-	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestNewHandle(t *testing.T) {
@@ -383,6 +383,15 @@ func TestPrimitivesWithConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", template, err)
 	}
+	// Add a second, disabled key.
+	mgr := keyset.NewManagerFromHandle(handle)
+	id, err := mgr.Add(mac.AESCMACTag128KeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.Add(%v) = %v, want nil", mac.AESCMACTag128KeyTemplate(), err)
+	}
+	if err := mgr.Disable(id); err != nil {
+		t.Fatalf("keyset.Disable(%v) = %v, want nil", id, err)
+	}
 	primitives, err := handle.Primitives(keyset.WithConfig(&testConfig{}))
 	if err != nil {
 		t.Fatalf("handle.Primitives(keyset.WithConfig(&testConfig{})) err = %v, want nil", err)
@@ -392,6 +401,33 @@ func TestPrimitivesWithConfig(t *testing.T) {
 	}
 	if _, ok := (primitives.Primary.Primitive).(testPrimitive); !ok {
 		t.Errorf("handle.Primitives().Primary = %v, want instance of `testPrimitive`", primitives.Primary.Primitive)
+	}
+}
+
+func TestAllPrimitivesWithConfig(t *testing.T) {
+	template := mac.HMACSHA256Tag128KeyTemplate()
+	template.OutputPrefixType = tinkpb.OutputPrefixType_RAW
+	handle, err := keyset.NewHandle(template)
+	if err != nil {
+		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", template, err)
+	}
+	mgr := keyset.NewManagerFromHandle(handle)
+	id, err := mgr.Add(mac.AESCMACTag128KeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.Add(%v) = %v, want nil", mac.AESCMACTag128KeyTemplate(), err)
+	}
+	if err := mgr.Disable(id); err != nil {
+		t.Fatalf("keyset.Disable(%v) = %v, want nil", id, err)
+	}
+	primitives, err := handle.AllPrimitives(keyset.WithConfig(&testConfig{}))
+	if err != nil {
+		t.Fatalf("handle.AllPrimitives(keyset.WithConfig(&testConfig{})) err = %v, want nil", err)
+	}
+	if len(primitives.EntriesInKeysetOrder) != 2 {
+		t.Fatalf("len(handle.AllPrimitives()) = %d, want 1", len(primitives.EntriesInKeysetOrder))
+	}
+	if _, ok := (primitives.Primary.Primitive).(testPrimitive); !ok {
+		t.Errorf("handle.AllPrimitives().Primary = %v, want instance of `testPrimitive`", primitives.Primary.Primitive)
 	}
 }
 
@@ -405,6 +441,19 @@ func TestPrimitivesWithMultipleConfigs(t *testing.T) {
 	_, err = handle.Primitives(keyset.WithConfig(&testConfig{}), keyset.WithConfig(&testConfig{}))
 	if err == nil { // if NO error
 		t.Error("handle.Primitives(keyset.WithConfig(&testConfig{}), keyset.WithConfig(&testConfig{})) err = nil, want error")
+	}
+}
+
+func TestAllPrimitivesWithMultipleConfigs(t *testing.T) {
+	template := mac.HMACSHA256Tag128KeyTemplate()
+	template.OutputPrefixType = tinkpb.OutputPrefixType_RAW
+	handle, err := keyset.NewHandle(template)
+	if err != nil {
+		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", template, err)
+	}
+	_, err = handle.AllPrimitives(keyset.WithConfig(&testConfig{}), keyset.WithConfig(&testConfig{}))
+	if err == nil { // if NO error
+		t.Error("handle.AllPrimitives(keyset.WithConfig(&testConfig{}), keyset.WithConfig(&testConfig{})) err = nil, want error")
 	}
 }
 
@@ -427,6 +476,16 @@ func TestPrimitivesWithKeyManager(t *testing.T) {
 		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", template, err)
 	}
 
+	// Add a second, disabled key.
+	mgr := keyset.NewManagerFromHandle(handle)
+	id, err := mgr.Add(mac.AESCMACTag128KeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.Add(%v) = %v, want nil", mac.AESCMACTag128KeyTemplate(), err)
+	}
+	if err := mgr.Disable(id); err != nil {
+		t.Fatalf("keyset.Disable(%v) = %v, want nil", id, err)
+	}
+
 	// Verify that without providing a custom key manager we get a usual MAC.
 	if _, err = mac.New(handle); err != nil {
 		t.Fatalf("mac.New(%v) err = %v, want nil", handle, err)
@@ -442,5 +501,40 @@ func TestPrimitivesWithKeyManager(t *testing.T) {
 	}
 	if _, ok := (primitives.Primary.Primitive).(testPrimitive); !ok {
 		t.Errorf("handle.PrimitivesWithKeyManager().Primary = %v, want instance of `testPrimitive`", primitives.Primary.Primitive)
+	}
+}
+
+func TestAllPrimitivesWithKeyManager(t *testing.T) {
+	template := mac.HMACSHA256Tag128KeyTemplate()
+	handle, err := keyset.NewHandle(template)
+	if err != nil {
+		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", template, err)
+	}
+
+	// Add a second, disabled key.
+	mgr := keyset.NewManagerFromHandle(handle)
+	id, err := mgr.Add(mac.AESCMACTag128KeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.Add(%v) = %v, want nil", mac.AESCMACTag128KeyTemplate(), err)
+	}
+	if err := mgr.Disable(id); err != nil {
+		t.Fatalf("keyset.Disable(%v) = %v, want nil", id, err)
+	}
+
+	// Verify that without providing a custom key manager we get a usual MAC.
+	if _, err = mac.New(handle); err != nil {
+		t.Fatalf("mac.New(%v) err = %v, want nil", handle, err)
+	}
+
+	// Verify that with the custom key manager provided we get the custom primitive.
+	primitives, err := handle.AllPrimitivesWithKeyManager(&testKeyManager{})
+	if err != nil {
+		t.Fatalf("handle.AllPrimitivesWithKeyManager(testKeyManager) err = %v, want nil", err)
+	}
+	if len(primitives.EntriesInKeysetOrder) != 2 {
+		t.Fatalf("len(handle.AllPrimitivesWithKeyManager()) = %d, want 1", len(primitives.EntriesInKeysetOrder))
+	}
+	if _, ok := (primitives.Primary.Primitive).(testPrimitive); !ok {
+		t.Errorf("handle.AllPrimitivesWithKeyManager().Primary = %v, want instance of `testPrimitive`", primitives.Primary.Primitive)
 	}
 }
