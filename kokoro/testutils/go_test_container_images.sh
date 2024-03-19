@@ -23,7 +23,8 @@ _image_prefix() {
 
 # Linux container images for Tink Go libraries.
 readonly TINK_GO_BASE_IMAGE_NAME="linux-tink-go-base"
-readonly TINK_GO_BASE_IMAGE_HASH="be963aaf342c6987772dcc3f45018ac38ad1bf324a615cfcd48560f90ad7323f"
+# Image from 2024-03-19.
+readonly TINK_GO_BASE_IMAGE_HASH="309617d28992a6b381ef3cbb229375d1a0907a5423be5856f43fa87da3490401"
 readonly TINK_GO_BASE_IMAGE="$(_image_prefix)/${TINK_GO_BASE_IMAGE_NAME}@sha256:${TINK_GO_BASE_IMAGE_HASH}"
 
 unset -f _image_prefix
