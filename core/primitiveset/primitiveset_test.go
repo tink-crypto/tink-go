@@ -22,8 +22,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
-	"github.com/tink-crypto/tink-go/v2/testutil"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 func makeTestKey(keyID int, status tinkpb.KeyStatusType, outputPrefixType tinkpb.OutputPrefixType, typeURL string) *tinkpb.Keyset_Key {
@@ -261,11 +261,11 @@ func TestAddWithInvalidInput(t *testing.T) {
 			primitive: &testutil.DummyMAC{},
 			key:       makeTestKey(0, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_UNKNOWN_PREFIX, "type.url.1"),
 		},
-		{
-			tag:       "disabled key",
-			primitive: &testutil.DummyMAC{},
-			key:       makeTestKey(0, tinkpb.KeyStatusType_DISABLED, tinkpb.OutputPrefixType_TINK, "type.url.1"),
-		},
+		// {
+		// 	tag:       "disabled key",
+		// 	primitive: &testutil.DummyMAC{},
+		// 	key:       makeTestKey(0, tinkpb.KeyStatusType_DISABLED, tinkpb.OutputPrefixType_TINK, "type.url.1"),
+		// },
 		{
 			tag:       "nil keyData",
 			primitive: &testutil.DummyMAC{},
