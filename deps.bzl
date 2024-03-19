@@ -14,14 +14,12 @@ def go_dependencies():
         sum = "h1:LUVKkCeviFUMKqHa4tXIIij/lbhnMbP7Fn5wKdKkRh4=",
         version = "v1.5.0",
     )
-
     go_repository(
         name = "com_github_google_go_cmp",
         importpath = "github.com/google/go-cmp",
         sum = "h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=",
         version = "v0.6.0",
     )
-
     go_repository(
         name = "org_golang_google_protobuf",
         importpath = "google.golang.org/protobuf",
@@ -34,14 +32,12 @@ def go_dependencies():
         sum = "h1:r8bRNjWL3GshPW3gkd+RpvzWrZAwPS49OmTGZ/uhM4k=",
         version = "v0.17.0",
     )
-
     go_repository(
         name = "org_golang_x_net",
         importpath = "golang.org/x/net",
         sum = "h1:X2//UzNDwYmtCLn7To6G58Wr6f5ahEAQgKNzv9Y951M=",
         version = "v0.10.0",
     )
-
     go_repository(
         name = "org_golang_x_sys",
         importpath = "golang.org/x/sys",
@@ -60,7 +56,6 @@ def go_dependencies():
         sum = "h1:ScX5w1eTa3QqT8oi6+ziP7dTV1S2+ALU0bI+0zXKWiQ=",
         version = "v0.14.0",
     )
-
     go_repository(
         name = "org_golang_x_xerrors",
         importpath = "golang.org/x/xerrors",
