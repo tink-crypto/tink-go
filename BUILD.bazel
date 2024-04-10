@@ -12,6 +12,7 @@ nogo(
 )
 
 # gazelle:prefix github.com/tink-crypto/tink-go/v2
+# gazelle:exclude proto/*.proto
 gazelle(
     name = "gazelle",
     args = [
