@@ -69,6 +69,7 @@ go_test(
         "jwt_rsa_ssa_pkcs1_verifier_key_manager_test.go",
         "jwt_rsa_ssa_pss_signer_key_manager_test.go",
         "jwt_rsa_ssa_pss_verify_key_manager_test.go",
+        "jwt_signature_benchmark_test.go",
         "jwt_signer_verifier_factory_test.go",
         "jwt_signer_verifier_kid_test.go",
         "jwt_test.go",
