@@ -42,6 +42,7 @@ go_test(
         "aes_ctr_hmac_key_manager_test.go",
         "aes_gcm_hkdf_key_manager_test.go",
         "decrypt_reader_test.go",
+        "streamingaead_benchmark_test.go",
         "streamingaead_factory_test.go",
         "streamingaead_key_templates_test.go",
         "streamingaead_test.go",
