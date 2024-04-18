@@ -549,6 +549,23 @@ func TestNewRawJWTValidationFailures(t *testing.T) {
 	}
 }
 
+func TestNewRawJWTWithTooManyRecursionsFails(t *testing.T) {
+	// The default recursion limit in golang is 10000, see
+	// google.golang.org/protobuf/encoding/protowire#DefaultRecursionLimit
+	numRecursions := 11000
+	payload := make([]byte, 0, 6*numRecursions+2)
+	for i := 0; i < numRecursions; i++ {
+		payload = append(payload, []byte(`{"a":`)...)
+	}
+	payload = append(payload, []byte(`""`)...)
+	for i := 0; i < numRecursions; i++ {
+		payload = append(payload, []byte(`}`)...)
+	}
+	if _, err := jwt.NewRawJWTFromJSON( /*typeHeader=*/ nil, payload); err == nil {
+		t.Errorf("jwt.NewRawJWTFromJSON() err = nil, want error")
+	}
+}
+
 func TestJSONPayload(t *testing.T) {
 	for _, tc := range []testCase{
 		{
