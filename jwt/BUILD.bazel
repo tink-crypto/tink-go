@@ -63,6 +63,7 @@ go_test(
         "jwt_encoding_test.go",
         "jwt_hmac_key_manager_test.go",
         "jwt_key_templates_test.go",
+        "jwt_mac_benchmark_test.go",
         "jwt_mac_factory_test.go",
         "jwt_mac_kid_test.go",
         "jwt_rsa_ssa_pkcs1_signer_key_manager_test.go",
