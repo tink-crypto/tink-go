@@ -131,7 +131,6 @@ func (a *AESCTRHMAC) deriveKeys(salt, aad []byte) ([]byte, []byte, error) {
 }
 
 type aesCTRHMACSegmentEncrypter struct {
-	noncebased.SegmentEncrypter
 	blockCipher    cipher.Block
 	hmac           *subtlemac.HMAC
 	tagSizeInBytes int
@@ -217,7 +216,6 @@ func (a *AESCTRHMAC) NewEncryptingWriter(w io.Writer, aad []byte) (io.WriteClose
 }
 
 type aesCTRHMACSegmentDecrypter struct {
-	noncebased.SegmentDecrypter
 	blockCipher    cipher.Block
 	hmac           *subtlemac.HMAC
 	tagSizeInBytes int

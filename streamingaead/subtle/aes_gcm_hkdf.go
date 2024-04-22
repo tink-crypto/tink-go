@@ -118,7 +118,6 @@ func (a *AESGCMHKDF) newCipher(key []byte) (cipher.AEAD, error) {
 }
 
 type aesGCMHKDFSegmentEncrypter struct {
-	noncebased.SegmentEncrypter
 	cipher cipher.AEAD
 }
 
@@ -179,7 +178,6 @@ func (a *AESGCMHKDF) NewEncryptingWriter(w io.Writer, aad []byte) (io.WriteClose
 }
 
 type aesGCMHKDFSegmentDecrypter struct {
-	noncebased.SegmentDecrypter
 	cipher cipher.AEAD
 }
 

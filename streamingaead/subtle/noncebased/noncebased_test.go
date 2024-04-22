@@ -181,7 +181,6 @@ func TestNonceBased_invalidParameters(t *testing.T) {
 // It produces ciphertexts which contain the plaintext broken into segments,
 // with the unmodified per-segment nonce placed at the end of each segment.
 type testEncrypter struct {
-	noncebased.SegmentEncrypter
 }
 
 func (e testEncrypter) EncryptSegment(segment, nonce []byte) ([]byte, error) {
@@ -193,7 +192,6 @@ func (e testEncrypter) EncryptSegment(segment, nonce []byte) ([]byte, error) {
 }
 
 type testDecrypter struct {
-	noncebased.SegmentDecrypter
 }
 
 func (d testDecrypter) DecryptSegment(segment, nonce []byte) ([]byte, error) {
