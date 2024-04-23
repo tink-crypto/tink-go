@@ -15,7 +15,9 @@
 package subtle_test
 
 import (
+	"bytes"
 	"encoding/hex"
+	"fmt"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle"
@@ -325,4 +327,269 @@ func TestAESCTRHMACModifiedCiphertext(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestAESCTRHMACWithValidParameters(t *testing.T) {
+	const (
+		segmentSize        = 256
+		firstSegmentOffset = 8
+	)
+	mainKey, err := hex.DecodeString(
+		"000102030405060708090a0b0c0d0e0f00112233445566778899aabbccddeeff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testCases := []struct {
+		hkdfAlg        string
+		tagAlg         string
+		keySizeInBytes int
+		tagSizeInBytes int
+	}{
+		// smallest possible key and tag sizes
+		{
+			hkdfAlg:        "SHA1",
+			tagAlg:         "SHA1",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA256",
+			tagAlg:         "SHA256",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA224",
+			tagAlg:         "SHA224",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA384",
+			tagAlg:         "SHA384",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA512",
+			tagAlg:         "SHA512",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+		// tagSize equal to digest size
+		{
+			hkdfAlg:        "SHA1",
+			tagAlg:         "SHA1",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 20,
+		},
+		{
+			hkdfAlg:        "SHA256",
+			tagAlg:         "SHA256",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 32,
+		},
+		{
+			hkdfAlg:        "SHA224",
+			tagAlg:         "SHA224",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 28,
+		},
+		{
+			hkdfAlg:        "SHA384",
+			tagAlg:         "SHA384",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 48,
+		},
+		{
+			hkdfAlg:        "SHA512",
+			tagAlg:         "SHA512",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 64,
+		},
+		// hkdfAlg and tagAlg different
+		{
+			hkdfAlg:        "SHA1",
+			tagAlg:         "SHA256",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA224",
+			tagAlg:         "SHA256",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA384",
+			tagAlg:         "SHA256",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA512",
+			tagAlg:         "SHA256",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA256",
+			tagAlg:         "SHA1",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA256",
+			tagAlg:         "SHA224",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA256",
+			tagAlg:         "SHA384",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA256",
+			tagAlg:         "SHA512",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 10,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%s-%s-%d-%d", tc.hkdfAlg, tc.tagAlg, tc.keySizeInBytes, tc.tagSizeInBytes), func(t *testing.T) {
+			primitive, err := subtle.NewAESCTRHMAC(mainKey, tc.hkdfAlg, tc.keySizeInBytes, tc.tagAlg, tc.tagSizeInBytes, segmentSize, firstSegmentOffset)
+			if err != nil {
+				t.Fatalf("subtle.NewAESCTRHMAC err = %v, want nil", err)
+			}
+			ciphertextBuffer := &bytes.Buffer{}
+			_, err = primitive.NewEncryptingWriter(ciphertextBuffer, []byte("associatedData"))
+			if err != nil {
+				t.Fatalf("primitive.NewEncryptingWriter err = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestAESCTRHMACWithInvalidParameters(t *testing.T) {
+	const (
+		keySizeInBytes     = 16
+		tagSizeInBytes     = 12
+		segmentSize        = 256
+		firstSegmentOffset = 8
+	)
+	mainKey, err := hex.DecodeString(
+		"000102030405060708090a0b0c0d0e0f00112233445566778899aabbccddeeff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testCases := []struct {
+		hkdfAlg        string
+		tagAlg         string
+		keySizeInBytes int
+		tagSizeInBytes int
+	}{
+		// keySize too small
+		{
+			hkdfAlg:        "SHA1",
+			tagAlg:         "SHA1",
+			keySizeInBytes: 15,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA256",
+			tagAlg:         "SHA256",
+			keySizeInBytes: 15,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA224",
+			tagAlg:         "SHA224",
+			keySizeInBytes: 15,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA384",
+			tagAlg:         "SHA384",
+			keySizeInBytes: 15,
+			tagSizeInBytes: 10,
+		},
+		{
+			hkdfAlg:        "SHA512",
+			tagAlg:         "SHA512",
+			keySizeInBytes: 15,
+			tagSizeInBytes: 10,
+		},
+		// tagSize too small
+		{
+			hkdfAlg:        "SHA1",
+			tagAlg:         "SHA1",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 9,
+		},
+		{
+			hkdfAlg:        "SHA256",
+			tagAlg:         "SHA256",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 9,
+		},
+		{
+			hkdfAlg:        "SHA224",
+			tagAlg:         "SHA224",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 9,
+		},
+		{
+			hkdfAlg:        "SHA384",
+			tagAlg:         "SHA384",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 9,
+		},
+		{
+			hkdfAlg:        "SHA512",
+			tagAlg:         "SHA512",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 9,
+		},
+		// tagSize larger than digest size
+		{
+			hkdfAlg:        "SHA1",
+			tagAlg:         "SHA1",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 21,
+		},
+		{
+			hkdfAlg:        "SHA256",
+			tagAlg:         "SHA256",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 33,
+		},
+		{
+			hkdfAlg:        "SHA224",
+			tagAlg:         "SHA224",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 29,
+		},
+		{
+			hkdfAlg:        "SHA384",
+			tagAlg:         "SHA384",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 49,
+		},
+		{
+			hkdfAlg:        "SHA512",
+			tagAlg:         "SHA512",
+			keySizeInBytes: 16,
+			tagSizeInBytes: 65,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%s-%s-%d-%d", tc.hkdfAlg, tc.tagAlg, tc.keySizeInBytes, tc.tagSizeInBytes), func(t *testing.T) {
+			_, err := subtle.NewAESCTRHMAC(mainKey, tc.hkdfAlg, tc.keySizeInBytes, tc.tagAlg, tc.tagSizeInBytes, segmentSize, firstSegmentOffset)
+			if err == nil {
+				t.Error("subtle.NewAESCTRHMAC = nil, want error")
+			}
+		})
+	}
 }
