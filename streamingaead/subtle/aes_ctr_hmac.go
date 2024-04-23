@@ -17,13 +17,14 @@ package subtle
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 
 	// Placeholder for internal crypto/cipher allowlist, please ignore.
 	subtleaead "github.com/tink-crypto/tink-go/v2/aead/subtle"
-	subtlemac "github.com/tink-crypto/tink-go/v2/mac/subtle"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle/noncebased"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/subtle"
@@ -132,26 +133,23 @@ func (a *AESCTRHMAC) deriveKeys(salt, aad []byte) ([]byte, []byte, error) {
 
 type aesCTRHMACSegmentEncrypter struct {
 	blockCipher    cipher.Block
-	hmac           *subtlemac.HMAC
+	tagHashFunc    func() hash.Hash
+	tagKey         []byte
 	tagSizeInBytes int
 }
 
 func (e aesCTRHMACSegmentEncrypter) EncryptSegment(segment, nonce []byte) ([]byte, error) {
 	sLen := len(segment)
-	nLen := len(nonce)
 	ctLen := sLen + e.tagSizeInBytes
 	ciphertext := make([]byte, ctLen)
 
 	stream := cipher.NewCTR(e.blockCipher, nonce)
 	stream.XORKeyStream(ciphertext, segment)
 
-	macInput := make([]byte, nLen+sLen)
-	copy(macInput, nonce)
-	copy(macInput[nLen:], ciphertext)
-	tag, err := e.hmac.ComputeMAC(macInput)
-	if err != nil {
-		return nil, err
-	}
+	mac := hmac.New(e.tagHashFunc, e.tagKey)
+	mac.Write(nonce)
+	mac.Write(ciphertext[:sLen])
+	tag := mac.Sum(nil)[:e.tagSizeInBytes]
 	copy(ciphertext[sLen:], tag)
 
 	return ciphertext, nil
@@ -184,11 +182,6 @@ func (a *AESCTRHMAC) NewEncryptingWriter(w io.Writer, aad []byte) (io.WriteClose
 		return nil, err
 	}
 
-	hmac, err := subtlemac.NewHMAC(a.tagAlg, hmacKey, uint32(a.tagSizeInBytes))
-	if err != nil {
-		return nil, err
-	}
-
 	header := make([]byte, a.HeaderLength())
 	header[0] = byte(a.HeaderLength())
 	copy(header[1:], salt)
@@ -201,7 +194,8 @@ func (a *AESCTRHMAC) NewEncryptingWriter(w io.Writer, aad []byte) (io.WriteClose
 		W: w,
 		SegmentEncrypter: aesCTRHMACSegmentEncrypter{
 			blockCipher:    blockCipher,
-			hmac:           hmac,
+			tagHashFunc:    subtle.GetHashFunc(a.tagAlg),
+			tagKey:         hmacKey,
 			tagSizeInBytes: a.tagSizeInBytes,
 		},
 		NonceSize:                    AESCTRHMACNonceSizeInBytes,
@@ -217,26 +211,25 @@ func (a *AESCTRHMAC) NewEncryptingWriter(w io.Writer, aad []byte) (io.WriteClose
 
 type aesCTRHMACSegmentDecrypter struct {
 	blockCipher    cipher.Block
-	hmac           *subtlemac.HMAC
+	tagHashFunc    func() hash.Hash
+	tagKey         []byte
 	tagSizeInBytes int
 }
 
 func (d aesCTRHMACSegmentDecrypter) DecryptSegment(segment, nonce []byte) ([]byte, error) {
-	sLen := len(segment)
-	nLen := len(nonce)
-	tagStart := sLen - d.tagSizeInBytes
+	tagStart := len(segment) - d.tagSizeInBytes
 	if tagStart < 0 {
 		return nil, errors.New("segment too short")
 	}
 	tag := segment[tagStart:]
 
-	macInput := make([]byte, nLen+tagStart)
-	copy(macInput, nonce)
-	copy(macInput[nLen:], segment[:tagStart])
-	if err := d.hmac.VerifyMAC(tag, macInput); err != nil {
+	mac := hmac.New(d.tagHashFunc, d.tagKey)
+	mac.Write(nonce)
+	mac.Write(segment[:tagStart])
+	wantTag := mac.Sum(nil)[:d.tagSizeInBytes]
+	if !hmac.Equal(tag, wantTag) {
 		return nil, errors.New("tag mismatch")
 	}
-
 	result := make([]byte, tagStart)
 	stream := cipher.NewCTR(d.blockCipher, nonce)
 	stream.XORKeyStream(result, segment[:tagStart])
@@ -280,16 +273,12 @@ func (a *AESCTRHMAC) NewDecryptingReader(r io.Reader, aad []byte) (io.Reader, er
 		return nil, err
 	}
 
-	hmac, err := subtlemac.NewHMAC(a.tagAlg, hmacKey, uint32(a.tagSizeInBytes))
-	if err != nil {
-		return nil, err
-	}
-
 	nr, err := noncebased.NewReader(noncebased.ReaderParams{
 		R: r,
 		SegmentDecrypter: aesCTRHMACSegmentDecrypter{
 			blockCipher:    blockCipher,
-			hmac:           hmac,
+			tagHashFunc:    subtle.GetHashFunc(a.tagAlg),
+			tagKey:         hmacKey,
 			tagSizeInBytes: a.tagSizeInBytes,
 		},
 		NonceSize:                    AESCTRHMACNonceSizeInBytes,
