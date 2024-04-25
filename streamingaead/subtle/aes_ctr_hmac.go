@@ -92,6 +92,9 @@ func NewAESCTRHMAC(mainKey []byte, hkdfAlg string, keySizeInBytes int, tagAlg st
 	if uint32(tagSizeInBytes) > digestSize {
 		return nil, errors.New("tag size too big")
 	}
+	if firstSegmentOffset < 0 {
+		return nil, errors.New("firstSegmentOffset must not be negative")
+	}
 	headerLen := 1 + keySizeInBytes + AESCTRHMACNoncePrefixSizeInBytes
 	if ciphertextSegmentSize <= firstSegmentOffset+headerLen+tagSizeInBytes {
 		return nil, errors.New("ciphertextSegmentSize too small")

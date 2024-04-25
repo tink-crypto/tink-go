@@ -593,3 +593,24 @@ func TestAESCTRHMACWithInvalidParameters(t *testing.T) {
 		})
 	}
 }
+
+func TestAESCTRHMACWithNegativeFirstSegmentOffsetFails(t *testing.T) {
+	const (
+		keySizeInBytes     = 16
+		tagSizeInBytes     = 12
+		segmentSize        = 256
+		hkdfAlg            = "SHA256"
+		tagAlg             = "SHA256"
+		firstSegmentOffset = -1
+	)
+	mainKey, err := hex.DecodeString(
+		"000102030405060708090a0b0c0d0e0f00112233445566778899aabbccddeeff")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = subtle.NewAESCTRHMAC(mainKey, hkdfAlg, keySizeInBytes, tagAlg, tagSizeInBytes, segmentSize, firstSegmentOffset)
+	if err == nil {
+		t.Error("subtle.NewAESCTRHMAC() = nil, want error")
+	}
+}
