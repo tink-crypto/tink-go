@@ -248,7 +248,9 @@ func TestAESGCMHKDFModifiedCiphertext(t *testing.T) {
 	t.Run("append to ciphertext", func(t *testing.T) {
 		sizes := []int{1, segmentSize - len(ct)%segmentSize, segmentSize}
 		for _, size := range sizes {
-			ct2 := append(ct, make([]byte, size)...)
+			var ct2 []byte
+			ct2 = append(ct2, ct...)
+			ct2 = append(ct2, make([]byte, size)...)
 			if err := decrypt(cipher, aad, pt, ct2, chunkSize); err == nil {
 				t.Errorf("expected error")
 			}
@@ -273,7 +275,9 @@ func TestAESGCMHKDFModifiedCiphertext(t *testing.T) {
 			if end > len(ct) {
 				end = len(ct)
 			}
-			ct2 := append(ct[:start], ct[end:]...)
+			var ct2 []byte
+			ct2 = append(ct2, ct[:start]...)
+			ct2 = append(ct2, ct[end:]...)
 			if err := decrypt(cipher, aad, pt, ct2, chunkSize); err == nil {
 				t.Errorf("expected error")
 			}

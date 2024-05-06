@@ -34,7 +34,7 @@ var _ tink.HybridEncrypt = (*Encrypt)(nil)
 
 // NewEncrypt constructs an Encrypt using HpkePublicKey.
 func NewEncrypt(recipientPubKey *pb.HpkePublicKey) (*Encrypt, error) {
-	if recipientPubKey.GetPublicKey() == nil || len(recipientPubKey.GetPublicKey()) == 0 {
+	if len(recipientPubKey.GetPublicKey()) == 0 {
 		return nil, errors.New("HpkePublicKey.PublicKey bytes are missing")
 	}
 	kem, kdf, aead, err := newPrimitivesFromProto(recipientPubKey.GetParams())
@@ -55,6 +55,8 @@ func (e *Encrypt) Encrypt(plaintext, contextInfo []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("seal: %v", err)
 	}
-
-	return append(ctx.encapsulatedKey, ciphertext...), nil
+	output := make([]byte, 0, len(ctx.encapsulatedKey)+len(ciphertext))
+	output = append(output, ctx.encapsulatedKey...)
+	output = append(output, ciphertext...)
+	return output, nil
 }

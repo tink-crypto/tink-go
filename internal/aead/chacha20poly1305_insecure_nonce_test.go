@@ -242,7 +242,9 @@ func runChaCha20Poly1305WycheproofCase(t *testing.T, tc *AEADCase) {
 		t.Fatalf("unexpected encryption error: %s", err)
 	}
 
-	ct := append(tc.CT, tc.Tag...)
+	var ct []byte
+	ct = append(ct, tc.CT...)
+	ct = append(ct, tc.Tag...)
 	decrypted, err := ca.Decrypt(tc.IV, ct, tc.AD)
 	if err != nil {
 		if tc.Result == "valid" {

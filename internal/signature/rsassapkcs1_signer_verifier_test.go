@@ -70,7 +70,9 @@ func TestRSASSAPKCS1ModifySignatureFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New_RSA_SSA_PKCS1_Verifier() err = %v, want nil", err)
 	}
-	appendSig := append(signature, 0x01)
+	var appendSig []byte
+	appendSig = append(appendSig, signature...)
+	appendSig = append(appendSig, 0x01)
 	if err := verifier.Verify(appendSig, data); err == nil {
 		t.Fatalf("Verify() err = nil, want error")
 	}
