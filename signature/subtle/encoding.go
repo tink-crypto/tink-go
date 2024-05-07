@@ -75,25 +75,14 @@ func ieeeP1363Encode(sig *ECDSASignature, curveName string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	// Bounds checking for the FillBytes() calls.
+	scalarSize := sigSize / 2
+	if sig.R.BitLen() > scalarSize*8 || sig.S.BitLen() > scalarSize*8 {
+		return nil, fmt.Errorf("ecdsa: invalid signature")
+	}
 	enc := make([]byte, sigSize)
-
-	// sigR and sigS must be half the size of the signature. If not, we need to pad them with zeros.
-	offset := 0
-	if len(sig.R.Bytes()) < (sigSize / 2) {
-		offset += (sigSize / 2) - len(sig.R.Bytes())
-	}
-	// Copy sigR after any zero-padding.
-	copy(enc[offset:], sig.R.Bytes())
-
-	// Skip the bytes of sigR.
-	offset = sigSize / 2
-	if len(sig.S.Bytes()) < (sigSize / 2) {
-		offset += (sigSize / 2) - len(sig.S.Bytes())
-	}
-	// Copy sigS after sigR and any zero-padding.
-	copy(enc[offset:], sig.S.Bytes())
-
+	sig.R.FillBytes(enc[:sigSize/2])
+	sig.S.FillBytes(enc[sigSize/2:])
 	return enc, nil
 }
 

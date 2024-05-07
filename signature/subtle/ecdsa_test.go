@@ -15,6 +15,7 @@
 package subtle_test
 
 import (
+	"bytes"
 	"encoding/asn1"
 	"encoding/hex"
 	"math/big"
@@ -100,10 +101,33 @@ func TestECDSAEncodeDecodeIEEEP1363(t *testing.T) {
 }
 
 func TestECDSAEncodeWithInvalidInput(t *testing.T) {
-	sig := newECDSARandomSignature()
-	_, err := sig.EncodeECDSASignature("UNKNOWN_ENCODING", "P-256")
-	if err == nil {
-		t.Errorf("expect an error when encoding is invalid")
+	testCases := []struct {
+		name     string
+		sig      *subtle.ECDSASignature
+		encoding string
+		curve    string
+	}{
+		{
+			name:     "invalid_encoding",
+			sig:      newECDSARandomSignature(),
+			encoding: "UNKNOWN_ENCODING",
+			curve:    "P-256",
+		},
+		{
+			name:     "too_large_IEEE_P1363",
+			sig:      subtle.NewECDSASignature(new(big.Int).SetBytes(bytes.Repeat([]byte{0xff}, 33)), new(big.Int).SetBytes(bytes.Repeat([]byte{0xff}, 33))),
+			encoding: "IEEE_P1363",
+			curve:    "P-256",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.sig.EncodeECDSASignature(tc.encoding, tc.curve)
+			if err == nil {
+				t.Errorf("sig.EncodeECDSASignature(%q, %q) err = nil, want not nil", tc.encoding, tc.curve)
+			}
+		})
 	}
 }
 
