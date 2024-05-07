@@ -277,3 +277,5 @@ func testDecrypt(plaintext, ciphertext []byte, chunkSize int, rp noncebased.Read
 	}
 	return nil
 }
+
+// TODO(juerg): Add tests with a segment encrypter using the segmentEncrypterWithDst API.

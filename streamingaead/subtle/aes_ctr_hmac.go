@@ -142,9 +142,22 @@ type aesCTRHMACSegmentEncrypter struct {
 }
 
 func (e aesCTRHMACSegmentEncrypter) EncryptSegment(segment, nonce []byte) ([]byte, error) {
+	return e.EncryptSegmentWithDst(nil, segment, nonce)
+}
+
+// Implements the noncebased.segmentEncrypterWithDst interface.
+func (e aesCTRHMACSegmentEncrypter) EncryptSegmentWithDst(dst, segment, nonce []byte) ([]byte, error) {
 	sLen := len(segment)
 	ctLen := sLen + e.tagSizeInBytes
-	ciphertext := make([]byte, ctLen)
+	if len(dst) != 0 {
+		return nil, errors.New("dst must be empty")
+	}
+	var ciphertext []byte
+	if cap(dst) < ctLen {
+		ciphertext = make([]byte, ctLen)
+	} else {
+		ciphertext = dst[:ctLen]
+	}
 
 	stream := cipher.NewCTR(e.blockCipher, nonce)
 	stream.XORKeyStream(ciphertext, segment)
@@ -220,22 +233,36 @@ type aesCTRHMACSegmentDecrypter struct {
 }
 
 func (d aesCTRHMACSegmentDecrypter) DecryptSegment(segment, nonce []byte) ([]byte, error) {
-	tagStart := len(segment) - d.tagSizeInBytes
-	if tagStart < 0 {
+	return d.DecryptSegmentWithDst(nil, segment, nonce)
+}
+
+// Implements the noncebased.segmentDecrypterWithDst interface.
+func (d aesCTRHMACSegmentDecrypter) DecryptSegmentWithDst(dst, segment, nonce []byte) ([]byte, error) {
+	plaintextLen := len(segment) - d.tagSizeInBytes
+	if plaintextLen < 0 {
 		return nil, errors.New("segment too short")
 	}
-	tag := segment[tagStart:]
+	if len(dst) != 0 {
+		return nil, errors.New("dst must be empty")
+	}
+	var result []byte
+	if cap(dst) < plaintextLen {
+		result = make([]byte, plaintextLen)
+	} else {
+		result = dst[:plaintextLen]
+	}
+	tag := segment[plaintextLen:]
 
 	mac := hmac.New(d.tagHashFunc, d.tagKey)
 	mac.Write(nonce)
-	mac.Write(segment[:tagStart])
+	mac.Write(segment[:plaintextLen])
 	wantTag := mac.Sum(nil)[:d.tagSizeInBytes]
 	if !hmac.Equal(tag, wantTag) {
 		return nil, errors.New("tag mismatch")
 	}
-	result := make([]byte, tagStart)
+
 	stream := cipher.NewCTR(d.blockCipher, nonce)
-	stream.XORKeyStream(result, segment[:tagStart])
+	stream.XORKeyStream(result, segment[:plaintextLen])
 	return result, nil
 }
 

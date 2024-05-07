@@ -21,11 +21,11 @@
 //
 // In this scheme, the format of a ciphertext is:
 //
-//   header || segment_0 || segment_1 || ... || segment_k.
+//	header || segment_0 || segment_1 || ... || segment_k.
 //
 // The format of header is:
 //
-//   headerLength || salt || nonce_prefix
+//	headerLength || salt || nonce_prefix
 //
 // headerLength is 1 byte which documents the size of the header and can be
 // obtained via HeaderLength(). In principle, headerLength is redundant
@@ -43,7 +43,7 @@
 //
 // The first segment size will be:
 //
-//		ciphertextSegmentSize - HeaderLength() - firstCiphertextSegmentOffset.
+//	ciphertextSegmentSize - HeaderLength() - firstCiphertextSegmentOffset.
 package noncebased
 
 import (
@@ -69,7 +69,18 @@ var (
 // SegmentEncrypter facilitates implementing various streaming AEAD encryption
 // modes.
 type SegmentEncrypter interface {
+	// EncryptSegment encrypts segment using nonce.
 	EncryptSegment(segment, nonce []byte) ([]byte, error)
+}
+
+// This is a slightly more general API of SegmentEnrypter that is more efficient because
+// it requires less memory allocations. It is currently not a stable API and is Tink internal.
+type segmentEncrypterWithDst interface {
+	// EncryptSegmentWithDst does the same as EncryptSegment, but will store the result in `dst` if
+	// `cap(dst)` is large enough.
+	//
+	// An error will be returned if `len(dst)` is not 0.
+	EncryptSegmentWithDst(dst, segment, nonce []byte) ([]byte, error)
 }
 
 // Writer provides a framework for ingesting plaintext data and
@@ -79,6 +90,8 @@ type SegmentEncrypter interface {
 type Writer struct {
 	w                            io.Writer
 	segmentEncrypter             SegmentEncrypter
+	segmentEncrypterWithDst      segmentEncrypterWithDst
+	useSegmentEncrypterWithDst   bool
 	encryptedSegmentCnt          uint64
 	firstCiphertextSegmentOffset int
 	nonceSize                    int
@@ -120,9 +133,16 @@ func NewWriter(params WriterParams) (*Writer, error) {
 	if params.NonceSize-len(params.NoncePrefix) < 5 {
 		return nil, ErrNonceSizeTooShort
 	}
+
+	// If params.SegmentEncrypter implements method EncryptSegmentWithDst, then we use that because it
+	// is more efficient.
+	encrypterWithDst, useEncrypterWithDst := params.SegmentEncrypter.(segmentEncrypterWithDst)
+
 	return &Writer{
 		w:                            params.W,
 		segmentEncrypter:             params.SegmentEncrypter,
+		segmentEncrypterWithDst:      encrypterWithDst,
+		useSegmentEncrypterWithDst:   useEncrypterWithDst,
 		nonceSize:                    params.NonceSize,
 		noncePrefix:                  params.NoncePrefix,
 		firstCiphertextSegmentOffset: params.FirstCiphertextSegmentOffset,
@@ -153,8 +173,11 @@ func (w *Writer) Write(p []byte) (int, error) {
 		if err != nil {
 			return pos, err
 		}
-
-		w.ciphertext, err = w.segmentEncrypter.EncryptSegment(w.plaintext[:ptLim], nonce)
+		if w.useSegmentEncrypterWithDst {
+			w.ciphertext, err = w.segmentEncrypterWithDst.EncryptSegmentWithDst(w.ciphertext[:0], w.plaintext[:ptLim], nonce)
+		} else {
+			w.ciphertext, err = w.segmentEncrypter.EncryptSegment(w.plaintext[:ptLim], nonce)
+		}
 		if err != nil {
 			return pos, err
 		}
@@ -180,8 +203,11 @@ func (w *Writer) Close() error {
 	if err != nil {
 		return err
 	}
-
-	w.ciphertext, err = w.segmentEncrypter.EncryptSegment(w.plaintext[:w.plaintextPos], nonce)
+	if w.useSegmentEncrypterWithDst {
+		w.ciphertext, err = w.segmentEncrypterWithDst.EncryptSegmentWithDst(w.ciphertext[:0], w.plaintext[:w.plaintextPos], nonce)
+	} else {
+		w.ciphertext, err = w.segmentEncrypter.EncryptSegment(w.plaintext[:w.plaintextPos], nonce)
+	}
 	if err != nil {
 		return err
 	}
@@ -198,7 +224,18 @@ func (w *Writer) Close() error {
 
 // SegmentDecrypter facilitates implementing various streaming AEAD encryption modes.
 type SegmentDecrypter interface {
+	// DecryptSegment decrypts segment using nonce.
 	DecryptSegment(segment, nonce []byte) ([]byte, error)
+}
+
+// This is a slightly more general API of SegmentDecrypter that is more efficient because
+// it requires less memory allocations. It is currently not a stable API and is Tink internal.
+type segmentDecrypterWithDst interface {
+	// DecryptSegmentWithDst does the same as DecryptSegment, but will store the result in `dst` if
+	// `cap(dst)` is large enough.
+	//
+	// An error will be returned if `len(dst)` is not 0.
+	DecryptSegmentWithDst(dst, segment, nonce []byte) ([]byte, error)
 }
 
 // Reader facilitates the decryption of ciphertexts created using a Writer.
@@ -209,6 +246,8 @@ type SegmentDecrypter interface {
 type Reader struct {
 	r                            io.Reader
 	segmentDecrypter             SegmentDecrypter
+	segmentDecrypterWithDst      segmentDecrypterWithDst
+	useSegmentDecrypterWithDst   bool
 	decryptedSegmentCnt          uint64
 	firstCiphertextSegmentOffset int
 	nonceSize                    int
@@ -231,7 +270,7 @@ type ReaderParams struct {
 	// of the Writer used to create the ciphertext.
 	NonceSize int
 
-	// NoncePrefix is a constant that all nocnes throughout the ciphertext start
+	// NoncePrefix is a constant that all nonces throughout the ciphertext start
 	// with. It's extracted from the header of the ciphertext.
 	NoncePrefix []byte
 
@@ -249,9 +288,15 @@ func NewReader(params ReaderParams) (*Reader, error) {
 	if params.NonceSize-len(params.NoncePrefix) < 5 {
 		return nil, ErrNonceSizeTooShort
 	}
+
+	// If params.SegmentDecrypter implements DecryptSegmentWithDst, then we use that because it is more efficient.
+	decrypterWithDst, useDecrypterWithDst := params.SegmentDecrypter.(segmentDecrypterWithDst)
+
 	return &Reader{
 		r:                            params.R,
 		segmentDecrypter:             params.SegmentDecrypter,
+		segmentDecrypterWithDst:      decrypterWithDst,
+		useSegmentDecrypterWithDst:   useDecrypterWithDst,
 		nonceSize:                    params.NonceSize,
 		noncePrefix:                  params.NoncePrefix,
 		firstCiphertextSegmentOffset: params.FirstCiphertextSegmentOffset,
@@ -299,8 +344,11 @@ func (r *Reader) Read(p []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-
-	r.plaintext, err = r.segmentDecrypter.DecryptSegment(r.ciphertext[:segment], nonce)
+	if r.useSegmentDecrypterWithDst {
+		r.plaintext, err = r.segmentDecrypterWithDst.DecryptSegmentWithDst(r.plaintext[:0], r.ciphertext[:segment], nonce)
+	} else {
+		r.plaintext, err = r.segmentDecrypter.DecryptSegment(r.ciphertext[:segment], nonce)
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -323,7 +371,7 @@ func (r *Reader) Read(p []byte) (int, error) {
 //
 // The format of the nonce is:
 //
-//   nonce_prefix || ctr || last_block.
+//	nonce_prefix || ctr || last_block.
 //
 // nonce_prefix is a constant prefix used throughout the whole ciphertext.
 //

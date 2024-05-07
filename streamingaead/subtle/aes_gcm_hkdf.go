@@ -122,9 +122,19 @@ type aesGCMHKDFSegmentEncrypter struct {
 }
 
 func (e aesGCMHKDFSegmentEncrypter) EncryptSegment(segment, nonce []byte) ([]byte, error) {
-	result := make([]byte, 0, len(segment)+e.cipher.Overhead())
-	result = e.cipher.Seal(result, nonce, segment, nil)
-	return result, nil
+	return e.EncryptSegmentWithDst(nil, segment, nonce)
+}
+
+// Implements the noncebased.segmentEncrypterWithDst interface.
+func (e aesGCMHKDFSegmentEncrypter) EncryptSegmentWithDst(dst, segment, nonce []byte) ([]byte, error) {
+	if len(dst) != 0 {
+		return nil, errors.New("dst must be empty")
+	}
+	ciphertextLen := len(segment) + e.cipher.Overhead()
+	if cap(dst) < ciphertextLen {
+		dst = make([]byte, 0, ciphertextLen)
+	}
+	return e.cipher.Seal(dst, nonce, segment, nil), nil
 }
 
 // aesGCMHKDFWriter works as a wrapper around underlying io.Writer, which is
@@ -182,12 +192,22 @@ type aesGCMHKDFSegmentDecrypter struct {
 }
 
 func (d aesGCMHKDFSegmentDecrypter) DecryptSegment(segment, nonce []byte) ([]byte, error) {
-	result := make([]byte, 0, len(segment))
-	result, err := d.cipher.Open(result, nonce, segment, nil)
-	if err != nil {
-		return nil, err
+	return d.DecryptSegmentWithDst(nil, segment, nonce)
+}
+
+// Implements the noncebased.segmentDecrypterWithDst interface.
+func (d aesGCMHKDFSegmentDecrypter) DecryptSegmentWithDst(dst, segment, nonce []byte) ([]byte, error) {
+	if len(dst) != 0 {
+		return nil, errors.New("dst must be empty")
 	}
-	return result, nil
+	plaintextLen := len(segment) - d.cipher.Overhead()
+	if plaintextLen < 0 {
+		return nil, errors.New("segment too short")
+	}
+	if cap(dst) < plaintextLen {
+		dst = make([]byte, 0, plaintextLen)
+	}
+	return d.cipher.Open(dst, nonce, segment, nil)
 }
 
 // aesGCMHKDFReader works as a wrapper around underlying io.Reader.
