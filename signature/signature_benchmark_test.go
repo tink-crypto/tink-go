@@ -47,6 +47,9 @@ var benchmarkTestCases = []struct {
 		name:     "ECDSA_P256",
 		template: signature.ECDSAP256KeyTemplate(),
 	}, {
+		name:     "ECDSA_P256_RAW",
+		template: signature.ECDSAP256RawKeyTemplate(),
+	}, {
 		name:     "ECDSA_P384",
 		template: signature.ECDSAP384SHA384KeyTemplate(),
 	}, {
