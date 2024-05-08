@@ -208,6 +208,60 @@ func (d testDecrypter) DecryptSegment(segment, nonce []byte) ([]byte, error) {
 	return result, nil
 }
 
+// testEncrypterWithDst does the same as testEncrypter, but only implements the
+// new EncryptSegmentWithDst function, and leave the old EncryptSegment function unimplemented.
+type testEncrypterWithDst struct {
+}
+
+func (e testEncrypterWithDst) EncryptSegment(segment, nonce []byte) ([]byte, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (e testEncrypterWithDst) EncryptSegmentWithDst(dst, segment, nonce []byte) ([]byte, error) {
+	if len(dst) != 0 {
+		return nil, errors.New("dst must be empty")
+	}
+	ctLen := len(segment) + len(nonce)
+	var ciphertext []byte
+	if cap(dst) < ctLen {
+		ciphertext = make([]byte, ctLen)
+	} else {
+		ciphertext = dst[:ctLen]
+	}
+	copy(ciphertext, segment)
+	copy(ciphertext[len(segment):], nonce)
+	return ciphertext, nil
+}
+
+type testDecrypterWithDst struct {
+}
+
+func (d testDecrypterWithDst) DecryptSegment(segment, nonce []byte) ([]byte, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (d testDecrypterWithDst) DecryptSegmentWithDst(dst, segment, nonce []byte) ([]byte, error) {
+	if len(dst) != 0 {
+		return nil, errors.New("dst must be empty")
+	}
+	plaintextLen := len(segment) - len(nonce)
+	if plaintextLen < 0 {
+		return nil, errors.New("segment too short")
+	}
+	tag := segment[plaintextLen:]
+	if !bytes.Equal(nonce, tag) {
+		return nil, fmt.Errorf("tag mismtach:\nsegment: %s\nnonce: %s\ntag: %s", hex.EncodeToString(segment), hex.EncodeToString(nonce), hex.EncodeToString(tag))
+	}
+	var result []byte
+	if cap(dst) < plaintextLen {
+		result = make([]byte, plaintextLen)
+	} else {
+		result = dst[:plaintextLen]
+	}
+	copy(result, segment[:plaintextLen])
+	return result, nil
+}
+
 // testEncrypt generates a random plaintext and random noncePrefix, then uses
 // them to instantiate a noncebased.Writer and uses it to produce a ciphertext.
 //
@@ -222,7 +276,7 @@ func testEncrypt(plaintextSize, noncePrefixSize int, wp noncebased.WriterParams)
 	}
 
 	wp.W = dstWriter
-	wp.SegmentEncrypter = testEncrypter{}
+	wp.SegmentEncrypter = testEncrypterWithDst{}
 	wp.NoncePrefix = noncePrefix
 
 	w, err := noncebased.NewWriter(wp)
@@ -248,7 +302,7 @@ func testEncrypt(plaintextSize, noncePrefixSize int, wp noncebased.WriterParams)
 // increments.
 func testDecrypt(plaintext, ciphertext []byte, chunkSize int, rp noncebased.ReaderParams) error {
 	rp.R = bytes.NewReader(ciphertext)
-	rp.SegmentDecrypter = testDecrypter{}
+	rp.SegmentDecrypter = testDecrypterWithDst{}
 	r, err := noncebased.NewReader(rp)
 	if err != nil {
 		return err
@@ -278,4 +332,80 @@ func testDecrypt(plaintext, ciphertext []byte, chunkSize int, rp noncebased.Read
 	return nil
 }
 
-// TODO(juerg): Add tests with a segment encrypter using the segmentEncrypterWithDst API.
+// This test uses testDecrypter and testEncrypter, to make sure that the old API is still working.
+func TestEncryptDecryptWithOldInterface(t *testing.T) {
+	plaintextSize := 110
+	nonceSize := 10
+	noncePrefixSize := 5
+	plaintextSegmentSize := 20
+	firstCiphertextSegmentOffset := 10
+	chunkSize := 5
+
+	noncePrefix := make([]byte, noncePrefixSize)
+	if _, err := rand.Read(noncePrefix); err != nil {
+		t.Fatalf("Generating nonce prefix failed: %v\n", err)
+	}
+
+	var dst bytes.Buffer
+	dstWriter := bufio.NewWriter(&dst)
+
+	writerParams := noncebased.WriterParams{
+		NonceSize:                    nonceSize,
+		PlaintextSegmentSize:         plaintextSegmentSize,
+		FirstCiphertextSegmentOffset: firstCiphertextSegmentOffset,
+		W:                            dstWriter,
+		SegmentEncrypter:             testEncrypter{},
+		NoncePrefix:                  noncePrefix,
+	}
+
+	w, err := noncebased.NewWriter(writerParams)
+	if err != nil {
+		t.Fatalf("Creating writer failed: %v\n", err)
+	}
+
+	plaintext := make([]byte, plaintextSize)
+	if _, err := rand.Read(plaintext); err != nil {
+		t.Fatalf("Generating plaintext failed: %v\n", err)
+	}
+
+	w.Write(plaintext)
+	w.Close()
+	dstWriter.Flush()
+	ciphertext := dst.Bytes()
+
+	readerParams := noncebased.ReaderParams{
+		NonceSize:                    nonceSize,
+		NoncePrefix:                  noncePrefix,
+		CiphertextSegmentSize:        plaintextSegmentSize + nonceSize,
+		FirstCiphertextSegmentOffset: firstCiphertextSegmentOffset,
+		R:                            bytes.NewReader(ciphertext),
+		SegmentDecrypter:             testDecrypterWithDst{},
+	}
+
+	r, err := noncebased.NewReader(readerParams)
+	if err != nil {
+		t.Fatalf("creating reader failed: %v\n", err)
+	}
+
+	var (
+		chunk     = make([]byte, chunkSize)
+		decrypted = 0
+		eof       = false
+	)
+	for !eof {
+		n, err := r.Read(chunk)
+		if err != nil && err != io.EOF {
+			t.Fatalf("Error reading chunk: %v", err)
+		}
+		eof = err == io.EOF
+		got := chunk[:n]
+		want := plaintext[decrypted : decrypted+n]
+		if !bytes.Equal(got, want) {
+			t.Fatalf("Decrypted data does not match. Got=%s;want=%s", hex.EncodeToString(got), hex.EncodeToString(want))
+		}
+		decrypted += n
+	}
+	if decrypted != len(plaintext) {
+		t.Fatalf("Number of decrypted bytes does not match. Got=%d,want=%d", decrypted, len(plaintext))
+	}
+}
