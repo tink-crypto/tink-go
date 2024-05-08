@@ -40,7 +40,7 @@ const (
 // AESGCMInsecureIV is an insecure implementation of the AEAD interface that
 // permits the user to set the IV.
 type AESGCMInsecureIV struct {
-	key       []byte
+	gcmCipher cipher.AEAD
 	prependIV bool
 }
 
@@ -50,12 +50,20 @@ type AESGCMInsecureIV struct {
 // If prependIV is true, both the ciphertext returned from Encrypt and passed
 // into Decrypt are prefixed with the IV.
 func NewAESGCMInsecureIV(key []byte, prependIV bool) (*AESGCMInsecureIV, error) {
-	keySize := uint32(len(key))
-	if err := ValidateAESKeySize(keySize); err != nil {
+	if err := ValidateAESKeySize(uint32(len(key))); err != nil {
 		return nil, fmt.Errorf("invalid AES key size: %s", err)
 	}
+	aesCipher, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, errors.New("failed to initialize cipher")
+	}
+	gcmCipher, err := cipher.NewGCM(aesCipher)
+	if err != nil {
+		return nil, errors.New("failed to initialize cipher")
+	}
+
 	return &AESGCMInsecureIV{
-		key:       key,
+		gcmCipher: gcmCipher,
 		prependIV: prependIV,
 	}, nil
 }
@@ -70,8 +78,8 @@ func NewAESGCMInsecureIV(key []byte, prependIV bool) (*AESGCMInsecureIV, error) 
 // Note: The crypto library's AES-GCM implementation always returns the
 // ciphertext with an AESGCMTagSize (16-byte) tag.
 func (i *AESGCMInsecureIV) Encrypt(iv, plaintext, associatedData []byte) ([]byte, error) {
-	if got, want := len(iv), AESGCMIVSize; got != want {
-		return nil, fmt.Errorf("unexpected IV size: got %d, want %d", got, want)
+	if len(iv) != AESGCMIVSize {
+		return nil, fmt.Errorf("unexpected IV size: got %d, want %d", len(iv), AESGCMIVSize)
 	}
 	// Seal() checks plaintext length, but this duplicated check avoids panic.
 	var maxPlaintextSize uint64 = maxIntPlaintextSize
@@ -82,18 +90,14 @@ func (i *AESGCMInsecureIV) Encrypt(iv, plaintext, associatedData []byte) ([]byte
 		return nil, fmt.Errorf("plaintext too long: got %d", len(plaintext))
 	}
 
-	cipher, err := i.newCipher()
-	if err != nil {
-		return nil, err
-	}
 	if !i.prependIV {
-		return cipher.Seal(nil, iv, plaintext, associatedData), nil
+		return i.gcmCipher.Seal(nil, iv, plaintext, associatedData), nil
 	}
 	// Make the capacity of dst large enough so that both the IV and the ciphertext fit inside.
-	dst := make([]byte, 0, AESGCMIVSize+len(plaintext)+cipher.Overhead())
+	dst := make([]byte, 0, AESGCMIVSize+len(plaintext)+i.gcmCipher.Overhead())
 	dst = append(dst, iv...)
 	// Seal appends the ciphertext to dst. So the final output is: iv || ciphertext.
-	return cipher.Seal(dst, iv, plaintext, associatedData), nil
+	return i.gcmCipher.Seal(dst, iv, plaintext, associatedData), nil
 }
 
 // Decrypt decrypts ciphertext with iv as the initialization vector and
@@ -112,7 +116,6 @@ func (i *AESGCMInsecureIV) Decrypt(iv, ciphertext, associatedData []byte) ([]byt
 		return nil, fmt.Errorf("unexpected IV size: got %d, want %d", len(iv), AESGCMIVSize)
 	}
 
-	var actualCiphertext []byte
 	if i.prependIV {
 		if len(ciphertext) < minPrependIVCiphertextSize {
 			return nil, fmt.Errorf("ciphertext too short: got %d, want >= %d", len(ciphertext), minPrependIVCiphertextSize)
@@ -120,35 +123,16 @@ func (i *AESGCMInsecureIV) Decrypt(iv, ciphertext, associatedData []byte) ([]byt
 		if !bytes.Equal(iv, ciphertext[:AESGCMIVSize]) {
 			return nil, fmt.Errorf("unequal IVs: iv argument %x, ct prefix %x", iv, ciphertext[:AESGCMIVSize])
 		}
-		actualCiphertext = ciphertext[AESGCMIVSize:]
+		ciphertext = ciphertext[AESGCMIVSize:]
 	} else {
 		if len(ciphertext) < minNoIVCiphertextSize {
 			return nil, fmt.Errorf("ciphertext too short: got %d, want >= %d", len(ciphertext), minNoIVCiphertextSize)
 		}
-		actualCiphertext = ciphertext
 	}
 
-	cipher, err := i.newCipher()
-	if err != nil {
-		return nil, err
-	}
-	plaintext, err := cipher.Open(nil, iv, actualCiphertext, associatedData)
+	plaintext, err := i.gcmCipher.Open(nil, iv, ciphertext, associatedData)
 	if err != nil {
 		return nil, err
 	}
 	return plaintext, nil
-}
-
-// newCipher creates a new AES-GCM cipher using the given key and the crypto
-// library.
-func (i *AESGCMInsecureIV) newCipher() (cipher.AEAD, error) {
-	aesCipher, err := aes.NewCipher(i.key)
-	if err != nil {
-		return nil, errors.New("failed to initialize cipher")
-	}
-	ret, err := cipher.NewGCM(aesCipher)
-	if err != nil {
-		return nil, errors.New("failed to initialize cipher")
-	}
-	return ret, nil
 }

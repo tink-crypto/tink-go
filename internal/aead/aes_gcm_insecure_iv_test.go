@@ -16,8 +16,11 @@ package aead_test
 
 import (
 	"bytes"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
+	"sync"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/internal/aead"
@@ -107,6 +110,63 @@ func TestAESGCMInsecureIVMismatchedIV(t *testing.T) {
 				t.Error("Decrypt with ct prefixed with wrong IV: want err, got success")
 			}
 		})
+	}
+}
+
+func TestAESGCMInsecureIVConcurrentEncryption(t *testing.T) {
+	numSamples := 1 << 14
+
+	key := random.GetRandomBytes(16)
+	iv := random.GetRandomBytes(aead.AESGCMIVSize)
+
+	plaintext := []byte("a secret")
+	associatedData := []byte("a context")
+
+	a, err := aead.NewAESGCMInsecureIV(key, true /*=prependIV*/)
+	if err != nil {
+		t.Fatalf("aead.NewAESGCMInsecureIV() err = %v, want nil", err)
+	}
+
+	// IV -> ciphertext
+	var ciphertexts sync.Map
+
+	var wg sync.WaitGroup
+	for i := 0; i < numSamples; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			uniqueIV := make([]byte, len(iv))
+			copy(uniqueIV, iv)
+			binary.BigEndian.PutUint32(uniqueIV[0:4], uint32(i))
+			ciphertext, err := a.Encrypt(uniqueIV, plaintext, associatedData)
+			if err != nil {
+				t.Errorf("a.Encrypt() err = %v, want nil", err)
+			}
+			ciphertexts.Store(hex.EncodeToString(uniqueIV), ciphertext)
+		}()
+	}
+	wg.Wait()
+
+	actualSamples := 0
+
+	ciphertexts.Range(func(k, v any) bool {
+		hexIV := k.(string)
+		iv, err := hex.DecodeString(hexIV)
+		if err != nil {
+			t.Fatalf("hex.DecodeString(%q) err = %v", hexIV, err)
+		}
+		ciphertext := v.([]byte)
+		_, err = a.Decrypt(iv, ciphertext, associatedData)
+		if err != nil {
+			t.Errorf("a.Decrypt() err = %v, want nil", err)
+		}
+		actualSamples++
+		return true
+	})
+
+	if actualSamples != numSamples {
+		t.Errorf("actualSamples != numSamples: got: %d, want %d", actualSamples, numSamples)
 	}
 }
 
@@ -288,7 +348,7 @@ func TestPreallocatedCiphertextMemoryIsExact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a.Encrypt() err = %v, want nil", err)
 	}
-  // Encrypt() uses cipher.Overhead() to pre-allocate the memory needed store the ciphertext.
+	// Encrypt() uses cipher.Overhead() to pre-allocate the memory needed store the ciphertext.
 	// For AES GCM, the size of the allocated memory should always be exact. If this check fails, the
 	// pre-allocated memory was too large or too small. If it was too small, the system had to
 	// re-allocate more memory, which is expensive and should be avoided.
