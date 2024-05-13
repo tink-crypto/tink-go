@@ -136,8 +136,7 @@ func (a *AESCTRHMAC) deriveKeys(salt, aad []byte) ([]byte, []byte, error) {
 
 type aesCTRHMACSegmentEncrypter struct {
 	blockCipher    cipher.Block
-	tagHashFunc    func() hash.Hash
-	tagKey         []byte
+	mac            hash.Hash
 	tagSizeInBytes int
 }
 
@@ -162,12 +161,11 @@ func (e aesCTRHMACSegmentEncrypter) EncryptSegmentWithDst(dst, segment, nonce []
 	stream := cipher.NewCTR(e.blockCipher, nonce)
 	stream.XORKeyStream(ciphertext, segment)
 
-	mac := hmac.New(e.tagHashFunc, e.tagKey)
-	mac.Write(nonce)
-	mac.Write(ciphertext[:sLen])
-	tag := mac.Sum(nil)[:e.tagSizeInBytes]
+	e.mac.Reset()
+	e.mac.Write(nonce)
+	e.mac.Write(ciphertext[:sLen])
+	tag := e.mac.Sum(nil)[:e.tagSizeInBytes]
 	copy(ciphertext[sLen:], tag)
-
 	return ciphertext, nil
 }
 
@@ -210,8 +208,7 @@ func (a *AESCTRHMAC) NewEncryptingWriter(w io.Writer, aad []byte) (io.WriteClose
 		W: w,
 		SegmentEncrypter: aesCTRHMACSegmentEncrypter{
 			blockCipher:    blockCipher,
-			tagHashFunc:    subtle.GetHashFunc(a.tagAlg),
-			tagKey:         hmacKey,
+			mac:            hmac.New(subtle.GetHashFunc(a.tagAlg), hmacKey),
 			tagSizeInBytes: a.tagSizeInBytes,
 		},
 		NonceSize:                    AESCTRHMACNonceSizeInBytes,
@@ -227,8 +224,7 @@ func (a *AESCTRHMAC) NewEncryptingWriter(w io.Writer, aad []byte) (io.WriteClose
 
 type aesCTRHMACSegmentDecrypter struct {
 	blockCipher    cipher.Block
-	tagHashFunc    func() hash.Hash
-	tagKey         []byte
+	mac            hash.Hash
 	tagSizeInBytes int
 }
 
@@ -253,10 +249,10 @@ func (d aesCTRHMACSegmentDecrypter) DecryptSegmentWithDst(dst, segment, nonce []
 	}
 	tag := segment[plaintextLen:]
 
-	mac := hmac.New(d.tagHashFunc, d.tagKey)
-	mac.Write(nonce)
-	mac.Write(segment[:plaintextLen])
-	wantTag := mac.Sum(nil)[:d.tagSizeInBytes]
+	d.mac.Reset()
+	d.mac.Write(nonce)
+	d.mac.Write(segment[:plaintextLen])
+	wantTag := d.mac.Sum(nil)[:d.tagSizeInBytes]
 	if !hmac.Equal(tag, wantTag) {
 		return nil, errors.New("tag mismatch")
 	}
@@ -307,8 +303,7 @@ func (a *AESCTRHMAC) NewDecryptingReader(r io.Reader, aad []byte) (io.Reader, er
 		R: r,
 		SegmentDecrypter: aesCTRHMACSegmentDecrypter{
 			blockCipher:    blockCipher,
-			tagHashFunc:    subtle.GetHashFunc(a.tagAlg),
-			tagKey:         hmacKey,
+			mac:            hmac.New(subtle.GetHashFunc(a.tagAlg), hmacKey),
 			tagSizeInBytes: a.tagSizeInBytes,
 		},
 		NonceSize:                    AESCTRHMACNonceSizeInBytes,
