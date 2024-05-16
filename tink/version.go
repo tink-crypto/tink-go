@@ -16,5 +16,5 @@ package tink
 
 const (
 	// Version is the current version of Tink.
-	Version = "2.1.0"
+	Version = "2.2.0"
 )
