@@ -146,6 +146,13 @@ func TestLegacyKeysetHandle(t *testing.T) {
 	}
 }
 
+func TestLegacyKeysetHandleWithNilKeysetReturnsNil(t *testing.T) {
+	handle := insecurecleartextkeyset.KeysetHandle(nil)
+	if handle != nil {
+		t.Error("insecurecleartextkeyset.KeysetHandle(nil) != nil, want nil")
+	}
+}
+
 func TestHandleFromReaderWithAnnotationsGetsMonitored(t *testing.T) {
 	defer internalregistry.ClearMonitoringClient()
 	client := &fakemonitoring.Client{}

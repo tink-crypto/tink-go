@@ -34,11 +34,14 @@ var errInvalidKeyset = fmt.Errorf("keyset.Handle: invalid keyset")
 // Handle provides access to a Keyset protobuf, to limit the exposure of actual protocol
 // buffers that hold sensitive key material.
 type Handle struct {
-	ks          *tinkpb.Keyset
+	ks          *tinkpb.Keyset // must be non-nil
 	annotations map[string]string
 }
 
 func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
+	if ks == nil {
+		return nil, errors.New("keyset.Handle: nil keyset")
+	}
 	h := &Handle{ks: ks}
 	if err := applyOptions(h, opts...); err != nil {
 		return nil, err

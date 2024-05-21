@@ -213,6 +213,7 @@ func TestWriteAndReadWithNoSecrets(t *testing.T) {
 	}
 	serialized := buff.Bytes()
 
+	// Using ReadWithNoSecrets.
 	handle2, err := keyset.ReadWithNoSecrets(keyset.NewBinaryReader(bytes.NewBuffer(serialized)))
 	if err != nil {
 		t.Fatalf("keyset.ReadWithNoSecrets() err = %v, want nil", err)
@@ -220,6 +221,27 @@ func TestWriteAndReadWithNoSecrets(t *testing.T) {
 
 	if !proto.Equal(testkeyset.KeysetMaterial(handle), testkeyset.KeysetMaterial(handle2)) {
 		t.Fatalf("keyset.ReadWithNoSecrets() = %v, want %v", handle2, handle)
+	}
+
+	// Using Read() and then NewHandleWithNoSecrets.
+	reader := keyset.NewBinaryReader(bytes.NewBuffer(serialized))
+	protoPublicKeyset, err := reader.Read()
+	if err != nil {
+		t.Fatalf("reader.Read() err = %v, want nil", err)
+	}
+	handle3, err := keyset.NewHandleWithNoSecrets(protoPublicKeyset)
+	if err != nil {
+		t.Fatalf("keyset.NewHandleWithNoSecrets() err = %v, want nil", err)
+	}
+
+	if !proto.Equal(testkeyset.KeysetMaterial(handle), testkeyset.KeysetMaterial(handle3)) {
+		t.Fatalf("keyset.NewHandleWithNoSecrets() = %v, want %v", handle3, handle)
+	}
+}
+
+func TestNewHandleWithNoSecretsReturnsErrorIfInputIsNil(t *testing.T) {
+	if _, err := keyset.NewHandleWithNoSecrets(nil); err == nil {
+		t.Fatal("keyset.NewHandleWithNoSecrets(nil) err = nil, want error")
 	}
 }
 
