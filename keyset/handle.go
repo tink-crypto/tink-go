@@ -147,6 +147,11 @@ func (h *Handle) String() string {
 	return string(c)
 }
 
+// Len returns the number of keys in the keyset.
+func (h *Handle) Len() int {
+	return len(h.ks.GetKey())
+}
+
 // KeysetInfo returns KeysetInfo representation of the managed keyset.
 // The result does not contain any sensitive key material.
 func (h *Handle) KeysetInfo() *tinkpb.KeysetInfo {

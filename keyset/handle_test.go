@@ -464,3 +464,33 @@ func TestPrimitivesWithKeyManager(t *testing.T) {
 		t.Errorf("handle.PrimitivesWithKeyManager().Primary = %v, want instance of `testPrimitive`", primitives.Primary.Primitive)
 	}
 }
+
+func TestLenWithOneKey(t *testing.T) {
+	template := mac.HMACSHA256Tag128KeyTemplate()
+	handle, err := keyset.NewHandle(template)
+	if err != nil {
+		t.Fatalf("keyset.NewHandle(%v) err = %v, want nil", template, err)
+	}
+	if handle.Len() != 1 {
+		t.Errorf("handle.Len() = %d, want 1", handle.Len())
+	}
+}
+
+func TestLenWithMultipleKeys(t *testing.T) {
+	ks := &tinkpb.Keyset{
+		Key: []*tinkpb.Keyset_Key{
+			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(2, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(3, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(4, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+		},
+		PrimaryKeyId: 1,
+	}
+	handle, err := testkeyset.NewHandle(ks)
+	if err != nil {
+		t.Fatalf("testkeyset.NewHandle(%v) err = %v, want nil", ks, err)
+	}
+	if handle.Len() != len(ks.Key) {
+		t.Errorf("handle.Len() = %d, want %d", handle.Len(), len(ks.Key))
+	}
+}
