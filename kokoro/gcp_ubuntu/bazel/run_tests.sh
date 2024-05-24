@@ -43,5 +43,5 @@ fi
   ./kokoro/testutils/run_bazel_tests.sh -t --test_arg=--test.v .
 
 ./kokoro/testutils/run_command.sh "${RUN_COMMAND_ARGS[@]}" \
-  ./kokoro/testutils/run_bazel_tests.sh -b "--enable_bzlmod" \
-    -t --enable_bzlmod,--test_arg=--test.v .
+  ./kokoro/testutils/run_bazel_tests.sh -b "--noenable_bzlmod" \
+    -t --noenable_bzlmod,--test_arg=--test.v .

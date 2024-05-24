@@ -1,3 +1,19 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tink Go repository module."""
+
 module(
     name = "tink-go",
     version = "2.2.0",
@@ -5,26 +21,27 @@ module(
 
 bazel_dep(
     name = "platforms",
-    version = "0.0.8",
+    version = "0.0.10",
 )
 
 bazel_dep(
     name = "rules_go",
-    version = "0.39.1",
+    version = "0.48.0",
     repo_name = "io_bazel_rules_go",
 )
 
 bazel_dep(
     name = "gazelle",
-    version = "0.31.0",
+    version = "0.36.0",
     repo_name = "bazel_gazelle",
 )
 
-go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
+
+
+go_sdk.nogo(nogo = "//:tink_nogo")
 
 go_sdk.download(version = "1.21.8")
-
-go_sdk.nogo(nogo = "@//:tink_nogo")
 
 go_sdk.host()
 
