@@ -15,14 +15,20 @@
 package jwt_test
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/jwt"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 
@@ -275,5 +281,206 @@ func TestVerifyMACAndDecodeReturnsValidationError(t *testing.T) {
 	}
 	if err.Error() != wantErr {
 		t.Errorf("p.VerifyMACAndDecode() err = %q, want %q", err.Error(), wantErr)
+	}
+}
+
+func TestComputeAndVerifyWithoutAnnotationsEmitsNoMonitoring(t *testing.T) {
+	defer internalregistry.ClearMonitoringClient()
+	client := fakemonitoring.NewClient("fake-client")
+	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+	kh, err := keyset.NewHandle(jwt.HS256Template())
+	if err != nil {
+		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
+	}
+	p, err := jwt.NewMAC(kh)
+	if err != nil {
+		t.Fatalf("jwt.NewMAC() err = %v, want nil", err)
+	}
+	audience := "audience"
+	rawJWT, err := jwt.NewRawJWT(&jwt.RawJWTOptions{Audience: &audience, WithoutExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewRawJWT() err = %v, want nil", err)
+	}
+	token, err := p.ComputeMACAndEncode(rawJWT)
+	if err != nil {
+		t.Errorf("p.ComputeMACAndEncode() err = %v, want nil", err)
+	}
+	validator, err := jwt.NewValidator(
+		&jwt.ValidatorOpts{ExpectedAudience: &audience, AllowMissingExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewValidator() err = %v, want nil", err)
+	}
+	if _, err = p.VerifyMACAndDecode(token, validator); err != nil {
+		t.Errorf("p.VerifyMACAndDecode() err = %v, want error", err)
+	}
+	if len(client.Failures()) != 0 {
+		t.Errorf("len(client.Failures()) = %d, want = 0", len(client.Failures()))
+	}
+	if len(client.Events()) != 0 {
+		t.Errorf("len(client.Events()) = %d, want = 0", len(client.Events()))
+	}
+}
+
+func TestComputeAndVerifyWithAnnotationsEmitsMonitoring(t *testing.T) {
+	defer internalregistry.ClearMonitoringClient()
+	client := fakemonitoring.NewClient("fake-client")
+	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+	kh, err := keyset.NewHandle(jwt.HS256Template())
+	if err != nil {
+		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
+	}
+	// Annotations are only supported through the `insecurecleartextkeyset` API.
+	buff := &bytes.Buffer{}
+	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
+		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
+	}
+	annotations := map[string]string{"foo": "bar"}
+	mh, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
+	if err != nil {
+		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
+	}
+	p, err := jwt.NewMAC(mh)
+	if err != nil {
+		t.Fatalf("jwt.NewMAC() err = %v, want nil", err)
+	}
+	audience := "audience"
+	rawJWT, err := jwt.NewRawJWT(&jwt.RawJWTOptions{Audience: &audience, WithoutExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewRawJWT() err = %v, want nil", err)
+	}
+	token, err := p.ComputeMACAndEncode(rawJWT)
+	if err != nil {
+		t.Errorf("p.ComputeMACAndEncode() err = %v, want nil", err)
+	}
+	validator, err := jwt.NewValidator(
+		&jwt.ValidatorOpts{ExpectedAudience: &audience, AllowMissingExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewValidator() err = %v, want nil", err)
+	}
+	if _, err = p.VerifyMACAndDecode(token, validator); err != nil {
+		t.Errorf("p.VerifyMACAndDecode() err = %v, want error", err)
+	}
+	failures := client.Failures()
+	if len(failures) != 0 {
+		t.Errorf("len(client.Failures()) = %d, want = 0", len(failures))
+	}
+	got := client.Events()
+	wantKeysetInfo := monitoring.NewKeysetInfo(
+		annotations,
+		kh.KeysetInfo().GetPrimaryKeyId(),
+		[]*monitoring.Entry{
+			{
+				KeyID:     kh.KeysetInfo().GetPrimaryKeyId(),
+				Status:    monitoring.Enabled,
+				KeyType:   "tink.JwtHmacKey",
+				KeyPrefix: "TINK",
+			},
+		},
+	)
+	want := []*fakemonitoring.LogEvent{
+		{
+			KeyID:    mh.KeysetInfo().GetPrimaryKeyId(),
+			NumBytes: 1,
+			Context:  monitoring.NewContext("jwtmac", "compute", wantKeysetInfo),
+		},
+		{
+			KeyID:    mh.KeysetInfo().GetPrimaryKeyId(),
+			NumBytes: 1,
+			Context:  monitoring.NewContext("jwtmac", "verify", wantKeysetInfo),
+		},
+	}
+	if cmp.Diff(got, want) != "" {
+		t.Errorf("%v", cmp.Diff(got, want))
+	}
+}
+
+func TestComputeFailureEmitsMonitoring(t *testing.T) {
+	defer internalregistry.ClearMonitoringClient()
+	client := &fakemonitoring.Client{Name: ""}
+	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+	keyData, err := newKeyData(newJWTHMACKey(jwtmacpb.JwtHmacAlgorithm_HS256, &jwtmacpb.JwtHmacKey_CustomKid{Value: "custom-kid"}))
+	if err != nil {
+		t.Fatalf("creating NewKeyData: %v", err)
+	}
+	primaryKey := testutil.NewKey(keyData, tinkpb.KeyStatusType_ENABLED, 42, tinkpb.OutputPrefixType_TINK)
+	kh, err := testkeyset.NewHandle(testutil.NewKeyset(primaryKey.KeyId, []*tinkpb.Keyset_Key{primaryKey}))
+	if err != nil {
+		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
+	}
+	// Annotations are only supported through the `insecurecleartextkeyset` API.
+	buff := &bytes.Buffer{}
+	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
+		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
+	}
+	annotations := map[string]string{"foo": "bar"}
+	mh, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
+	if err != nil {
+		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
+	}
+	p, err := jwt.NewMAC(mh)
+	if err != nil {
+		t.Fatalf("jwt.NewMAC() err = %v, want nil", err)
+	}
+	rawJWT, err := jwt.NewRawJWT(&jwt.RawJWTOptions{WithoutExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewRawJWT() err = %v, want nil", err)
+	}
+	if _, err := p.ComputeMACAndEncode(rawJWT); err == nil {
+		t.Errorf("p.ComputeMACAndEncode() err = nil, want error")
+	}
+	failures := client.Failures()
+	if len(failures) != 1 {
+		t.Errorf("len(client.Failures()) = %d, want = 1", len(failures))
+	}
+	if len(client.Events()) != 0 {
+		t.Errorf("len(client.Events()) = %d, want = 0", len(client.Events()))
+	}
+}
+
+func TestVerifyFailureEmitsMonitoring(t *testing.T) {
+	defer internalregistry.ClearMonitoringClient()
+	client := fakemonitoring.NewClient("fake-client")
+	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+	kh, err := keyset.NewHandle(jwt.HS256Template())
+	if err != nil {
+		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
+	}
+	// Annotations are only supported through the `insecurecleartextkeyset` API.
+	buff := &bytes.Buffer{}
+	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
+		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
+	}
+	annotations := map[string]string{"foo": "bar"}
+	mh, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
+	if err != nil {
+		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
+	}
+	p, err := jwt.NewMAC(mh)
+	if err != nil {
+		t.Fatalf("jwt.NewMAC() err = %v, want nil", err)
+	}
+	audience := "audience"
+	validator, err := jwt.NewValidator(
+		&jwt.ValidatorOpts{ExpectedAudience: &audience, AllowMissingExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewValidator() err = %v, want nil", err)
+	}
+	if _, err := p.VerifyMACAndDecode("", validator); err == nil {
+		t.Errorf("p.VerifyMACAndDecode() err = nil, want error")
+	}
+	failures := client.Failures()
+	if len(failures) != 1 {
+		t.Errorf("len(client.Failures()) = %d, want = 1", len(failures))
+	}
+	if len(client.Events()) != 0 {
+		t.Errorf("len(client.Events()) = %d, want = 0", len(client.Events()))
 	}
 }

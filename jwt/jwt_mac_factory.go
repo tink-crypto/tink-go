@@ -18,7 +18,10 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -36,7 +39,9 @@ func NewMAC(handle *keyset.Handle) (MAC, error) {
 
 // wrappedJWTMAC is a JWTMAC implementation that uses the underlying primitive set for JWT MAC.
 type wrappedJWTMAC struct {
-	ps *primitiveset.PrimitiveSet
+	ps            *primitiveset.PrimitiveSet
+	computeLogger monitoring.Logger
+	verifyLogger  monitoring.Logger
 }
 
 var _ MAC = (*wrappedJWTMAC)(nil)
@@ -55,7 +60,39 @@ func newWrappedJWTMAC(ps *primitiveset.PrimitiveSet) (*wrappedJWTMAC, error) {
 			}
 		}
 	}
-	return &wrappedJWTMAC{ps: ps}, nil
+	computeLogger, verifyLogger, err := createLoggers(ps)
+	if err != nil {
+		return nil, err
+	}
+	return &wrappedJWTMAC{ps: ps, computeLogger: computeLogger, verifyLogger: verifyLogger}, nil
+}
+
+func createLoggers(ps *primitiveset.PrimitiveSet) (monitoring.Logger, monitoring.Logger, error) {
+	if len(ps.Annotations) == 0 {
+		return &monitoringutil.DoNothingLogger{}, &monitoringutil.DoNothingLogger{}, nil
+	}
+	client := internalregistry.GetMonitoringClient()
+	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
+	if err != nil {
+		return nil, nil, err
+	}
+	computeLogger, err := client.NewLogger(&monitoring.Context{
+		Primitive:   "jwtmac",
+		APIFunction: "compute",
+		KeysetInfo:  keysetInfo,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	verifyLogger, err := client.NewLogger(&monitoring.Context{
+		Primitive:   "jwtmac",
+		APIFunction: "verify",
+		KeysetInfo:  keysetInfo,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return computeLogger, verifyLogger, nil
 }
 
 func (w *wrappedJWTMAC) ComputeMACAndEncode(token *RawJWT) (string, error) {
@@ -64,7 +101,13 @@ func (w *wrappedJWTMAC) ComputeMACAndEncode(token *RawJWT) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("jwt_mac_factory: not a JWT MAC primitive")
 	}
-	return p.ComputeMACAndEncodeWithKID(token, keyID(primary.KeyID, primary.PrefixType))
+	signedToken, err := p.ComputeMACAndEncodeWithKID(token, keyID(primary.KeyID, primary.PrefixType))
+	if err != nil {
+		w.computeLogger.LogFailure()
+		return "", err
+	}
+	w.computeLogger.Log(primary.KeyID, 1)
+	return signedToken, nil
 }
 
 func (w *wrappedJWTMAC) VerifyMACAndDecode(compact string, validator *Validator) (*VerifiedJWT, error) {
@@ -77,6 +120,7 @@ func (w *wrappedJWTMAC) VerifyMACAndDecode(compact string, validator *Validator)
 			}
 			verifiedJWT, err := p.VerifyMACAndDecodeWithKID(compact, validator, keyID(e.KeyID, e.PrefixType))
 			if err == nil {
+				w.verifyLogger.Log(e.KeyID, 1)
 				return verifiedJWT, nil
 			}
 			if err != errJwtVerification {
@@ -85,6 +129,7 @@ func (w *wrappedJWTMAC) VerifyMACAndDecode(compact string, validator *Validator)
 			}
 		}
 	}
+	w.verifyLogger.LogFailure()
 	if interestingErr != nil {
 		return nil, interestingErr
 	}
