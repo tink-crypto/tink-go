@@ -24,6 +24,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -36,6 +37,76 @@ var errInvalidKeyset = fmt.Errorf("keyset.Handle: invalid keyset")
 type Handle struct {
 	ks          *tinkpb.Keyset // must be non-nil
 	annotations map[string]string
+}
+
+// KeyStatus is the key status.
+type KeyStatus int
+
+const (
+	// Unknown is the default invalid value.
+	Unknown KeyStatus = iota
+	// Enabled means the key is enabled.
+	Enabled
+	// Disabled means the key is disabled.
+	Disabled
+	// Destroyed means the key is marked for destruction.
+	Destroyed
+)
+
+// String implements fmt.Stringer.
+func (ks KeyStatus) String() string {
+	switch ks {
+	case Enabled:
+		return "Enabled"
+	case Disabled:
+		return "Disabled"
+	case Destroyed:
+		return "Destroyed"
+	default:
+		return "Unknown"
+	}
+}
+
+// Entry represents an entry in a keyset.
+type Entry struct {
+	// Object that represents a full Tink key, i.e., key material, parameters and algorithm.
+	key       any
+	isPrimary bool
+	keyID     uint32
+	status    KeyStatus
+}
+
+// Key returns the key.
+func (e *Entry) Key() any {
+	return e.key
+}
+
+// IsPrimary returns true if the key is the primary key.
+func (e *Entry) IsPrimary() bool {
+	return e.isPrimary
+}
+
+// KeyID returns the key ID.
+func (e *Entry) KeyID() uint32 {
+	return e.keyID
+}
+
+// KeyStatus returns the key status.
+func (e *Entry) KeyStatus() KeyStatus {
+	return e.status
+}
+
+func keyStatusFromProto(status tinkpb.KeyStatusType) (KeyStatus, error) {
+	switch status {
+	case tinkpb.KeyStatusType_ENABLED:
+		return Enabled, nil
+	case tinkpb.KeyStatusType_DISABLED:
+		return Disabled, nil
+	case tinkpb.KeyStatusType_DESTROYED:
+		return Destroyed, nil
+	default:
+		return Unknown, fmt.Errorf("unknown key status: %v", status)
+	}
 }
 
 func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
@@ -107,6 +178,30 @@ func ReadWithNoSecrets(reader Reader) (*Handle, error) {
 		return nil, err
 	}
 	return NewHandleWithNoSecrets(ks)
+}
+
+// Primary returns the primary key of the keyset. Returns (Entry, nil) if a primary key is found.
+// Returns (nil, err) if the keyset is invalid or if no primary key is found.
+func (h *Handle) Primary() (*Entry, error) {
+	if err := Validate(h.ks); err != nil {
+		return nil, fmt.Errorf("keyset.Handle: invalid keyset: %v", err)
+	}
+	for _, key := range h.ks.GetKey() {
+		if key.GetKeyId() == h.ks.GetPrimaryKeyId() {
+			keyStatus, err := keyStatusFromProto(key.GetStatus())
+			if err != nil {
+				return nil, fmt.Errorf("keyset.Handle: invalid key status: %v", key.GetStatus())
+			}
+			return &Entry{
+				key:       protoserialization.NewFallbackProtoKey(key),
+				isPrimary: true,
+				keyID:     key.GetKeyId(),
+				status:    keyStatus,
+			}, nil
+		}
+	}
+	// Should never reach this point.
+	return nil, fmt.Errorf("keyset.Handle: no primary key found")
 }
 
 // Public returns a Handle of the public keys if the managed keyset contains private keys.

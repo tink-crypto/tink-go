@@ -22,6 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/signature"
@@ -492,5 +493,77 @@ func TestLenWithMultipleKeys(t *testing.T) {
 	}
 	if handle.Len() != len(ks.Key) {
 		t.Errorf("handle.Len() = %d, want %d", handle.Len(), len(ks.Key))
+	}
+}
+
+func TestPrimaryFailsIfNoPrimaryKey(t *testing.T) {
+	ks := &tinkpb.Keyset{
+		Key: []*tinkpb.Keyset_Key{
+			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(2, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(3, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(4, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+		},
+	}
+	handle, err := testkeyset.NewHandle(ks)
+	if err != nil {
+		t.Fatalf("testkeyset.NewHandle(%v) err = %v, want nil", ks, err)
+	}
+	_, err = handle.Primary()
+	if err == nil { // if NO error
+		t.Error("handle.Primary() err = nil, want error")
+	}
+}
+
+func TestPrimaryFailsIfKeysetIsInvalid(t *testing.T) {
+	// Invalid because it has multiple primary keys.
+	ks := &tinkpb.Keyset{
+		Key: []*tinkpb.Keyset_Key{
+			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+		},
+		PrimaryKeyId: 1,
+	}
+	handle, err := testkeyset.NewHandle(ks)
+	if err != nil {
+		t.Fatalf("testkeyset.NewHandle(%v) err = %v, want nil", ks, err)
+	}
+	_, err = handle.Primary()
+	if err == nil { // if NO error
+		t.Error("handle.Primary() err = nil, want error")
+	}
+}
+
+func TestPrimaryReturnsPrimaryKey(t *testing.T) {
+	primaryKey := testutil.NewDummyKey(2, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK)
+	ks := &tinkpb.Keyset{
+		Key: []*tinkpb.Keyset_Key{
+			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			primaryKey,
+			testutil.NewDummyKey(3, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+		},
+		PrimaryKeyId: 2,
+	}
+	handle, err := testkeyset.NewHandle(ks)
+	if err != nil {
+		t.Fatalf("testkeyset.NewHandle(%v) err = %v, want nil", ks, err)
+	}
+	entry, err := handle.Primary()
+	if err != nil {
+		t.Fatalf("handle.Primary() err = %v, want nil", err)
+	}
+	if entry.KeyID() != 2 {
+		t.Errorf("entry.KeyID() = %v, want 2", entry.KeyID())
+	}
+	if entry.KeyStatus() != keyset.Enabled {
+		t.Errorf("entry.KeyStatus() = %v, want Enabled", entry.KeyStatus())
+	}
+	protoKey, ok := entry.Key().(*protoserialization.FallbackProtoKey)
+	if !ok {
+		t.Fatalf("type mismatch: got %T, want *protoserialization.FallbackProtoKey", entry.Key())
+	}
+	protoKeysetKey := protoserialization.ProtoKeysetKey(protoKey)
+	if !proto.Equal(protoKeysetKey, primaryKey) {
+		t.Errorf("protoKey.ProtoKeysetKey() = %v, want %v", protoKeysetKey, primaryKey)
 	}
 }

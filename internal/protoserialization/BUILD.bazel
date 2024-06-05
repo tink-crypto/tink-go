@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "protoserialization",
+    srcs = ["protoserialization.go"],
+    importpath = "github.com/tink-crypto/tink-go/v2/internal/protoserialization",
+    visibility = ["//:__subpackages__"],
+    deps = ["//proto/tink_go_proto"],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":protoserialization",
+    visibility = ["//:__subpackages__"],
+)
