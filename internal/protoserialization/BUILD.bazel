@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "protoserialization",
@@ -12,4 +12,13 @@ alias(
     name = "go_default_library",
     actual = ":protoserialization",
     visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "protoserialization_test",
+    srcs = ["protoserialization_test.go"],
+    deps = [
+        ":protoserialization",
+        "//proto/tink_go_proto",
+    ],
 )

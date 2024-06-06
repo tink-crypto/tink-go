@@ -192,8 +192,12 @@ func (h *Handle) Primary() (*Entry, error) {
 			if err != nil {
 				return nil, fmt.Errorf("keyset.Handle: invalid key status: %v", key.GetStatus())
 			}
+			keyObject, err := protoserialization.ParseKey(key)
+			if err != nil {
+				return nil, fmt.Errorf("keyset.Handle: %v", err)
+			}
 			return &Entry{
-				key:       protoserialization.NewFallbackProtoKey(key),
+				key:       keyObject,
 				isPrimary: true,
 				keyID:     key.GetKeyId(),
 				status:    keyStatus,
