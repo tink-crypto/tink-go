@@ -534,6 +534,83 @@ func TestPrimaryFailsIfKeysetIsInvalid(t *testing.T) {
 	}
 }
 
+func TestEntryReturnsCorrectKey(t *testing.T) {
+	ks := &tinkpb.Keyset{
+		Key: []*tinkpb.Keyset_Key{
+			testutil.NewDummyKey(0, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(2, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(3, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(4, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+		},
+		PrimaryKeyId: 2,
+	}
+	handle, err := testkeyset.NewHandle(ks)
+	if err != nil {
+		t.Fatalf("testkeyset.NewHandle(%v) err = %v, want nil", ks, err)
+	}
+
+	for i := 0; i < handle.Len(); i++ {
+		entry, err := handle.Entry(i)
+		if err != nil {
+			t.Errorf("handle.Entry(%d) err = %v, want nil", i, err)
+		}
+		if int(entry.KeyID()) != i {
+			t.Errorf("entry.KeyID() = %v, want %v", entry.KeyID(), i)
+		}
+		if wantIsPrimary := i == 2; entry.IsPrimary() != wantIsPrimary {
+			t.Errorf("entry.IsPrimary() = %v, want %v", entry.IsPrimary(), wantIsPrimary)
+		}
+		if entry.KeyStatus() != keyset.Enabled {
+			t.Errorf("entry.KeyStatus() = %v, want Enabled", entry.KeyStatus())
+		}
+	}
+}
+
+func TestEntryFailsIfIndexOutOfRange(t *testing.T) {
+	ks := &tinkpb.Keyset{
+		Key: []*tinkpb.Keyset_Key{
+			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(2, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(3, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(4, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+		},
+	}
+	handle, err := testkeyset.NewHandle(ks)
+	if err != nil {
+		t.Fatalf("testkeyset.NewHandle(%v) err = %v, want nil", ks, err)
+	}
+	_, err = handle.Entry(-1)
+	if err == nil {
+		t.Error("handle.Entry(-1) err = nil, want error")
+	}
+	_, err = handle.Entry(handle.Len())
+	if err == nil {
+		t.Errorf("handle.Entry(%d) err = nil, want error", handle.Len())
+	}
+}
+
+func TestEntryFailsIfKeysetIsInvalid(t *testing.T) {
+	// Invalid because it has multiple primary keys.
+	ks := &tinkpb.Keyset{
+		Key: []*tinkpb.Keyset_Key{
+			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+		},
+		PrimaryKeyId: 1,
+	}
+	handle, err := testkeyset.NewHandle(ks)
+	if err != nil {
+		t.Fatalf("testkeyset.NewHandle(%v) err = %v, want nil", ks, err)
+	}
+	for i := 0; i < handle.Len(); i++ {
+		_, err = handle.Entry(i)
+		if err == nil {
+			t.Errorf("handle.Entry(%d) err = nil, want error", i)
+		}
+	}
+}
+
 func TestPrimaryReturnsPrimaryKey(t *testing.T) {
 	primaryKey := testutil.NewDummyKey(2, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK)
 	ks := &tinkpb.Keyset{
@@ -548,22 +625,38 @@ func TestPrimaryReturnsPrimaryKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("testkeyset.NewHandle(%v) err = %v, want nil", ks, err)
 	}
-	entry, err := handle.Primary()
+	primaryEntry, err := handle.Primary()
 	if err != nil {
 		t.Fatalf("handle.Primary() err = %v, want nil", err)
 	}
-	if entry.KeyID() != 2 {
-		t.Errorf("entry.KeyID() = %v, want 2", entry.KeyID())
+	if primaryEntry.KeyID() != 2 {
+		t.Errorf("primaryEntry.KeyID() = %v, want 2", primaryEntry.KeyID())
 	}
-	if entry.KeyStatus() != keyset.Enabled {
-		t.Errorf("entry.KeyStatus() = %v, want Enabled", entry.KeyStatus())
+	if primaryEntry.KeyStatus() != keyset.Enabled {
+		t.Errorf("primaryEntry.KeyStatus() = %v, want Enabled", primaryEntry.KeyStatus())
 	}
-	protoKey, ok := entry.Key().(*protoserialization.FallbackProtoKey)
+	primaryProtoKey, ok := primaryEntry.Key().(*protoserialization.FallbackProtoKey)
+	if !ok {
+		t.Fatalf("type mismatch: got %T, want *protoserialization.FallbackProtoKey", primaryEntry.Key())
+	}
+	primaryProtoKeysetKey := protoserialization.ProtoKeysetKey(primaryProtoKey)
+	if !proto.Equal(primaryProtoKeysetKey, primaryKey) {
+		t.Errorf("primaryProtoKey.ProtoKeysetKey() = %v, want %v", primaryProtoKeysetKey, primaryKey)
+	}
+	// Check that is the same as Entry(1).
+	entry, err := handle.Entry(1)
+	if err != nil {
+		t.Fatalf("handle.Entry(1) err = %v, want nil", err)
+	}
+	entryProtoKey, ok := entry.Key().(*protoserialization.FallbackProtoKey)
 	if !ok {
 		t.Fatalf("type mismatch: got %T, want *protoserialization.FallbackProtoKey", entry.Key())
 	}
-	protoKeysetKey := protoserialization.ProtoKeysetKey(protoKey)
-	if !proto.Equal(protoKeysetKey, primaryKey) {
-		t.Errorf("protoKey.ProtoKeysetKey() = %v, want %v", protoKeysetKey, primaryKey)
+	entryProtoKeysetKey := protoserialization.ProtoKeysetKey(entryProtoKey)
+	if !proto.Equal(entryProtoKeysetKey, primaryProtoKeysetKey) {
+		t.Errorf("entryProtoKey.ProtoKeysetKey() = %v, want %v", entryProtoKeysetKey, primaryProtoKeysetKey)
+	}
+	if !proto.Equal(entryProtoKeysetKey, primaryProtoKeysetKey) {
+		t.Errorf("proto.Equal(entryProtoKeysetKey, primaryProtoKeysetKey) = false, want true")
 	}
 }

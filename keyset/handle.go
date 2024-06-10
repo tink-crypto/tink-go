@@ -180,8 +180,7 @@ func ReadWithNoSecrets(reader Reader) (*Handle, error) {
 	return NewHandleWithNoSecrets(ks)
 }
 
-// Primary returns the primary key of the keyset. Returns (Entry, nil) if a primary key is found.
-// Returns (nil, err) if the keyset is invalid or if no primary key is found.
+// Primary returns the primary key of the keyset.
 func (h *Handle) Primary() (*Entry, error) {
 	if err := Validate(h.ks); err != nil {
 		return nil, fmt.Errorf("keyset.Handle: invalid keyset: %v", err)
@@ -206,6 +205,33 @@ func (h *Handle) Primary() (*Entry, error) {
 	}
 	// Should never reach this point.
 	return nil, fmt.Errorf("keyset.Handle: no primary key found")
+}
+
+// Entry returns the key at index i from the keyset.
+// i must be within the range [0, Handle.Len()).
+func (h *Handle) Entry(i int) (*Entry, error) {
+	if err := Validate(h.ks); err != nil {
+		return nil, fmt.Errorf("keyset.Handle: invalid keyset: %v", err)
+	}
+	if i < 0 || i >= h.Len() {
+		return nil, fmt.Errorf("keyset.Handle: index %d out of range", i)
+	}
+
+	key := h.ks.GetKey()[i]
+	keyStatus, err := keyStatusFromProto(key.GetStatus())
+	if err != nil {
+		return nil, fmt.Errorf("keyset.Handle: %v", err)
+	}
+	keyObject, err := protoserialization.ParseKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("keyset.Handle: %v", err)
+	}
+	return &Entry{
+		key:       keyObject,
+		isPrimary: key.GetKeyId() == h.ks.GetPrimaryKeyId(),
+		keyID:     key.GetKeyId(),
+		status:    keyStatus,
+	}, nil
 }
 
 // Public returns a Handle of the public keys if the managed keyset contains private keys.
