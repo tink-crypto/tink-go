@@ -85,5 +85,5 @@ func ParseKey(keysetKey *tinkpb.Keyset_Key) (any, error) {
 func ClearKeyParsers() {
 	keyParsersMu.Lock()
 	defer keyParsersMu.Unlock()
-	clear(keyParsers)
+	keyParsers = make(map[string]KeyParser)
 }
