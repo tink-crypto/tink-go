@@ -18,7 +18,10 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -36,10 +39,27 @@ func NewSigner(handle *keyset.Handle) (Signer, error) {
 
 // wrappedSigner is a JWT Signer implementation that uses the underlying primitive set for JWT Sign.
 type wrappedSigner struct {
-	ps *primitiveset.PrimitiveSet
+	ps     *primitiveset.PrimitiveSet
+	logger monitoring.Logger
 }
 
 var _ Signer = (*wrappedSigner)(nil)
+
+func createSignerLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, error) {
+	// only keysets which contain annotations are monitored.
+	if len(ps.Annotations) == 0 {
+		return &monitoringutil.DoNothingLogger{}, nil
+	}
+	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
+	if err != nil {
+		return nil, err
+	}
+	return internalregistry.GetMonitoringClient().NewLogger(&monitoring.Context{
+		KeysetInfo:  keysetInfo,
+		Primitive:   "jwtsign",
+		APIFunction: "sign",
+	})
+}
 
 func newWrappedSigner(ps *primitiveset.PrimitiveSet) (*wrappedSigner, error) {
 	if _, ok := (ps.Primary.Primitive).(*signerWithKID); !ok {
@@ -55,7 +75,14 @@ func newWrappedSigner(ps *primitiveset.PrimitiveSet) (*wrappedSigner, error) {
 			}
 		}
 	}
-	return &wrappedSigner{ps: ps}, nil
+	logger, err := createSignerLogger(ps)
+	if err != nil {
+		return nil, err
+	}
+	return &wrappedSigner{
+		ps:     ps,
+		logger: logger,
+	}, nil
 }
 
 func (w *wrappedSigner) SignAndEncode(rawJWT *RawJWT) (string, error) {
@@ -64,5 +91,11 @@ func (w *wrappedSigner) SignAndEncode(rawJWT *RawJWT) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("jwt_signer_factory: not a JWT Signer primitive")
 	}
-	return p.SignAndEncodeWithKID(rawJWT, keyID(primary.KeyID, primary.PrefixType))
+	token, err := p.SignAndEncodeWithKID(rawJWT, keyID(primary.KeyID, primary.PrefixType))
+	if err != nil {
+		w.logger.LogFailure()
+		return "", err
+	}
+	w.logger.Log(primary.KeyID, 1)
+	return token, nil
 }

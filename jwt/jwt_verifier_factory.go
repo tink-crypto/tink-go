@@ -18,7 +18,10 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -36,10 +39,27 @@ func NewVerifier(handle *keyset.Handle) (Verifier, error) {
 
 // wrappedVerifier is a JWT Verifier implementation that uses the underlying primitive set for JWT Verifier.
 type wrappedVerifier struct {
-	ps *primitiveset.PrimitiveSet
+	ps     *primitiveset.PrimitiveSet
+	logger monitoring.Logger
 }
 
 var _ Verifier = (*wrappedVerifier)(nil)
+
+func createVerifierLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, error) {
+	// only keysets which contain annotations are monitored.
+	if len(ps.Annotations) == 0 {
+		return &monitoringutil.DoNothingLogger{}, nil
+	}
+	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
+	if err != nil {
+		return nil, err
+	}
+	return internalregistry.GetMonitoringClient().NewLogger(&monitoring.Context{
+		KeysetInfo:  keysetInfo,
+		Primitive:   "jwtverify",
+		APIFunction: "verify",
+	})
+}
 
 func newWrappedVerifier(ps *primitiveset.PrimitiveSet) (*wrappedVerifier, error) {
 	if _, ok := (ps.Primary.Primitive).(*verifierWithKID); !ok {
@@ -55,7 +75,14 @@ func newWrappedVerifier(ps *primitiveset.PrimitiveSet) (*wrappedVerifier, error)
 			}
 		}
 	}
-	return &wrappedVerifier{ps: ps}, nil
+	logger, err := createVerifierLogger(ps)
+	if err != nil {
+		return nil, err
+	}
+	return &wrappedVerifier{
+		ps:     ps,
+		logger: logger,
+	}, nil
 }
 
 func (w *wrappedVerifier) VerifyAndDecode(compact string, validator *Validator) (*VerifiedJWT, error) {
@@ -68,6 +95,7 @@ func (w *wrappedVerifier) VerifyAndDecode(compact string, validator *Validator) 
 			}
 			verifiedJWT, err := p.VerifyAndDecodeWithKID(compact, validator, keyID(e.KeyID, e.PrefixType))
 			if err == nil {
+				w.logger.Log(e.KeyID, 1)
 				return verifiedJWT, nil
 			}
 			if err != errJwtVerification {
@@ -76,6 +104,7 @@ func (w *wrappedVerifier) VerifyAndDecode(compact string, validator *Validator) 
 			}
 		}
 	}
+	w.logger.LogFailure()
 	if interestingErr != nil {
 		return nil, interestingErr
 	}
