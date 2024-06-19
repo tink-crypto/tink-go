@@ -20,5 +20,6 @@ go_test(
     deps = [
         ":protoserialization",
         "//proto/tink_go_proto",
+        "@org_golang_google_protobuf//proto",
     ],
 )

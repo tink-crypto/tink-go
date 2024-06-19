@@ -19,14 +19,17 @@ package protoserialization
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 var (
-	keyParsersMu sync.RWMutex
-	keyParsers   = make(map[string]KeyParser) // TypeURL -> KeyParser
+	keyParsersMu     sync.RWMutex
+	keyParsers       = make(map[string]KeyParser) // TypeURL -> KeyParser
+	keySerializersMu sync.RWMutex
+	keySerializers   = make(map[reflect.Type]KeySerializer) // KeyType -> KeySerializer
 )
 
 // FallbackProtoKey is a key that wraps a proto keyset key.
@@ -55,7 +58,37 @@ type KeyParser interface {
 	ParseKey(keysetKey *tinkpb.Keyset_Key) (any, error)
 }
 
-// RegisterKeyParser registers the given key parser to the global registry.
+// KeySerializer is an interface for serializing a key into a proto keyset key.
+type KeySerializer interface {
+	// SerializeKey serializes the given key into a proto keyset key.
+	SerializeKey(key any) (*tinkpb.Keyset_Key, error)
+}
+
+// RegisterKeySerializer registers the given key serializer for keys of type K.
+//
+// It doesn't allow replacing existing serializers.
+func RegisterKeySerializer[K any](keySerializer KeySerializer) error {
+	keySerializersMu.Lock()
+	defer keySerializersMu.Unlock()
+	keyType := reflect.TypeOf((*K)(nil)).Elem()
+	if _, found := keySerializers[keyType]; found {
+		return fmt.Errorf("serialization.RegisterKeySerializer: type %v already registered", keyType)
+	}
+	keySerializers[keyType] = keySerializer
+	return nil
+}
+
+// SerializeKey serializes the given key into a proto keyset key.
+func SerializeKey(key any) (*tinkpb.Keyset_Key, error) {
+	keyType := reflect.TypeOf(key)
+	serializer, ok := keySerializers[keyType]
+	if !ok {
+		return nil, fmt.Errorf("serialization.SerializeKey: no serializer for type %v", keyType)
+	}
+	return serializer.SerializeKey(key)
+}
+
+// RegisterKeyParser registers the given key parser.
 //
 // It doesn't allow replacing existing parsers.
 func RegisterKeyParser(keyTypeURL string, keyParser KeyParser) error {
@@ -79,11 +112,37 @@ func ParseKey(keysetKey *tinkpb.Keyset_Key) (any, error) {
 	return parser.ParseKey(keysetKey)
 }
 
-// ClearKeyParsers clears the global parsers registry.
+type fallbackProtoKeySerializer struct{}
+
+func (s *fallbackProtoKeySerializer) SerializeKey(key any) (*tinkpb.Keyset_Key, error) {
+	fallbackKey, ok := key.(*FallbackProtoKey)
+	if !ok {
+		return nil, fmt.Errorf("serialization.fallbackProtoKeySerializer.SerializeKey: key is not a FallbackProtoKey")
+	}
+	return fallbackKey.protoKeysetKey, nil
+}
+
+// ClearKeyParsers clears the global key parsers registry.
 //
 // This function is intended to be used in tests only.
 func ClearKeyParsers() {
 	keyParsersMu.Lock()
 	defer keyParsersMu.Unlock()
-	keyParsers = make(map[string]KeyParser)
+	clear(keyParsers)
+}
+
+// ReinitializeKeySerializers clears the global key serializers registry and registers
+// fallbackProtoKeySerializer.
+//
+// This function is intended to be used in tests only.
+func ReinitializeKeySerializers() {
+	keySerializersMu.Lock()
+	defer keySerializersMu.Unlock()
+	clear(keySerializers)
+	// Always register the fallback serializer.
+	keySerializers[reflect.TypeOf((*FallbackProtoKey)(nil))] = &fallbackProtoKeySerializer{}
+}
+
+func init() {
+	RegisterKeySerializer[*FallbackProtoKey](&fallbackProtoKeySerializer{})
 }
