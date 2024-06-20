@@ -54,7 +54,7 @@ func TestKeysetManagerBasic(t *testing.T) {
 	}
 }
 
-func TestExistingKeyset(t *testing.T) {
+func TestKeysetManagerExistingKeyset(t *testing.T) {
 	// Create a keyset that contains a single HmacKey.
 	ksm1 := keyset.NewManager()
 	kt := mac.HMACSHA256Tag128KeyTemplate()
@@ -98,32 +98,75 @@ func TestExistingKeyset(t *testing.T) {
 	}
 }
 
-func TestKeysetManagerFull(t *testing.T) {
-	// Test a full keyset manager cycle: add, get info, set primary.
-	ksm := keyset.NewManager()
+func TestKeysetManagerNewManagerFromHandleMakesACopy(t *testing.T) {
+	// Create a keyset that contains a single HmacKey.
+	ksm1 := keyset.NewManager()
 	kt := mac.HMACSHA256Tag128KeyTemplate()
-	_, err := ksm.Add(kt)
+	keyID1, err := ksm1.Add(kt)
 	if err != nil {
-		t.Errorf("Expected no error but got %s", err)
+		t.Errorf("ksm1.Add(kt) err = %q, want nil", err)
+	}
+	err = ksm1.SetPrimary(keyID1)
+	if err != nil {
+		t.Errorf("ksm1.SetPrimary(%v) err = %q, want nil", keyID1, err)
+	}
+	h1, err := ksm1.Handle()
+	if err != nil {
+		t.Errorf("ksm1.Handle() err = %q, want nil", err)
+	}
+	if h1.Len() != 1 {
+		t.Errorf("h1.Len() = %d, want 1", h1.Len())
+	}
+
+	ksm2 := keyset.NewManagerFromHandle(h1)
+	keyID2, err := ksm2.Add(kt)
+	if err != nil {
+		t.Errorf("ksm2.Add(kt) err = %q, want nil", err)
+	}
+	err = ksm2.SetPrimary(keyID2)
+	if err != nil {
+		t.Errorf("ksm2.SetPrimary(%v) err = %q, want nil", keyID2, err)
+	}
+	h2, err := ksm2.Handle()
+	if err != nil {
+		t.Errorf("ksm2.Handle() err = %q, want nil", err)
+	}
+	if h2.Len() != 2 {
+		t.Errorf("h2.Len() = %d, want 2", h2.Len())
+	}
+
+	// Make sure no changes were made to the original handle.
+	if h1.Len() == h2.Len() {
+		t.Errorf("h1.Len() == h2.Len(), want different")
+	}
+}
+
+func TestKeysetManagerAddSetPrimaryHandle(t *testing.T) {
+	// Test a full keyset manager cycle: Add, SetPrimary, Handle.
+	ksm := keyset.NewManager()
+	keyID, err := ksm.Add(mac.HMACSHA256Tag128KeyTemplate())
+	if err != nil {
+		t.Errorf("ksm.Add(mac.HMACSHA256Tag128KeyTemplate()) err = %q, want nil", err)
+	}
+	err = ksm.SetPrimary(keyID)
+	if err != nil {
+		t.Errorf("ksm.SetPrimary(%v) err = %q, want nil", keyID, err)
 	}
 	h1, err := ksm.Handle()
 	if err != nil {
-		t.Errorf("Expected no error but got %s", err)
+		t.Errorf("ksm.Handle() err = %q, want nil", err)
 	}
 	info := h1.KeysetInfo()
 	if len(info.KeyInfo) != 1 {
-		t.Errorf("Expected one key but got %d", len(info.KeyInfo))
+		t.Errorf("len(h1.KeysetInfo()) = %d, want 1", len(info.KeyInfo))
 	}
-	newPrimaryKey := info.KeyInfo[0].KeyId
-	err = ksm.SetPrimary(newPrimaryKey)
-	if err != nil {
-		t.Errorf("Expected no error but got %s", err)
+	if info.KeyInfo[0].GetKeyId() != keyID {
+		t.Errorf("info.KeyInfo[0].GetKeyId() = %d, want %d", info.KeyInfo[0].GetKeyId(), keyID)
 	}
-	// validate this is a valid keyset
 	ks1 := testkeyset.KeysetMaterial(h1)
 	err = keyset.Validate(ks1)
 	if err != nil {
-		t.Errorf("Expected no error but got %s", err)
+		t.Errorf("keyset.Validate(ks1) err = %q, want nil", err)
 	}
 }
 
@@ -602,5 +645,40 @@ func TestKeysetManagerWithEmptyManager(t *testing.T) {
 	err = ksm1.Disable(0)
 	if err == nil {
 		t.Errorf("ksm1.Disable succeeded on empty manager, want error")
+	}
+}
+
+func TestKeysetManagerHandleMakesACopyOfTheKeyset(t *testing.T) {
+	manager := keyset.NewManager()
+	template := mac.HMACSHA256Tag128KeyTemplate()
+	keyID, err := manager.Add(template)
+	if err != nil {
+		t.Fatalf("manager.Add(template) err = %q, want nil", err)
+	}
+	err = manager.SetPrimary(keyID)
+	if err != nil {
+		t.Fatalf("manager.SetPrimary(%v) err = %q, want nil", keyID, err)
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %q, want nil", err)
+	}
+	if handle.Len() != 1 {
+		t.Errorf("handle.Len() = %d, want 1", handle.Len())
+	}
+	// Continue adding keys to the manager.
+	_, err = manager.Add(template)
+	if err != nil {
+		t.Fatalf("manager.Add(template) err = %q, want nil", err)
+	}
+	if handle.Len() != 1 {
+		t.Errorf("handle.Len() = %d, want 1", handle.Len())
+	}
+	anotherHandle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %q, want nil", err)
+	}
+	if anotherHandle.Len() != 2 {
+		t.Errorf("anotherHandle.Len() = %d, want 2", anotherHandle.Len())
 	}
 }

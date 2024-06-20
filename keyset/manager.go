@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 
+	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 
@@ -40,7 +41,7 @@ func NewManager() *Manager {
 // NewManagerFromHandle creates a new instance from the given Handle.
 func NewManagerFromHandle(kh *Handle) *Manager {
 	ret := new(Manager)
-	ret.ks = kh.ks
+	ret.ks = proto.Clone(kh.ks).(*tinkpb.Keyset)
 	return ret
 }
 
@@ -161,7 +162,9 @@ func (km *Manager) Delete(keyID uint32) error {
 
 // Handle creates a new Handle for the managed keyset.
 func (km *Manager) Handle() (*Handle, error) {
-	return &Handle{ks: km.ks}, nil
+	// Make a copy of the keyset to keep it
+	ks := proto.Clone(km.ks).(*tinkpb.Keyset)
+	return &Handle{ks: ks}, nil
 }
 
 // newKeyID generates a key id that has not been used by any key in the keyset.
