@@ -35,8 +35,9 @@ var errInvalidKeyset = fmt.Errorf("keyset.Handle: invalid keyset")
 // Handle provides access to a Keyset protobuf, to limit the exposure of actual protocol
 // buffers that hold sensitive key material.
 type Handle struct {
-	ks          *tinkpb.Keyset // must be non-nil
-	annotations map[string]string
+	ks            *tinkpb.Keyset // must be non-nil
+	isKsValidated bool
+	annotations   map[string]string
 }
 
 // KeyStatus is the key status.
@@ -180,10 +181,21 @@ func ReadWithNoSecrets(reader Reader) (*Handle, error) {
 	return NewHandleWithNoSecrets(ks)
 }
 
+func (h *Handle) validateKeyset() error {
+	if h.isKsValidated {
+		return nil
+	}
+	if err := Validate(h.ks); err != nil {
+		return fmt.Errorf("keyset.Handle: invalid keyset: %v", err)
+	}
+	h.isKsValidated = true
+	return nil
+}
+
 // Primary returns the primary key of the keyset.
 func (h *Handle) Primary() (*Entry, error) {
-	if err := Validate(h.ks); err != nil {
-		return nil, fmt.Errorf("keyset.Handle: invalid keyset: %v", err)
+	if err := h.validateKeyset(); err != nil {
+		return nil, err
 	}
 	for _, key := range h.ks.GetKey() {
 		if key.GetKeyId() == h.ks.GetPrimaryKeyId() {
@@ -210,8 +222,8 @@ func (h *Handle) Primary() (*Entry, error) {
 // Entry returns the key at index i from the keyset.
 // i must be within the range [0, Handle.Len()).
 func (h *Handle) Entry(i int) (*Entry, error) {
-	if err := Validate(h.ks); err != nil {
-		return nil, fmt.Errorf("keyset.Handle: invalid keyset: %v", err)
+	if err := h.validateKeyset(); err != nil {
+		return nil, err
 	}
 	if i < 0 || i >= h.Len() {
 		return nil, fmt.Errorf("keyset.Handle: index %d out of range", i)
