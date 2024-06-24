@@ -17,6 +17,7 @@ package keyset
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
@@ -28,13 +29,15 @@ import (
 // Manager manages a Keyset-proto, with convenience methods that rotate, disable, enable or destroy keys.
 // Note: It is not thread-safe.
 type Manager struct {
-	ks *tinkpb.Keyset
+	ks                *tinkpb.Keyset
+	unavailableKeyIDs map[uint32]bool // set of key IDs that are not available for new keys
 }
 
 // NewManager creates a new instance with an empty Keyset.
 func NewManager() *Manager {
 	ret := new(Manager)
 	ret.ks = new(tinkpb.Keyset)
+	ret.unavailableKeyIDs = make(map[uint32]bool)
 	return ret
 }
 
@@ -42,6 +45,10 @@ func NewManager() *Manager {
 func NewManagerFromHandle(kh *Handle) *Manager {
 	ret := new(Manager)
 	ret.ks = proto.Clone(kh.ks).(*tinkpb.Keyset)
+	ret.unavailableKeyIDs = make(map[uint32]bool)
+	for _, key := range ret.ks.Key {
+		ret.unavailableKeyIDs[key.KeyId] = true
+	}
 	return ret
 }
 
@@ -50,17 +57,17 @@ func NewManagerFromHandle(kh *Handle) *Manager {
 // It returns the ID of the new key
 func (km *Manager) Add(kt *tinkpb.KeyTemplate) (uint32, error) {
 	if kt == nil {
-		return 0, errors.New("keyset_manager: cannot add key, need key template")
+		return 0, errors.New("keyset.Manager: key template is nil")
 	}
 	if kt.OutputPrefixType == tinkpb.OutputPrefixType_UNKNOWN_PREFIX {
-		return 0, errors.New("keyset_manager: unknown output prefix type")
+		return 0, errors.New("keyset.Manager: unknown output prefix type")
 	}
 	if km.ks == nil {
-		return 0, errors.New("keyset_manager: cannot add key to nil keyset")
+		return 0, errors.New("keyset.Manager: cannot add key to nil keyset")
 	}
 	keyData, err := registry.NewKeyData(kt)
 	if err != nil {
-		return 0, fmt.Errorf("keyset_manager: cannot create KeyData: %s", err)
+		return 0, fmt.Errorf("keyset.Manager: cannot create KeyData: %s", err)
 	}
 	keyID := km.newKeyID()
 	key := &tinkpb.Keyset_Key{
@@ -77,7 +84,7 @@ func (km *Manager) Add(kt *tinkpb.KeyTemplate) (uint32, error) {
 // Returns an error if the key is not found or not enabled.
 func (km *Manager) SetPrimary(keyID uint32) error {
 	if km.ks == nil {
-		return errors.New("keyset_manager: cannot set primary, no keyset")
+		return errors.New("keyset.Manager: cannot set primary key to nil keyset")
 	}
 	for _, key := range km.ks.Key {
 		if key.KeyId != keyID {
@@ -87,17 +94,17 @@ func (km *Manager) SetPrimary(keyID uint32) error {
 			km.ks.PrimaryKeyId = keyID
 			return nil
 		}
-		return errors.New("keyset_manager: cannot set key as primary because it's not enabled")
+		return errors.New("keyset.Manager: cannot set key as primary because it's not enabled")
 
 	}
-	return fmt.Errorf("keyset_manager: key with id %d not found", keyID)
+	return fmt.Errorf("keyset.Manager: key with id %d not found", keyID)
 }
 
 // Enable will enable the key with given keyID.
 // Returns an error if the key is not found or is not enabled or disabled already.
 func (km *Manager) Enable(keyID uint32) error {
 	if km.ks == nil {
-		return errors.New("keyset_manager: cannot enable key, no keyset")
+		return errors.New("keyset.Manager: cannot enable key; nil keyset")
 	}
 	for i, key := range km.ks.Key {
 		if key.KeyId != keyID {
@@ -107,19 +114,19 @@ func (km *Manager) Enable(keyID uint32) error {
 			km.ks.Key[i].Status = tinkpb.KeyStatusType_ENABLED
 			return nil
 		}
-		return fmt.Errorf("keyset_manager: cannot enable key with id %d with status %s", keyID, key.Status.String())
+		return fmt.Errorf("keyset.Manager: cannot enable key with id %d with status %s", keyID, key.Status.String())
 	}
-	return fmt.Errorf("keyset_manager: key with id %d not found", keyID)
+	return fmt.Errorf("keyset.Manager: key with id %d not found", keyID)
 }
 
 // Disable will disable the key with given keyID.
 // Returns an error if the key is not found or it is the primary key.
 func (km *Manager) Disable(keyID uint32) error {
 	if km.ks == nil {
-		return errors.New("keyset_manager: cannot disable key, no keyset")
+		return errors.New("keyset.Manager: cannot disable key; nil keyset")
 	}
 	if km.ks.PrimaryKeyId == keyID {
-		return errors.New("keyset_manager: cannot disable the primary key")
+		return errors.New("keyset.Manager: cannot disable the primary key")
 	}
 	for i, key := range km.ks.Key {
 		if key.KeyId != keyID {
@@ -129,34 +136,34 @@ func (km *Manager) Disable(keyID uint32) error {
 			km.ks.Key[i].Status = tinkpb.KeyStatusType_DISABLED
 			return nil
 		}
-		return fmt.Errorf("keyset_manager: cannot disable key with id %d with status %s", keyID, key.Status.String())
+		return fmt.Errorf("keyset.Manager: cannot disable key with id %d with status %s", keyID, key.Status.String())
 	}
-	return fmt.Errorf("keyset_manager: key with id %d not found", keyID)
+	return fmt.Errorf("keyset.Manager: key with id %d not found", keyID)
 }
 
 // Delete will delete the key with given keyID, removing the key from the keyset entirely.
 // Returns an error if the key is not found or it is the primary key.
 func (km *Manager) Delete(keyID uint32) error {
 	if km.ks == nil {
-		return errors.New("keyset_manager: cannot delete key, no keyset")
+		return errors.New("keyset.Manager: cannot delete key, no keyset")
 	}
 	if km.ks.PrimaryKeyId == keyID {
-		return errors.New("keyset_manager: cannot delete the primary key")
+		return errors.New("keyset.Manager: cannot delete the primary key")
 	}
 	deleteIdx, found := 0, false
 	for i, key := range km.ks.Key {
 		if key.KeyId == keyID {
-			found = true
 			deleteIdx = i
+			found = true
+			break
 		}
 	}
 	if !found {
-		return fmt.Errorf("keyset_manager: key with id %d not found", keyID)
+		return fmt.Errorf("keyset.Manager: key with id %d not found", keyID)
 	}
-	// swap elements
-	km.ks.Key[deleteIdx] = km.ks.Key[len(km.ks.Key)-1]
-	// trim last element
-	km.ks.Key = km.ks.Key[:len(km.ks.Key)-1]
+	km.ks.Key = slices.Delete(km.ks.Key, deleteIdx, deleteIdx+1)
+	// NOTE: not removing the ID from unavailableKeyIDs on purpose to avoid reusing the keyID right
+	// away.
 	return nil
 }
 
@@ -170,16 +177,10 @@ func (km *Manager) Handle() (*Handle, error) {
 // newKeyID generates a key id that has not been used by any key in the keyset.
 func (km *Manager) newKeyID() uint32 {
 	for {
-		ret := random.GetRandomUint32()
-		ok := true
-		for _, key := range km.ks.Key {
-			if key.KeyId == ret {
-				ok = false
-				break
-			}
-		}
-		if ok {
-			return ret
+		newRandomID := random.GetRandomUint32()
+		if _, found := km.unavailableKeyIDs[newRandomID]; !found {
+			km.unavailableKeyIDs[newRandomID] = true
+			return newRandomID
 		}
 	}
 }
