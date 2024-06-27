@@ -22,6 +22,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -33,13 +34,38 @@ var (
 	ErrKeySerialization = errors.New("key serialization failed")
 )
 
+type testParams struct {
+	hasIDRequirement bool
+}
+
+func (p *testParams) HasIDRequirement() bool { return p.hasIDRequirement }
+
+func (p *testParams) Equals(params key.Parameters) bool {
+	_, ok := params.(*testParams)
+	return ok && p.hasIDRequirement == params.HasIDRequirement()
+}
+
 type testKey struct {
 	keyBytes []byte
+	id       uint32
+	params   testParams
 }
+
+func (k *testKey) Parameters() key.Parameters { return &k.params }
+
+func (k *testKey) Equals(other key.Key) bool {
+	fallbackProtoKey, ok := other.(*testKey)
+	if !ok {
+		return false
+	}
+	return k.params.Equals(fallbackProtoKey.Parameters())
+}
+
+func (k *testKey) IDRequirement() (uint32, bool) { return k.id, k.params.HasIDRequirement() }
 
 type testParser struct{}
 
-func (p *testParser) ParseKey(keysetKey *tinkpb.Keyset_Key) (any, error) {
+func (p *testParser) ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
 	return &testKey{
 		keyBytes: keysetKey.GetKeyData().GetValue(),
 	}, nil
@@ -47,9 +73,9 @@ func (p *testParser) ParseKey(keysetKey *tinkpb.Keyset_Key) (any, error) {
 
 var _ protoserialization.KeyParser = (*testParser)(nil)
 
-type testSerializer struct{}
+type testKeySerializer struct{}
 
-func (s *testSerializer) SerializeKey(key any) (*tinkpb.Keyset_Key, error) {
+func (s *testKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
 	actualKey, ok := key.(*testKey)
 	if !ok {
 		return nil, fmt.Errorf("type mismatch: got %T, want *testKey", key)
@@ -61,7 +87,7 @@ func (s *testSerializer) SerializeKey(key any) (*tinkpb.Keyset_Key, error) {
 	}, nil
 }
 
-var _ protoserialization.KeySerializer = (*testSerializer)(nil)
+var _ protoserialization.KeySerializer = (*testKeySerializer)(nil)
 
 func TestRegisterKeyParserFailsIfAlreadyRegistered(t *testing.T) {
 	defer protoserialization.ClearKeyParsers()
@@ -143,17 +169,17 @@ func TestParseKeyReturnsFallbackIfDifferentParserRegistered(t *testing.T) {
 	}
 }
 
-type failingParser struct{}
+type alwaysFailingKeyParser struct{}
 
-func (p *failingParser) ParseKey(keysetKey *tinkpb.Keyset_Key) (any, error) {
+func (p *alwaysFailingKeyParser) ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
 	return nil, ErrKeyParsing
 }
 
-var _ protoserialization.KeyParser = (*failingParser)(nil)
+var _ protoserialization.KeyParser = (*alwaysFailingKeyParser)(nil)
 
 func TestParseKeyFailsIfParserFails(t *testing.T) {
 	defer protoserialization.ClearKeyParsers()
-	err := protoserialization.RegisterKeyParser(testKeyURL, &failingParser{})
+	err := protoserialization.RegisterKeyParser(testKeyURL, &alwaysFailingKeyParser{})
 	if err != nil {
 		t.Fatalf("protoserialization.RegisterKeyParser(%s) err = %v, want nil", testKeyURL, err)
 	}
@@ -172,9 +198,9 @@ func TestParseKeyFailsIfParserFails(t *testing.T) {
 
 func TestRegisterKeySerializerAndSerializeKey(t *testing.T) {
 	defer protoserialization.ReinitializeKeySerializers()
-	err := protoserialization.RegisterKeySerializer[*testKey](&testSerializer{})
+	err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{})
 	if err != nil {
-		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testSerializer{}) err = %v, want nil", err)
+		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %v, want nil", err)
 	}
 
 	key := &testKey{
@@ -191,12 +217,12 @@ func TestRegisterKeySerializerAndSerializeKey(t *testing.T) {
 
 func TestRegisterKeySerializerFailsIfAlreadyRegistered(t *testing.T) {
 	defer protoserialization.ReinitializeKeySerializers()
-	err := protoserialization.RegisterKeySerializer[*testKey](&testSerializer{})
+	err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{})
 	if err != nil {
-		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testSerializer{}) err = %v, want nil", err)
+		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %v, want nil", err)
 	}
-	if protoserialization.RegisterKeySerializer[*testKey](&testSerializer{}) == nil {
-		t.Errorf("protoserialization.RegisterKeySerializer[*testKey](&testSerializer{}) err = nil, want error")
+	if protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) == nil {
+		t.Errorf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = nil, want error")
 	}
 }
 
@@ -228,19 +254,19 @@ func TestSerializeKeyWithFallbackKey(t *testing.T) {
 	}
 }
 
-type alwaysFailingSerializer struct{}
+type alwaysFailingKeySerializer struct{}
 
-func (s *alwaysFailingSerializer) SerializeKey(key any) (*tinkpb.Keyset_Key, error) {
+func (s *alwaysFailingKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
 	return nil, ErrKeySerialization
 }
 
-var _ protoserialization.KeySerializer = (*alwaysFailingSerializer)(nil)
+var _ protoserialization.KeySerializer = (*alwaysFailingKeySerializer)(nil)
 
 func TestSerializeKeyFailsIfSerializeFails(t *testing.T) {
 	defer protoserialization.ReinitializeKeySerializers()
-	err := protoserialization.RegisterKeySerializer[*testKey](&alwaysFailingSerializer{})
+	err := protoserialization.RegisterKeySerializer[*testKey](&alwaysFailingKeySerializer{})
 	if err != nil {
-		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&alwaysFailingSerializer{}) err = %v, want nil", err)
+		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&alwaysFailingKeySerializer{}) err = %v, want nil", err)
 	}
 	key := &testKey{
 		keyBytes: []byte("123"),

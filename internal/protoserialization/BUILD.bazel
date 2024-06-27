@@ -5,7 +5,10 @@ go_library(
     srcs = ["protoserialization.go"],
     importpath = "github.com/tink-crypto/tink-go/v2/internal/protoserialization",
     visibility = ["//:__subpackages__"],
-    deps = ["//proto/tink_go_proto"],
+    deps = [
+        "//key",
+        "//proto/tink_go_proto",
+    ],
 )
 
 alias(
@@ -19,6 +22,7 @@ go_test(
     srcs = ["protoserialization_test.go"],
     deps = [
         ":protoserialization",
+        "//key",
         "//proto/tink_go_proto",
         "@org_golang_google_protobuf//proto",
     ],

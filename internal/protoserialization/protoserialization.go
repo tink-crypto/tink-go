@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/tink-crypto/tink-go/v2/key"
+
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -32,18 +34,49 @@ var (
 	keySerializers   = make(map[reflect.Type]KeySerializer) // KeyType -> KeySerializer
 )
 
+type fallbackProtoKeyParams struct {
+	hasIDRequirement bool
+}
+
+func (p *fallbackProtoKeyParams) HasIDRequirement() bool { return p.hasIDRequirement }
+
+func (p *fallbackProtoKeyParams) Equals(params key.Parameters) bool {
+	_, ok := params.(*fallbackProtoKeyParams)
+	return ok && p.hasIDRequirement == params.HasIDRequirement()
+}
+
 // FallbackProtoKey is a key that wraps a proto keyset key.
 //
 // This is a fallback key type that is used to wrap individual keyset keys when no concrete key type
-// is available; it is purposely internal an does not expose any "getter" to avoid premature use of
-// this type.
+// is available; it is purposely internal and does not allow accessing the internal proto
+// representation to avoid premature use of this type.
 type FallbackProtoKey struct {
 	protoKeysetKey *tinkpb.Keyset_Key
+	params         *fallbackProtoKeyParams
+}
+
+// Parameters returns the parameters of this key.
+func (k *FallbackProtoKey) Parameters() key.Parameters { return k.params }
+
+// Equals reports whether k is equal to other.
+func (k *FallbackProtoKey) Equals(other key.Key) bool {
+	_, ok := other.(*FallbackProtoKey)
+	return ok && k.params.Equals(other.Parameters())
+}
+
+// IDRequirement returns the key ID and whether it is required.
+func (k *FallbackProtoKey) IDRequirement() (uint32, bool) {
+	return k.protoKeysetKey.GetKeyId(), k.params.HasIDRequirement()
 }
 
 // NewFallbackProtoKey creates a new FallbackProtoKey.
 func NewFallbackProtoKey(protoKeysetKey *tinkpb.Keyset_Key) *FallbackProtoKey {
-	return &FallbackProtoKey{protoKeysetKey: protoKeysetKey}
+	return &FallbackProtoKey{
+		protoKeysetKey: protoKeysetKey,
+		params: &fallbackProtoKeyParams{
+			hasIDRequirement: protoKeysetKey.GetOutputPrefixType() != tinkpb.OutputPrefixType_RAW,
+		},
+	}
 }
 
 // ProtoKeysetKey returns the proto keyset key wrapped in fallbackProtoKey.
@@ -53,21 +86,20 @@ func ProtoKeysetKey(fallbackProtoKey *FallbackProtoKey) *tinkpb.Keyset_Key {
 
 // KeyParser is an interface for parsing a proto keyset key into a key.
 type KeyParser interface {
-	// ParseKey parses the given keyset key into a key and returns (any, nil) if successful, or
-	// (nil, err) otherwise.
-	ParseKey(keysetKey *tinkpb.Keyset_Key) (any, error)
+	// ParseKey parses the given keyset key into a key.
+	ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error)
 }
 
 // KeySerializer is an interface for serializing a key into a proto keyset key.
 type KeySerializer interface {
 	// SerializeKey serializes the given key into a proto keyset key.
-	SerializeKey(key any) (*tinkpb.Keyset_Key, error)
+	SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error)
 }
 
 // RegisterKeySerializer registers the given key serializer for keys of type K.
 //
 // It doesn't allow replacing existing serializers.
-func RegisterKeySerializer[K any](keySerializer KeySerializer) error {
+func RegisterKeySerializer[K key.Key](keySerializer KeySerializer) error {
 	keySerializersMu.Lock()
 	defer keySerializersMu.Unlock()
 	keyType := reflect.TypeOf((*K)(nil)).Elem()
@@ -79,7 +111,7 @@ func RegisterKeySerializer[K any](keySerializer KeySerializer) error {
 }
 
 // SerializeKey serializes the given key into a proto keyset key.
-func SerializeKey(key any) (*tinkpb.Keyset_Key, error) {
+func SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
 	keyType := reflect.TypeOf(key)
 	serializer, ok := keySerializers[keyType]
 	if !ok {
@@ -101,10 +133,10 @@ func RegisterKeyParser(keyTypeURL string, keyParser KeyParser) error {
 	return nil
 }
 
-// ParseKey parses the given keyset key into a key and returns (any, nil) if successful, or
-// (nil, err) otherwise. If no parser is registered for the given type URL, a fallback key is
-// returned.
-func ParseKey(keysetKey *tinkpb.Keyset_Key) (any, error) {
+// ParseKey parses the given keyset key into a key.
+//
+// If no parser is registered for the given type URL, a fallback key is returned.
+func ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
 	parser, found := keyParsers[keysetKey.GetKeyData().GetTypeUrl()]
 	if !found {
 		return &FallbackProtoKey{protoKeysetKey: keysetKey}, nil
@@ -114,7 +146,7 @@ func ParseKey(keysetKey *tinkpb.Keyset_Key) (any, error) {
 
 type fallbackProtoKeySerializer struct{}
 
-func (s *fallbackProtoKeySerializer) SerializeKey(key any) (*tinkpb.Keyset_Key, error) {
+func (s *fallbackProtoKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
 	fallbackKey, ok := key.(*FallbackProtoKey)
 	if !ok {
 		return nil, fmt.Errorf("serialization.fallbackProtoKeySerializer.SerializeKey: key is not a FallbackProtoKey")

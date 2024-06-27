@@ -29,6 +29,7 @@ go_library(
         "//internal/internalapi",
         "//internal/protoserialization",
         "//internal/registryconfig",
+        "//key",
         "//proto/tink_go_proto",
         "//subtle/random",
         "//tink",

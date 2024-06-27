@@ -26,6 +26,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -71,14 +72,14 @@ func (ks KeyStatus) String() string {
 // Entry represents an entry in a keyset.
 type Entry struct {
 	// Object that represents a full Tink key, i.e., key material, parameters and algorithm.
-	key       any
+	key       key.Key
 	isPrimary bool
 	keyID     uint32
 	status    KeyStatus
 }
 
 // Key returns the key.
-func (e *Entry) Key() any {
+func (e *Entry) Key() key.Key {
 	return e.key
 }
 
