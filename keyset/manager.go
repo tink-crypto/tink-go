@@ -114,6 +114,16 @@ func (km *Manager) AddKey(key key.Key) (uint32, error) {
 	return keysetKey.KeyId, nil
 }
 
+// AddNewKeyFromParameters generates a new key from parameters, adds the key to
+// the keyset, and returns the key ID.
+func (km *Manager) AddNewKeyFromParameters(parameters key.Parameters) (uint32, error) {
+	keyTemplate, err := protoserialization.SerializeParameters(parameters)
+	if err != nil {
+		return 0, fmt.Errorf("keyset.Manager: %v", err)
+	}
+	return km.Add(keyTemplate)
+}
+
 // SetPrimary sets the key with given keyID as primary.
 // Returns an error if the key is not found or not enabled.
 func (km *Manager) SetPrimary(keyID uint32) error {

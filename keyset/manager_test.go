@@ -15,6 +15,7 @@
 package keyset_test
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -27,6 +28,10 @@ import (
 	"github.com/tink-crypto/tink-go/v2/testutil"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+)
+
+var (
+	ErrParamtersSerialization = errors.New("parameters serialization failed")
 )
 
 func TestKeysetManagerBasic(t *testing.T) {
@@ -880,5 +885,88 @@ func TestKeysetManagerAddKeyFailsIfKeyHasIDRequirementAndIDAlreadyInUse(t *testi
 	})
 	if err == nil {
 		t.Errorf("manager.AddKey() err = nil, want err")
+	}
+}
+
+func TestKeysetManagerAddNewKeyFromParametersFailsIfNilParameters(t *testing.T) {
+	manager := keyset.NewManager()
+	if _, err := manager.AddNewKeyFromParameters(nil); err == nil {
+		t.Errorf("manager.AddKeyFromParameters(nil) err = nil, want error")
+	}
+}
+
+type testParams struct {
+	hasIDRequirement bool
+}
+
+func (p *testParams) HasIDRequirement() bool { return p.hasIDRequirement }
+func (p *testParams) Equals(params key.Parameters) bool {
+	_, ok := params.(*testParams)
+	return ok && p.hasIDRequirement == params.HasIDRequirement()
+}
+
+var _ key.Parameters = (*testParams)(nil)
+
+type alwaysFailingParametersSerializer struct{}
+
+func (s *alwaysFailingParametersSerializer) Serialize(params key.Parameters) (*tinkpb.KeyTemplate, error) {
+	return nil, ErrParamtersSerialization
+}
+
+func TestKeysetManagerAddNewKeyFromParametersFailsIfSerializerFails(t *testing.T) {
+	if err := protoserialization.RegisterParametersSerializer[*testParams](&alwaysFailingParametersSerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterParametersSerializer[*testParams](&alwaysFailingParametersSerializer{}) err = %q, want nil", err)
+	}
+	defer protoserialization.ClearParametersSerializers()
+
+	manager := keyset.NewManager()
+	params := &testParams{hasIDRequirement: true}
+
+	_, err := manager.AddNewKeyFromParameters(params)
+	if err == nil {
+		t.Errorf("manager.AddKeyFromParameters(params) err = nil, want error")
+	}
+}
+
+type testParametersSerializer struct{}
+
+func (s *testParametersSerializer) Serialize(params key.Parameters) (*tinkpb.KeyTemplate, error) {
+	return mac.HMACSHA256Tag128KeyTemplate(), nil
+}
+
+func TestKeysetManagerAddNewKeyFromParametersWorks(t *testing.T) {
+	if err := protoserialization.RegisterParametersSerializer[*testParams](&testParametersSerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterParametersSerializer[*testParams](&testParametersSerializer{}) err = %q, want nil", err)
+	}
+	defer protoserialization.ClearParametersSerializers()
+	manager := keyset.NewManager()
+	params := &testParams{hasIDRequirement: true}
+	keyID, err := manager.AddNewKeyFromParameters(params)
+	if err != nil {
+		t.Errorf("manager.AddKeyFromParameters(params) err = %v, want nil", err)
+	}
+	if err := manager.SetPrimary(keyID); err != nil {
+		t.Errorf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %q, want nil", err)
+	}
+	if handle.Len() != 1 {
+		t.Errorf("handle.Len() = %d, want 1", handle.Len())
+	}
+
+	// Make sure we can get and use a MAC primitive from the handle.
+	primitive, err := mac.New(handle)
+	if err != nil {
+		t.Fatalf("mac.New(handle) err = %q, want nil", err)
+	}
+	message := []byte("message")
+	tag, err := primitive.ComputeMAC(message)
+	if err != nil {
+		t.Errorf("primitive.ComputeMAC(message) err = %q, want nil", err)
+	}
+	if err := primitive.VerifyMAC(tag, message); err != nil {
+		t.Errorf("primitive.VerifyMAC(message, mac) err = %q, want nil", err)
 	}
 }
