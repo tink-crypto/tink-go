@@ -57,6 +57,7 @@ go_test(
         "//insecurecleartextkeyset",
         "//internal/internalapi",
         "//internal/protoserialization",
+        "//key",
         "//mac",
         "//proto/common_go_proto",
         "//proto/tink_go_proto",

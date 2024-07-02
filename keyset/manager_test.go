@@ -15,9 +15,12 @@
 package keyset_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
@@ -680,5 +683,202 @@ func TestKeysetManagerHandleMakesACopyOfTheKeyset(t *testing.T) {
 	}
 	if anotherHandle.Len() != 2 {
 		t.Errorf("anotherHandle.Len() = %d, want 2", anotherHandle.Len())
+	}
+}
+
+type testParameters struct {
+	hasIDRequirement bool
+}
+
+func (p *testParameters) HasIDRequirement() bool { return p.hasIDRequirement }
+func (p *testParameters) Equals(params key.Parameters) bool {
+	_, ok := params.(*testParameters)
+	return ok && p.hasIDRequirement == params.HasIDRequirement()
+}
+
+var _ key.Parameters = (*testParameters)(nil)
+
+type testKey struct {
+	params testParameters
+	id     uint32
+}
+
+func (k *testKey) IDRequirement() (id uint32, required bool) {
+	return k.id, k.Parameters().HasIDRequirement()
+}
+func (k *testKey) Parameters() key.Parameters { return &k.params }
+func (k *testKey) Equals(other key.Key) bool {
+	thisKeyID, Required := k.IDRequirement()
+	otherkeyID, otherKeyRequired := other.IDRequirement()
+	return thisKeyID == otherkeyID &&
+		Required == otherKeyRequired &&
+		k.Parameters().Equals(other.Parameters())
+}
+
+var _ key.Key = (*testKey)(nil)
+
+type testKeySerializer struct{}
+
+func (s *testKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
+	actualKey, ok := key.(*testKey)
+	if !ok {
+		return nil, fmt.Errorf("testKeySerializer.SerializeKey: key is not a testKey")
+	}
+	return &tinkpb.Keyset_Key{
+		KeyId:            actualKey.id,
+		KeyData:          &tinkpb.KeyData{TypeUrl: "test_type_url"},
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+	}, nil
+}
+
+func TestKeysetManagerAddKeySucceeds(t *testing.T) {
+	if err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %q, want nil", err)
+	}
+	defer protoserialization.ReinitializeKeySerializers()
+
+	manager := keyset.NewManager()
+	keyID1, err := manager.AddKey(&testKey{
+		params: testParameters{hasIDRequirement: true},
+		id:     1,
+	})
+	if err != nil {
+		t.Fatalf("manager.AddKey() err = %q, want nil", err)
+	}
+	if keyID1 != 1 {
+		t.Errorf("keyID1 = %d, want 1", keyID1)
+	}
+	keyID2, err := manager.AddKey(
+		&testKey{
+			params: testParameters{hasIDRequirement: false},
+			id:     2,
+		})
+	if err != nil {
+		t.Fatalf("manager.AddKey() err = %q, want nil", err)
+	}
+
+	if err := manager.SetPrimary(keyID1); err != nil {
+		t.Fatalf("manager.SetPrimary(%v) err = %q, want nil", keyID1, err)
+	}
+
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %q, want nil", err)
+	}
+	if handle.Len() != 2 {
+		t.Errorf("handle.Len() = %d, want 1", handle.Len())
+	}
+
+	keysetProto := testkeyset.KeysetMaterial(handle)
+	if keysetProto.Key[0].KeyId != keyID1 {
+		t.Errorf("keysetProto.Key[0].KeyId = %d, want %v", keysetProto.Key[0].KeyId, keyID1)
+	}
+	if keysetProto.Key[0].GetStatus() != tinkpb.KeyStatusType_ENABLED {
+		t.Errorf("keysetProto.Key[0].GetStatus() = %v, want %v", keysetProto.Key[0].GetStatus(), tinkpb.KeyStatusType_ENABLED)
+	}
+	if keysetProto.Key[1].KeyId != keyID2 {
+		t.Errorf("keysetProto.Key[0].KeyId = %d, want %v", keysetProto.Key[1].KeyId, keyID2)
+	}
+	if keysetProto.Key[1].GetStatus() != tinkpb.KeyStatusType_ENABLED {
+		t.Errorf("keysetProto.Key[1].GetStatus() = %v, want %v", keysetProto.Key[1].GetStatus(), tinkpb.KeyStatusType_DISABLED)
+	}
+}
+
+func TestKeysetManagerAddKeyFromExistingKeyset(t *testing.T) {
+	if err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %q, want nil", err)
+	}
+	defer protoserialization.ReinitializeKeySerializers()
+
+	// Create a keyset that contains a single HmacKey.
+	manager := keyset.NewManager()
+	template := mac.HMACSHA256Tag128KeyTemplate()
+	keyID1, err := manager.Add(template)
+	if err != nil {
+		t.Errorf("manager.Add(template) err = %q, want nil", err)
+	}
+	err = manager.SetPrimary(keyID1)
+	if err != nil {
+		t.Errorf("manager.SetPrimary(%v) err = %q, want nil", keyID1, err)
+	}
+	keyID2, err := manager.AddKey(&testKey{
+		params: testParameters{hasIDRequirement: true},
+		id:     1,
+	})
+	if err != nil {
+		t.Fatalf("manager.AddKey() err = %q, want nil", err)
+	}
+	if keyID2 != 1 {
+		t.Errorf("keyID2 = %d, want 1", keyID2)
+	}
+	keyID3, err := manager.AddKey(
+		&testKey{
+			params: testParameters{hasIDRequirement: false},
+			id:     2,
+		})
+	if err != nil {
+		t.Fatalf("manager.AddKey() err = %q, want nil", err)
+	}
+	// The ID should be randomly generated and different from the existing key IDs.
+	if keyID3 == keyID1 || keyID3 == keyID2 {
+		t.Errorf("(%v == %v || %v == %v) == true, want false", keyID3, keyID1, keyID3, keyID2)
+	}
+
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %q, want nil", err)
+	}
+	if handle.Len() != 3 {
+		t.Errorf("handle.Len() = %d, want 1", handle.Len())
+	}
+	keysetProto := testkeyset.KeysetMaterial(handle)
+	if keysetProto.GetPrimaryKeyId() != keyID1 {
+		t.Errorf("keysetProto.GetPrimaryKeyId() = %d, want %v", keysetProto.GetPrimaryKeyId(), keyID1)
+	}
+}
+
+func TestKeysetManagerAddKeyFailsIfKeyIsNull(t *testing.T) {
+	manager := keyset.NewManager()
+	_, err := manager.AddKey(nil)
+	if err == nil {
+		t.Errorf("manager.AddKey() err = nil, want err")
+	}
+}
+
+func TestKeysetManagerAddKeyFailsIfNoSerializerIsAvailable(t *testing.T) {
+	manager := keyset.NewManager()
+	_, err := manager.AddKey(&testKey{
+		params: testParameters{hasIDRequirement: true},
+		id:     1,
+	})
+	if err == nil {
+		t.Errorf("manager.AddKey() err = nil, want err")
+	}
+}
+
+func TestKeysetManagerAddKeyFailsIfKeyHasIDRequirementAndIDAlreadyInUse(t *testing.T) {
+	if err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %q, want nil", err)
+	}
+	defer protoserialization.ReinitializeKeySerializers()
+
+	manager := keyset.NewManager()
+	keyID, err := manager.AddKey(&testKey{
+		params: testParameters{hasIDRequirement: true},
+		id:     1,
+	})
+	if err != nil {
+		t.Fatalf("manager.AddKey() err = %q, want nil", err)
+	}
+	if keyID != 1 {
+		t.Errorf("keyID = %d, want 1", keyID)
+	}
+
+	_, err = manager.AddKey(&testKey{
+		params: testParameters{hasIDRequirement: true},
+		id:     1,
+	})
+	if err == nil {
+		t.Errorf("manager.AddKey() err = nil, want err")
 	}
 }

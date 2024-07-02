@@ -21,6 +21,8 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -69,7 +71,7 @@ func (km *Manager) Add(kt *tinkpb.KeyTemplate) (uint32, error) {
 	if err != nil {
 		return 0, fmt.Errorf("keyset.Manager: cannot create KeyData: %s", err)
 	}
-	keyID := km.newKeyID()
+	keyID := km.newRandomKeyID()
 	key := &tinkpb.Keyset_Key{
 		KeyData:          keyData,
 		Status:           tinkpb.KeyStatusType_ENABLED,
@@ -78,6 +80,38 @@ func (km *Manager) Add(kt *tinkpb.KeyTemplate) (uint32, error) {
 	}
 	km.ks.Key = append(km.ks.Key, key)
 	return keyID, nil
+}
+
+func (km *Manager) getIDForKey(key key.Key) (uint32, error) {
+	id, required := key.IDRequirement()
+	if !required {
+		return km.newRandomKeyID(), nil
+	}
+	if _, found := km.unavailableKeyIDs[id]; found {
+		return 0, fmt.Errorf("keyset already has a key with ID %d", id)
+	}
+	km.unavailableKeyIDs[id] = true
+	return id, nil
+}
+
+// AddKey adds key to the keyset and returns the key ID. The added key is
+// enabled by default.
+func (km *Manager) AddKey(key key.Key) (uint32, error) {
+	if key == nil {
+		return 0, fmt.Errorf("keyset.Handle: entry must have Key set")
+	}
+	keysetKey, err := protoserialization.SerializeKey(key)
+	if err != nil {
+		return 0, fmt.Errorf("keyset.Handle: %v", err)
+	}
+	// This is going to be either an ID requirement or a new random ID.
+	keysetKey.KeyId, err = km.getIDForKey(key)
+	if err != nil {
+		return 0, err
+	}
+	keysetKey.Status = tinkpb.KeyStatusType_ENABLED
+	km.ks.Key = append(km.ks.Key, keysetKey)
+	return keysetKey.KeyId, nil
 }
 
 // SetPrimary sets the key with given keyID as primary.
@@ -174,8 +208,8 @@ func (km *Manager) Handle() (*Handle, error) {
 	return &Handle{ks: ks}, nil
 }
 
-// newKeyID generates a key id that has not been used by any key in the keyset.
-func (km *Manager) newKeyID() uint32 {
+// newRandomKeyID generates a key id that has not been used by any key in the keyset.
+func (km *Manager) newRandomKeyID() uint32 {
 	for {
 		newRandomID := random.GetRandomUint32()
 		if _, found := km.unavailableKeyIDs[newRandomID]; !found {
