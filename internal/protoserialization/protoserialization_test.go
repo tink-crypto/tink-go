@@ -30,8 +30,9 @@ var (
 	testKeyURL  = "test-key-url"
 	testKeyURL2 = "test-key-url-2"
 
-	ErrKeyParsing       = errors.New("key parsing failed")
-	ErrKeySerialization = errors.New("key serialization failed")
+	ErrKeyParsing             = errors.New("key parsing failed")
+	ErrKeySerialization       = errors.New("key serialization failed")
+	ErrParamtersSerialization = errors.New("parameters serialization failed")
 )
 
 type testParams struct {
@@ -88,6 +89,20 @@ func (s *testKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error
 }
 
 var _ protoserialization.KeySerializer = (*testKeySerializer)(nil)
+
+type testParamsSerializer struct{}
+
+func (s *testParamsSerializer) Serialize(params key.Parameters) (*tinkpb.KeyTemplate, error) {
+	_, ok := params.(*testParams)
+	if !ok {
+		return nil, fmt.Errorf("type mismatch: got %T, want *testParams", params)
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl: testKeyURL,
+	}, nil
+}
+
+var _ protoserialization.ParametersSerializer = (*testParamsSerializer)(nil)
 
 func TestRegisterKeyParserFailsIfAlreadyRegistered(t *testing.T) {
 	defer protoserialization.ClearKeyParsers()
@@ -208,7 +223,7 @@ func TestRegisterKeySerializerAndSerializeKey(t *testing.T) {
 	}
 	gotKeysetKey, err := protoserialization.SerializeKey(key)
 	if err != nil {
-		t.Fatalf("protoserialization.SerializeKey(%v) err = %v, want nil", key, err)
+		t.Fatalf("protoserialization.SerializeKey(key) err = %v, want nil", err)
 	}
 	if !bytes.Equal(gotKeysetKey.GetKeyData().GetValue(), key.keyBytes) {
 		t.Errorf("bytes.Equal(%v, %v) = false, want true", gotKeysetKey.GetKeyData().GetValue(), key.keyBytes)
@@ -232,7 +247,7 @@ func TestSerializeKeyFailsIfNoSerializersRegistered(t *testing.T) {
 		keyBytes: []byte("123"),
 	}
 	if _, err := protoserialization.SerializeKey(key); err == nil {
-		t.Errorf("protoserialization.SerializeKey(%v) err = nil, want error", key)
+		t.Errorf("protoserialization.SerializeKey(key) err = nil, want error")
 	}
 }
 
@@ -247,7 +262,7 @@ func TestSerializeKeyWithFallbackKey(t *testing.T) {
 	key := protoserialization.NewFallbackProtoKey(wantProtoKey)
 	gotProtoKey, err := protoserialization.SerializeKey(key)
 	if err != nil {
-		t.Fatalf("protoserialization.SerializeKey(%v) err = %v, want nil", key, err)
+		t.Fatalf("protoserialization.SerializeKey(key) err = %v, want nil", err)
 	}
 	if !proto.Equal(gotProtoKey, wantProtoKey) {
 		t.Errorf("proto.Equal(%v, %v) = false, want true", gotProtoKey, wantProtoKey)
@@ -273,9 +288,83 @@ func TestSerializeKeyFailsIfSerializeFails(t *testing.T) {
 	}
 	_, err = protoserialization.SerializeKey(key)
 	if err == nil {
-		t.Errorf("protoserialization.SerializeKey(%v) err = nil, want error", key)
+		t.Errorf("protoserialization.SerializeKey(key) err = nil, want error")
 	}
 	if !errors.Is(err, ErrKeySerialization) {
-		t.Errorf("protoserialization.SerializeKey(%v) err = %v, want %v", key, err, ErrKeyParsing)
+		t.Errorf("protoserialization.SerializeKey(key) err = %v, want %v", err, ErrKeyParsing)
+	}
+}
+
+func TestRegisterParametersSerializerAndSerializeParameters(t *testing.T) {
+	defer protoserialization.ClearParametersSerializers()
+	err := protoserialization.RegisterParametersSerializer[*testParams](&testParamsSerializer{})
+	if err != nil {
+		t.Fatalf("protoserialization.RegisterParametersSerializer[*testParams](&testParamsSerializer{}) err = %v, want nil", err)
+	}
+
+	params := &testParams{
+		hasIDRequirement: true,
+	}
+
+	keyTemplate, err := protoserialization.SerializeParameters(params)
+	if err != nil {
+		t.Fatalf("protoserialization.SerializeParameters(params) err = %v, want nil", err)
+	}
+	if keyTemplate.GetTypeUrl() != testKeyURL {
+		t.Errorf("keyTemplate.GetTypeUrl() = %s, want %s", keyTemplate.GetTypeUrl(), testKeyURL)
+	}
+}
+
+func TestRegisterParametersSerializerFailsIfAlreadyRegistered(t *testing.T) {
+	defer protoserialization.ClearParametersSerializers()
+	err := protoserialization.RegisterParametersSerializer[*testParams](&testParamsSerializer{})
+	if err != nil {
+		t.Fatalf("protoserialization.RegisterParametersSerializer[*testParams](&testParamsSerializer{}) err = %v, want nil", err)
+	}
+	if protoserialization.RegisterParametersSerializer[*testParams](&testParamsSerializer{}) == nil {
+		t.Errorf("protoserialization.RegisterParametersSerializer[*testParams](&testParamsSerializer{}) err = nil, want error")
+	}
+}
+
+func TestSerializeParametersFailsIfNoSerializersRegistered(t *testing.T) {
+	defer protoserialization.ClearParametersSerializers()
+	params := &testParams{
+		hasIDRequirement: true,
+	}
+	if _, err := protoserialization.SerializeParameters(params); err == nil {
+		t.Errorf("protoserialization.SerializeParameters(params) err = nil, want error")
+	}
+}
+
+func TestSerializeParametersFailsIfNilParameters(t *testing.T) {
+	defer protoserialization.ClearParametersSerializers()
+	if _, err := protoserialization.SerializeParameters(nil); err == nil {
+		t.Errorf("protoserialization.SerializeParameters(nil) err = nil, want error")
+	}
+}
+
+type alwaysFailingParametersSerializer struct{}
+
+func (s *alwaysFailingParametersSerializer) Serialize(params key.Parameters) (*tinkpb.KeyTemplate, error) {
+	return nil, ErrParamtersSerialization
+}
+
+var _ protoserialization.ParametersSerializer = (*alwaysFailingParametersSerializer)(nil)
+
+func TestSerializeParametersFailsIfParserFails(t *testing.T) {
+	defer protoserialization.ClearParametersSerializers()
+	err := protoserialization.RegisterParametersSerializer[*testParams](&alwaysFailingParametersSerializer{})
+	if err != nil {
+		t.Fatalf("protoserialization.RegisterParametersSerializer[*testParams](&alwaysFailingParametersSerializer{}) err = %v, want nil", err)
+	}
+	params := &testParams{
+		hasIDRequirement: true,
+	}
+	_, err = protoserialization.SerializeParameters(params)
+	if err == nil {
+		t.Errorf("protoserialization.SerializeParameters(params) err = nil, want error")
+	}
+	if !errors.Is(err, ErrParamtersSerialization) {
+		t.Errorf("protoserialization.SerializeParameters(params) err = %v, want %v", err, ErrKeyParsing)
 	}
 }

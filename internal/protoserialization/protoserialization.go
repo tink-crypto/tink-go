@@ -28,10 +28,12 @@ import (
 )
 
 var (
-	keyParsersMu     sync.RWMutex
-	keyParsers       = make(map[string]KeyParser) // TypeURL -> KeyParser
-	keySerializersMu sync.RWMutex
-	keySerializers   = make(map[reflect.Type]KeySerializer) // KeyType -> KeySerializer
+	keyParsersMu            sync.RWMutex
+	keyParsers              = make(map[string]KeyParser) // TypeURL -> KeyParser
+	keySerializersMu        sync.RWMutex
+	keySerializers          = make(map[reflect.Type]KeySerializer) // KeyType -> KeySerializer
+	parametersSerializersMu sync.RWMutex
+	parameterSerializers    = make(map[reflect.Type]ParametersSerializer) // ParameterType -> ParametersSerializer
 )
 
 type fallbackProtoKeyParams struct {
@@ -40,9 +42,9 @@ type fallbackProtoKeyParams struct {
 
 func (p *fallbackProtoKeyParams) HasIDRequirement() bool { return p.hasIDRequirement }
 
-func (p *fallbackProtoKeyParams) Equals(params key.Parameters) bool {
-	_, ok := params.(*fallbackProtoKeyParams)
-	return ok && p.hasIDRequirement == params.HasIDRequirement()
+func (p *fallbackProtoKeyParams) Equals(parameters key.Parameters) bool {
+	_, ok := parameters.(*fallbackProtoKeyParams)
+	return ok && p.hasIDRequirement == parameters.HasIDRequirement()
 }
 
 // FallbackProtoKey is a key that wraps a proto keyset key.
@@ -52,28 +54,28 @@ func (p *fallbackProtoKeyParams) Equals(params key.Parameters) bool {
 // representation to avoid premature use of this type.
 type FallbackProtoKey struct {
 	protoKeysetKey *tinkpb.Keyset_Key
-	params         *fallbackProtoKeyParams
+	parameters     *fallbackProtoKeyParams
 }
 
 // Parameters returns the parameters of this key.
-func (k *FallbackProtoKey) Parameters() key.Parameters { return k.params }
+func (k *FallbackProtoKey) Parameters() key.Parameters { return k.parameters }
 
 // Equals reports whether k is equal to other.
 func (k *FallbackProtoKey) Equals(other key.Key) bool {
 	_, ok := other.(*FallbackProtoKey)
-	return ok && k.params.Equals(other.Parameters())
+	return ok && k.parameters.Equals(other.Parameters())
 }
 
 // IDRequirement returns the key ID and whether it is required.
 func (k *FallbackProtoKey) IDRequirement() (uint32, bool) {
-	return k.protoKeysetKey.GetKeyId(), k.params.HasIDRequirement()
+	return k.protoKeysetKey.GetKeyId(), k.parameters.HasIDRequirement()
 }
 
 // NewFallbackProtoKey creates a new FallbackProtoKey.
 func NewFallbackProtoKey(protoKeysetKey *tinkpb.Keyset_Key) *FallbackProtoKey {
 	return &FallbackProtoKey{
 		protoKeysetKey: protoKeysetKey,
-		params: &fallbackProtoKeyParams{
+		parameters: &fallbackProtoKeyParams{
 			hasIDRequirement: protoKeysetKey.GetOutputPrefixType() != tinkpb.OutputPrefixType_RAW,
 		},
 	}
@@ -96,6 +98,12 @@ type KeySerializer interface {
 	SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error)
 }
 
+// ParametersSerializer is an interface for serializing parameters into a proto key template.
+type ParametersSerializer interface {
+	// Serialize serializes the given parameters into a proto key template.
+	Serialize(parameters key.Parameters) (*tinkpb.KeyTemplate, error)
+}
+
 // RegisterKeySerializer registers the given key serializer for keys of type K.
 //
 // It doesn't allow replacing existing serializers.
@@ -110,6 +118,20 @@ func RegisterKeySerializer[K key.Key](keySerializer KeySerializer) error {
 	return nil
 }
 
+// RegisterParametersSerializer registers the given parameter serializer for parameters of type P.
+//
+// It doesn't allow replacing existing serializers.
+func RegisterParametersSerializer[P key.Parameters](parameterSerializer ParametersSerializer) error {
+	parametersSerializersMu.Lock()
+	defer parametersSerializersMu.Unlock()
+	parameterType := reflect.TypeOf((*P)(nil)).Elem()
+	if _, found := parameterSerializers[parameterType]; found {
+		return fmt.Errorf("serialization.RegisterParametersSerializer: type %v already registered", parameterType)
+	}
+	parameterSerializers[parameterType] = parameterSerializer
+	return nil
+}
+
 // SerializeKey serializes the given key into a proto keyset key.
 func SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
 	keyType := reflect.TypeOf(key)
@@ -118,6 +140,19 @@ func SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
 		return nil, fmt.Errorf("serialization.SerializeKey: no serializer for type %v", keyType)
 	}
 	return serializer.SerializeKey(key)
+}
+
+// SerializeParameters serializes the given parameters into a proto key template.
+func SerializeParameters(parameters key.Parameters) (*tinkpb.KeyTemplate, error) {
+	if parameters == nil {
+		return nil, fmt.Errorf("serialization.SerializeParameters: parameters is nil")
+	}
+	parametersType := reflect.TypeOf(parameters)
+	serializer, ok := parameterSerializers[parametersType]
+	if !ok {
+		return nil, fmt.Errorf("serialization.SerializeParameters: no serializer for type %v", parametersType)
+	}
+	return serializer.Serialize(parameters)
 }
 
 // RegisterKeyParser registers the given key parser.
@@ -173,6 +208,15 @@ func ReinitializeKeySerializers() {
 	clear(keySerializers)
 	// Always register the fallback serializer.
 	keySerializers[reflect.TypeOf((*FallbackProtoKey)(nil))] = &fallbackProtoKeySerializer{}
+}
+
+// ClearParametersSerializers clears the global parameters serializers registry.
+//
+// This function is intended to be used in tests only.
+func ClearParametersSerializers() {
+	parametersSerializersMu.Lock()
+	defer parametersSerializersMu.Unlock()
+	clear(parameterSerializers)
 }
 
 func init() {
