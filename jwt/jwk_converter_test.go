@@ -1205,6 +1205,16 @@ func TestJWKSetFromPublicKeysetNonEnabledKeysAreIgnored(t *testing.T) {
       "key": [
           {
               "keyId": 303799737,
+              "status": "ENABLED",
+              "outputPrefixType": "TINK",
+              "keyData": {
+                  "typeUrl": "type.googleapis.com/google.crypto.tink.JwtEcdsaPublicKey",
+                  "keyMaterialType": "ASYMMETRIC_PUBLIC",
+                  "value": "IiDuhGJiGeaQ/qeqt1daC2xZRarm4VEsmSHJUWJY9EHbvxogwO6uIxh8SkKOO8VjZXNRTteRcwCPE4/4JElKyaa0fcQQAQ=="
+              }
+          },
+          {
+              "keyId": 303799738,
               "status": "DISABLED",
               "outputPrefixType": "TINK",
               "keyData": {
@@ -1223,10 +1233,28 @@ func TestJWKSetFromPublicKeysetNonEnabledKeysAreIgnored(t *testing.T) {
 	if err != nil {
 		t.Fatalf("jwt.JWKSetFromPublicKeysetHandle() err = %v, want nil", err)
 	}
-	want := `{"keys":[]}`
-	if string(jwkSet) != want {
-		t.Fatalf("jwt.JWKSetFromPublicKeysetHandle() = %q, want %q", string(jwkSet), want)
+	wantJwkSet := `{"keys":[{
+		"kty":"EC",
+		"crv":"P-256",
+		"x":"wO6uIxh8SkKOO8VjZXNRTteRcwCPE4_4JElKyaa0fcQ",
+		"y":"7oRiYhnmkP6nqrdXWgtsWUWq5uFRLJkhyVFiWPRB278",
+		"use":"sig",
+		"alg":"ES256",
+		"key_ops":["verify"],
+		"kid":"EhuduQ"}]
+		}`
+	want := &spb.Struct{}
+	if err := want.UnmarshalJSON([]byte(wantJwkSet)); err != nil {
+		t.Fatalf("want.UnmarshalJSON() err = %v, want nil", err)
 	}
+	got := &spb.Struct{}
+	if err := got.UnmarshalJSON(jwkSet); err != nil {
+		t.Fatalf("got.UnmarshalJSON() err = %v, want nil", err)
+	}
+	if !cmp.Equal(want, got, protocmp.Transform()) {
+		t.Errorf("mismatch in jwk sets: diff (-want,+got): %v", cmp.Diff(want, got, protocmp.Transform()))
+	}
+
 }
 
 func TestJWKSetFromPublicKeysetHandleTinkOutputPrefixHasKID(t *testing.T) {
