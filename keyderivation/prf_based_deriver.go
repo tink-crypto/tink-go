@@ -83,18 +83,20 @@ func (p *prfBasedDeriver) DeriveKeyset(salt []byte) (*keyset.Handle, error) {
 		return nil, fmt.Errorf("derive key failed: %v", err)
 	}
 	// Fill in placeholder values for key ID, status, and output prefix type.
+	// The placeholder values are s.t. the keyset is valid and can be used to
+	// create a keyset handle.
 	// These will be populated with the correct values in the keyset deriver
-	// factory. This is acceptable because the keyset as-is will never leave Tink,
-	// and the user only interacts via the keyset deriver factory.
+	// factory. This is acceptable because the keyset as-is will never leave
+	// Tink, and the user only interacts via the keyset deriver factory.
 	var primaryKeyID uint32 = 0
 	return keysetHandle(&tinkpb.Keyset{
 		PrimaryKeyId: primaryKeyID,
 		Key: []*tinkpb.Keyset_Key{
 			&tinkpb.Keyset_Key{
 				KeyData:          keyData,
-				Status:           tinkpb.KeyStatusType_UNKNOWN_STATUS,
+				Status:           tinkpb.KeyStatusType_ENABLED,
 				KeyId:            primaryKeyID,
-				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
 			},
 		},
 	})

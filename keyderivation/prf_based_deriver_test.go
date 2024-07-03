@@ -241,10 +241,10 @@ func TestPRFBasedDeriverWithHKDFRFCVectorForAESGCM(t *testing.T) {
 				t.Fatal("keyset has no primary key")
 			}
 			// Verify key attributes set by prfBasedDeriver.
-			if got, want := key.GetStatus(), tinkpb.KeyStatusType_UNKNOWN_STATUS; got != want {
+			if got, want := key.GetStatus(), tinkpb.KeyStatusType_ENABLED; got != want {
 				t.Errorf("derived key status = %s, want %s", got, want)
 			}
-			if got, want := key.GetOutputPrefixType(), tinkpb.OutputPrefixType_UNKNOWN_PREFIX; got != want {
+			if got, want := key.GetOutputPrefixType(), tinkpb.OutputPrefixType_RAW; got != want {
 				t.Errorf("derived key output prefix type = %s, want %s", got, want)
 			}
 			// Verify key value.
