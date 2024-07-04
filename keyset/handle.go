@@ -314,7 +314,7 @@ func (h *Handle) WriteWithAssociatedData(writer Writer, masterKey tink.AEAD, ass
 // contains secret key material.
 func (h *Handle) WriteWithNoSecrets(w Writer) error {
 	if h.hasSecrets() {
-		return errors.New("exporting unencrypted secret key material is forbidden")
+		return errors.New("keyset.Handle: exporting unencrypted secret key material is forbidden")
 	}
 
 	return w.Write(h.ks)
@@ -359,7 +359,7 @@ func WithConfig(c Config) PrimitivesOption {
 func (h *Handle) Primitives(opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
 	p, err := h.primitives(nil, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("handle.Primitives: %v", err)
+		return nil, fmt.Errorf("keyset.Handle: %v", err)
 	}
 	return p, nil
 }
@@ -379,7 +379,7 @@ func (h *Handle) Primitives(opts ...PrimitivesOption) (*primitiveset.PrimitiveSe
 func (h *Handle) PrimitivesWithKeyManager(km registry.KeyManager) (*primitiveset.PrimitiveSet, error) {
 	p, err := h.primitives(km)
 	if err != nil {
-		return nil, fmt.Errorf("handle.PrimitivesWithKeyManager: %v", err)
+		return nil, fmt.Errorf("keyset.Handle: %v", err)
 	}
 	return p, nil
 }

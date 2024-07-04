@@ -98,11 +98,11 @@ func (km *Manager) getIDForKey(key key.Key) (uint32, error) {
 // enabled by default.
 func (km *Manager) AddKey(key key.Key) (uint32, error) {
 	if key == nil {
-		return 0, fmt.Errorf("keyset.Handle: entry must have Key set")
+		return 0, fmt.Errorf("keyset.Manager: entry must have Key set")
 	}
 	keysetKey, err := protoserialization.SerializeKey(key)
 	if err != nil {
-		return 0, fmt.Errorf("keyset.Handle: %v", err)
+		return 0, fmt.Errorf("keyset.Manager: %v", err)
 	}
 	// This is going to be either an ID requirement or a new random ID.
 	keysetKey.KeyId, err = km.getIDForKey(key)
