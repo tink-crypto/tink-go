@@ -45,6 +45,7 @@ go_test(
         "binary_io_test.go",
         "handle_test.go",
         "json_io_test.go",
+        "keyset_benchmark_test.go",
         "keyset_test.go",
         "manager_test.go",
         "mem_io_test.go",
