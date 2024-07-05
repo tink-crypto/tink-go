@@ -31,7 +31,7 @@ func New(handle *keyset.Handle) (KeysetDeriver, error) {
 	if handle == nil {
 		return nil, errors.New("keyset_deriver_factory: keyset handle can't be nil")
 	}
-	ps, err := handle.PrimitivesWithKeyManager(nil)
+	ps, err := handle.Primitives()
 	if err != nil {
 		return nil, fmt.Errorf("keyset_deriver_factory: cannot obtain primitive set: %v", err)
 	}

@@ -30,7 +30,7 @@ func NewVerifier(handle *keyset.Handle) (Verifier, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := handle.PrimitivesWithKeyManager(nil)
+	ps, err := handle.Primitives()
 	if err != nil {
 		return nil, fmt.Errorf("jwt_verifier_factory: cannot obtain primitive set: %v", err)
 	}

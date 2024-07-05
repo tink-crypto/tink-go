@@ -30,7 +30,7 @@ func NewMAC(handle *keyset.Handle) (MAC, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := handle.PrimitivesWithKeyManager(nil)
+	ps, err := handle.Primitives()
 	if err != nil {
 		return nil, fmt.Errorf("jwt_mac_factory: cannot obtain primitive set: %v", err)
 	}
