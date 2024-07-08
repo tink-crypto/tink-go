@@ -174,7 +174,7 @@ func RegisterKeyParser(keyTypeURL string, keyParser KeyParser) error {
 func ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
 	parser, found := keyParsers[keysetKey.GetKeyData().GetTypeUrl()]
 	if !found {
-		return &FallbackProtoKey{protoKeysetKey: keysetKey}, nil
+		return NewFallbackProtoKey(keysetKey), nil
 	}
 	return parser.ParseKey(keysetKey)
 }

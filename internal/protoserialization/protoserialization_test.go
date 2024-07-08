@@ -83,8 +83,13 @@ func (s *testKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error
 	}
 	return &tinkpb.Keyset_Key{
 		KeyData: &tinkpb.KeyData{
-			Value: actualKey.keyBytes,
+			TypeUrl:         testKeyURL,
+			Value:           actualKey.keyBytes,
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 		},
+		Status:           tinkpb.KeyStatusType_ENABLED,
+		KeyId:            actualKey.id,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 	}, nil
 }
 
@@ -122,12 +127,14 @@ func TestParseKey(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeyParser(%s) err = %v, want nil", testKeyURL, err)
 	}
 	protoKeysetKey := &tinkpb.Keyset_Key{
-		OutputPrefixType: tinkpb.OutputPrefixType_RAW,
-		KeyId:            123,
 		KeyData: &tinkpb.KeyData{
-			TypeUrl: testKeyURL,
-			Value:   []byte("123"),
+			TypeUrl:         testKeyURL,
+			Value:           []byte("123"),
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 		},
+		Status:           tinkpb.KeyStatusType_ENABLED,
+		KeyId:            123,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 	}
 	key, err := protoserialization.ParseKey(protoKeysetKey)
 	if err != nil {
@@ -151,15 +158,30 @@ func TestParseKeyReturnsFallbackIfNoParsersRegistered(t *testing.T) {
 	// Empty parser map.
 	key, err := protoserialization.ParseKey(&tinkpb.Keyset_Key{
 		KeyData: &tinkpb.KeyData{
-			TypeUrl: testKeyURL,
+			TypeUrl:         testKeyURL,
+			Value:           []byte("123"),
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 		},
+		Status:           tinkpb.KeyStatusType_ENABLED,
+		KeyId:            123,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 	})
 	if err != nil {
 		t.Fatalf("protoserialization.ParseKey(%s) err = %v, want nil", testKeyURL, err)
 	}
-	_, ok := key.(*protoserialization.FallbackProtoKey)
+	fallbackProtoKey, ok := key.(*protoserialization.FallbackProtoKey)
 	if !ok {
 		t.Errorf("type mismatch: got %T, want *protoserialization.FallbackProtoKey", key)
+	}
+	keyID, hasIDRequirement := fallbackProtoKey.IDRequirement()
+	if !hasIDRequirement {
+		t.Errorf("hasIDRequirement = false, want true")
+	}
+	if hasIDRequirement != fallbackProtoKey.Parameters().HasIDRequirement() {
+		t.Errorf("hasIDRequirement != fallbackProtoKey.Parameters().HasIDRequirement(), want equal")
+	}
+	if keyID != 123 {
+		t.Errorf("keyID = %d, want 123", keyID)
 	}
 }
 
@@ -172,8 +194,13 @@ func TestParseKeyReturnsFallbackIfDifferentParserRegistered(t *testing.T) {
 	}
 	key, err := protoserialization.ParseKey(&tinkpb.Keyset_Key{
 		KeyData: &tinkpb.KeyData{
-			TypeUrl: testKeyURL,
+			TypeUrl:         testKeyURL,
+			Value:           []byte("123"),
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 		},
+		Status:           tinkpb.KeyStatusType_ENABLED,
+		KeyId:            123,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 	})
 	if err != nil {
 		t.Fatalf("protoserialization.ParseKey(%s) err = %v, want nil", testKeyURL, err)
@@ -200,8 +227,13 @@ func TestParseKeyFailsIfParserFails(t *testing.T) {
 	}
 	_, err = protoserialization.ParseKey(&tinkpb.Keyset_Key{
 		KeyData: &tinkpb.KeyData{
-			TypeUrl: testKeyURL,
+			TypeUrl:         testKeyURL,
+			Value:           []byte("123"),
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 		},
+		Status:           tinkpb.KeyStatusType_ENABLED,
+		KeyId:            123,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 	})
 	if err == nil {
 		t.Errorf("protoserialization.ParseKey(%s) err = nil, want error", testKeyURL)
@@ -255,9 +287,13 @@ func TestSerializeKeyWithFallbackKey(t *testing.T) {
 	defer protoserialization.ReinitializeKeySerializers()
 	wantProtoKey := &tinkpb.Keyset_Key{
 		KeyData: &tinkpb.KeyData{
-			TypeUrl: testKeyURL,
-			Value:   []byte("123"),
+			TypeUrl:         testKeyURL,
+			Value:           []byte("123"),
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 		},
+		Status:           tinkpb.KeyStatusType_ENABLED,
+		KeyId:            123,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 	}
 	key := protoserialization.NewFallbackProtoKey(wantProtoKey)
 	gotProtoKey, err := protoserialization.SerializeKey(key)
