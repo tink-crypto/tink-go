@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//key",
         "//proto/tink_go_proto",
+        "@org_golang_google_protobuf//proto",
     ],
 )
 

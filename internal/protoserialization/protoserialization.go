@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/key"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -62,8 +63,12 @@ func (k *FallbackProtoKey) Parameters() key.Parameters { return k.parameters }
 
 // Equals reports whether k is equal to other.
 func (k *FallbackProtoKey) Equals(other key.Key) bool {
-	_, ok := other.(*FallbackProtoKey)
-	return ok && k.parameters.Equals(other.Parameters())
+	otherFallbackProtoKey, ok := other.(*FallbackProtoKey)
+	if !ok {
+		return false
+	}
+	return k.parameters.Equals(other.Parameters()) &&
+		proto.Equal(k.protoKeysetKey, otherFallbackProtoKey.protoKeysetKey)
 }
 
 // IDRequirement returns the key ID and whether it is required.
