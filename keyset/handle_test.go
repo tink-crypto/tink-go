@@ -71,6 +71,104 @@ func TestKeysetMaterialMakesACopy(t *testing.T) {
 	}
 }
 
+func TestNewHandleExistingKeyset(t *testing.T) {
+	testCases := []struct {
+		name string
+		ks   *tinkpb.Keyset
+	}{
+		{
+			name: "one enabled key",
+			ks: &tinkpb.Keyset{
+				PrimaryKeyId: 1,
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_ENABLED,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+				},
+			},
+		},
+		{
+			name: "one disabled key",
+			ks: &tinkpb.Keyset{
+				PrimaryKeyId: 1,
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_DISABLED,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+				},
+			},
+		},
+		{
+			name: "one destroyed key",
+			ks: &tinkpb.Keyset{
+				PrimaryKeyId: 1,
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_DESTROYED,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+				},
+			},
+		},
+		{
+			name: "one key with unknown status",
+			ks: &tinkpb.Keyset{
+				PrimaryKeyId: 1,
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_UNKNOWN_STATUS,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+				},
+			},
+		},
+		{
+			name: "keyset without primary key",
+			ks: &tinkpb.Keyset{
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_UNKNOWN_STATUS,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+				},
+			},
+		},
+		{
+			name: "keyset with all default values",
+			ks: &tinkpb.Keyset{
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			wantProtoKeyset := tc.ks
+			handle, err := testkeyset.NewHandle(wantProtoKeyset)
+			if err != nil {
+				t.Errorf("testkeyset.NewHandle(wantProtoKeyset) = %v, want nil", err)
+			}
+			gotProtoKeyset := testkeyset.KeysetMaterial(handle)
+			if !proto.Equal(gotProtoKeyset, wantProtoKeyset) {
+				t.Errorf("testkeyset.NewHandle(wantProtoKeyset) = %v, want %v", gotProtoKeyset, wantProtoKeyset)
+			}
+		})
+	}
+}
+
 func TestNewHandleWithInvalidTypeURLFails(t *testing.T) {
 	// template with unknown TypeURL
 	invalidTemplate := mac.HMACSHA256Tag128KeyTemplate()

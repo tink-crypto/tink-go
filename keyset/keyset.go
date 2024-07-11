@@ -17,7 +17,6 @@
 package keyset
 
 import (
-	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/internal"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -33,7 +32,11 @@ func keysetHandle(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
 // testkeyset (via package internal) to read the key material in a
 // keyset.Handle. Returns a clone of the keyset.
 func keysetMaterial(h *Handle) *tinkpb.Keyset {
-	return proto.Clone(h.ks).(*tinkpb.Keyset)
+	ks, err := entriesToProtoKeyset(h.entries)
+	if err != nil {
+		return nil
+	}
+	return ks
 }
 
 func init() {
