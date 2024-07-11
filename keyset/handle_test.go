@@ -196,6 +196,56 @@ func TestReadWithMismatchedAssociatedData(t *testing.T) {
 	}
 }
 
+func TestPrimaryReturnsErrorForZeroValueHandle(t *testing.T) {
+	handle := &keyset.Handle{}
+	_, err := handle.Primary()
+	if err == nil {
+		t.Errorf("handle.Primary() err = nil, want err")
+	}
+}
+
+func TestLenReturnsZeroForZeroValueHandle(t *testing.T) {
+	handle := &keyset.Handle{}
+	length := handle.Len()
+	if length != 0 {
+		t.Errorf("handle.Len() = %v, want 0", length)
+	}
+}
+
+func TestPublicReturnsErrorForZeroValueHandle(t *testing.T) {
+	handle := &keyset.Handle{}
+	_, err := handle.Public()
+	if err == nil {
+		t.Errorf("handle.Public() err = nil, want err")
+	}
+}
+
+func TestEntryReturnsErrorForZeroValueHandle(t *testing.T) {
+	handle := &keyset.Handle{}
+	_, err := handle.Entry(0)
+	if err == nil {
+		t.Errorf("handle.Entry(0) err = nil, want err")
+	}
+}
+
+func TestWriteReturnsErrorForZeroValueHandle(t *testing.T) {
+	keysetEncryptionHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
+	if err != nil {
+		t.Errorf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
+	}
+	keysetEncryptionAEAD, err := aead.New(keysetEncryptionHandle)
+	if err != nil {
+		t.Errorf("aead.New(keysetEncryptionHandle) err = %v, want nil", err)
+	}
+
+	handle := &keyset.Handle{}
+	buff := &bytes.Buffer{}
+	err = handle.Write(keyset.NewBinaryWriter(buff), keysetEncryptionAEAD)
+	if err == nil {
+		t.Error("handle.Write() err = nil, want err")
+	}
+}
+
 func TestWriteAndReadWithNoSecrets(t *testing.T) {
 	// Create a keyset that contains a public key.
 	privateHandle, err := keyset.NewHandle(signature.ECDSAP256KeyTemplate())

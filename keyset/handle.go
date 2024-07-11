@@ -249,7 +249,10 @@ func (h *Handle) Entry(i int) (*Entry, error) {
 
 // Public returns a Handle of the public keys if the managed keyset contains private keys.
 func (h *Handle) Public() (*Handle, error) {
-	privKeys := h.ks.Key
+	privKeys := h.ks.GetKey()
+	if len(privKeys) == 0 {
+		return nil, errors.New("keyset.Handle: invalid keyset")
+	}
 	pubKeys := make([]*tinkpb.Keyset_Key, len(privKeys))
 
 	for i := 0; i < len(privKeys); i++ {
@@ -303,6 +306,9 @@ func (h *Handle) Write(writer Writer, masterKey tink.AEAD) error {
 
 // WriteWithAssociatedData encrypts and writes the enclosing keyset using the provided associated data.
 func (h *Handle) WriteWithAssociatedData(writer Writer, masterKey tink.AEAD, associatedData []byte) error {
+	if h.ks == nil {
+		return errors.New("keyset.Handle: invalid keyset")
+	}
 	encrypted, err := encrypt(h.ks, masterKey, associatedData)
 	if err != nil {
 		return err
