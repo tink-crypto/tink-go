@@ -54,6 +54,23 @@ func TestNewHandle(t *testing.T) {
 	}
 }
 
+func TestKeysetMaterialMakesACopy(t *testing.T) {
+	wantProtoKeyset := testutil.NewKeyset(1, []*tinkpb.Keyset_Key{
+		testutil.NewKey(testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC), tinkpb.KeyStatusType_ENABLED, 1, tinkpb.OutputPrefixType_TINK),
+	})
+	handle, err := testkeyset.NewHandle(wantProtoKeyset)
+	if err != nil {
+		t.Errorf("testkeyset.NewHandle(wantProtoKeyset) = %v, want nil", err)
+	}
+	gotProtoKeyset := testkeyset.KeysetMaterial(handle)
+	if wantProtoKeyset == gotProtoKeyset {
+		t.Errorf("testkeyset.KeysetMaterial(handle) = %v, want a copy of %v", gotProtoKeyset, wantProtoKeyset)
+	}
+	if !proto.Equal(gotProtoKeyset, wantProtoKeyset) {
+		t.Errorf("testkeyset.NewHandle(wantProtoKeyset) = %v, want %v", gotProtoKeyset, wantProtoKeyset)
+	}
+}
+
 func TestNewHandleWithInvalidTypeURLFails(t *testing.T) {
 	// template with unknown TypeURL
 	invalidTemplate := mac.HMACSHA256Tag128KeyTemplate()
