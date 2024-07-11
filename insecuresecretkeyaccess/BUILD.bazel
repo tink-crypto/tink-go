@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "insecuresecretkeyaccess",
+    srcs = ["insecuresecretkeyaccess.go"],
+    importpath = "github.com/tink-crypto/tink-go/v2/insecuresecretkeyaccess",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":insecuresecretkeyaccess",
+    visibility = ["//visibility:public"],
+)
