@@ -215,7 +215,7 @@ func (km *Manager) Delete(keyID uint32) error {
 func (km *Manager) Handle() (*Handle, error) {
 	// Make a copy of the keyset to keep it
 	ks := proto.Clone(km.ks).(*tinkpb.Keyset)
-	return &Handle{ks: ks}, nil
+	return newWithOptions(ks)
 }
 
 // newRandomKeyID generates a key id that has not been used by any key in the keyset.

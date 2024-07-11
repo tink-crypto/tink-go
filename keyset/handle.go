@@ -144,15 +144,15 @@ func NewHandle(kt *tinkpb.KeyTemplate) (*Handle, error) {
 // NewHandleWithNoSecrets creates a new instance of KeysetHandle using the given keyset which does
 // not contain any secret key material.
 func NewHandleWithNoSecrets(ks *tinkpb.Keyset) (*Handle, error) {
-	if ks == nil {
-		return nil, errors.New("keyset.Handle: nil keyset")
+	handle, err := newWithOptions(ks)
+	if err != nil {
+		return nil, err
 	}
-	h := &Handle{ks: ks}
-	if h.hasSecrets() {
+	if handle.hasSecrets() {
 		// If you need to do this, you have to use func insecurecleartextkeyset.Read() instead.
 		return nil, errors.New("importing unencrypted secret key material is forbidden")
 	}
-	return h, nil
+	return handle, nil
 }
 
 // Read tries to create a Handle from an encrypted keyset obtained via reader.
@@ -170,7 +170,7 @@ func ReadWithAssociatedData(reader Reader, masterKey tink.AEAD, associatedData [
 	if err != nil {
 		return nil, err
 	}
-	return &Handle{ks: ks}, nil
+	return newWithOptions(ks)
 }
 
 // ReadWithNoSecrets tries to create a keyset.Handle from a keyset obtained via reader.
@@ -275,7 +275,7 @@ func (h *Handle) Public() (*Handle, error) {
 		PrimaryKeyId: h.ks.PrimaryKeyId,
 		Key:          pubKeys,
 	}
-	return &Handle{ks: ks}, nil
+	return newWithOptions(ks)
 }
 
 // String returns a string representation of the managed keyset.
