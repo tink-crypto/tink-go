@@ -36,9 +36,10 @@ var errInvalidKeyset = fmt.Errorf("keyset.Handle: invalid keyset")
 // Handle provides access to a Keyset protobuf, to limit the exposure of actual protocol
 // buffers that hold sensitive key material.
 type Handle struct {
-	ks            *tinkpb.Keyset // must be non-nil
-	isKsValidated bool
-	annotations   map[string]string
+	ks               *tinkpb.Keyset // must be non-nil
+	isKsValidated    bool
+	annotations      map[string]string
+	keysetHasSecrets bool // Whether the keyset contains secret key material.
 }
 
 // KeyStatus is the key status.
@@ -115,7 +116,7 @@ func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
 	if ks == nil {
 		return nil, errors.New("keyset.Handle: nil keyset")
 	}
-	h := &Handle{ks: ks}
+	h := &Handle{ks: ks, keysetHasSecrets: hasSecrets(ks)}
 	if err := applyOptions(h, opts...); err != nil {
 		return nil, err
 	}
@@ -148,7 +149,7 @@ func NewHandleWithNoSecrets(ks *tinkpb.Keyset) (*Handle, error) {
 	if err != nil {
 		return nil, err
 	}
-	if handle.hasSecrets() {
+	if handle.keysetHasSecrets {
 		// If you need to do this, you have to use func insecurecleartextkeyset.Read() instead.
 		return nil, errors.New("importing unencrypted secret key material is forbidden")
 	}
@@ -319,10 +320,9 @@ func (h *Handle) WriteWithAssociatedData(writer Writer, masterKey tink.AEAD, ass
 // WriteWithNoSecrets exports the keyset in h to the given Writer w returning an error if the keyset
 // contains secret key material.
 func (h *Handle) WriteWithNoSecrets(w Writer) error {
-	if h.hasSecrets() {
+	if h.keysetHasSecrets {
 		return errors.New("keyset.Handle: exporting unencrypted secret key material is forbidden")
 	}
-
 	return w.Write(h.ks)
 }
 
@@ -432,20 +432,18 @@ func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*
 	return primitiveSet, nil
 }
 
-// hasSecrets returns true if the keyset handle contains key material considered secret. This
-// includes symmetric keys, private keys of asymmetric crypto systems, and keys of an unknown type.
-func (h *Handle) hasSecrets() bool {
-	for _, k := range h.ks.Key {
-		if k == nil || k.KeyData == nil {
+// hasSecrets tells whether the keyset contains key material considered secret.
+//
+// This includes symmetric keys, private keys of asymmetric crypto systems,
+// and keys of an unknown type.
+func hasSecrets(ks *tinkpb.Keyset) bool {
+	for _, k := range ks.GetKey() {
+		if k.GetKeyData() == nil {
 			continue
 		}
-		if k.KeyData.KeyMaterialType == tinkpb.KeyData_UNKNOWN_KEYMATERIAL {
-			return true
-		}
-		if k.KeyData.KeyMaterialType == tinkpb.KeyData_ASYMMETRIC_PRIVATE {
-			return true
-		}
-		if k.KeyData.KeyMaterialType == tinkpb.KeyData_SYMMETRIC {
+		if k.GetKeyData().KeyMaterialType == tinkpb.KeyData_UNKNOWN_KEYMATERIAL ||
+			k.GetKeyData().KeyMaterialType == tinkpb.KeyData_ASYMMETRIC_PRIVATE ||
+			k.GetKeyData().KeyMaterialType == tinkpb.KeyData_SYMMETRIC {
 			return true
 		}
 	}
