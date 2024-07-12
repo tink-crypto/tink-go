@@ -46,7 +46,7 @@ func NewManager() *Manager {
 // NewManagerFromHandle creates a new instance from the given Handle.
 func NewManagerFromHandle(kh *Handle) *Manager {
 	ret := new(Manager)
-	ret.ks = keysetMaterial(kh)
+	ret.ks = proto.Clone(kh.ks).(*tinkpb.Keyset)
 	ret.unavailableKeyIDs = make(map[uint32]bool)
 	for _, key := range ret.ks.Key {
 		ret.unavailableKeyIDs[key.KeyId] = true

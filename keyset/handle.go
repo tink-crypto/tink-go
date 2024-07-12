@@ -33,14 +33,13 @@ import (
 
 var errInvalidKeyset = fmt.Errorf("keyset.Handle: invalid keyset")
 
-// Handle provides access to a keyset to limit the exposure of the internal
-// keyset representation, which may hold sensitive key material.
+// Handle provides access to a Keyset protobuf, to limit the exposure of actual protocol
+// buffers that hold sensitive key material.
 type Handle struct {
-	entries          []*Entry
+	ks               *tinkpb.Keyset // must be non-nil
 	isKsValidated    bool
 	annotations      map[string]string
 	keysetHasSecrets bool // Whether the keyset contains secret key material.
-	primaryKeyEntry  *Entry
 }
 
 // KeyStatus is the key status.
@@ -109,82 +108,15 @@ func keyStatusFromProto(status tinkpb.KeyStatusType) (KeyStatus, error) {
 	case tinkpb.KeyStatusType_DESTROYED:
 		return Destroyed, nil
 	default:
-		return Unknown, nil
+		return Unknown, fmt.Errorf("unknown key status: %v", status)
 	}
-}
-
-func keyStatusToProto(status KeyStatus) (tinkpb.KeyStatusType, error) {
-	switch status {
-	case Enabled:
-		return tinkpb.KeyStatusType_ENABLED, nil
-	case Disabled:
-		return tinkpb.KeyStatusType_DISABLED, nil
-	case Destroyed:
-		return tinkpb.KeyStatusType_DESTROYED, nil
-	default:
-		return tinkpb.KeyStatusType_UNKNOWN_STATUS, nil
-	}
-}
-
-func entriesToProtoKeyset(entries []*Entry) (*tinkpb.Keyset, error) {
-	if entries == nil {
-		return nil, fmt.Errorf("entriesToProtoKeyset called with nil")
-	}
-	if len(entries) == 0 {
-		return nil, fmt.Errorf("entries is empty")
-	}
-	protoKeyset := &tinkpb.Keyset{}
-	for _, entry := range entries {
-		protoKey, err := protoserialization.SerializeKey(entry.Key())
-		if err != nil {
-			return nil, err
-		}
-		if protoKey == nil {
-			return nil, fmt.Errorf("key is nil")
-		}
-		protoKey.Status, err = keyStatusToProto(entry.KeyStatus())
-		if err != nil {
-			return nil, err
-		}
-		protoKey.KeyId = entry.KeyID()
-		protoKeyset.Key = append(protoKeyset.Key, protoKey)
-		if entry.IsPrimary() {
-			protoKeyset.PrimaryKeyId = entry.KeyID()
-		}
-	}
-	return protoKeyset, nil
 }
 
 func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
 	if ks == nil {
-		return nil, errors.New("keyset.Handle: keyset is nil")
+		return nil, errors.New("keyset.Handle: nil keyset")
 	}
-	entries := make([]*Entry, len(ks.Key))
-	var primaryKeyEntry *Entry = nil
-	for i, protoKey := range ks.Key {
-		key, err := protoserialization.ParseKey(protoKey)
-		if err != nil {
-			return nil, fmt.Errorf("keyset.Handle: %v", err)
-		}
-		keyStatus, err := keyStatusFromProto(protoKey.GetStatus())
-		if err != nil {
-			return nil, fmt.Errorf("keyset.Handle: %v", err)
-		}
-		entries[i] = &Entry{
-			key:       key,
-			isPrimary: protoKey.GetKeyId() == ks.GetPrimaryKeyId(),
-			keyID:     protoKey.GetKeyId(),
-			status:    keyStatus,
-		}
-		if protoKey.GetKeyId() == ks.GetPrimaryKeyId() {
-			primaryKeyEntry = entries[i]
-		}
-	}
-	h := &Handle{
-		entries:          entries,
-		keysetHasSecrets: hasSecrets(ks),
-		primaryKeyEntry:  primaryKeyEntry,
-	}
+	h := &Handle{ks: ks, keysetHasSecrets: hasSecrets(ks)}
 	if err := applyOptions(h, opts...); err != nil {
 		return nil, err
 	}
@@ -235,32 +167,28 @@ func ReadWithAssociatedData(reader Reader, masterKey tink.AEAD, associatedData [
 	if err != nil {
 		return nil, err
 	}
-	protoKeyset, err := decrypt(encryptedKeyset, masterKey, associatedData)
+	ks, err := decrypt(encryptedKeyset, masterKey, associatedData)
 	if err != nil {
 		return nil, err
 	}
-	return newWithOptions(protoKeyset)
+	return newWithOptions(ks)
 }
 
 // ReadWithNoSecrets tries to create a keyset.Handle from a keyset obtained via reader.
 func ReadWithNoSecrets(reader Reader) (*Handle, error) {
-	protoKeyset, err := reader.Read()
+	ks, err := reader.Read()
 	if err != nil {
 		return nil, err
 	}
-	return NewHandleWithNoSecrets(protoKeyset)
+	return NewHandleWithNoSecrets(ks)
 }
 
 func (h *Handle) validateKeyset() error {
 	if h.isKsValidated {
 		return nil
 	}
-	protoKeyset, err := entriesToProtoKeyset(h.entries)
-	if err != nil {
-		return err
-	}
-	if err := Validate(protoKeyset); err != nil {
-		return fmt.Errorf("invalid keyset: %v", err)
+	if err := Validate(h.ks); err != nil {
+		return fmt.Errorf("keyset.Handle: invalid keyset: %v", err)
 	}
 	h.isKsValidated = true
 	return nil
@@ -269,58 +197,92 @@ func (h *Handle) validateKeyset() error {
 // Primary returns the primary key of the keyset.
 func (h *Handle) Primary() (*Entry, error) {
 	if err := h.validateKeyset(); err != nil {
-		return nil, fmt.Errorf("keyset.Handle: %v", err)
+		return nil, err
 	}
-	// If validation succeeded, then the primary key must exist.
-	return h.primaryKeyEntry, nil
+	for _, key := range h.ks.GetKey() {
+		if key.GetKeyId() == h.ks.GetPrimaryKeyId() {
+			keyStatus, err := keyStatusFromProto(key.GetStatus())
+			if err != nil {
+				return nil, fmt.Errorf("keyset.Handle: invalid key status: %v", key.GetStatus())
+			}
+			keyObject, err := protoserialization.ParseKey(key)
+			if err != nil {
+				return nil, fmt.Errorf("keyset.Handle: %v", err)
+			}
+			return &Entry{
+				key:       keyObject,
+				isPrimary: true,
+				keyID:     key.GetKeyId(),
+				status:    keyStatus,
+			}, nil
+		}
+	}
+	// Should never reach this point.
+	return nil, fmt.Errorf("keyset.Handle: no primary key found")
 }
 
 // Entry returns the key at index i from the keyset.
 // i must be within the range [0, Handle.Len()).
 func (h *Handle) Entry(i int) (*Entry, error) {
 	if err := h.validateKeyset(); err != nil {
-		return nil, fmt.Errorf("keyset.Handle: %v", err)
+		return nil, err
 	}
 	if i < 0 || i >= h.Len() {
 		return nil, fmt.Errorf("keyset.Handle: index %d out of range", i)
 	}
-	return h.entries[i], nil
+
+	key := h.ks.GetKey()[i]
+	keyStatus, err := keyStatusFromProto(key.GetStatus())
+	if err != nil {
+		return nil, fmt.Errorf("keyset.Handle: %v", err)
+	}
+	keyObject, err := protoserialization.ParseKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("keyset.Handle: %v", err)
+	}
+	return &Entry{
+		key:       keyObject,
+		isPrimary: key.GetKeyId() == h.ks.GetPrimaryKeyId(),
+		keyID:     key.GetKeyId(),
+		status:    keyStatus,
+	}, nil
 }
 
 // Public returns a Handle of the public keys if the managed keyset contains private keys.
 func (h *Handle) Public() (*Handle, error) {
-	protoKeyset, err := entriesToProtoKeyset(h.entries)
-	if err != nil {
-		return nil, fmt.Errorf("keyset.Handle: %v", err)
+	privKeys := h.ks.GetKey()
+	if len(privKeys) == 0 {
+		return nil, errors.New("keyset.Handle: invalid keyset")
 	}
-	publicKeys := make([]*tinkpb.Keyset_Key, h.Len())
-	for i, privKey := range protoKeyset.Key {
-		if privKey == nil || privKey.KeyData == nil {
+	pubKeys := make([]*tinkpb.Keyset_Key, len(privKeys))
+
+	for i := 0; i < len(privKeys); i++ {
+		if privKeys[i] == nil || privKeys[i].KeyData == nil {
 			return nil, errInvalidKeyset
 		}
-		privKeyData := privKey.KeyData
+		privKeyData := privKeys[i].KeyData
 		pubKeyData, err := publicKeyData(privKeyData)
 		if err != nil {
 			return nil, fmt.Errorf("keyset.Handle: %s", err)
 		}
-		publicKeys[i] = &tinkpb.Keyset_Key{
+		pubKeys[i] = &tinkpb.Keyset_Key{
 			KeyData:          pubKeyData,
-			Status:           privKey.Status,
-			KeyId:            privKey.KeyId,
-			OutputPrefixType: privKey.OutputPrefixType,
+			Status:           privKeys[i].Status,
+			KeyId:            privKeys[i].KeyId,
+			OutputPrefixType: privKeys[i].OutputPrefixType,
 		}
 	}
-	publicProtoKeyset := &tinkpb.Keyset{
-		PrimaryKeyId: protoKeyset.PrimaryKeyId,
-		Key:          publicKeys,
+	ks := &tinkpb.Keyset{
+		PrimaryKeyId: h.ks.PrimaryKeyId,
+		Key:          pubKeys,
 	}
-	return newWithOptions(publicProtoKeyset)
+	return newWithOptions(ks)
 }
 
 // String returns a string representation of the managed keyset.
 // The result does not contain any sensitive key material.
 func (h *Handle) String() string {
-	c, err := prototext.MarshalOptions{}.Marshal(h.KeysetInfo())
+	c, err := prototext.MarshalOptions{}.Marshal(getKeysetInfo(h.ks))
 	if err != nil {
 		return ""
 	}
@@ -329,13 +291,13 @@ func (h *Handle) String() string {
 
 // Len returns the number of keys in the keyset.
 func (h *Handle) Len() int {
-	return len(h.entries)
+	return len(h.ks.GetKey())
 }
 
 // KeysetInfo returns KeysetInfo representation of the managed keyset.
 // The result does not contain any sensitive key material.
 func (h *Handle) KeysetInfo() *tinkpb.KeysetInfo {
-	return getKeysetInfo(keysetMaterial(h))
+	return getKeysetInfo(h.ks)
 }
 
 // Write encrypts and writes the enclosing keyset.
@@ -345,11 +307,10 @@ func (h *Handle) Write(writer Writer, masterKey tink.AEAD) error {
 
 // WriteWithAssociatedData encrypts and writes the enclosing keyset using the provided associated data.
 func (h *Handle) WriteWithAssociatedData(writer Writer, masterKey tink.AEAD, associatedData []byte) error {
-	protoKeyset, err := entriesToProtoKeyset(h.entries)
-	if err != nil {
-		return err
+	if h.ks == nil {
+		return errors.New("keyset.Handle: invalid keyset")
 	}
-	encrypted, err := encrypt(protoKeyset, masterKey, associatedData)
+	encrypted, err := encrypt(h.ks, masterKey, associatedData)
 	if err != nil {
 		return err
 	}
@@ -362,11 +323,7 @@ func (h *Handle) WriteWithNoSecrets(w Writer) error {
 	if h.keysetHasSecrets {
 		return errors.New("keyset.Handle: exporting unencrypted secret key material is forbidden")
 	}
-	protoKeyset, err := entriesToProtoKeyset(h.entries)
-	if err != nil {
-		return err
-	}
-	return w.Write(protoKeyset)
+	return w.Write(h.ks)
 }
 
 // Config defines methods in the config.Config concrete type that are used by keyset.Handle.
@@ -445,16 +402,12 @@ func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*
 		config = &registryconfig.RegistryConfig{}
 	}
 
-	if err := h.validateKeyset(); err != nil {
+	if err := Validate(h.ks); err != nil {
 		return nil, fmt.Errorf("invalid keyset: %v", err)
 	}
 	primitiveSet := primitiveset.New()
 	primitiveSet.Annotations = h.annotations
-	protoKeyset, err := entriesToProtoKeyset(h.entries)
-	if err != nil {
-		return nil, err
-	}
-	for _, key := range protoKeyset.Key {
+	for _, key := range h.ks.Key {
 		if key.Status != tinkpb.KeyStatusType_ENABLED {
 			continue
 		}
@@ -472,7 +425,7 @@ func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*
 		if err != nil {
 			return nil, fmt.Errorf("cannot add primitive: %v", err)
 		}
-		if key.KeyId == protoKeyset.PrimaryKeyId {
+		if key.KeyId == h.ks.PrimaryKeyId {
 			primitiveSet.Primary = entry
 		}
 	}
