@@ -320,6 +320,9 @@ func (h *Handle) WriteWithAssociatedData(writer Writer, masterKey tink.AEAD, ass
 // WriteWithNoSecrets exports the keyset in h to the given Writer w returning an error if the keyset
 // contains secret key material.
 func (h *Handle) WriteWithNoSecrets(w Writer) error {
+	if h.ks == nil {
+		return errors.New("keyset.Handle: invalid keyset")
+	}
 	if h.keysetHasSecrets {
 		return errors.New("keyset.Handle: exporting unencrypted secret key material is forbidden")
 	}

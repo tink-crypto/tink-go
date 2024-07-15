@@ -213,7 +213,7 @@ func TestReadWithMismatchedAssociatedData(t *testing.T) {
 	}
 }
 
-func TestPrimaryReturnsErrorForZeroValueHandle(t *testing.T) {
+func TestPrimaryReturnsErrorWithZeroValueHandle(t *testing.T) {
 	handle := &keyset.Handle{}
 	_, err := handle.Primary()
 	if err == nil {
@@ -221,7 +221,7 @@ func TestPrimaryReturnsErrorForZeroValueHandle(t *testing.T) {
 	}
 }
 
-func TestLenReturnsZeroForZeroValueHandle(t *testing.T) {
+func TestLenReturnsZeroWithZeroValueHandle(t *testing.T) {
 	handle := &keyset.Handle{}
 	length := handle.Len()
 	if length != 0 {
@@ -229,7 +229,7 @@ func TestLenReturnsZeroForZeroValueHandle(t *testing.T) {
 	}
 }
 
-func TestPublicReturnsErrorForZeroValueHandle(t *testing.T) {
+func TestPublicReturnsErrorWithZeroValueHandle(t *testing.T) {
 	handle := &keyset.Handle{}
 	_, err := handle.Public()
 	if err == nil {
@@ -237,7 +237,7 @@ func TestPublicReturnsErrorForZeroValueHandle(t *testing.T) {
 	}
 }
 
-func TestEntryReturnsErrorForZeroValueHandle(t *testing.T) {
+func TestEntryReturnsErrorWithZeroValueHandle(t *testing.T) {
 	handle := &keyset.Handle{}
 	_, err := handle.Entry(0)
 	if err == nil {
@@ -245,7 +245,35 @@ func TestEntryReturnsErrorForZeroValueHandle(t *testing.T) {
 	}
 }
 
-func TestWriteReturnsErrorForZeroValueHandle(t *testing.T) {
+func TestPrimitivesReturnsErrorWithZeroValueHandle(t *testing.T) {
+	handle := &keyset.Handle{}
+	_, err := handle.Primitives()
+	if err == nil {
+		t.Errorf("handle.Primitives() err = nil, want err")
+	}
+}
+
+func TestKeysetInfoPanicsWithZeroValueHandle(t *testing.T) {
+	handle := &keyset.Handle{}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("handle.KeysetInfo() did not panic")
+		}
+	}()
+	_ = handle.KeysetInfo()
+}
+
+func TestStringPanicsWithZeroValueHandle(t *testing.T) {
+	handle := &keyset.Handle{}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("handle.String() did not panic")
+		}
+	}()
+	_ = handle.String()
+}
+
+func TestWriteReturnsErrorWithZeroValueHandle(t *testing.T) {
 	keysetEncryptionHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
 	if err != nil {
 		t.Errorf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
@@ -260,6 +288,32 @@ func TestWriteReturnsErrorForZeroValueHandle(t *testing.T) {
 	err = handle.Write(keyset.NewBinaryWriter(buff), keysetEncryptionAEAD)
 	if err == nil {
 		t.Error("handle.Write() err = nil, want err")
+	}
+}
+
+func TestWriteWithAssociatedDataReturnsErrorWithZeroValueHandle(t *testing.T) {
+	keysetEncryptionHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
+	if err != nil {
+		t.Errorf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
+	}
+	keysetEncryptionAEAD, err := aead.New(keysetEncryptionHandle)
+	if err != nil {
+		t.Errorf("aead.New(keysetEncryptionHandle) err = %v, want nil", err)
+	}
+
+	handle := &keyset.Handle{}
+	buff := &bytes.Buffer{}
+	err = handle.WriteWithAssociatedData(keyset.NewBinaryWriter(buff), keysetEncryptionAEAD, []byte("aad"))
+	if err == nil {
+		t.Error("handle.WriteWithAssociatedData() err = nil, want err")
+	}
+}
+
+func TestWriteWithNoSecretsReturnsErrorWithZeroValueHandle(t *testing.T) {
+	handle := &keyset.Handle{}
+	buff := &bytes.Buffer{}
+	if err := handle.WriteWithNoSecrets(keyset.NewBinaryWriter(buff)); err == nil {
+		t.Error("handle.WriteWithNoSecrets() err = nil, want err")
 	}
 }
 
