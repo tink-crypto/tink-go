@@ -577,6 +577,14 @@ func TestSerializeKeyWithFallbackKey(t *testing.T) {
 	if !proto.Equal(gotProtoKey, wantProtoKey) {
 		t.Errorf("proto.Equal(%v, %v) = false, want true", gotProtoKey, wantProtoKey)
 	}
+	// Check that the returned proto is a copy of the original.
+	if gotProtoKey == wantProtoKey {
+		t.Errorf("protoserialization.SerializeKey(key) = %v, want a copy of %v", gotProtoKey, wantProtoKey)
+	}
+	gotProtoKey.GetKeyData().Value = []byte("456")
+	if proto.Equal(gotProtoKey, wantProtoKey) {
+		t.Errorf("proto.Equal(%v, %v) = true, want false", gotProtoKey, wantProtoKey)
+	}
 }
 
 type alwaysFailingKeySerializer struct{}

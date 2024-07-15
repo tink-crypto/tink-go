@@ -191,7 +191,7 @@ func (s *fallbackProtoKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_K
 	if !ok {
 		return nil, fmt.Errorf("serialization.fallbackProtoKeySerializer.SerializeKey: key is not a FallbackProtoKey")
 	}
-	return fallbackKey.protoKeysetKey, nil
+	return proto.Clone(fallbackKey.protoKeysetKey).(*tinkpb.Keyset_Key), nil
 }
 
 // ClearKeyParsers clears the global key parsers registry.
