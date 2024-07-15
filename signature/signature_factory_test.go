@@ -104,6 +104,13 @@ func TestSignerVerifyFactory(t *testing.T) {
 	}
 }
 
+func TestPrimitiveFactoryFailsWithEmptyHandle(t *testing.T) {
+	handle := &keyset.Handle{}
+	if _, err := signature.NewVerifier(handle); err == nil {
+		t.Errorf("signature.NewVerifier(handle) err = nil, want not nil")
+	}
+}
+
 func TestPrimitiveFactoryFailsWhenKeysetHasNoPrimary(t *testing.T) {
 	privateKey, _ := newECDSAKeysetKeypair(t, commonpb.HashType_SHA512,
 		commonpb.EllipticCurveType_NIST_P521,

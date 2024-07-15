@@ -186,6 +186,16 @@ func TestPrimitiveFactoryFailsWhenKeysetHasNoPrimary(t *testing.T) {
 	}
 }
 
+func TestPrimitiveFactoryFailsWhenHandleIsEmpty(t *testing.T) {
+	handle := &keyset.Handle{}
+	if _, err := hybrid.NewHybridEncrypt(handle); err == nil {
+		t.Errorf("NewHybridEncrypt(handle) err = nil, want not nil")
+	}
+	if _, err := hybrid.NewHybridDecrypt(handle); err == nil {
+		t.Errorf("NewHybridDecrypt(handle) err = nil, want not nil")
+	}
+}
+
 func TestPrimitiveFactoryMonitoringWithAnnotationsLogsEncryptAndDecryptWithPrefix(t *testing.T) {
 	defer internalregistry.ClearMonitoringClient()
 	client := fakemonitoring.NewClient("fake-client")

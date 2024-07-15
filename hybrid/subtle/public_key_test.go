@@ -201,6 +201,14 @@ func TestSerializePrimaryPublicKeyInvalidHandleFails(t *testing.T) {
 	}
 }
 
+func TestSerializePrimaryPublicKeyFailsWithEmptyHandle(t *testing.T) {
+	handle := &keyset.Handle{}
+	keyTemplate := hybrid.DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_CHACHA20_POLY1305_Raw_Key_Template()
+	if _, err := subtle.SerializePrimaryPublicKey(handle, keyTemplate); err == nil {
+		t.Errorf("SerializePrimaryPublicKey(%v, %v) err = nil, want error", handle, keyTemplate)
+	}
+}
+
 func TestKeysetHandleFromSerializedPublicKeyInvalidTemplateFails(t *testing.T) {
 	keyTemplate := hybrid.DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_CHACHA20_POLY1305_Raw_Key_Template()
 	privHandle, err := keyset.NewHandle(keyTemplate)
