@@ -29,7 +29,7 @@ const (
 
 // ChaCha20Poly1305 is an implementation of AEAD interface.
 type ChaCha20Poly1305 struct {
-	Key []byte
+	key []byte
 }
 
 // Assert that ChaCha20Poly1305 implements the AEAD interface.
@@ -42,7 +42,7 @@ func NewChaCha20Poly1305(key []byte) (*ChaCha20Poly1305, error) {
 		return nil, errors.New("chacha20poly1305: bad key length")
 	}
 
-	return &ChaCha20Poly1305{Key: key}, nil
+	return &ChaCha20Poly1305{key}, nil
 }
 
 // Encrypt encrypts plaintext with associatedData.
@@ -54,7 +54,7 @@ func (ca *ChaCha20Poly1305) Encrypt(plaintext []byte, associatedData []byte) ([]
 	if len(plaintext) > maxInt-chacha20poly1305.NonceSize-poly1305TagSize {
 		return nil, fmt.Errorf("chacha20poly1305: plaintext too long")
 	}
-	c, err := chacha20poly1305.New(ca.Key)
+	c, err := chacha20poly1305.New(ca.key)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (ca *ChaCha20Poly1305) Encrypt(plaintext []byte, associatedData []byte) ([]
 }
 
 // Decrypt decrypts ciphertext with associatedData.
-// 
+//
 // ciphertext consists of two parts:
 //  1. the nonce used for encryption
 //  2. the actual ciphertext
@@ -77,7 +77,7 @@ func (ca *ChaCha20Poly1305) Decrypt(ciphertext []byte, associatedData []byte) ([
 		return nil, fmt.Errorf("chacha20poly1305: ciphertext too short")
 	}
 
-	c, err := chacha20poly1305.New(ca.Key)
+	c, err := chacha20poly1305.New(ca.key)
 	if err != nil {
 		return nil, err
 	}

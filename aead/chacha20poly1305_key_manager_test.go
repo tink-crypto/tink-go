@@ -171,24 +171,22 @@ func genInvalidChaCha20Poly1305Keys() []*cppb.ChaCha20Poly1305Key {
 
 func validateChaCha20Poly1305Primitive(p any, key *cppb.ChaCha20Poly1305Key) error {
 	cipher := p.(*subtle.ChaCha20Poly1305)
-	if !bytes.Equal(cipher.Key, key.KeyValue) {
-		return fmt.Errorf("key and primitive don't match")
-	}
 
-	// Try to encrypt and decrypt.
-	pt := random.GetRandomBytes(32)
+	wantPT := random.GetRandomBytes(32)
 	aad := random.GetRandomBytes(32)
-	ct, err := cipher.Encrypt(pt, aad)
+	ct, err := cipher.Encrypt(wantPT, aad)
 	if err != nil {
 		return fmt.Errorf("encryption failed")
 	}
-	decrypted, err := cipher.Decrypt(ct, aad)
+
+	gotPT, err := cipher.Decrypt(ct, aad)
 	if err != nil {
 		return fmt.Errorf("decryption failed")
 	}
-	if !bytes.Equal(decrypted, pt) {
+	if !bytes.Equal(gotPT, wantPT) {
 		return fmt.Errorf("decryption failed")
 	}
+
 	return nil
 }
 
