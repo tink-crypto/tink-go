@@ -16,6 +16,7 @@ package keyset_test
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -779,5 +780,61 @@ func TestPrimaryReturnsPrimaryKey(t *testing.T) {
 	}
 	if !proto.Equal(entryProtoKeysetKey, primaryProtoKeysetKey) {
 		t.Errorf("proto.Equal(entryProtoKeysetKey, primaryProtoKeysetKey) = false, want true")
+	}
+}
+
+func TestPrimaryIsThreadSafe(t *testing.T) {
+	template := signature.ECDSAP256KeyTemplate()
+	manager := keyset.NewManager()
+	// Add 10 keys. Last one is the primary.
+	for i := 0; i < 10; i++ {
+		keyID, err := manager.Add(template)
+		if err != nil {
+			t.Fatalf("manager.Add(template) err = %v, want nil", err)
+		}
+		if err = manager.SetPrimary(keyID); err != nil {
+			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+		}
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+	for i := 0; i < 50; i++ {
+		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
+			t.Parallel()
+			_, err := handle.Primary()
+			if err != nil {
+				t.Fatalf("handle.Primary() err = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestEntryIsThreadSafe(t *testing.T) {
+	template := signature.ECDSAP256KeyTemplate()
+	manager := keyset.NewManager()
+	// Add 10 keys. Last one is the primary.
+	for i := 0; i < 10; i++ {
+		keyID, err := manager.Add(template)
+		if err != nil {
+			t.Fatalf("manager.Add(template) err = %v, want nil", err)
+		}
+		if err = manager.SetPrimary(keyID); err != nil {
+			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+		}
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+	for i := 0; i < 50; i++ {
+		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
+			t.Parallel()
+			_, err := handle.Entry(0) // Index doesn't matter.
+			if err != nil {
+				t.Fatalf("handle.Entry() err = %v, want nil", err)
+			}
+		})
 	}
 }

@@ -17,6 +17,7 @@ package keyset
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
@@ -37,6 +38,7 @@ var errInvalidKeyset = fmt.Errorf("keyset.Handle: invalid keyset")
 // buffers that hold sensitive key material.
 type Handle struct {
 	ks               *tinkpb.Keyset // must be non-nil
+	isKsValidatedMu  sync.RWMutex
 	isKsValidated    bool
 	annotations      map[string]string
 	keysetHasSecrets bool // Whether the keyset contains secret key material.
@@ -184,6 +186,8 @@ func ReadWithNoSecrets(reader Reader) (*Handle, error) {
 }
 
 func (h *Handle) validateKeyset() error {
+	h.isKsValidatedMu.Lock()
+	defer h.isKsValidatedMu.Unlock()
 	if h.isKsValidated {
 		return nil
 	}
