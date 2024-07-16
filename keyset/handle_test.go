@@ -24,6 +24,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/signature"
@@ -614,6 +615,10 @@ func TestPrimitivesWithRegistry(t *testing.T) {
 type testConfig struct{}
 
 func (c *testConfig) PrimitiveFromKeyData(_ *tinkpb.KeyData, _ internalapi.Token) (any, error) {
+	return testPrimitive{}, nil
+}
+
+func (c *testConfig) PrimitiveFromKey(_ key.Key, _ internalapi.Token) (any, error) {
 	return testPrimitive{}, nil
 }
 

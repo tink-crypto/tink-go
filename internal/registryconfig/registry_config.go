@@ -20,17 +20,28 @@ package registryconfig
 import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // RegistryConfig is an internal way for the keyset handle to access the
-// old global Regsitry through the new Configuration interface.
+// old global Registry through the new Configuration interface.
 type RegistryConfig struct{}
 
 // PrimitiveFromKeyData creates a primitive from KeyData by forwarding the
 // KeyData straight to the Registry.
 func (c *RegistryConfig) PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error) {
 	return registry.PrimitiveFromKeyData(keyData)
+}
+
+// PrimitiveFromKey creates a primitive from a Key using the Registry.
+func (c *RegistryConfig) PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error) {
+	protoKey, err := protoserialization.SerializeKey(key)
+	if err != nil {
+		return nil, err
+	}
+	return registry.PrimitiveFromKeyData(protoKey.GetKeyData())
 }
 
 // RegisterKeyManager registers a provided KeyManager by forwarding it directly

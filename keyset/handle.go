@@ -377,6 +377,8 @@ func (h *Handle) WriteWithNoSecrets(w Writer) error {
 // The config.Config concrete type is not used directly due to circular dependencies.
 type Config interface {
 	PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error)
+	// PrimitiveFromKey creates a primitive from a key.Key.
+	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
 }
 type primitiveOptions struct {
 	config Config
@@ -410,11 +412,43 @@ func WithConfig(c Config) PrimitivesOption {
 // The returned set is usually later "wrapped" into a class that implements
 // the corresponding Primitive-interface.
 func (h *Handle) Primitives(opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
-	p, err := h.primitives(nil, opts...)
-	if err != nil {
+	if err := h.validateKeyset(); err != nil {
 		return nil, fmt.Errorf("keyset.Handle: %v", err)
 	}
-	return p, nil
+	args := new(primitiveOptions)
+	for _, opt := range opts {
+		if err := opt(args); err != nil {
+			return nil, fmt.Errorf("keyset.Handle: failed to process primitiveOptions: %v", err)
+		}
+	}
+	config := args.config
+	if config == nil {
+		config = &registryconfig.RegistryConfig{}
+	}
+	primitiveSet := primitiveset.New()
+	primitiveSet.Annotations = h.annotations
+	for _, entry := range h.entries {
+		if entry.KeyStatus() != Enabled {
+			continue
+		}
+		primitive, err := config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
+		if err != nil {
+			return nil, fmt.Errorf("keyset.Handle: cannot get primitive from key: %v", err)
+		}
+		// Serialize the key to add it to the primitive set.
+		protoKey, err := protoserialization.SerializeKey(entry.Key())
+		if err != nil {
+			return nil, fmt.Errorf("keyset.Handle: cannot serialize key: %v", err)
+		}
+		primitiveSetEntry, err := primitiveSet.Add(primitive, protoKey)
+		if err != nil {
+			return nil, fmt.Errorf("keyset.Handle: cannot add primitive: %v", err)
+		}
+		if entry.IsPrimary() {
+			primitiveSet.Primary = primitiveSetEntry
+		}
+	}
+	return primitiveSet, nil
 }
 
 // PrimitivesWithKeyManager creates a set of primitives corresponding to

@@ -8,6 +8,8 @@ go_library(
     deps = [
         "//core/registry",
         "//internal/internalapi",
+        "//internal/protoserialization",
+        "//key",
         "//proto/tink_go_proto",
     ],
 )
@@ -25,6 +27,10 @@ go_test(
         ":registryconfig",
         "//core/registry",
         "//internal/internalapi",
+        "//internal/protoserialization",
+        "//key",
+        "//keyset",
+        "//mac",
         "//mac/subtle",
         "//proto/common_go_proto",
         "//proto/tink_go_proto",
