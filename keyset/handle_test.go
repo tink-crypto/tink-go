@@ -72,6 +72,104 @@ func TestKeysetMaterialMakesACopy(t *testing.T) {
 	}
 }
 
+func TestNewHandleExistingKeyset(t *testing.T) {
+	testCases := []struct {
+		name string
+		ks   *tinkpb.Keyset
+	}{
+		{
+			name: "one enabled key",
+			ks: &tinkpb.Keyset{
+				PrimaryKeyId: 1,
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_ENABLED,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+				},
+			},
+		},
+		{
+			name: "one disabled key",
+			ks: &tinkpb.Keyset{
+				PrimaryKeyId: 1,
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_DISABLED,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+				},
+			},
+		},
+		{
+			name: "one destroyed key",
+			ks: &tinkpb.Keyset{
+				PrimaryKeyId: 1,
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_DESTROYED,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+				},
+			},
+		},
+		{
+			name: "one key with unknown status",
+			ks: &tinkpb.Keyset{
+				PrimaryKeyId: 1,
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_UNKNOWN_STATUS,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+				},
+			},
+		},
+		{
+			name: "keyset without primary key",
+			ks: &tinkpb.Keyset{
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_UNKNOWN_STATUS,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+				},
+			},
+		},
+		{
+			name: "keyset with all default values",
+			ks: &tinkpb.Keyset{
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			wantProtoKeyset := tc.ks
+			handle, err := testkeyset.NewHandle(wantProtoKeyset)
+			if err != nil {
+				t.Errorf("testkeyset.NewHandle(wantProtoKeyset) = %v, want nil", err)
+			}
+			gotProtoKeyset := testkeyset.KeysetMaterial(handle)
+			if !proto.Equal(gotProtoKeyset, wantProtoKeyset) {
+				t.Errorf("testkeyset.NewHandle(wantProtoKeyset) = %v, want %v", gotProtoKeyset, wantProtoKeyset)
+			}
+		})
+	}
+}
+
 func TestNewHandleWithInvalidTypeURLFails(t *testing.T) {
 	// template with unknown TypeURL
 	invalidTemplate := mac.HMACSHA256Tag128KeyTemplate()
@@ -834,6 +932,225 @@ func TestEntryIsThreadSafe(t *testing.T) {
 			_, err := handle.Entry(0) // Index doesn't matter.
 			if err != nil {
 				t.Fatalf("handle.Entry() err = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestKeysetInfoIsThreadSafe(t *testing.T) {
+	template := signature.ECDSAP256KeyTemplate()
+	manager := keyset.NewManager()
+	// Add 10 keys. Last one is the primary.
+	for i := 0; i < 10; i++ {
+		keyID, err := manager.Add(template)
+		if err != nil {
+			t.Fatalf("manager.Add(template) err = %v, want nil", err)
+		}
+		if err = manager.SetPrimary(keyID); err != nil {
+			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+		}
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+	for i := 0; i < 50; i++ {
+		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
+			t.Parallel()
+			if handle.KeysetInfo() == nil {
+				t.Fatalf("handle.KeysetInfo() == nul, want non-nil")
+			}
+		})
+	}
+}
+
+func TestPrimitivesIsThreadSafe(t *testing.T) {
+	template := signature.ECDSAP256KeyTemplate()
+	manager := keyset.NewManager()
+	// Add 10 keys. Last one is the primary.
+	for i := 0; i < 10; i++ {
+		keyID, err := manager.Add(template)
+		if err != nil {
+			t.Fatalf("manager.Add(template) err = %v, want nil", err)
+		}
+		if err = manager.SetPrimary(keyID); err != nil {
+			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+		}
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+	for i := 0; i < 50; i++ {
+		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
+			t.Parallel()
+			_, err := handle.Primitives()
+			if err != nil {
+				t.Fatalf("handle.Primitives() err = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestPrimitivesWithKeyManagerIsThreadSafe(t *testing.T) {
+	template := mac.HMACSHA256Tag128KeyTemplate()
+	manager := keyset.NewManager()
+	// Add 10 keys. Last one is the primary.
+	for i := 0; i < 10; i++ {
+		keyID, err := manager.Add(template)
+		if err != nil {
+			t.Fatalf("manager.Add(template) err = %v, want nil", err)
+		}
+		if err = manager.SetPrimary(keyID); err != nil {
+			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+		}
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+	keysetManager := &testKeyManager{}
+	for i := 0; i < 50; i++ {
+		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
+			t.Parallel()
+			_, err := handle.PrimitivesWithKeyManager(keysetManager)
+			if err != nil {
+				t.Fatalf("handle.PrimitivesWithKeyManager(keysetManager) err = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestPublicIsThreadSafe(t *testing.T) {
+	template := signature.ECDSAP256KeyTemplate()
+	manager := keyset.NewManager()
+	// Add 10 keys. Last one is the primary.
+	for i := 0; i < 10; i++ {
+		keyID, err := manager.Add(template)
+		if err != nil {
+			t.Fatalf("manager.Add(template) err = %v, want nil", err)
+		}
+		if err = manager.SetPrimary(keyID); err != nil {
+			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+		}
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+	for i := 0; i < 50; i++ {
+		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
+			t.Parallel()
+			_, err := handle.Public()
+			if err != nil {
+				t.Fatalf("handle.Public() err = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestWriteIsThreadSafe(t *testing.T) {
+	template := signature.ECDSAP256KeyTemplate()
+	manager := keyset.NewManager()
+	// Add 10 keys. Last one is the primary.
+	for i := 0; i < 10; i++ {
+		keyID, err := manager.Add(template)
+		if err != nil {
+			t.Fatalf("manager.Add(template) err = %v, want nil", err)
+		}
+		if err = manager.SetPrimary(keyID); err != nil {
+			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+		}
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+	keysetEncryptionHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
+	if err != nil {
+		t.Errorf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
+	}
+	for i := 0; i < 50; i++ {
+		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
+			t.Parallel()
+			keysetEncryptionAead, err := aead.New(keysetEncryptionHandle)
+			if err != nil {
+				t.Errorf("aead.New(keysetEncryptionHandle) err = %v, want nil", err)
+			}
+			buff := &bytes.Buffer{}
+			err = handle.Write(keyset.NewBinaryWriter(buff), keysetEncryptionAead)
+			if err != nil {
+				t.Fatalf("handle.Write() err = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestWriteWithAssociatedDataIsThreadSafe(t *testing.T) {
+	template := signature.ECDSAP256KeyTemplate()
+	manager := keyset.NewManager()
+	// Add 10 keys. Last one is the primary.
+	for i := 0; i < 10; i++ {
+		keyID, err := manager.Add(template)
+		if err != nil {
+			t.Fatalf("manager.Add(template) err = %v, want nil", err)
+		}
+		if err = manager.SetPrimary(keyID); err != nil {
+			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+		}
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+
+	keysetEncryptionHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
+	if err != nil {
+		t.Errorf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
+	}
+	associatedData := []byte{0x01, 0x02}
+	for i := 0; i < 50; i++ {
+		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
+			t.Parallel()
+			buff := &bytes.Buffer{}
+			keysetEncryptionAead, err := aead.New(keysetEncryptionHandle)
+			if err != nil {
+				t.Errorf("aead.New(keysetEncryptionHandle) err = %v, want nil", err)
+			}
+			if err := handle.WriteWithAssociatedData(keyset.NewBinaryWriter(buff), keysetEncryptionAead, associatedData); err != nil {
+				t.Fatalf("handle.WriteWithAssociatedData(keyset.NewBinaryWriter(buff), keysetEncryptionAead, associatedData) err = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestWriteWithNoSecretsIsThreadSafe(t *testing.T) {
+	template := signature.ECDSAP256KeyTemplate()
+	manager := keyset.NewManager()
+	// Add 10 keys. Last one is the primary.
+	for i := 0; i < 10; i++ {
+		keyID, err := manager.Add(template)
+		if err != nil {
+			t.Fatalf("manager.Add(template) err = %v, want nil", err)
+		}
+		if err = manager.SetPrimary(keyID); err != nil {
+			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+		}
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+	publicHandle, err := handle.Public()
+	if err != nil {
+		t.Fatalf("manager.Public() err = %v, want nil", err)
+	}
+	for i := 0; i < 50; i++ {
+		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
+			t.Parallel()
+			buff := &bytes.Buffer{}
+			if err := publicHandle.WriteWithNoSecrets(keyset.NewBinaryWriter(buff)); err != nil {
+				t.Fatalf("publicHandle.WriteWithNoSecrets(keyset.NewBinaryWriter(buff)) err = %v, want nil", err)
 			}
 		})
 	}
