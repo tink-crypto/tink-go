@@ -17,7 +17,6 @@ package keyset
 import (
 	"errors"
 	"fmt"
-	"sync"
 
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
@@ -38,8 +37,6 @@ var errInvalidKeyset = fmt.Errorf("keyset.Handle: invalid keyset")
 // keyset representation, which may hold sensitive key material.
 type Handle struct {
 	entries          []*Entry
-	isKsValidatedMu  sync.RWMutex
-	isKsValidated    bool
 	annotations      map[string]string
 	keysetHasSecrets bool // Whether the keyset contains secret key material.
 	primaryKeyEntry  *Entry
@@ -111,7 +108,7 @@ func keyStatusFromProto(status tinkpb.KeyStatusType) (KeyStatus, error) {
 	case tinkpb.KeyStatusType_DESTROYED:
 		return Destroyed, nil
 	default:
-		return Unknown, nil
+		return Unknown, fmt.Errorf("unknown key status: %v", status.String())
 	}
 }
 
@@ -124,7 +121,7 @@ func keyStatusToProto(status KeyStatus) (tinkpb.KeyStatusType, error) {
 	case Destroyed:
 		return tinkpb.KeyStatusType_DESTROYED, nil
 	default:
-		return tinkpb.KeyStatusType_UNKNOWN_STATUS, nil
+		return tinkpb.KeyStatusType_UNKNOWN_STATUS, fmt.Errorf("unknown key status: %v", status.String())
 	}
 }
 
@@ -141,9 +138,6 @@ func entriesToProtoKeyset(entries []*Entry) (*tinkpb.Keyset, error) {
 		if err != nil {
 			return nil, err
 		}
-		if protoKey == nil {
-			return nil, fmt.Errorf("key is nil")
-		}
 		protoKey.Status, err = keyStatusToProto(entry.KeyStatus())
 		if err != nil {
 			return nil, err
@@ -158,8 +152,8 @@ func entriesToProtoKeyset(entries []*Entry) (*tinkpb.Keyset, error) {
 }
 
 func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
-	if ks == nil {
-		return nil, errors.New("keyset.Handle: keyset is nil")
+	if err := Validate(ks); err != nil {
+		return nil, fmt.Errorf("keyset.Handle: invalid keyset: %v", err)
 	}
 	entries := make([]*Entry, len(ks.Key))
 	var primaryKeyEntry *Entry = nil
@@ -212,8 +206,8 @@ func NewHandle(kt *tinkpb.KeyTemplate) (*Handle, error) {
 	return handle, nil
 }
 
-// NewHandleWithNoSecrets creates a new instance of KeysetHandle using the given keyset which does
-// not contain any secret key material.
+// NewHandleWithNoSecrets creates a new instance of KeysetHandle from the
+// the given keyset which does not contain any secret key material.
 func NewHandleWithNoSecrets(ks *tinkpb.Keyset) (*Handle, error) {
 	handle, err := newWithOptions(ks)
 	if err != nil {
@@ -253,38 +247,17 @@ func ReadWithNoSecrets(reader Reader) (*Handle, error) {
 	return NewHandleWithNoSecrets(protoKeyset)
 }
 
-func (h *Handle) validateKeyset() error {
-	h.isKsValidatedMu.Lock()
-	defer h.isKsValidatedMu.Unlock()
-	if h.isKsValidated {
-		return nil
-	}
-	protoKeyset, err := entriesToProtoKeyset(h.entries)
-	if err != nil {
-		return err
-	}
-	if err := Validate(protoKeyset); err != nil {
-		return fmt.Errorf("invalid keyset: %v", err)
-	}
-	h.isKsValidated = true
-	return nil
-}
-
 // Primary returns the primary key of the keyset.
 func (h *Handle) Primary() (*Entry, error) {
-	if err := h.validateKeyset(); err != nil {
-		return nil, fmt.Errorf("keyset.Handle: %v", err)
+	if h.primaryKeyEntry == nil {
+		return nil, fmt.Errorf("keyset.Handle: no primary key")
 	}
-	// If validation succeeded, then the primary key must exist.
 	return h.primaryKeyEntry, nil
 }
 
 // Entry returns the key at index i from the keyset.
 // i must be within the range [0, Handle.Len()).
 func (h *Handle) Entry(i int) (*Entry, error) {
-	if err := h.validateKeyset(); err != nil {
-		return nil, fmt.Errorf("keyset.Handle: %v", err)
-	}
 	if i < 0 || i >= h.Len() {
 		return nil, fmt.Errorf("keyset.Handle: index %d out of range", i)
 	}
@@ -412,8 +385,8 @@ func WithConfig(c Config) PrimitivesOption {
 // The returned set is usually later "wrapped" into a class that implements
 // the corresponding Primitive-interface.
 func (h *Handle) Primitives(opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
-	if err := h.validateKeyset(); err != nil {
-		return nil, fmt.Errorf("keyset.Handle: %v", err)
+	if h.Len() == 0 {
+		return nil, fmt.Errorf("entries is empty")
 	}
 	args := new(primitiveOptions)
 	for _, opt := range opts {
@@ -481,10 +454,6 @@ func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*
 	config := args.config
 	if config == nil {
 		config = &registryconfig.RegistryConfig{}
-	}
-
-	if err := h.validateKeyset(); err != nil {
-		return nil, fmt.Errorf("invalid keyset: %v", err)
 	}
 	primitiveSet := primitiveset.New()
 	primitiveSet.Annotations = h.annotations

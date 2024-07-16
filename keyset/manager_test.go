@@ -183,25 +183,28 @@ func TestKeysetManagerAdd(t *testing.T) {
 	kt := mac.HMACSHA256Tag128KeyTemplate()
 	keyID, err := ksm1.Add(kt)
 	if err != nil {
-		t.Errorf("Expected no error but got %s", err)
+		t.Errorf("ksm1.Add(kt) err = %q, want nil", err)
+	}
+	err = ksm1.SetPrimary(keyID)
+	if err != nil {
+		t.Errorf("ksm1.SetPrimary(keyID) err = %q, want nil", err)
 	}
 	h, err := ksm1.Handle()
 	if err != nil {
-		t.Errorf("Cannot get keyset handle: %s", err)
+		t.Errorf("ksm1.Handle() err = %q, want nil", err)
 	}
-	ks := testkeyset.KeysetMaterial(h)
-	if len(ks.Key) != 1 {
-		t.Errorf("Expected one key but got %d", len(ks.Key))
+	if h.Len() != 1 {
+		t.Errorf("h.Len() = %d, want 1", h.Len())
 	}
-	if ks.Key[0].KeyId != keyID {
-		t.Errorf("Expected added keyID to be %d but got %d", keyID, ks.Key[0].KeyId)
+	entry, err := h.Entry(0)
+	if err != nil {
+		t.Errorf("h.Entry(0) err = %q, want nil", err)
 	}
-	if ks.Key[0].Status != tinkpb.KeyStatusType_ENABLED {
-		t.Errorf("Expected key to be enabled but got %s", ks.Key[0].Status.String())
+	if entry.KeyID() != keyID {
+		t.Errorf("entry.KeyID() = %d, want %d", entry.KeyID(), keyID)
 	}
-	// no primary key set
-	if ks.PrimaryKeyId != 0 {
-		t.Errorf("Expected no primary key but got %d", ks.PrimaryKeyId)
+	if entry.KeyStatus() != keyset.Enabled {
+		t.Errorf("entry.KeyStatus() = %s, want %s", entry.KeyStatus().String(), keyset.Enabled.String())
 	}
 }
 
@@ -237,17 +240,23 @@ func TestKeysetManagerAddWithUnknownOutputPrefixTypeFails(t *testing.T) {
 }
 
 func TestKeysetManagerEnable(t *testing.T) {
-	keyID := uint32(42)
 	keyData := testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC)
-	key := testutil.NewKey(keyData, tinkpb.KeyStatusType_DISABLED, keyID, tinkpb.OutputPrefixType_TINK)
-	ks1 := testutil.NewKeyset(keyID, []*tinkpb.Keyset_Key{key})
+	keyID1 := uint32(42)
+	key1 := testutil.NewKey(keyData, tinkpb.KeyStatusType_DISABLED, keyID1, tinkpb.OutputPrefixType_TINK)
+	keyID2 := uint32(43)
+	key2 := testutil.NewKey(keyData, tinkpb.KeyStatusType_ENABLED, keyID2, tinkpb.OutputPrefixType_TINK)
+	ks1 := &tinkpb.Keyset{
+		Key:          []*tinkpb.Keyset_Key{key1, key2},
+		PrimaryKeyId: keyID2,
+	}
 	h1, err := testkeyset.NewHandle(ks1)
 	if err != nil {
 		t.Errorf("Expected no error but got error %s", err)
 	}
+
 	ksm1 := keyset.NewManagerFromHandle(h1)
 	// enable key
-	err = ksm1.Enable(keyID)
+	err = ksm1.Enable(keyID1)
 	if err != nil {
 		t.Errorf("Expected no error but got error %s", err)
 	}
@@ -256,49 +265,34 @@ func TestKeysetManagerEnable(t *testing.T) {
 		t.Errorf("ksm1.Handle() err = %q, want nil", err)
 	}
 	ks2 := testkeyset.KeysetMaterial(h2)
-	if len(ks2.Key) != 1 {
-		t.Fatalf("Expected only one key, got %d", len(ks2.Key))
+	if len(ks2.Key) != 2 {
+		t.Fatalf("Expected only 2 keys, got %d", len(ks2.Key))
 	}
-	if ks2.Key[0].KeyId != keyID {
-		t.Errorf("Expected keyID %d, got %d", keyID, ks2.Key[0].KeyId)
+	if ks2.Key[0].KeyId != keyID1 {
+		t.Errorf("Expected keyID %d, got %d", keyID1, ks2.Key[0].KeyId)
 	}
 	if ks2.Key[0].Status != tinkpb.KeyStatusType_ENABLED {
 		t.Errorf("Expected key to be enabled, but got %s", ks2.Key[0].Status.String())
 	}
 }
 
-func TestKeysetManagerEnableWithUnknownStatus(t *testing.T) {
-	keyID := uint32(42)
-	keyData := testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC)
-	key := testutil.NewKey(keyData, tinkpb.KeyStatusType_UNKNOWN_STATUS, keyID, tinkpb.OutputPrefixType_TINK)
-	ks1 := testutil.NewKeyset(keyID, []*tinkpb.Keyset_Key{key})
-	h1, err := testkeyset.NewHandle(ks1)
-	if err != nil {
-		t.Errorf("Expected no error but got error %s", err)
-	}
-	ksm1 := keyset.NewManagerFromHandle(h1)
-	// enable key
-	err = ksm1.Enable(keyID)
-	if err == nil {
-		t.Errorf("ksm1.Enable where key has unknown status succeeded, want error")
-	}
-	if !strings.Contains(err.Error(), "cannot enable") {
-		t.Errorf("Expected 'cannot enable' message, got %s", err)
-	}
-}
-
 func TestKeysetManagerEnableWithDestroyed(t *testing.T) {
-	keyID := uint32(42)
-	keyData := testutil.NewKeyData("some type url", nil, tinkpb.KeyData_SYMMETRIC)
-	key := testutil.NewKey(keyData, tinkpb.KeyStatusType_DESTROYED, keyID, tinkpb.OutputPrefixType_TINK)
-	ks1 := testutil.NewKeyset(keyID, []*tinkpb.Keyset_Key{key})
+	keyData := testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC)
+	keyID1 := uint32(42)
+	key1 := testutil.NewKey(keyData, tinkpb.KeyStatusType_DESTROYED, keyID1, tinkpb.OutputPrefixType_TINK)
+	keyID2 := uint32(43)
+	key2 := testutil.NewKey(keyData, tinkpb.KeyStatusType_ENABLED, keyID2, tinkpb.OutputPrefixType_TINK)
+	ks1 := &tinkpb.Keyset{
+		Key:          []*tinkpb.Keyset_Key{key1, key2},
+		PrimaryKeyId: keyID2,
+	}
 	h1, err := testkeyset.NewHandle(ks1)
 	if err != nil {
 		t.Errorf("Expected no error but got error %s", err)
 	}
 	ksm1 := keyset.NewManagerFromHandle(h1)
 	// enable key
-	err = ksm1.Enable(keyID)
+	err = ksm1.Enable(keyID1)
 	if err == nil {
 		t.Errorf("ksm1.Enable where key was destroyed succeeded, want error")
 	}
@@ -310,8 +304,11 @@ func TestKeysetManagerEnableWithDestroyed(t *testing.T) {
 func TestKeysetManagerEnableWithMissingKey(t *testing.T) {
 	keyID := uint32(42)
 	keyData := testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC)
-	key := testutil.NewKey(keyData, tinkpb.KeyStatusType_UNKNOWN_STATUS, keyID, tinkpb.OutputPrefixType_TINK)
-	ks1 := testutil.NewKeyset(keyID, []*tinkpb.Keyset_Key{key})
+	key := testutil.NewKey(keyData, tinkpb.KeyStatusType_ENABLED, keyID, tinkpb.OutputPrefixType_TINK)
+	ks1 := &tinkpb.Keyset{
+		Key:          []*tinkpb.Keyset_Key{key},
+		PrimaryKeyId: keyID,
+	}
 	h1, err := testkeyset.NewHandle(ks1)
 	if err != nil {
 		t.Errorf("Expected no error but got error %s", err)
@@ -403,37 +400,11 @@ func TestKeysetManagerSetPrimaryWithDestroyedKey(t *testing.T) {
 	}
 }
 
-func TestKeysetManagerSetPrimaryWithUnknownStatusKey(t *testing.T) {
-	keyID := uint32(42)
-	newKeyID := uint32(43)
-	keyData := testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC)
-	key := testutil.NewKey(keyData, tinkpb.KeyStatusType_ENABLED, keyID, tinkpb.OutputPrefixType_TINK)
-	// create an unknown status key
-	key2 := testutil.NewKey(keyData, tinkpb.KeyStatusType_UNKNOWN_STATUS, newKeyID, tinkpb.OutputPrefixType_TINK)
-	ks1 := testutil.NewKeyset(keyID, []*tinkpb.Keyset_Key{key, key2})
-	h1, err := testkeyset.NewHandle(ks1)
-	if err != nil {
-		t.Errorf("Expected no error but got error %s", err)
-	}
-	ksm1 := keyset.NewManagerFromHandle(h1)
-	// set primary key
-	err = ksm1.SetPrimary(newKeyID)
-	if err == nil {
-		t.Errorf("ksm1.SetPrimary on unknown key succeeded, want error")
-	}
-	if !strings.Contains(err.Error(), "not enabled") {
-		t.Errorf("Expected 'not enabled' message, got %s", err)
-	}
-}
-
 func TestKeysetManagerSetPrimaryWithMissingKey(t *testing.T) {
-	keyID := uint32(42)
-	newKeyID := uint32(43)
 	keyData := testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC)
-	key := testutil.NewKey(keyData, tinkpb.KeyStatusType_ENABLED, keyID, tinkpb.OutputPrefixType_TINK)
-	// create an unknown status key
-	key2 := testutil.NewKey(keyData, tinkpb.KeyStatusType_UNKNOWN_STATUS, newKeyID, tinkpb.OutputPrefixType_TINK)
-	ks1 := testutil.NewKeyset(keyID, []*tinkpb.Keyset_Key{key, key2})
+	key := testutil.NewKey(keyData, tinkpb.KeyStatusType_ENABLED, 42, tinkpb.OutputPrefixType_TINK)
+	key2 := testutil.NewKey(keyData, tinkpb.KeyStatusType_ENABLED, 43, tinkpb.OutputPrefixType_TINK)
+	ks1 := testutil.NewKeyset(42, []*tinkpb.Keyset_Key{key, key2})
 	h1, err := testkeyset.NewHandle(ks1)
 	if err != nil {
 		t.Errorf("Expected no error but got error %s", err)

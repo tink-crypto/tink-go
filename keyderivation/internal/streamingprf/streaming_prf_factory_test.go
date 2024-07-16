@@ -255,34 +255,6 @@ func TestNewRejectsInvalidKeysetHandle(t *testing.T) {
 					},
 				},
 			}},
-		{
-			"invalid status",
-			&tinkpb.Keyset{
-				PrimaryKeyId: 119,
-				Key: []*tinkpb.Keyset_Key{
-					&tinkpb.Keyset_Key{
-						KeyData:          keyData,
-						Status:           tinkpb.KeyStatusType_UNKNOWN_STATUS,
-						KeyId:            119,
-						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
-					},
-				},
-			},
-		},
-		{
-			"no primary key",
-			&tinkpb.Keyset{
-				PrimaryKeyId: 200,
-				Key: []*tinkpb.Keyset_Key{
-					&tinkpb.Keyset_Key{
-						KeyData:          keyData,
-						Status:           tinkpb.KeyStatusType_UNKNOWN_STATUS,
-						KeyId:            119,
-						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
-					},
-				},
-			},
-		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			handle, err := testkeyset.NewHandle(test.keyset)

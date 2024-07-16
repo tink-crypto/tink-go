@@ -111,32 +111,6 @@ func TestPrimitiveFactoryFailsWithEmptyHandle(t *testing.T) {
 	}
 }
 
-func TestPrimitiveFactoryFailsWhenKeysetHasNoPrimary(t *testing.T) {
-	privateKey, _ := newECDSAKeysetKeypair(t, commonpb.HashType_SHA512,
-		commonpb.EllipticCurveType_NIST_P521,
-		tinkpb.OutputPrefixType_TINK,
-		1)
-	privateKeysetWithoutPrimary := &tinkpb.Keyset{
-		Key: []*tinkpb.Keyset_Key{privateKey},
-	}
-	privateHandleWithoutPrimary, err := testkeyset.NewHandle(privateKeysetWithoutPrimary)
-	if err != nil {
-		t.Fatalf("testkeyset.NewHandle(privateKeysetWithoutPrimary) err = %v, want nil", err)
-	}
-	publicHandleWithoutPrimary, err := privateHandleWithoutPrimary.Public()
-	if err != nil {
-		t.Fatalf("privateHandleWithoutPrimary.Public() err = %v, want nil", err)
-	}
-
-	if _, err = signature.NewSigner(privateHandleWithoutPrimary); err == nil {
-		t.Errorf("signature.NewSigner(privateHandleWithoutPrimary) err = nil, want not nil")
-	}
-
-	if _, err = signature.NewVerifier(publicHandleWithoutPrimary); err == nil {
-		t.Errorf("signature.NewVerifier(publicHandleWithoutPrimary) err = nil, want not nil")
-	}
-}
-
 func newECDSAKeysetKeypair(t *testing.T, hashType commonpb.HashType, curve commonpb.EllipticCurveType, outputPrefixType tinkpb.OutputPrefixType, keyID uint32) (*tinkpb.Keyset_Key, *tinkpb.Keyset_Key) {
 	t.Helper()
 	key := testutil.NewRandomECDSAPrivateKey(hashType, curve)

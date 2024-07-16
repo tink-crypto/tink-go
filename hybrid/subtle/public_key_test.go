@@ -114,7 +114,7 @@ func TestSerializePrimaryPublicKeyInvalidTemplateFails(t *testing.T) {
 	}
 }
 
-func TestSerializePrimaryPublicKeyInvalidHandleFails(t *testing.T) {
+func TestSerializePrimaryPublicKeyInvalidKeyFails(t *testing.T) {
 	// Build valid key data.
 	keyTemplate := hybrid.DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_CHACHA20_POLY1305_Raw_Key_Template()
 	privHandle, err := keyset.NewHandle(keyTemplate)
@@ -156,24 +156,9 @@ func TestSerializePrimaryPublicKeyInvalidHandleFails(t *testing.T) {
 		key          *tinkpb.Keyset_Key
 	}{
 		{
-			"empty",
-			123,
-			nil,
-		},
-		{
-			"invalid status type",
-			123,
-			testutil.NewKey(validKD, tinkpb.KeyStatusType_DISABLED, 123, tinkpb.OutputPrefixType_RAW),
-		},
-		{
 			"invalid prefix type",
 			123,
 			testutil.NewKey(validKD, tinkpb.KeyStatusType_ENABLED, 123, tinkpb.OutputPrefixType_TINK),
-		},
-		{
-			"no primary key",
-			0,
-			testutil.NewKey(validKD, tinkpb.KeyStatusType_ENABLED, 123, tinkpb.OutputPrefixType_RAW),
 		},
 		{
 			"invalid type URL",

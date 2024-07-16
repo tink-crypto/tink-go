@@ -93,65 +93,22 @@ func TestNewHandleExistingKeyset(t *testing.T) {
 			},
 		},
 		{
-			name: "one disabled key",
+			name: "multiple keys",
 			ks: &tinkpb.Keyset{
 				PrimaryKeyId: 1,
 				Key: []*tinkpb.Keyset_Key{
 					&tinkpb.Keyset_Key{
 						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_ENABLED,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+					&tinkpb.Keyset_Key{
+						KeyId:            2,
 						Status:           tinkpb.KeyStatusType_DISABLED,
 						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
 					},
-				},
-			},
-		},
-		{
-			name: "one destroyed key",
-			ks: &tinkpb.Keyset{
-				PrimaryKeyId: 1,
-				Key: []*tinkpb.Keyset_Key{
-					&tinkpb.Keyset_Key{
-						KeyId:            1,
-						Status:           tinkpb.KeyStatusType_DESTROYED,
-						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
-					},
-				},
-			},
-		},
-		{
-			name: "one key with unknown status",
-			ks: &tinkpb.Keyset{
-				PrimaryKeyId: 1,
-				Key: []*tinkpb.Keyset_Key{
-					&tinkpb.Keyset_Key{
-						KeyId:            1,
-						Status:           tinkpb.KeyStatusType_UNKNOWN_STATUS,
-						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
-					},
-				},
-			},
-		},
-		{
-			name: "keyset without primary key",
-			ks: &tinkpb.Keyset{
-				Key: []*tinkpb.Keyset_Key{
-					&tinkpb.Keyset_Key{
-						KeyId:            1,
-						Status:           tinkpb.KeyStatusType_UNKNOWN_STATUS,
-						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
-					},
-				},
-			},
-		},
-		{
-			name: "keyset with all default values",
-			ks: &tinkpb.Keyset{
-				Key: []*tinkpb.Keyset_Key{
-					&tinkpb.Keyset_Key{},
 				},
 			},
 		},
@@ -161,7 +118,7 @@ func TestNewHandleExistingKeyset(t *testing.T) {
 			wantProtoKeyset := tc.ks
 			handle, err := testkeyset.NewHandle(wantProtoKeyset)
 			if err != nil {
-				t.Errorf("testkeyset.NewHandle(wantProtoKeyset) = %v, want nil", err)
+				t.Fatalf("testkeyset.NewHandle(wantProtoKeyset) = %v, want nil", err)
 			}
 			gotProtoKeyset := testkeyset.KeysetMaterial(handle)
 			if !proto.Equal(gotProtoKeyset, wantProtoKeyset) {
@@ -721,44 +678,6 @@ func TestLenWithMultipleKeys(t *testing.T) {
 	}
 }
 
-func TestPrimaryFailsIfNoPrimaryKey(t *testing.T) {
-	ks := &tinkpb.Keyset{
-		Key: []*tinkpb.Keyset_Key{
-			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
-			testutil.NewDummyKey(2, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
-			testutil.NewDummyKey(3, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
-			testutil.NewDummyKey(4, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
-		},
-	}
-	handle, err := testkeyset.NewHandle(ks)
-	if err != nil {
-		t.Fatalf("testkeyset.NewHandle(%v) err = %v, want nil", ks, err)
-	}
-	_, err = handle.Primary()
-	if err == nil { // if NO error
-		t.Error("handle.Primary() err = nil, want error")
-	}
-}
-
-func TestPrimaryFailsIfKeysetIsInvalid(t *testing.T) {
-	// Invalid because it has multiple primary keys.
-	ks := &tinkpb.Keyset{
-		Key: []*tinkpb.Keyset_Key{
-			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
-			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
-		},
-		PrimaryKeyId: 1,
-	}
-	handle, err := testkeyset.NewHandle(ks)
-	if err != nil {
-		t.Fatalf("testkeyset.NewHandle(%v) err = %v, want nil", ks, err)
-	}
-	_, err = handle.Primary()
-	if err == nil { // if NO error
-		t.Error("handle.Primary() err = nil, want error")
-	}
-}
-
 func TestEntryReturnsCorrectKey(t *testing.T) {
 	ks := &tinkpb.Keyset{
 		Key: []*tinkpb.Keyset_Key{
@@ -800,6 +719,7 @@ func TestEntryFailsIfIndexOutOfRange(t *testing.T) {
 			testutil.NewDummyKey(3, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
 			testutil.NewDummyKey(4, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
 		},
+		PrimaryKeyId: 1,
 	}
 	handle, err := testkeyset.NewHandle(ks)
 	if err != nil {
@@ -812,27 +732,6 @@ func TestEntryFailsIfIndexOutOfRange(t *testing.T) {
 	_, err = handle.Entry(handle.Len())
 	if err == nil {
 		t.Errorf("handle.Entry(%d) err = nil, want error", handle.Len())
-	}
-}
-
-func TestEntryFailsIfKeysetIsInvalid(t *testing.T) {
-	// Invalid because it has multiple primary keys.
-	ks := &tinkpb.Keyset{
-		Key: []*tinkpb.Keyset_Key{
-			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
-			testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
-		},
-		PrimaryKeyId: 1,
-	}
-	handle, err := testkeyset.NewHandle(ks)
-	if err != nil {
-		t.Fatalf("testkeyset.NewHandle(%v) err = %v, want nil", ks, err)
-	}
-	for i := 0; i < handle.Len(); i++ {
-		_, err = handle.Entry(i)
-		if err == nil {
-			t.Errorf("handle.Entry(%d) err = nil, want error", i)
-		}
 	}
 }
 
