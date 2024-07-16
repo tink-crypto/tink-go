@@ -27,4 +27,17 @@ source ./kokoro/testutils/install_go.sh
 echo "Using go binary from $(which go): $(go version)"
 
 ./kokoro/testutils/check_go_generated_files_up_to_date.sh .
-./kokoro/testutils/run_bazel_tests.sh -t --test_arg=--test.v .
+
+RUN_BAZEL_TESTS_OPTS=(
+  -t
+  --test_arg=--test.v
+)
+if [[ -n "${TINK_REMOTE_BAZEL_CACHE_GCS_BUCKET:-}" ]]; then
+  cp "${TINK_REMOTE_BAZEL_CACHE_SERVICE_KEY}" ./cache_key
+  RUN_BAZEL_TESTS_OPTS+=(
+    -c "${TINK_REMOTE_BAZEL_CACHE_GCS_BUCKET}/bazel/macos_tink_go"
+  )
+fi
+readonly RUN_BAZEL_TESTS_OPTS
+
+./kokoro/testutils/run_bazel_tests.sh "${RUN_BAZEL_TESTS_OPTS[@]}" .

@@ -39,5 +39,17 @@ fi
 ./kokoro/testutils/run_command.sh "${RUN_COMMAND_ARGS[@]}" \
   ./kokoro/testutils/check_go_generated_files_up_to_date.sh .
 
+RUN_BAZEL_TESTS_OPTS=(
+  -t
+  --test_arg=--test.v
+)
+if [[ -n "${TINK_REMOTE_BAZEL_CACHE_GCS_BUCKET:-}" ]]; then
+  cp "${TINK_REMOTE_BAZEL_CACHE_SERVICE_KEY}" ./cache_key
+  RUN_BAZEL_TESTS_OPTS+=(
+    -c "${TINK_REMOTE_BAZEL_CACHE_GCS_BUCKET}/bazel/${TINK_GO_BASE_IMAGE_HASH}"
+  )
+fi
+readonly RUN_BAZEL_TESTS_OPTS
+
 ./kokoro/testutils/run_command.sh "${RUN_COMMAND_ARGS[@]}" \
-  ./kokoro/testutils/run_bazel_tests.sh -t --test_arg=--test.v .
+  ./kokoro/testutils/run_bazel_tests.sh "${RUN_BAZEL_TESTS_OPTS[@]}" .
