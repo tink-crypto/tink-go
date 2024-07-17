@@ -31,56 +31,6 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func TestPrimitiveFromKeyData(t *testing.T) {
-	keyData := testutil.NewHMACKeyData(commonpb.HashType_SHA256, 16)
-	registryConfig := &registryconfig.RegistryConfig{}
-	p, err := registryConfig.PrimitiveFromKeyData(keyData, internalapi.Token{})
-	if err != nil {
-		t.Errorf("registryConfig.PrimitiveFromKeyData() err = %v, want nil", err)
-	}
-	if _, ok := p.(*subtle.HMAC); !ok {
-		t.Error("primitive is not of type *subtle.HMAC")
-	}
-}
-
-func TestPrimitiveFromKeyDataErrors(t *testing.T) {
-	registryConfig := &registryconfig.RegistryConfig{}
-
-	testCases := []struct {
-		name    string
-		keyData *tinkpb.KeyData
-	}{
-		{
-			name: "unregistered url",
-			keyData: func() *tinkpb.KeyData {
-				kd := testutil.NewHMACKeyData(commonpb.HashType_SHA256, 16)
-				kd.TypeUrl = "some url"
-				return kd
-			}(),
-		},
-		{
-			name: "mismatching url",
-			keyData: func() *tinkpb.KeyData {
-				kd := testutil.NewHMACKeyData(commonpb.HashType_SHA256, 16)
-				kd.TypeUrl = testutil.AESGCMTypeURL
-				return kd
-			}(),
-		},
-		{
-			name:    "nil KeyData",
-			keyData: nil,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if _, err := registryConfig.PrimitiveFromKeyData(tc.keyData, internalapi.Token{}); err == nil {
-				t.Errorf("registryConfig.Primitive() err = nil, want not-nil")
-			}
-		})
-	}
-}
-
 func TestPrimitiveFromKey(t *testing.T) {
 	keyset, err := keyset.NewHandle(mac.HMACSHA256Tag256KeyTemplate())
 	if err != nil {

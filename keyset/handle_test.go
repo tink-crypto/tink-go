@@ -310,6 +310,14 @@ func TestPrimitivesReturnsErrorWithZeroValueHandle(t *testing.T) {
 	}
 }
 
+func TestPrimitivesWithKeyManagerReturnsErrorWithZeroValueHandle(t *testing.T) {
+	handle := &keyset.Handle{}
+	_, err := handle.PrimitivesWithKeyManager(&testKeyManager{})
+	if err == nil {
+		t.Errorf("handle.PrimitivesWithKeyManager(&testKeyManager{}) err = nil, want err")
+	}
+}
+
 func TestKeysetInfoPanicsWithZeroValueHandle(t *testing.T) {
 	handle := &keyset.Handle{}
 	defer func() {

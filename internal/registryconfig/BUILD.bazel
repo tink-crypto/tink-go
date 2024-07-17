@@ -10,7 +10,6 @@ go_library(
         "//internal/internalapi",
         "//internal/protoserialization",
         "//key",
-        "//proto/tink_go_proto",
     ],
 )
 

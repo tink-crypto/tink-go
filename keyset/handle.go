@@ -352,7 +352,6 @@ func (h *Handle) WriteWithNoSecrets(w Writer) error {
 // Config defines methods in the config.Config concrete type that are used by keyset.Handle.
 // The config.Config concrete type is not used directly due to circular dependencies.
 type Config interface {
-	PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error)
 	// PrimitiveFromKey creates a primitive from a key.Key.
 	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
 }
@@ -389,43 +388,11 @@ func WithConfig(c Config) PrimitivesOption {
 // The returned set is usually later "wrapped" into a class that implements
 // the corresponding Primitive-interface.
 func (h *Handle) Primitives(opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
-	if h.Len() == 0 {
-		return nil, fmt.Errorf("entries is empty")
+	p, err := h.primitives(nil, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("keyset.Handle: %v", err)
 	}
-	args := new(primitiveOptions)
-	for _, opt := range opts {
-		if err := opt(args); err != nil {
-			return nil, fmt.Errorf("keyset.Handle: failed to process primitiveOptions: %v", err)
-		}
-	}
-	config := args.config
-	if config == nil {
-		config = &registryconfig.RegistryConfig{}
-	}
-	primitiveSet := primitiveset.New()
-	primitiveSet.Annotations = h.annotations
-	for _, entry := range h.entries {
-		if entry.KeyStatus() != Enabled {
-			continue
-		}
-		primitive, err := config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
-		if err != nil {
-			return nil, fmt.Errorf("keyset.Handle: cannot get primitive from key: %v", err)
-		}
-		// Serialize the key to add it to the primitive set.
-		protoKey, err := protoserialization.SerializeKey(entry.Key())
-		if err != nil {
-			return nil, fmt.Errorf("keyset.Handle: cannot serialize key: %v", err)
-		}
-		primitiveSetEntry, err := primitiveSet.Add(primitive, protoKey)
-		if err != nil {
-			return nil, fmt.Errorf("keyset.Handle: cannot add primitive: %v", err)
-		}
-		if entry.IsPrimary() {
-			primitiveSet.Primary = primitiveSetEntry
-		}
-	}
-	return primitiveSet, nil
+	return p, nil
 }
 
 // PrimitivesWithKeyManager creates a set of primitives corresponding to
@@ -449,6 +416,9 @@ func (h *Handle) PrimitivesWithKeyManager(km registry.KeyManager) (*primitiveset
 }
 
 func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
+	if h.Len() == 0 {
+		return nil, fmt.Errorf("empty keyset")
+	}
 	args := new(primitiveOptions)
 	for _, opt := range opts {
 		if err := opt(args); err != nil {
@@ -461,30 +431,29 @@ func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*
 	}
 	primitiveSet := primitiveset.New()
 	primitiveSet.Annotations = h.annotations
-	protoKeyset, err := entriesToProtoKeyset(h.entries)
-	if err != nil {
-		return nil, err
-	}
-	for _, key := range protoKeyset.Key {
-		if key.Status != tinkpb.KeyStatusType_ENABLED {
+	for _, entry := range h.entries {
+		if entry.KeyStatus() != Enabled {
 			continue
 		}
+		protoKey, err := protoserialization.SerializeKey(entry.Key())
+		if err != nil {
+			return nil, fmt.Errorf("cannot serialize key: %v", err)
+		}
 		var primitive any
-		var err error
-		if km != nil && km.DoesSupport(key.KeyData.TypeUrl) {
-			primitive, err = km.Primitive(key.KeyData.Value)
+		if km != nil && km.DoesSupport(protoKey.GetKeyData().GetTypeUrl()) {
+			primitive, err = km.Primitive(protoKey.GetKeyData().GetValue())
 		} else {
-			primitive, err = config.PrimitiveFromKeyData(key.KeyData, internalapi.Token{})
+			primitive, err = config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
 		}
 		if err != nil {
 			return nil, fmt.Errorf("cannot get primitive from key: %v", err)
 		}
-		entry, err := primitiveSet.Add(primitive, key)
+		primitiveSetEntry, err := primitiveSet.Add(primitive, protoKey)
 		if err != nil {
 			return nil, fmt.Errorf("cannot add primitive: %v", err)
 		}
-		if key.KeyId == protoKeyset.PrimaryKeyId {
-			primitiveSet.Primary = entry
+		if entry.IsPrimary() {
+			primitiveSet.Primary = primitiveSetEntry
 		}
 	}
 	return primitiveSet, nil
