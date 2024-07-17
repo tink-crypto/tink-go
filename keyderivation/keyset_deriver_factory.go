@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
-	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -69,16 +69,20 @@ func (w *wrappedKeysetDeriver) DeriveKeyset(salt []byte) (*keyset.Handle, error)
 		if err != nil {
 			return nil, errors.New("keyset_deriver_factory: keyset derivation failed")
 		}
-		if len(handle.KeysetInfo().GetKeyInfo()) != 1 {
+		if handle.Len() != 1 {
 			return nil, errors.New("keyset_deriver_factory: primitive must derive keyset handle with exactly one key")
 		}
-		ks := insecurecleartextkeyset.KeysetMaterial(handle)
-		if len(ks.GetKey()) != 1 {
-			return nil, errors.New("keyset_deriver_factory: primitive must derive keyset handle with exactly one key")
+		entry, err := handle.Entry(0)
+		if err != nil {
+			return nil, fmt.Errorf("keyset_deriver_factory: cannot obtain entry from derived keyset: %v", err)
 		}
-		// Set all fields, except for KeyData, to match the Entry's in the keyset.
+		protoKey, err := protoserialization.SerializeKey(entry.Key())
+		if err != nil {
+			return nil, fmt.Errorf("keyset_deriver_factory: cannot get proto key from entry: %v", err)
+		}
+		// Set all fields, except for KeyData, to match the Entry in the keyset.
 		key := &tinkpb.Keyset_Key{
-			KeyData:          ks.GetKey()[0].GetKeyData(),
+			KeyData:          protoKey.GetKeyData(),
 			Status:           e.Status,
 			KeyId:            e.KeyID,
 			OutputPrefixType: e.PrefixType,

@@ -19,9 +19,9 @@ go_library(
     deps = [
         "//core/primitiveset",
         "//core/registry",
-        "//insecurecleartextkeyset",
         "//internal",
         "//internal/internalregistry",
+        "//internal/protoserialization",
         "//keyderivation/internal/streamingprf",
         "//keyset",
         "//proto/prf_based_deriver_go_proto",
