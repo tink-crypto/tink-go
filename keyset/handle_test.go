@@ -579,10 +579,6 @@ func TestPrimitivesWithRegistry(t *testing.T) {
 
 type testConfig struct{}
 
-func (c *testConfig) PrimitiveFromKeyData(_ *tinkpb.KeyData, _ internalapi.Token) (any, error) {
-	return testPrimitive{}, nil
-}
-
 func (c *testConfig) PrimitiveFromKey(_ key.Key, _ internalapi.Token) (any, error) {
 	return testPrimitive{}, nil
 }
