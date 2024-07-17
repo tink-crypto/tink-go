@@ -125,6 +125,20 @@ func keyStatusToProto(status KeyStatus) (tinkpb.KeyStatusType, error) {
 	}
 }
 
+// entryToProtoKey converts an Entry to a tinkpb.Keyset_Key. Assumes entry is not nil.
+func entryToProtoKey(entry *Entry) (*tinkpb.Keyset_Key, error) {
+	protoKey, err := protoserialization.SerializeKey(entry.Key())
+	if err != nil {
+		return nil, err
+	}
+	protoKey.Status, err = keyStatusToProto(entry.KeyStatus())
+	if err != nil {
+		return nil, err
+	}
+	protoKey.KeyId = entry.KeyID()
+	return protoKey, nil
+}
+
 func entriesToProtoKeyset(entries []*Entry) (*tinkpb.Keyset, error) {
 	if entries == nil {
 		return nil, fmt.Errorf("entriesToProtoKeyset called with nil")
@@ -134,15 +148,10 @@ func entriesToProtoKeyset(entries []*Entry) (*tinkpb.Keyset, error) {
 	}
 	protoKeyset := &tinkpb.Keyset{}
 	for _, entry := range entries {
-		protoKey, err := protoserialization.SerializeKey(entry.Key())
+		protoKey, err := entryToProtoKey(entry)
 		if err != nil {
 			return nil, err
 		}
-		protoKey.Status, err = keyStatusToProto(entry.KeyStatus())
-		if err != nil {
-			return nil, err
-		}
-		protoKey.KeyId = entry.KeyID()
 		protoKeyset.Key = append(protoKeyset.Key, protoKey)
 		if entry.IsPrimary() {
 			protoKeyset.PrimaryKeyId = entry.KeyID()
@@ -435,9 +444,9 @@ func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*
 		if entry.KeyStatus() != Enabled {
 			continue
 		}
-		protoKey, err := protoserialization.SerializeKey(entry.Key())
+		protoKey, err := entryToProtoKey(entry)
 		if err != nil {
-			return nil, fmt.Errorf("cannot serialize key: %v", err)
+			return nil, err
 		}
 		var primitive any
 		if km != nil && km.DoesSupport(protoKey.GetKeyData().GetTypeUrl()) {
