@@ -155,9 +155,9 @@ func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
 	if err := Validate(ks); err != nil {
 		return nil, fmt.Errorf("keyset.Handle: invalid keyset: %v", err)
 	}
-	entries := make([]*Entry, len(ks.Key))
+	entries := make([]*Entry, len(ks.GetKey()))
 	var primaryKeyEntry *Entry = nil
-	for i, protoKey := range ks.Key {
+	for i, protoKey := range ks.GetKey() {
 		key, err := protoserialization.ParseKey(protoKey)
 		if err != nil {
 			return nil, fmt.Errorf("keyset.Handle: %v", err)
@@ -480,9 +480,9 @@ func decrypt(encryptedKeyset *tinkpb.EncryptedKeyset, masterKey tink.AEAD, assoc
 	if encryptedKeyset == nil || masterKey == nil {
 		return nil, fmt.Errorf("keyset.Handle: invalid encrypted keyset")
 	}
-	decrypted, err := masterKey.Decrypt(encryptedKeyset.EncryptedKeyset, associatedData)
+	decrypted, err := masterKey.Decrypt(encryptedKeyset.GetEncryptedKeyset(), associatedData)
 	if err != nil {
-		return nil, fmt.Errorf("keyset.Handle: decryption failed: %s", err)
+		return nil, fmt.Errorf("keyset.Handle: decryption failed: %v", err)
 	}
 	keyset := new(tinkpb.Keyset)
 	if err := proto.Unmarshal(decrypted, keyset); err != nil {
@@ -498,7 +498,7 @@ func encrypt(keyset *tinkpb.Keyset, masterKey tink.AEAD, associatedData []byte) 
 	}
 	encrypted, err := masterKey.Encrypt(serializedKeyset, associatedData)
 	if err != nil {
-		return nil, fmt.Errorf("keyset.Handle: encrypted failed: %s", err)
+		return nil, fmt.Errorf("keyset.Handle: encryption failed: %v", err)
 	}
 	// get keyset info
 	encryptedKeyset := &tinkpb.EncryptedKeyset{
@@ -513,9 +513,8 @@ func getKeysetInfo(keyset *tinkpb.Keyset) *tinkpb.KeysetInfo {
 	if keyset == nil {
 		panic("keyset.Handle: keyset must be non nil")
 	}
-	nKey := len(keyset.Key)
-	keyInfos := make([]*tinkpb.KeysetInfo_KeyInfo, nKey)
-	for i, key := range keyset.Key {
+	keyInfos := make([]*tinkpb.KeysetInfo_KeyInfo, len(keyset.GetKey()))
+	for i, key := range keyset.GetKey() {
 		keyInfos[i] = getKeyInfo(key)
 	}
 	return &tinkpb.KeysetInfo{
