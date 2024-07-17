@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/key"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -84,6 +85,45 @@ func NewFallbackProtoKey(protoKeysetKey *tinkpb.Keyset_Key) *FallbackProtoKey {
 			hasIDRequirement: protoKeysetKey.GetOutputPrefixType() != tinkpb.OutputPrefixType_RAW,
 		},
 	}
+}
+
+// FallbackProtoPrivateKey represents a fallback private key that wraps a proto
+// keyset key.
+type FallbackProtoPrivateKey struct {
+	FallbackProtoKey
+}
+
+// NewFallbackProtoPrivateKey creates a new FallbackProtoPrivateKey.
+func NewFallbackProtoPrivateKey(protoKeysetKey *tinkpb.Keyset_Key) (*FallbackProtoPrivateKey, error) {
+	if protoKeysetKey.GetKeyData().GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PRIVATE {
+		return nil, fmt.Errorf("the key is not a private key")
+	}
+	return &FallbackProtoPrivateKey{
+		FallbackProtoKey: *NewFallbackProtoKey(protoKeysetKey),
+	}, nil
+}
+
+// PublicKey returns the public key of the private key.
+func (k *FallbackProtoPrivateKey) PublicKey() (key.Key, error) {
+	privKeyData := k.protoKeysetKey.GetKeyData()
+	keyManager, err := registry.GetKeyManager(privKeyData.GetTypeUrl())
+	if err != nil {
+		return nil, err
+	}
+	privateKeyManager, ok := keyManager.(registry.PrivateKeyManager)
+	if !ok {
+		return nil, fmt.Errorf("%s does not correspond to a PrivateKeyManager", privKeyData.GetTypeUrl())
+	}
+	publicKeyData, err := privateKeyManager.PublicKeyData(privKeyData.GetValue())
+	if err != nil {
+		return nil, err
+	}
+	return ParseKey(&tinkpb.Keyset_Key{
+		KeyData:          publicKeyData,
+		Status:           k.protoKeysetKey.GetStatus(),
+		KeyId:            k.protoKeysetKey.GetKeyId(),
+		OutputPrefixType: k.protoKeysetKey.GetOutputPrefixType(),
+	})
 }
 
 // ProtoKeysetKey returns the proto keyset key wrapped in fallbackProtoKey.
@@ -179,6 +219,9 @@ func RegisterKeyParser(keyTypeURL string, keyParser KeyParser) error {
 func ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
 	parser, found := keyParsers[keysetKey.GetKeyData().GetTypeUrl()]
 	if !found {
+		if keysetKey.GetKeyData().GetKeyMaterialType() == tinkpb.KeyData_ASYMMETRIC_PRIVATE {
+			return NewFallbackProtoPrivateKey(keysetKey)
+		}
 		return NewFallbackProtoKey(keysetKey), nil
 	}
 	return parser.ParseKey(keysetKey)
@@ -189,7 +232,17 @@ type fallbackProtoKeySerializer struct{}
 func (s *fallbackProtoKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
 	fallbackKey, ok := key.(*FallbackProtoKey)
 	if !ok {
-		return nil, fmt.Errorf("serialization.fallbackProtoKeySerializer.SerializeKey: key is not a FallbackProtoKey")
+		return nil, fmt.Errorf("key is of type %T; needed *FallbackProtoKey", fallbackKey)
+	}
+	return proto.Clone(fallbackKey.protoKeysetKey).(*tinkpb.Keyset_Key), nil
+}
+
+type fallbackProtoPrivateKeySerializer struct{}
+
+func (s *fallbackProtoPrivateKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
+	fallbackKey, ok := key.(*FallbackProtoPrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T; needed *FallbackProtoPrivateKey", fallbackKey)
 	}
 	return proto.Clone(fallbackKey.protoKeysetKey).(*tinkpb.Keyset_Key), nil
 }
@@ -213,6 +266,7 @@ func ReinitializeKeySerializers() {
 	clear(keySerializers)
 	// Always register the fallback serializer.
 	keySerializers[reflect.TypeOf((*FallbackProtoKey)(nil))] = &fallbackProtoKeySerializer{}
+	keySerializers[reflect.TypeOf((*FallbackProtoPrivateKey)(nil))] = &fallbackProtoPrivateKeySerializer{}
 }
 
 // ClearParametersSerializers clears the global parameters serializers registry.
@@ -226,4 +280,5 @@ func ClearParametersSerializers() {
 
 func init() {
 	RegisterKeySerializer[*FallbackProtoKey](&fallbackProtoKeySerializer{})
+	RegisterKeySerializer[*FallbackProtoPrivateKey](&fallbackProtoPrivateKeySerializer{})
 }

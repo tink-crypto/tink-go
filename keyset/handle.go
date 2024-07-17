@@ -264,34 +264,37 @@ func (h *Handle) Entry(i int) (*Entry, error) {
 	return h.entries[i], nil
 }
 
+// privateKey represents a key with a public key.
+type privateKey interface {
+	PublicKey() (key.Key, error)
+}
+
 // Public returns a Handle of the public keys if the managed keyset contains private keys.
 func (h *Handle) Public() (*Handle, error) {
-	protoKeyset, err := entriesToProtoKeyset(h.entries)
-	if err != nil {
-		return nil, fmt.Errorf("keyset.Handle: %v", err)
+	if h.Len() == 0 {
+		return nil, fmt.Errorf("entries is empty or nil")
 	}
-	publicKeys := make([]*tinkpb.Keyset_Key, h.Len())
-	for i, privKey := range protoKeyset.Key {
-		if privKey == nil || privKey.KeyData == nil {
-			return nil, errInvalidKeyset
+	entries := make([]*Entry, h.Len())
+	for i, entry := range h.entries {
+		privateKey, ok := entry.Key().(privateKey)
+		if !ok {
+			return nil, fmt.Errorf("keyset.Handle: keyset contains a non-private key")
 		}
-		privKeyData := privKey.KeyData
-		pubKeyData, err := publicKeyData(privKeyData)
+		publicKey, err := privateKey.PublicKey()
 		if err != nil {
-			return nil, fmt.Errorf("keyset.Handle: %s", err)
+			return nil, fmt.Errorf("keyset.Handle: %v", err)
 		}
-		publicKeys[i] = &tinkpb.Keyset_Key{
-			KeyData:          pubKeyData,
-			Status:           privKey.Status,
-			KeyId:            privKey.KeyId,
-			OutputPrefixType: privKey.OutputPrefixType,
+		entries[i] = &Entry{
+			key:       publicKey,
+			isPrimary: entry.isPrimary,
+			keyID:     entry.keyID,
+			status:    entry.status,
 		}
 	}
-	publicProtoKeyset := &tinkpb.Keyset{
-		PrimaryKeyId: protoKeyset.PrimaryKeyId,
-		Key:          publicKeys,
-	}
-	return newWithOptions(publicProtoKeyset)
+	return &Handle{
+		entries:          entries,
+		keysetHasSecrets: false,
+	}, nil
 }
 
 // String returns a string representation of the managed keyset.
@@ -353,6 +356,7 @@ type Config interface {
 	// PrimitiveFromKey creates a primitive from a key.Key.
 	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
 }
+
 type primitiveOptions struct {
 	config Config
 }
@@ -502,21 +506,6 @@ func hasSecrets(ks *tinkpb.Keyset) bool {
 		}
 	}
 	return false
-}
-
-func publicKeyData(privKeyData *tinkpb.KeyData) (*tinkpb.KeyData, error) {
-	if privKeyData.KeyMaterialType != tinkpb.KeyData_ASYMMETRIC_PRIVATE {
-		return nil, fmt.Errorf("keyset.Handle: keyset contains a non-private key")
-	}
-	km, err := registry.GetKeyManager(privKeyData.TypeUrl)
-	if err != nil {
-		return nil, err
-	}
-	pkm, ok := km.(registry.PrivateKeyManager)
-	if !ok {
-		return nil, fmt.Errorf("keyset.Handle: %s does not belong to a PrivateKeyManager", privKeyData.TypeUrl)
-	}
-	return pkm.PublicKeyData(privKeyData.Value)
 }
 
 func decrypt(encryptedKeyset *tinkpb.EncryptedKeyset, masterKey tink.AEAD, associatedData []byte) (*tinkpb.Keyset, error) {

@@ -21,8 +21,13 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/signature"
+	"github.com/tink-crypto/tink-go/v2/testkeyset"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -584,6 +589,147 @@ func TestSerializeKeyWithFallbackKey(t *testing.T) {
 	gotProtoKey.GetKeyData().Value = []byte("456")
 	if proto.Equal(gotProtoKey, wantProtoKey) {
 		t.Errorf("proto.Equal(%v, %v) = true, want false", gotProtoKey, wantProtoKey)
+	}
+}
+
+func TestSerializeKeyWithFallbackPrivateKey(t *testing.T) {
+	defer protoserialization.ReinitializeKeySerializers()
+	wantProtoKey := &tinkpb.Keyset_Key{
+		KeyData: &tinkpb.KeyData{
+			TypeUrl:         testKeyURL,
+			Value:           []byte("123"),
+			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+		},
+		Status:           tinkpb.KeyStatusType_ENABLED,
+		KeyId:            123,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+	}
+	key, err := protoserialization.NewFallbackProtoPrivateKey(wantProtoKey)
+	if err != nil {
+		t.Fatalf("protoserialization.NewFallbackProtoPrivateKey(wantProtoKey) err = %v, want nil", err)
+	}
+	gotProtoKey, err := protoserialization.SerializeKey(key)
+	if err != nil {
+		t.Fatalf("protoserialization.SerializeKey(key) err = %v, want nil", err)
+	}
+	if !proto.Equal(gotProtoKey, wantProtoKey) {
+		t.Errorf("proto.Equal(%v, %v) = false, want true", gotProtoKey, wantProtoKey)
+	}
+}
+
+func TestNewFallbackProtoPrivateKeyFailsIfNotAsymmetricPrivate(t *testing.T) {
+	defer protoserialization.ReinitializeKeySerializers()
+	protoKey := &tinkpb.Keyset_Key{
+		KeyData: &tinkpb.KeyData{
+			TypeUrl:         testKeyURL,
+			Value:           []byte("123"),
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+		},
+		Status:           tinkpb.KeyStatusType_ENABLED,
+		KeyId:            123,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+	}
+	_, err := protoserialization.NewFallbackProtoPrivateKey(protoKey)
+	if err == nil {
+		t.Errorf("protoserialization.NewFallbackProtoPrivateKey(protoKey) err = nil, want error")
+	}
+}
+
+func TestPublicKeyFailsIfUnsupportedKey(t *testing.T) {
+	defer protoserialization.ReinitializeKeySerializers()
+	protoKey := &tinkpb.Keyset_Key{
+		KeyData: &tinkpb.KeyData{
+			TypeUrl:         testKeyURL,
+			Value:           []byte("123"),
+			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+		},
+		Status:           tinkpb.KeyStatusType_ENABLED,
+		KeyId:            123,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+	}
+	fallbackPrivateKey, err := protoserialization.NewFallbackProtoPrivateKey(protoKey)
+	if err != nil {
+		t.Errorf("protoserialization.NewFallbackProtoPrivateKey(protoKey) err = %v, want nil", err)
+	}
+	_, err = fallbackPrivateKey.PublicKey()
+	if err == nil {
+		t.Errorf("fallbackPrivateKey.PublicKey() err = nil, want error")
+	}
+}
+
+func TestPublicKeyFailsIfNotPrivateKeyManager(t *testing.T) {
+	defer protoserialization.ReinitializeKeySerializers()
+	registry.RegisterKeyManager(testutil.NewTestKeyManager([]byte(""), "some-test-key-URL"))
+
+	protoKey := &tinkpb.Keyset_Key{
+		KeyData: &tinkpb.KeyData{
+			TypeUrl:         "some-test-key-URL",
+			Value:           []byte("123"),
+			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+		},
+		Status:           tinkpb.KeyStatusType_ENABLED,
+		KeyId:            123,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+	}
+	fallbackPrivateKey, err := protoserialization.NewFallbackProtoPrivateKey(protoKey)
+	if err != nil {
+		t.Errorf("protoserialization.NewFallbackProtoPrivateKey(protoKey) err = %v, want nil", err)
+	}
+	_, err = fallbackPrivateKey.PublicKey()
+	fmt.Println(err)
+	if err == nil {
+		t.Errorf("fallbackPrivateKey.PublicKey() err = nil, want error")
+	}
+}
+
+func TestPublicKey(t *testing.T) {
+	defer protoserialization.ReinitializeKeySerializers()
+	handle, err := keyset.NewHandle(signature.ECDSAP256KeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.NewHandle(signature.ECDSAP256KeyTemplate()) err = %v, want nil", err)
+	}
+	protoKeyset := testkeyset.KeysetMaterial(handle)
+	protoPrivateKey := protoKeyset.GetKey()[0]
+	privatekey, err := protoserialization.ParseKey(protoPrivateKey)
+	if err != nil {
+		t.Fatalf("protoserialization.ParseKey(protoPrivateKey) err = %v, want nil", err)
+	}
+	fallbackPrivateKey, ok := privatekey.(*protoserialization.FallbackProtoPrivateKey)
+	if !ok {
+		t.Fatalf("type mismatch: got %T, want *protoserialization.FallbackProtoPrivateKey", privatekey)
+	}
+	publicKey, err := fallbackPrivateKey.PublicKey()
+	if err != nil {
+		t.Fatalf("fallbackPrivateKey.PublicKey() err = %v, want nil", err)
+	}
+	gotPublicKeyProto, err := protoserialization.SerializeKey(publicKey)
+	if err != nil {
+		t.Fatalf("protoserialization.SerializeKey(publicKey) err = %v, want nil", err)
+	}
+
+	// Get the public key from the key manager.
+	keyManager, err := registry.GetKeyManager(signature.ECDSAP256KeyTemplate().GetTypeUrl())
+	if err != nil {
+		t.Fatalf("registry.GetKeyManager(%s) err = %v, want nil", signature.ECDSAP256KeyTemplate().GetTypeUrl(), err)
+	}
+	privateKeyManager, ok := keyManager.(registry.PrivateKeyManager)
+	if !ok {
+		t.Fatalf("type mismatch: got %T, want registry.PrivateKeyManager", keyManager)
+	}
+	wantPublicKeyProtoData, err := privateKeyManager.PublicKeyData(protoPrivateKey.GetKeyData().GetValue())
+	if err != nil {
+		t.Fatalf("privateKeyManager.PublicKeyData(protoPrivateKey.GetKeyData().GetValue()) err = %v, want nil", err)
+	}
+
+	wantPublicKeyProto := &tinkpb.Keyset_Key{
+		KeyData:          wantPublicKeyProtoData,
+		Status:           protoKeyset.GetKey()[0].GetStatus(),
+		KeyId:            protoKeyset.GetKey()[0].GetKeyId(),
+		OutputPrefixType: protoKeyset.GetKey()[0].GetOutputPrefixType(),
+	}
+
+	if !proto.Equal(gotPublicKeyProto, wantPublicKeyProto) {
+		t.Errorf("proto.Equal(%v, %v) = false, want true", gotPublicKeyProto, wantPublicKeyProto)
 	}
 }
 

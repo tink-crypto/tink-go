@@ -6,6 +6,7 @@ go_library(
     importpath = "github.com/tink-crypto/tink-go/v2/internal/protoserialization",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//core/registry",
         "//key",
         "//proto/tink_go_proto",
         "@org_golang_google_protobuf//proto",
@@ -23,8 +24,13 @@ go_test(
     srcs = ["protoserialization_test.go"],
     deps = [
         ":protoserialization",
+        "//core/registry",
         "//key",
+        "//keyset",
         "//proto/tink_go_proto",
+        "//signature",
+        "//testkeyset",
+        "//testutil",
         "@org_golang_google_protobuf//proto",
     ],
 )
