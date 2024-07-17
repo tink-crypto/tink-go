@@ -162,18 +162,18 @@ func entriesToProtoKeyset(entries []*Entry) (*tinkpb.Keyset, error) {
 
 func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
 	if err := Validate(ks); err != nil {
-		return nil, fmt.Errorf("keyset.Handle: invalid keyset: %v", err)
+		return nil, fmt.Errorf("invalid keyset: %v", err)
 	}
 	entries := make([]*Entry, len(ks.GetKey()))
 	var primaryKeyEntry *Entry = nil
 	for i, protoKey := range ks.GetKey() {
 		key, err := protoserialization.ParseKey(protoKey)
 		if err != nil {
-			return nil, fmt.Errorf("keyset.Handle: %v", err)
+			return nil, err
 		}
 		keyStatus, err := keyStatusFromProto(protoKey.GetStatus())
 		if err != nil {
-			return nil, fmt.Errorf("keyset.Handle: %v", err)
+			return nil, err
 		}
 		entries[i] = &Entry{
 			key:       key,
@@ -220,11 +220,11 @@ func NewHandle(kt *tinkpb.KeyTemplate) (*Handle, error) {
 func NewHandleWithNoSecrets(ks *tinkpb.Keyset) (*Handle, error) {
 	handle, err := newWithOptions(ks)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("keyset.Handle: cannot generate new keyset: %s", err)
 	}
 	if handle.keysetHasSecrets {
 		// If you need to do this, you have to use func insecurecleartextkeyset.Read() instead.
-		return nil, errors.New("importing unencrypted secret key material is forbidden")
+		return nil, errors.New("keyset.Handle: importing unencrypted secret key material is forbidden")
 	}
 	return handle, nil
 }
@@ -281,7 +281,7 @@ type privateKey interface {
 // Public returns a Handle of the public keys if the managed keyset contains private keys.
 func (h *Handle) Public() (*Handle, error) {
 	if h.Len() == 0 {
-		return nil, fmt.Errorf("entries is empty or nil")
+		return nil, fmt.Errorf("keyset.Handle: entries list is empty or nil")
 	}
 	entries := make([]*Entry, h.Len())
 	for i, entry := range h.entries {
