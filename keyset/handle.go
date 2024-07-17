@@ -468,9 +468,8 @@ func hasSecrets(ks *tinkpb.Keyset) bool {
 		if k.GetKeyData() == nil {
 			continue
 		}
-		if k.GetKeyData().KeyMaterialType == tinkpb.KeyData_UNKNOWN_KEYMATERIAL ||
-			k.GetKeyData().KeyMaterialType == tinkpb.KeyData_ASYMMETRIC_PRIVATE ||
-			k.GetKeyData().KeyMaterialType == tinkpb.KeyData_SYMMETRIC {
+		switch k.GetKeyData().GetKeyMaterialType() {
+		case tinkpb.KeyData_UNKNOWN_KEYMATERIAL, tinkpb.KeyData_ASYMMETRIC_PRIVATE, tinkpb.KeyData_SYMMETRIC:
 			return true
 		}
 	}
