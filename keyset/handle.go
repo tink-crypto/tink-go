@@ -108,7 +108,7 @@ func keyStatusFromProto(status tinkpb.KeyStatusType) (KeyStatus, error) {
 	case tinkpb.KeyStatusType_DESTROYED:
 		return Destroyed, nil
 	default:
-		return Unknown, fmt.Errorf("unknown key status: %v", status.String())
+		return Unknown, fmt.Errorf("unknown key status: %v", status)
 	}
 }
 
@@ -121,7 +121,7 @@ func keyStatusToProto(status KeyStatus) (tinkpb.KeyStatusType, error) {
 	case Destroyed:
 		return tinkpb.KeyStatusType_DESTROYED, nil
 	default:
-		return tinkpb.KeyStatusType_UNKNOWN_STATUS, fmt.Errorf("unknown key status: %v", status.String())
+		return tinkpb.KeyStatusType_UNKNOWN_STATUS, fmt.Errorf("unknown key status: %v", status)
 	}
 }
 
