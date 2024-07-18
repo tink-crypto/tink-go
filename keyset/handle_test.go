@@ -609,7 +609,7 @@ func TestWriteWithNoSecretsFailsWithSymmetricSecretKey(t *testing.T) {
 	// Create a keyset that contains a symmetric secret key.
 	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(aead.AES256GCMKeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(aead.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
 	}
 
 	buff := &bytes.Buffer{}
@@ -623,7 +623,7 @@ func TestReadWithNoSecretsFailsWithSymmetricSecretKey(t *testing.T) {
 	// Create a keyset that contains a symmetric secret key.
 	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(aead.AES256GCMKeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(aead.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
 	}
 	buff := &bytes.Buffer{}
 	err = testkeyset.Write(handle, keyset.NewBinaryWriter(buff))
