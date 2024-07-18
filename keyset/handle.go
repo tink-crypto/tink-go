@@ -258,6 +258,9 @@ func ReadWithNoSecrets(reader Reader) (*Handle, error) {
 
 // Primary returns the primary key of the keyset.
 func (h *Handle) Primary() (*Entry, error) {
+	if h == nil {
+		return nil, fmt.Errorf("keyset.Handle: nil handle")
+	}
 	if h.primaryKeyEntry == nil {
 		return nil, fmt.Errorf("keyset.Handle: no primary key")
 	}
@@ -267,6 +270,9 @@ func (h *Handle) Primary() (*Entry, error) {
 // Entry returns the key at index i from the keyset.
 // i must be within the range [0, Handle.Len()).
 func (h *Handle) Entry(i int) (*Entry, error) {
+	if h == nil {
+		return nil, fmt.Errorf("keyset.Handle: nil handle")
+	}
 	if i < 0 || i >= h.Len() {
 		return nil, fmt.Errorf("keyset.Handle: index %d out of range", i)
 	}
@@ -280,6 +286,9 @@ type privateKey interface {
 
 // Public returns a Handle of the public keys if the managed keyset contains private keys.
 func (h *Handle) Public() (*Handle, error) {
+	if h == nil {
+		return nil, fmt.Errorf("keyset.Handle: nil handle")
+	}
 	if h.Len() == 0 {
 		return nil, fmt.Errorf("keyset.Handle: entries list is empty or nil")
 	}
@@ -318,6 +327,9 @@ func (h *Handle) String() string {
 
 // Len returns the number of keys in the keyset.
 func (h *Handle) Len() int {
+	if h == nil {
+		return 0
+	}
 	return len(h.entries)
 }
 
@@ -329,11 +341,17 @@ func (h *Handle) KeysetInfo() *tinkpb.KeysetInfo {
 
 // Write encrypts and writes the enclosing keyset.
 func (h *Handle) Write(writer Writer, masterKey tink.AEAD) error {
+	if h == nil {
+		return fmt.Errorf("keyset.Handle: nil handle")
+	}
 	return h.WriteWithAssociatedData(writer, masterKey, []byte{})
 }
 
 // WriteWithAssociatedData encrypts and writes the enclosing keyset using the provided associated data.
 func (h *Handle) WriteWithAssociatedData(writer Writer, masterKey tink.AEAD, associatedData []byte) error {
+	if h == nil {
+		return fmt.Errorf("keyset.Handle: nil handle")
+	}
 	protoKeyset, err := entriesToProtoKeyset(h.entries)
 	if err != nil {
 		return err
@@ -348,6 +366,9 @@ func (h *Handle) WriteWithAssociatedData(writer Writer, masterKey tink.AEAD, ass
 // WriteWithNoSecrets exports the keyset in h to the given Writer w returning an error if the keyset
 // contains secret key material.
 func (h *Handle) WriteWithNoSecrets(w Writer) error {
+	if h == nil {
+		return fmt.Errorf("keyset.Handle: nil handle")
+	}
 	if h.keysetHasSecrets {
 		return errors.New("keyset.Handle: exporting unencrypted secret key material is forbidden")
 	}
@@ -425,6 +446,9 @@ func (h *Handle) PrimitivesWithKeyManager(km registry.KeyManager) (*primitiveset
 }
 
 func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
+	if h == nil {
+		return nil, fmt.Errorf("nil handle")
+	}
 	if h.Len() == 0 {
 		return nil, fmt.Errorf("empty keyset")
 	}

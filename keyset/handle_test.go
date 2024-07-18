@@ -270,75 +270,235 @@ func TestReadWithMismatchedAssociatedData(t *testing.T) {
 	}
 }
 
-func TestPrimaryReturnsErrorWithZeroValueHandle(t *testing.T) {
-	handle := &keyset.Handle{}
-	_, err := handle.Primary()
-	if err == nil {
-		t.Errorf("handle.Primary() err = nil, want err")
+func TestPrimaryReturnsError(t *testing.T) {
+	testCases := []struct {
+		name   string
+		handle *keyset.Handle
+	}{
+		{
+			name:   "zero value handle",
+			handle: &keyset.Handle{},
+		},
+		{
+			name:   "nil handle",
+			handle: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.handle.Primary()
+			if err == nil {
+				t.Errorf("handle.Primary() err = nil, want err")
+			}
+		})
 	}
 }
 
-func TestLenReturnsZeroWithZeroValueHandle(t *testing.T) {
-	handle := &keyset.Handle{}
-	length := handle.Len()
-	if length != 0 {
-		t.Errorf("handle.Len() = %v, want 0", length)
+func TestLenReturnsZero(t *testing.T) {
+	testCases := []struct {
+		name   string
+		handle *keyset.Handle
+	}{
+		{
+			name:   "zero value handle",
+			handle: &keyset.Handle{},
+		},
+		{
+			name:   "nil handle",
+			handle: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			length := tc.handle.Len()
+			if length != 0 {
+				t.Errorf("handle.Len() = %v, want 0", length)
+			}
+		})
 	}
 }
 
-func TestPublicReturnsErrorWithZeroValueHandle(t *testing.T) {
-	handle := &keyset.Handle{}
-	_, err := handle.Public()
-	if err == nil {
-		t.Errorf("handle.Public() err = nil, want err")
+func TestPublicReturnsError(t *testing.T) {
+	testCases := []struct {
+		name   string
+		handle *keyset.Handle
+	}{
+		{
+			name:   "zero value handle",
+			handle: &keyset.Handle{},
+		},
+		{
+			name:   "nil handle",
+			handle: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.handle.Public()
+			if err == nil {
+				t.Errorf("handle.Public() err = nil, want err")
+			}
+		})
 	}
 }
 
-func TestEntryReturnsErrorWithZeroValueHandle(t *testing.T) {
-	handle := &keyset.Handle{}
-	_, err := handle.Entry(0)
-	if err == nil {
-		t.Errorf("handle.Entry(0) err = nil, want err")
+func TestEntryReturnsError(t *testing.T) {
+	testCases := []struct {
+		name   string
+		handle *keyset.Handle
+	}{
+		{
+			name:   "zero value handle",
+			handle: &keyset.Handle{},
+		},
+		{
+			name:   "nil handle",
+			handle: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.handle.Entry(0)
+			if err == nil {
+				t.Errorf("handle.Entry(0) err = nil, want err")
+			}
+		})
 	}
 }
 
-func TestPrimitivesReturnsErrorWithZeroValueHandle(t *testing.T) {
-	handle := &keyset.Handle{}
-	_, err := handle.Primitives()
-	if err == nil {
-		t.Errorf("handle.Primitives() err = nil, want err")
+func TestPrimitivesReturnsError(t *testing.T) {
+	testCases := []struct {
+		name   string
+		handle *keyset.Handle
+	}{
+		{
+			name:   "zero value handle",
+			handle: &keyset.Handle{},
+		},
+		{
+			name:   "nil handle",
+			handle: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.handle.Primitives()
+			if err == nil {
+				t.Errorf("handle.Primitives() err = nil, want err")
+			}
+		})
 	}
 }
 
-func TestPrimitivesWithKeyManagerReturnsErrorWithZeroValueHandle(t *testing.T) {
-	handle := &keyset.Handle{}
-	_, err := handle.PrimitivesWithKeyManager(&testKeyManager{})
-	if err == nil {
-		t.Errorf("handle.PrimitivesWithKeyManager(&testKeyManager{}) err = nil, want err")
+func TestPrimitivesWithKeyManagerReturnsError(t *testing.T) {
+	testCases := []struct {
+		name   string
+		handle *keyset.Handle
+	}{
+		{
+			name:   "zero value handle",
+			handle: &keyset.Handle{},
+		},
+		{
+			name:   "nil handle",
+			handle: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.handle.PrimitivesWithKeyManager(&testKeyManager{})
+			if err == nil {
+				t.Errorf("handle.PrimitivesWithKeyManager(&testKeyManager{}) err = nil, want err")
+			}
+		})
 	}
 }
 
-func TestKeysetInfoPanicsWithZeroValueHandle(t *testing.T) {
-	handle := &keyset.Handle{}
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("handle.KeysetInfo() did not panic")
-		}
-	}()
-	_ = handle.KeysetInfo()
+func TestKeysetInfoPanics(t *testing.T) {
+	testCases := []struct {
+		name   string
+		handle *keyset.Handle
+	}{
+		{
+			name:   "zero value handle",
+			handle: &keyset.Handle{},
+		},
+		{
+			name:   "nil handle",
+			handle: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Errorf("tc.handle.KeysetInfo() did not panic")
+				}
+			}()
+			_ = tc.handle.KeysetInfo()
+		})
+	}
 }
 
-func TestStringPanicsWithZeroValueHandle(t *testing.T) {
-	handle := &keyset.Handle{}
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("handle.String() did not panic")
-		}
-	}()
-	_ = handle.String()
+func TestStringPanics(t *testing.T) {
+	testCases := []struct {
+		name   string
+		handle *keyset.Handle
+	}{
+		{
+			name:   "zero value handle",
+			handle: &keyset.Handle{},
+		},
+		{
+			name:   "nil handle",
+			handle: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Errorf("tc.handle.String() did not panic")
+				}
+			}()
+			_ = tc.handle.String()
+		})
+	}
 }
 
-func TestWriteReturnsErrorWithZeroValueHandle(t *testing.T) {
+func TestWriteReturnsError(t *testing.T) {
+	keysetEncryptionHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
+	if err != nil {
+		t.Errorf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
+	}
+	keysetEncryptionAEAD, err := aead.New(keysetEncryptionHandle)
+	if err != nil {
+		t.Errorf("aead.New(keysetEncryptionHandle) err = %v, want nil", err)
+	}
+	testCases := []struct {
+		name   string
+		handle *keyset.Handle
+	}{
+		{
+			name:   "zero value handle",
+			handle: &keyset.Handle{},
+		},
+		{
+			name:   "nil handle",
+			handle: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			buff := &bytes.Buffer{}
+			if err := tc.handle.Write(keyset.NewBinaryWriter(buff), keysetEncryptionAEAD); err == nil {
+				t.Error("handle.Write() err = nil, want err")
+			}
+		})
+	}
+}
+
+func TestWriteWithAssociatedDataReturnsError(t *testing.T) {
 	keysetEncryptionHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
 	if err != nil {
 		t.Errorf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
@@ -348,37 +508,50 @@ func TestWriteReturnsErrorWithZeroValueHandle(t *testing.T) {
 		t.Errorf("aead.New(keysetEncryptionHandle) err = %v, want nil", err)
 	}
 
-	handle := &keyset.Handle{}
-	buff := &bytes.Buffer{}
-	err = handle.Write(keyset.NewBinaryWriter(buff), keysetEncryptionAEAD)
-	if err == nil {
-		t.Error("handle.Write() err = nil, want err")
+	testCases := []struct {
+		name   string
+		handle *keyset.Handle
+	}{
+		{
+			name:   "zero value handle",
+			handle: &keyset.Handle{},
+		},
+		{
+			name:   "nil handle",
+			handle: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			buff := &bytes.Buffer{}
+			if err := tc.handle.WriteWithAssociatedData(keyset.NewBinaryWriter(buff), keysetEncryptionAEAD, []byte("aad")); err == nil {
+				t.Error("handle.WriteWithAssociatedData() err = nil, want err")
+			}
+		})
 	}
 }
 
-func TestWriteWithAssociatedDataReturnsErrorWithZeroValueHandle(t *testing.T) {
-	keysetEncryptionHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
-	if err != nil {
-		t.Errorf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
+func TestWriteWithNoSecretsReturnsError(t *testing.T) {
+	testCases := []struct {
+		name   string
+		handle *keyset.Handle
+	}{
+		{
+			name:   "zero value handle",
+			handle: &keyset.Handle{},
+		},
+		{
+			name:   "nil handle",
+			handle: nil,
+		},
 	}
-	keysetEncryptionAEAD, err := aead.New(keysetEncryptionHandle)
-	if err != nil {
-		t.Errorf("aead.New(keysetEncryptionHandle) err = %v, want nil", err)
-	}
-
-	handle := &keyset.Handle{}
-	buff := &bytes.Buffer{}
-	err = handle.WriteWithAssociatedData(keyset.NewBinaryWriter(buff), keysetEncryptionAEAD, []byte("aad"))
-	if err == nil {
-		t.Error("handle.WriteWithAssociatedData() err = nil, want err")
-	}
-}
-
-func TestWriteWithNoSecretsReturnsErrorWithZeroValueHandle(t *testing.T) {
-	handle := &keyset.Handle{}
-	buff := &bytes.Buffer{}
-	if err := handle.WriteWithNoSecrets(keyset.NewBinaryWriter(buff)); err == nil {
-		t.Error("handle.WriteWithNoSecrets() err = nil, want err")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			buff := &bytes.Buffer{}
+			if err := tc.handle.WriteWithNoSecrets(keyset.NewBinaryWriter(buff)); err == nil {
+				t.Error("handle.WriteWithNoSecrets() err = nil, want err")
+			}
+		})
 	}
 }
 
