@@ -20,26 +20,6 @@
 // Consumers of secret key bytes should use the insecuresecretkeyaccess
 // package directly.
 //
-// TODO: b/354103265 - Move this to an example test.
-//
-// For example, an API that returns secret key bytes could simply do:
-//
-//	func MyFunction() (secretKey Bytes, err error) {
-//		// ...
-//	}
-//
-// Then to access the wrapped bytes, the caller would do:
-//
-//	secretKey, err := MyFunction()
-//	if err != nil {
-//		return err
-//	}
-//	secretKeyMaterial, err := secretKey.Data(insecuresecretkeyaccess.Token{})
-//	if err != nil {
-//		return err
-//	}
-//	// ...
-//
 // This package and build restrictions on insecuresecretkeyaccess may be used
 // together to restrict access to secret key bytes.
 package secretkeyaccess

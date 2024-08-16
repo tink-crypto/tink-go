@@ -16,7 +16,10 @@ alias(
 
 go_test(
     name = "secretkeyaccess_test",
-    srcs = ["secretkeyaccess_test.go"],
+    srcs = [
+        "example_test.go",
+        "secretkeyaccess_test.go",
+    ],
     deps = [
         ":secretkeyaccess",
         "//insecuresecretkeyaccess",
