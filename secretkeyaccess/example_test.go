@@ -23,18 +23,18 @@ import (
 )
 
 type Key struct {
-	key *secretkeyaccess.Bytes
+	keyMaterial *secretkeyaccess.Bytes
 }
 
 func NewKey() (*Key, error) {
-	key, err := secretkeyaccess.NewBytes(32)
+	keyMaterial, err := secretkeyaccess.NewBytes(32)
 	if err != nil {
 		return nil, err
 	}
-	return &Key{key: key}, nil
+	return &Key{keyMaterial: keyMaterial}, nil
 }
 
-func (k *Key) Key() *secretkeyaccess.Bytes { return k.key }
+func (k *Key) Key() *secretkeyaccess.Bytes { return k.keyMaterial }
 
 func ExampleBytes() {
 	key, err := NewKey()
@@ -43,19 +43,15 @@ func ExampleBytes() {
 	}
 
 	// APIs can safely return the the key material wrapped in a
-	// secretkeyaccess.Bytes object.
+	// secretkeyaccess.Bytes value.
 	keyMaterial := key.Key()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Extracting the wrapped key material requires an
-	// insecuresecretkeyaccess.Token object.
-	keyMaterialBytes, err := keyMaterial.Data(insecuresecretkeyaccess.Token{})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(len(keyMaterialBytes))
+	// Extracting the wrapped data requires an insecuresecretkeyaccess.Token
+	// value.
+	keyMaterialData := keyMaterial.Data(insecuresecretkeyaccess.Token{})
+	fmt.Println(len(keyMaterialData))
 	// Output: 32
 }

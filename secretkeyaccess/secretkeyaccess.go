@@ -70,23 +70,17 @@ func NewBytes(size uint32) (*Bytes, error) {
 
 // NewBytesFromData creates a new Bytes populated with data.
 //
-// This function make a copy of the data. Returns an error if token is not an
-// [insecuresecretkeyaccess.Token].
-func NewBytesFromData(data []byte, token any) (*Bytes, error) {
-	if err := Validate(token); err != nil {
-		return nil, err
-	}
-	return &Bytes{data: bytes.Clone(data)}, nil
+// This function makes a copy of the data. It requires an
+// [insecuresecretkeyaccess.Token] value.
+func NewBytesFromData(data []byte, token insecuresecretkeyaccess.Token) *Bytes {
+	return &Bytes{data: bytes.Clone(data)}
 }
 
 // Data returns a copy of the wrapped bytes.
 //
-// Returns an error if token is not an [insecuresecretkeyaccess.Token].
-func (b *Bytes) Data(token any) ([]byte, error) {
-	if err := Validate(token); err != nil {
-		return nil, err
-	}
-	return bytes.Clone(b.data), nil
+// It requires an [insecuresecretkeyaccess.Token] value to access the data.
+func (b *Bytes) Data(token insecuresecretkeyaccess.Token) []byte {
+	return bytes.Clone(b.data)
 }
 
 // Len returns the size of the wrapped bytes.
