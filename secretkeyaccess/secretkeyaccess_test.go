@@ -22,42 +22,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/secretkeyaccess"
 )
 
-func TestValidateWithValidToken(t *testing.T) {
-	if err := secretkeyaccess.Validate(insecuresecretkeyaccess.Token{}); err != nil {
-		t.Errorf("secretkeyaccess.Validate(insecuresecretkeyaccess.Token{}) = %v, want nil", err)
-	}
-}
-
-func TestInvalidTokenReturnsError(t *testing.T) {
-	for _, tc := range []struct {
-		name  string
-		token any
-	}{
-		{
-			name:  "nil",
-			token: nil,
-		},
-		{
-			name:  "int",
-			token: 42,
-		},
-		{
-			name:  "string",
-			token: "token",
-		},
-		{
-			name:  "reference to insecuresecretkeyaccess.Token",
-			token: &insecuresecretkeyaccess.Token{},
-		},
-	} {
-		t.Run("Validate_"+tc.name, func(t *testing.T) {
-			if err := secretkeyaccess.Validate(tc.token); err == nil {
-				t.Errorf("secretkeyaccess.Validate(%v) = nil, want error", tc.token)
-			}
-		})
-	}
-}
-
 func TestBytesWithStructLiteralAndBuiltInNewHaveZeroLen(t *testing.T) {
 	bytes := &secretkeyaccess.Bytes{}
 	if got, want := bytes.Len(), 0; got != want {

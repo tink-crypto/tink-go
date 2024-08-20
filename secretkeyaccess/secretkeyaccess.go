@@ -28,24 +28,9 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/subtle"
-	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretkeyaccess"
 )
-
-// Validate validates a secret key access token.
-//
-// This function should be used by APIs that return secret key bytes to
-// validate that the caller has a valid token.
-//
-// This function and build restrictions on insecuresecretkeyaccess may be used
-// together to restrict access to secret key bytes.
-func Validate(token any) error {
-	if _, ok := token.(insecuresecretkeyaccess.Token); !ok {
-		return fmt.Errorf("secret key access token is not of type insecuresecretkeyaccess.Token, got %T", token)
-	}
-	return nil
-}
 
 // Bytes is a wrapper around []byte that requires a secret key access token to
 // access a copy of the data.
