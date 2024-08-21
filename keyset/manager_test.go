@@ -708,10 +708,10 @@ func (s *testKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error
 }
 
 func TestKeysetManagerAddKeySucceeds(t *testing.T) {
+	defer protoserialization.UnregisterKeySerializer[*testKey]()
 	if err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %q, want nil", err)
 	}
-	defer protoserialization.ReinitializeKeySerializers()
 
 	manager := keyset.NewManager()
 	keyID1, err := manager.AddKey(&testKey{
@@ -761,10 +761,10 @@ func TestKeysetManagerAddKeySucceeds(t *testing.T) {
 }
 
 func TestKeysetManagerAddKeyFromExistingKeyset(t *testing.T) {
+	defer protoserialization.UnregisterKeySerializer[*testKey]()
 	if err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %q, want nil", err)
 	}
-	defer protoserialization.ReinitializeKeySerializers()
 
 	// Create a keyset that contains a single HmacKey.
 	manager := keyset.NewManager()
@@ -833,10 +833,10 @@ func TestKeysetManagerAddKeyFailsIfNoSerializerIsAvailable(t *testing.T) {
 }
 
 func TestKeysetManagerAddKeyFailsIfKeyHasIDRequirementAndIDAlreadyInUse(t *testing.T) {
+	defer protoserialization.UnregisterKeySerializer[*testKey]()
 	if err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %q, want nil", err)
 	}
-	defer protoserialization.ReinitializeKeySerializers()
 
 	manager := keyset.NewManager()
 	keyID, err := manager.AddKey(&testKey{

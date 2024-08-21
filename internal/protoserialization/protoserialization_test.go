@@ -523,7 +523,7 @@ func TestParseKeyFailsIfParserFails(t *testing.T) {
 }
 
 func TestRegisterKeySerializerAndSerializeKey(t *testing.T) {
-	defer protoserialization.ReinitializeKeySerializers()
+	defer protoserialization.UnregisterKeySerializer[*testKey]()
 	err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{})
 	if err != nil {
 		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %v, want nil", err)
@@ -542,7 +542,7 @@ func TestRegisterKeySerializerAndSerializeKey(t *testing.T) {
 }
 
 func TestRegisterKeySerializerFailsIfAlreadyRegistered(t *testing.T) {
-	defer protoserialization.ReinitializeKeySerializers()
+	defer protoserialization.UnregisterKeySerializer[*testKey]()
 	err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{})
 	if err != nil {
 		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %v, want nil", err)
@@ -553,7 +553,6 @@ func TestRegisterKeySerializerFailsIfAlreadyRegistered(t *testing.T) {
 }
 
 func TestSerializeKeyFailsIfNoSerializersRegistered(t *testing.T) {
-	defer protoserialization.ReinitializeKeySerializers()
 	key := &testKey{
 		keyBytes: []byte("123"),
 	}
@@ -563,7 +562,6 @@ func TestSerializeKeyFailsIfNoSerializersRegistered(t *testing.T) {
 }
 
 func TestSerializeKeyWithFallbackKey(t *testing.T) {
-	defer protoserialization.ReinitializeKeySerializers()
 	wantProtoKey := &tinkpb.Keyset_Key{
 		KeyData: &tinkpb.KeyData{
 			TypeUrl:         testKeyURL,
@@ -593,7 +591,6 @@ func TestSerializeKeyWithFallbackKey(t *testing.T) {
 }
 
 func TestSerializeKeyWithFallbackPrivateKey(t *testing.T) {
-	defer protoserialization.ReinitializeKeySerializers()
 	wantProtoKey := &tinkpb.Keyset_Key{
 		KeyData: &tinkpb.KeyData{
 			TypeUrl:         testKeyURL,
@@ -618,7 +615,6 @@ func TestSerializeKeyWithFallbackPrivateKey(t *testing.T) {
 }
 
 func TestNewFallbackProtoPrivateKeyFailsIfNotAsymmetricPrivate(t *testing.T) {
-	defer protoserialization.ReinitializeKeySerializers()
 	protoKey := &tinkpb.Keyset_Key{
 		KeyData: &tinkpb.KeyData{
 			TypeUrl:         testKeyURL,
@@ -636,7 +632,6 @@ func TestNewFallbackProtoPrivateKeyFailsIfNotAsymmetricPrivate(t *testing.T) {
 }
 
 func TestPublicKeyFailsIfUnsupportedKey(t *testing.T) {
-	defer protoserialization.ReinitializeKeySerializers()
 	protoKey := &tinkpb.Keyset_Key{
 		KeyData: &tinkpb.KeyData{
 			TypeUrl:         testKeyURL,
@@ -658,7 +653,6 @@ func TestPublicKeyFailsIfUnsupportedKey(t *testing.T) {
 }
 
 func TestPublicKeyFailsIfNotPrivateKeyManager(t *testing.T) {
-	defer protoserialization.ReinitializeKeySerializers()
 	registry.RegisterKeyManager(testutil.NewTestKeyManager([]byte(""), "some-test-key-URL"))
 
 	protoKey := &tinkpb.Keyset_Key{
@@ -683,7 +677,6 @@ func TestPublicKeyFailsIfNotPrivateKeyManager(t *testing.T) {
 }
 
 func TestPublicKey(t *testing.T) {
-	defer protoserialization.ReinitializeKeySerializers()
 	handle, err := keyset.NewHandle(signature.ECDSAP256KeyTemplate())
 	if err != nil {
 		t.Fatalf("keyset.NewHandle(signature.ECDSAP256KeyTemplate()) err = %v, want nil", err)
@@ -742,7 +735,7 @@ func (s *alwaysFailingKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_K
 var _ protoserialization.KeySerializer = (*alwaysFailingKeySerializer)(nil)
 
 func TestSerializeKeyFailsIfSerializeFails(t *testing.T) {
-	defer protoserialization.ReinitializeKeySerializers()
+	defer protoserialization.UnregisterKeySerializer[*testKey]()
 	err := protoserialization.RegisterKeySerializer[*testKey](&alwaysFailingKeySerializer{})
 	if err != nil {
 		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&alwaysFailingKeySerializer{}) err = %v, want nil", err)

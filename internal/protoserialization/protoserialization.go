@@ -256,17 +256,16 @@ func ClearKeyParsers() {
 	clear(keyParsers)
 }
 
-// ReinitializeKeySerializers clears the global key serializers registry and registers
-// fallbackProtoKeySerializer.
+// UnregisterKeySerializer removes the serializer for the given key type from
+// the global registry. If no serializer is registered for the given type, this
+// function does nothing.
 //
 // This function is intended to be used in tests only.
-func ReinitializeKeySerializers() {
+func UnregisterKeySerializer[K key.Key]() {
 	keySerializersMu.Lock()
 	defer keySerializersMu.Unlock()
-	clear(keySerializers)
-	// Always register the fallback serializer.
-	keySerializers[reflect.TypeOf((*FallbackProtoKey)(nil))] = &fallbackProtoKeySerializer{}
-	keySerializers[reflect.TypeOf((*FallbackProtoPrivateKey)(nil))] = &fallbackProtoPrivateKeySerializer{}
+	keyType := reflect.TypeOf((*K)(nil)).Elem()
+	delete(keySerializers, keyType)
 }
 
 // ClearParametersSerializers clears the global parameters serializers registry.
