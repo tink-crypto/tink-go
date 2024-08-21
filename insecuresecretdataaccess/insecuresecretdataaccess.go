@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package insecuresecretkeyaccess provides the definition of a token
-// used to control and track access to secret key material.
-package insecuresecretkeyaccess
+// Package insecuresecretdataaccess provides the definition of a token
+// used to control and track access to secret data.
+package insecuresecretdataaccess
 
-// Token is a required parameter for Tink APIs that return secret key material.
+// Token is a required parameter for Tink APIs that return secret data.
 //
-// Users who need access to key material must hold a value of this type.
+// Users who need access to secret data must hold a value of this type.
 // Within Google, this token is used in conjunction with the build system to
-// restrict access to functions that return secret key material.
+// restrict access to functions that return secret data.
 type Token struct{}

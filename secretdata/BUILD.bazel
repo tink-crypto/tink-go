@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "secretdata",
+    srcs = ["secretdata.go"],
+    importpath = "github.com/tink-crypto/tink-go/v2/secretdata",
+    visibility = ["//visibility:public"],
+    deps = ["//insecuresecretdataaccess"],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":secretdata",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "secretdata_test",
+    srcs = [
+        "example_test.go",
+        "secretdata_test.go",
+    ],
+    deps = [
+        ":secretdata",
+        "//insecuresecretdataaccess",
+    ],
+)

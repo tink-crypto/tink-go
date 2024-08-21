@@ -12,24 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package secretkeyaccess provides utilities for APIs that return secret key
-// material and need to validate secret key access tokens.
+// Package secretdata provides access-controlled structs to wrap sensitive
+// data.
 //
-// This package is intended for use in APIs that return secret key bytes to
-// avoid taking a direct dependency on the insecuresecretkeyaccess package.
-// Consumers of secret key bytes should use the insecuresecretkeyaccess
-// package directly.
+// This package is intended for use in APIs that return secret key material.
 //
-// This package and build restrictions on insecuresecretkeyaccess may be used
+// This package and build restrictions on insecuresecretdataaccess may be used
 // together to restrict access to secret key bytes.
-package secretkeyaccess
+package secretdata
 
 import (
 	"bytes"
 	"crypto/rand"
 	"crypto/subtle"
 
-	"github.com/tink-crypto/tink-go/v2/insecuresecretkeyaccess"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 )
 
 // Bytes is a wrapper around []byte that requires a secret key access token to
@@ -37,7 +34,7 @@ import (
 //
 // This type ensures immutability of the wrapped bytes.
 //
-// This type and build restrictions on insecuresecretkeyaccess may be used
+// This type and build restrictions on insecuresecretdataaccess may be used
 // together to restrict access to secret key bytes.
 type Bytes struct {
 	data []byte
@@ -56,15 +53,15 @@ func NewBytesFromRand(size uint32) (*Bytes, error) {
 // NewBytesFromData creates a new Bytes populated with data.
 //
 // This function makes a copy of the data. It requires an
-// [insecuresecretkeyaccess.Token] value.
-func NewBytesFromData(data []byte, token insecuresecretkeyaccess.Token) *Bytes {
+// [insecuresecretdataaccess.Token] value.
+func NewBytesFromData(data []byte, token insecuresecretdataaccess.Token) *Bytes {
 	return &Bytes{data: bytes.Clone(data)}
 }
 
 // Data returns a copy of the wrapped bytes.
 //
-// It requires an [insecuresecretkeyaccess.Token] value to access the data.
-func (b *Bytes) Data(token insecuresecretkeyaccess.Token) []byte {
+// It requires an [insecuresecretdataaccess.Token] value to access the data.
+func (b *Bytes) Data(token insecuresecretdataaccess.Token) []byte {
 	return bytes.Clone(b.data)
 }
 

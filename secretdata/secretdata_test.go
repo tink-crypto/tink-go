@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package secretkeyaccess_test
+package secretdata_test
 
 import (
 	"bytes"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/v2/insecuresecretkeyaccess"
-	"github.com/tink-crypto/tink-go/v2/secretkeyaccess"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
 func TestBytesWithStructLiteralAndBuiltInNewHaveZeroLen(t *testing.T) {
-	bytes := &secretkeyaccess.Bytes{}
+	bytes := &secretdata.Bytes{}
 	if got, want := bytes.Len(), 0; got != want {
 		t.Errorf("bytes.Len() = %v, want %v", got, want)
 	}
-	bytesWithNew := new(secretkeyaccess.Bytes)
+	bytesWithNew := new(secretdata.Bytes)
 	if got, want := bytesWithNew.Len(), 0; got != want {
 		t.Errorf("bytesWithNew.Len() = %v, want %v", got, want)
 	}
@@ -35,9 +35,9 @@ func TestBytesWithStructLiteralAndBuiltInNewHaveZeroLen(t *testing.T) {
 
 func TestNewBytesLen(t *testing.T) {
 	for _, size := range []uint32{0, 1, 16, 1024} {
-		keyMaterial, err := secretkeyaccess.NewBytesFromRand(size)
+		keyMaterial, err := secretdata.NewBytesFromRand(size)
 		if err != nil {
-			t.Fatalf("secretkeyaccess.NewBytesFromRand(%v) = %v, want nil", size, err)
+			t.Fatalf("secretdata.NewBytesFromRand(%v) = %v, want nil", size, err)
 		}
 		if got, want := keyMaterial.Len(), int(size); got != want {
 			t.Errorf("keyMaterial.Len() = %v, want %v", got, want)
@@ -47,14 +47,14 @@ func TestNewBytesLen(t *testing.T) {
 
 func TestNewBytesFromDataLen(t *testing.T) {
 	data := []byte("secret key material")
-	keyMaterial := secretkeyaccess.NewBytesFromData(data, insecuresecretkeyaccess.Token{})
+	keyMaterial := secretdata.NewBytesFromData(data, insecuresecretdataaccess.Token{})
 	if got, want := keyMaterial.Len(), len(data); got != want {
 		t.Errorf("keyMaterial.Len() = %v, want %v", got, want)
 	}
 }
 
 func TestBytesWithNilBytesHasZeroLen(t *testing.T) {
-	keyMaterial := secretkeyaccess.NewBytesFromData(nil, insecuresecretkeyaccess.Token{})
+	keyMaterial := secretdata.NewBytesFromData(nil, insecuresecretdataaccess.Token{})
 	if got, want := keyMaterial.Len(), 0; got != want {
 		t.Errorf("keyMaterial.Len() = %v, want %v", got, want)
 	}
@@ -62,8 +62,8 @@ func TestBytesWithNilBytesHasZeroLen(t *testing.T) {
 
 func TestBytesData(t *testing.T) {
 	expected := []byte("secret key material")
-	keyMaterial := secretkeyaccess.NewBytesFromData(expected, insecuresecretkeyaccess.Token{})
-	got := keyMaterial.Data(insecuresecretkeyaccess.Token{})
+	keyMaterial := secretdata.NewBytesFromData(expected, insecuresecretdataaccess.Token{})
+	got := keyMaterial.Data(insecuresecretdataaccess.Token{})
 	if !bytes.Equal(got, expected) {
 		t.Errorf("bytes.Equal(got, expected) = false, want true")
 	}
@@ -71,29 +71,29 @@ func TestBytesData(t *testing.T) {
 
 func TestBytesEquals(t *testing.T) {
 	data := []byte("secret key material")
-	keyMaterial := secretkeyaccess.NewBytesFromData(data, insecuresecretkeyaccess.Token{})
-	otherBytes := secretkeyaccess.NewBytesFromData(data, insecuresecretkeyaccess.Token{})
+	keyMaterial := secretdata.NewBytesFromData(data, insecuresecretdataaccess.Token{})
+	otherBytes := secretdata.NewBytesFromData(data, insecuresecretdataaccess.Token{})
 	if !keyMaterial.Equals(otherBytes) {
 		t.Errorf("keyMaterial.Equals(otherBytes) = false, want true")
 	}
-	differentBytes := secretkeyaccess.NewBytesFromData([]byte("different secret key material"), insecuresecretkeyaccess.Token{})
+	differentBytes := secretdata.NewBytesFromData([]byte("different secret key material"), insecuresecretdataaccess.Token{})
 	if differentBytes.Equals(keyMaterial) {
 		t.Errorf("differentBytes.Equals(keyMaterial) = true, want false")
 	}
 }
 
 func TestBytesEqualsEmpty(t *testing.T) {
-	nilBytes := secretkeyaccess.NewBytesFromData(nil, insecuresecretkeyaccess.Token{})
-	emptyBytes := secretkeyaccess.NewBytesFromData([]byte(""), insecuresecretkeyaccess.Token{})
-	randomEmptyBytes, err := secretkeyaccess.NewBytesFromRand(0)
+	nilBytes := secretdata.NewBytesFromData(nil, insecuresecretdataaccess.Token{})
+	emptyBytes := secretdata.NewBytesFromData([]byte(""), insecuresecretdataaccess.Token{})
+	randomEmptyBytes, err := secretdata.NewBytesFromRand(0)
 	if err != nil {
-		t.Fatalf("secretkeyaccess.NewBytesFromRand(0) = %v, want nil", err)
+		t.Fatalf("secretdata.NewBytesFromRand(0) = %v, want nil", err)
 	}
-	structLiteralBytes := &secretkeyaccess.Bytes{}
+	structLiteralBytes := &secretdata.Bytes{}
 	testCases := []struct {
 		name        string
-		firstBytes  *secretkeyaccess.Bytes
-		secondBytes *secretkeyaccess.Bytes
+		firstBytes  *secretdata.Bytes
+		secondBytes *secretdata.Bytes
 	}{
 		{
 			name:        "nil vs nil",
