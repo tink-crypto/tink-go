@@ -35,9 +35,9 @@ func TestBytesWithStructLiteralAndBuiltInNewHaveZeroLen(t *testing.T) {
 
 func TestNewBytesLen(t *testing.T) {
 	for _, size := range []uint32{0, 1, 16, 1024} {
-		keyMaterial, err := secretkeyaccess.NewBytes(size)
+		keyMaterial, err := secretkeyaccess.NewBytesFromRand(size)
 		if err != nil {
-			t.Fatalf("secretkeyaccess.NewBytes(%v) = %v, want nil", size, err)
+			t.Fatalf("secretkeyaccess.NewBytesFromRand(%v) = %v, want nil", size, err)
 		}
 		if got, want := keyMaterial.Len(), int(size); got != want {
 			t.Errorf("keyMaterial.Len() = %v, want %v", got, want)
@@ -85,9 +85,9 @@ func TestBytesEquals(t *testing.T) {
 func TestBytesEqualsEmpty(t *testing.T) {
 	nilBytes := secretkeyaccess.NewBytesFromData(nil, insecuresecretkeyaccess.Token{})
 	emptyBytes := secretkeyaccess.NewBytesFromData([]byte(""), insecuresecretkeyaccess.Token{})
-	randomEmptyBytes, err := secretkeyaccess.NewBytes(0)
+	randomEmptyBytes, err := secretkeyaccess.NewBytesFromRand(0)
 	if err != nil {
-		t.Fatalf("secretkeyaccess.NewBytes(0) = %v, want nil", err)
+		t.Fatalf("secretkeyaccess.NewBytesFromRand(0) = %v, want nil", err)
 	}
 	structLiteralBytes := &secretkeyaccess.Bytes{}
 	testCases := []struct {

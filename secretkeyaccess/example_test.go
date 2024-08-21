@@ -27,7 +27,7 @@ type Key struct {
 }
 
 func NewKey() (*Key, error) {
-	keyMaterial, err := secretkeyaccess.NewBytes(32)
+	keyMaterial, err := secretkeyaccess.NewBytesFromRand(32)
 	if err != nil {
 		return nil, err
 	}

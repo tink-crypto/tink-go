@@ -43,9 +43,9 @@ type Bytes struct {
 	data []byte
 }
 
-// NewBytes creates a new Bytes with size bytes of cryptographically strong
-// random data.
-func NewBytes(size uint32) (*Bytes, error) {
+// NewBytesFromRand returns a Bytes value wrapping size bytes of
+// cryptographically strong random data.
+func NewBytesFromRand(size uint32) (*Bytes, error) {
 	b := &Bytes{data: make([]byte, size)}
 	if _, err := rand.Read(b.data); err != nil {
 		return nil, err
