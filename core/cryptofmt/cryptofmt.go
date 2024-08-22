@@ -17,8 +17,9 @@
 package cryptofmt
 
 import (
-	"encoding/binary"
 	"fmt"
+
+	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -53,19 +54,12 @@ const (
 func OutputPrefix(key *tinkpb.Keyset_Key) (string, error) {
 	switch key.OutputPrefixType {
 	case tinkpb.OutputPrefixType_LEGACY, tinkpb.OutputPrefixType_CRUNCHY:
-		return createOutputPrefix(LegacyPrefixSize, LegacyStartByte, key.KeyId), nil
+		return string(outputprefix.Legacy(key.KeyId)), nil
 	case tinkpb.OutputPrefixType_TINK:
-		return createOutputPrefix(TinkPrefixSize, TinkStartByte, key.KeyId), nil
+		return string(outputprefix.Tink(key.KeyId)), nil
 	case tinkpb.OutputPrefixType_RAW:
 		return RawPrefix, nil
 	default:
 		return "", fmt.Errorf("crypto_format: unknown output prefix type")
 	}
-}
-
-func createOutputPrefix(size int, startByte byte, keyID uint32) string {
-	prefix := make([]byte, size)
-	prefix[0] = startByte
-	binary.BigEndian.PutUint32(prefix[1:], keyID)
-	return string(prefix)
 }
