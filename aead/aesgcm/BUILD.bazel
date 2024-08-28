@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "aesgcm",
+    srcs = ["aesgcm.go"],
+    importpath = "github.com/tink-crypto/tink-go/v2/aead/aesgcm",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//internal/outputprefix",
+        "//key",
+        "//secretdata",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":aesgcm",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "aesgcm_test",
+    srcs = ["aesgcm_test.go"],
+    deps = [
+        ":aesgcm",
+        "//core/cryptofmt",
+        "//insecuresecretdataaccess",
+        "//secretdata",
+    ],
+)
