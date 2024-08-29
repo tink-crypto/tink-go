@@ -101,19 +101,26 @@ type ParametersOpts struct {
 	Variant        Variant
 }
 
-// NewParameters creates a new AES-GCM Parameters object.
-func NewParameters(opts ParametersOpts) (*Parameters, error) {
+func validateOpts(opts *ParametersOpts) error {
 	if opts.KeySizeInBytes != 16 && opts.KeySizeInBytes != 24 && opts.KeySizeInBytes != 32 {
-		return nil, fmt.Errorf("aesgcm.Parameters: unsupported key size; want 16, 24, or 32, got: %v", opts.KeySizeInBytes)
+		return fmt.Errorf("unsupported key size; want 16, 24, or 32, got: %v", opts.KeySizeInBytes)
 	}
 	if opts.IVSizeInBytes <= 0 {
-		return nil, fmt.Errorf("aesgcm.Parameters: unsupported IV size; want > 0, got: %v", opts.IVSizeInBytes)
+		return fmt.Errorf("unsupported IV size; want > 0, got: %v", opts.IVSizeInBytes)
 	}
 	if opts.TagSizeInBytes < 12 || opts.TagSizeInBytes > 16 {
-		return nil, fmt.Errorf("aesgcm.Parameters: unsupported tag size; want >= 12 and <= 16, got: %v", opts.TagSizeInBytes)
+		return fmt.Errorf("unsupported tag size; want >= 12 and <= 16, got: %v", opts.TagSizeInBytes)
 	}
 	if opts.Variant == VariantUnknown {
-		return nil, fmt.Errorf("aesgcm.Parameters: unsupported variant: %v", opts.Variant)
+		return fmt.Errorf("unsupported variant: %v", opts.Variant)
+	}
+	return nil
+}
+
+// NewParameters creates a new AES-GCM Parameters object.
+func NewParameters(opts ParametersOpts) (*Parameters, error) {
+	if err := validateOpts(&opts); err != nil {
+		return nil, fmt.Errorf("aesgcm.NewParameters: %v", err)
 	}
 	return &Parameters{
 		keySizeInBytes: opts.KeySizeInBytes,
@@ -151,6 +158,17 @@ func NewKey(keyBytes secretdata.Bytes, keyID uint32, parameters *Parameters) (*K
 	if parameters == nil {
 		return nil, fmt.Errorf("aesgcm.NewKey: parameters is nil")
 	}
+
+	opts := &ParametersOpts{
+		KeySizeInBytes: parameters.KeySizeInBytes(),
+		IVSizeInBytes:  parameters.IVSizeInBytes(),
+		TagSizeInBytes: parameters.TagSizeInBytes(),
+		Variant:        parameters.Variant(),
+	}
+	if err := validateOpts(opts); err != nil {
+		return nil, fmt.Errorf("aesgcm.NewKey: %v", err)
+	}
+
 	if keyBytes.Len() != int(parameters.KeySizeInBytes()) {
 		return nil, fmt.Errorf("aesgcm.NewKey: key.Len() = %v, want %v", keyBytes.Len(), parameters.KeySizeInBytes())
 	}

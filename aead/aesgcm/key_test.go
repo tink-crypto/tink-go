@@ -91,6 +91,70 @@ func TestNewParametersInvalidVariant(t *testing.T) {
 	}
 }
 
+func TestNewKeyFailsIfParametersIsNil(t *testing.T) {
+	keyBytes, err := secretdata.NewBytesFromRand(32)
+	if err != nil {
+		t.Fatalf("secretdata.NewBytesFromRand(32) err = %v, want nil", err)
+	}
+	if _, err := aesgcm.NewKey(*keyBytes, 123, nil); err == nil {
+		t.Errorf("aesgcm.NewKey(*keyBytes, 123, nil) err = nil, want error")
+	}
+}
+
+func TestNewKeyFailsIfKeySizeIsDifferentThanParameters(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		keyBytes *secretdata.Bytes
+		params   aesgcm.ParametersOpts
+	}{
+		{
+			name:     "key size is 16 but parameters is 32",
+			keyBytes: secretdata.NewBytesFromData(key128Bits, insecuresecretdataaccess.Token{}),
+			params: aesgcm.ParametersOpts{
+				KeySizeInBytes: 32,
+				IVSizeInBytes:  12,
+				TagSizeInBytes: 16,
+				Variant:        aesgcm.VariantTink,
+			},
+		},
+		{
+			name:     "key size is 32 but parameters is 16",
+			keyBytes: secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{}),
+			params: aesgcm.ParametersOpts{
+				KeySizeInBytes: 16,
+				IVSizeInBytes:  12,
+				TagSizeInBytes: 16,
+				Variant:        aesgcm.VariantTink,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			params, err := aesgcm.NewParameters(tc.params)
+			if err != nil {
+				t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", tc.params, err)
+			}
+			if _, err := aesgcm.NewKey(*tc.keyBytes, 123, params); err == nil {
+				t.Errorf("aesgcm.NewKey(%v, 123, %v) err = nil, want error", tc.keyBytes, params)
+			}
+		})
+	}
+}
+
+// TestNewKeyFailsIfInvalidParams tests that NewKey fails if the parameters are invalid.
+//
+// The only way to create invalid parameters is to create a struct literal with default
+// values.
+func TestNewKeyFailsIfInvalidParams(t *testing.T) {
+	keyBytes, err := secretdata.NewBytesFromRand(32)
+	if err != nil {
+		t.Fatalf("secretdata.NewBytesFromRand(32) err = %v, want nil", err)
+	}
+	params := &aesgcm.Parameters{}
+	if _, err := aesgcm.NewKey(*keyBytes, 123, params); err == nil {
+		t.Errorf("aesgcm.NewKey(*keyBytes, 123, nil) err = nil, want error")
+	}
+}
+
 func TestOutputPrefix(t *testing.T) {
 	for _, test := range []struct {
 		name    string
