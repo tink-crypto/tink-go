@@ -105,12 +105,12 @@ func TestNewKeyFailsIfKeySizeIsDifferentThanParameters(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		keyBytes *secretdata.Bytes
-		params   aesgcm.ParametersOpts
+		opts     aesgcm.ParametersOpts
 	}{
 		{
 			name:     "key size is 16 but parameters is 32",
 			keyBytes: secretdata.NewBytesFromData(key128Bits, insecuresecretdataaccess.Token{}),
-			params: aesgcm.ParametersOpts{
+			opts: aesgcm.ParametersOpts{
 				KeySizeInBytes: 32,
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -120,7 +120,7 @@ func TestNewKeyFailsIfKeySizeIsDifferentThanParameters(t *testing.T) {
 		{
 			name:     "key size is 32 but parameters is 16",
 			keyBytes: secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{}),
-			params: aesgcm.ParametersOpts{
+			opts: aesgcm.ParametersOpts{
 				KeySizeInBytes: 16,
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -129,9 +129,9 @@ func TestNewKeyFailsIfKeySizeIsDifferentThanParameters(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			params, err := aesgcm.NewParameters(tc.params)
+			params, err := aesgcm.NewParameters(tc.opts)
 			if err != nil {
-				t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", tc.params, err)
+				t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", tc.opts, err)
 			}
 			if _, err := aesgcm.NewKey(*tc.keyBytes, 123, params); err == nil {
 				t.Errorf("aesgcm.NewKey(%v, 123, %v) err = nil, want error", tc.keyBytes, params)
@@ -152,6 +152,23 @@ func TestNewKeyFailsIfInvalidParams(t *testing.T) {
 	params := &aesgcm.Parameters{}
 	if _, err := aesgcm.NewKey(*keyBytes, 123, params); err == nil {
 		t.Errorf("aesgcm.NewKey(*keyBytes, 123, nil) err = nil, want error")
+	}
+}
+
+func TestNewKeyFailsIfNoPrefixAndIDIsNotZero(t *testing.T) {
+	opts := aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	}
+	params, err := aesgcm.NewParameters(opts)
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", opts, err)
+	}
+	keyBytes := secretdata.NewBytesFromData(key128Bits, insecuresecretdataaccess.Token{})
+	if _, err := aesgcm.NewKey(*keyBytes, 123, params); err == nil {
+		t.Errorf("aesgcm.NewKey(keyBytes, 123, %v) err = nil, want error", params)
 	}
 }
 
@@ -177,7 +194,7 @@ func TestOutputPrefix(t *testing.T) {
 		{
 			name:    "No prefix",
 			variant: aesgcm.VariantNoPrefix,
-			id:      uint32(0x01020304),
+			id:      0,
 			want:    nil,
 		},
 	} {
@@ -345,42 +362,42 @@ func TestNewKeyWorks(t *testing.T) {
 		{
 			name:    "128-bit key with Tink prefix",
 			keySize: 16,
-			id:      0x01,
+			id:      1,
 			key:     key128Bits,
 			variant: aesgcm.VariantTink,
 		},
 		{
 			name:    "128-bit key with Crunchy prefix",
 			keySize: 16,
-			id:      0x01,
+			id:      1,
 			key:     key128Bits,
 			variant: aesgcm.VariantCrunchy,
 		},
 		{
 			name:    "128-bit key with NoPrefix prefix",
 			keySize: 16,
-			id:      0x01,
+			id:      0,
 			key:     key128Bits,
 			variant: aesgcm.VariantNoPrefix,
 		},
 		{
 			name:    "256-bit key with Tink prefix",
 			keySize: 32,
-			id:      0x01,
+			id:      1,
 			key:     key256Bits,
 			variant: aesgcm.VariantTink,
 		},
 		{
 			name:    "256-bit key with Crunchy prefix",
 			keySize: 32,
-			id:      0x01,
+			id:      1,
 			key:     key256Bits,
 			variant: aesgcm.VariantCrunchy,
 		},
 		{
 			name:    "256-bit key with NoPrefix prefix",
 			keySize: 32,
-			id:      0x01,
+			id:      0,
 			key:     key256Bits,
 			variant: aesgcm.VariantNoPrefix,
 		},
@@ -410,16 +427,20 @@ func TestNewKeyWorks(t *testing.T) {
 			if !keyBytes.Equals(&key1Bytes) {
 				t.Errorf("keyBytes.Equals(key1Bytes) = false, want true")
 			}
-			id, required := key1.IDRequirement()
-			if required != (test.variant != aesgcm.VariantNoPrefix) {
-				t.Errorf("key1.ID() = %v, want %v", required, (test.variant == aesgcm.VariantNoPrefix))
+			keyID1, required := key1.IDRequirement()
+			if wantRequired := test.variant != aesgcm.VariantNoPrefix; required != wantRequired {
+				t.Errorf("required = %v, want %v", required, wantRequired)
 			}
-			if id != test.id {
-				t.Errorf("id = %v, want %v", id, test.id)
+			wantID := test.id
+			if !required {
+				wantID = 0
 			}
-			key2, err := aesgcm.NewKey(*keyBytes, test.id, params)
+			if keyID1 != wantID {
+				t.Errorf("keyID1 = %v, want %v", keyID1, wantID)
+			}
+			key2, err := aesgcm.NewKey(*keyBytes, keyID1, params)
 			if err != nil {
-				t.Fatalf("aesgcm.NewKey(keyBytes, %v, %v) err = %v, want nil", test.id, params, err)
+				t.Fatalf("aesgcm.NewKey(keyBytes, %v, %v) err = %v, want nil", keyID1, params, err)
 			}
 			// Test Equals.
 			if !key1.Equals(key2) {

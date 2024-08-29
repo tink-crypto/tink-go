@@ -23,7 +23,7 @@ type Parameters interface {
 	// In Tink, certain keys change their behavior depending on the key ID (e.g.,
 	// an AEAD object may add a prefix containing the big endian encoding of the
 	// key id to the ciphertext). In this case, such a key should require a unique
-	// id in key.ID() and return true.
+	// id in key.IDRequirement() and return true.
 	HasIDRequirement() bool
 	// Equals compares this parameters object with other.
 	Equals(other Parameters) bool
@@ -39,7 +39,15 @@ type Key interface {
 	Parameters() Parameters
 	// IDRequirement returns required to indicate if this key requires an
 	// identifier. If it does, id will contain that identifier.
-	IDRequirement() (id uint32, required bool)
+	//
+	// An ID requirement is an identifier that may change the behavior of the
+	// function this key represents. If the key is in a keyset and
+	// the key has an ID requirement, this matches the keyset key ID.
+	//
+	// As an invariant, required will be true if and only if
+	// Parameters.HasIDRequirement(). If not required, the returned ID
+	// is zero and unusable.
+	IDRequirement() (idRequirement uint32, required bool)
 	// Equals compares this key object with other.
 	Equals(other Key) bool
 }

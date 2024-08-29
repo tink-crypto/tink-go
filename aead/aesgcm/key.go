@@ -145,20 +145,26 @@ func (p *Parameters) Equals(other key.Parameters) bool {
 
 // Key represents an AES-GCM key.
 type Key struct {
-	keyBytes     secretdata.Bytes
-	id           uint32
-	outputPrefix []byte
-	parameters   *Parameters
+	keyBytes secretdata.Bytes
+	// idRequirement is the ID requirement to be included in the output of the
+	// AES-GCM function. If the key is in a keyset and the key has an ID
+	// requirement, this matches the keyset key ID.
+	idRequirement uint32
+	outputPrefix  []byte
+	parameters    *Parameters
 }
 
 var _ key.Key = (*Key)(nil)
 
-// NewKey creates a new AES-GCM key with key, keyID and parameters.
-func NewKey(keyBytes secretdata.Bytes, keyID uint32, parameters *Parameters) (*Key, error) {
+// NewKey creates a new AES-GCM key with key, idRequirement and parameters.
+//
+// The idRequirement is the ID requirement to be included in the output of the
+// AES-GCM function. If parameters.HasIDRequirement() == false, idRequirement
+// must be zero.
+func NewKey(keyBytes secretdata.Bytes, idRequirement uint32, parameters *Parameters) (*Key, error) {
 	if parameters == nil {
 		return nil, fmt.Errorf("aesgcm.NewKey: parameters is nil")
 	}
-
 	opts := &ParametersOpts{
 		KeySizeInBytes: parameters.KeySizeInBytes(),
 		IVSizeInBytes:  parameters.IVSizeInBytes(),
@@ -168,19 +174,21 @@ func NewKey(keyBytes secretdata.Bytes, keyID uint32, parameters *Parameters) (*K
 	if err := validateOpts(opts); err != nil {
 		return nil, fmt.Errorf("aesgcm.NewKey: %v", err)
 	}
-
+	if !parameters.HasIDRequirement() && idRequirement != 0 {
+		return nil, fmt.Errorf("aesgcm.NewKey: idRequirement = %v and parameters.HasIDRequirement() = false, want 0", idRequirement)
+	}
 	if keyBytes.Len() != int(parameters.KeySizeInBytes()) {
 		return nil, fmt.Errorf("aesgcm.NewKey: key.Len() = %v, want %v", keyBytes.Len(), parameters.KeySizeInBytes())
 	}
-	outputPrefix, err := calculateOutputPrefix(parameters.Variant(), keyID)
+	outputPrefix, err := calculateOutputPrefix(parameters.Variant(), idRequirement)
 	if err != nil {
 		return nil, fmt.Errorf("aesgcm.NewKey: %v", err)
 	}
 	return &Key{
-		keyBytes:     keyBytes,
-		id:           keyID,
-		outputPrefix: outputPrefix,
-		parameters:   parameters,
+		keyBytes:      keyBytes,
+		idRequirement: idRequirement,
+		outputPrefix:  outputPrefix,
+		parameters:    parameters,
 	}, nil
 }
 
@@ -194,10 +202,11 @@ func (k *Key) KeyBytes() secretdata.Bytes { return k.keyBytes }
 // Parameters returns the parameters of this key.
 func (k *Key) Parameters() key.Parameters { return k.parameters }
 
-// IDRequirement returns whether the key ID and whether it is required
-//
-// If not required, the returned key ID is not usable.
-func (k *Key) IDRequirement() (uint32, bool) { return k.id, k.Parameters().HasIDRequirement() }
+// IDRequirement returns required to indicate if this key requires an
+// identifier. If it does, id will contain that identifier.
+func (k *Key) IDRequirement() (uint32, bool) {
+	return k.idRequirement, k.Parameters().HasIDRequirement()
+}
 
 // OutputPrefix returns the output prefix.
 func (k *Key) OutputPrefix() []byte { return bytes.Clone(k.outputPrefix) }
@@ -205,8 +214,11 @@ func (k *Key) OutputPrefix() []byte { return bytes.Clone(k.outputPrefix) }
 // Equals returns whether this key object is equal to other.
 func (k *Key) Equals(other key.Key) bool {
 	that, ok := other.(*Key)
+	thisIDRequirement, thisIDRequired := k.IDRequirement()
+	thatIDRequirement, thatIDRequired := that.IDRequirement()
 	return ok && k.Parameters().Equals(that.Parameters()) &&
-		k.id == that.id &&
+		thisIDRequired == thatIDRequired &&
+		thisIDRequirement == thatIDRequirement &&
 		k.keyBytes.Equals(&that.keyBytes) &&
 		bytes.Equal(k.outputPrefix, that.outputPrefix)
 }
