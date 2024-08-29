@@ -29,6 +29,10 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
+const (
+	aesGCMTypeURL = "type.googleapis.com/google.crypto.tink.AesGcmKey"
+)
+
 // This file contains pre-generated KeyTemplates for AEAD keys. One can use these templates
 // to generate new Keysets.
 

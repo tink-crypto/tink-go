@@ -20,19 +20,13 @@ package aead
 import (
 	"fmt"
 
+	_ "github.com/tink-crypto/tink-go/v2/aead/aesgcm" // To register the AES-GCM key manager.
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 )
 
 func init() {
 	if err := registry.RegisterKeyManager(new(aesCTRHMACAEADKeyManager)); err != nil {
-		panic(fmt.Sprintf("aead.init() failed: %v", err))
-	}
-
-	if err := registry.RegisterKeyManager(new(aesGCMKeyManager)); err != nil {
-		panic(fmt.Sprintf("aead.init() failed: %v", err))
-	}
-	if err := internalregistry.AllowKeyDerivation(aesGCMTypeURL); err != nil {
 		panic(fmt.Sprintf("aead.init() failed: %v", err))
 	}
 
