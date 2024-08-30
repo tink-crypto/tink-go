@@ -140,6 +140,9 @@ type KeyParser interface {
 // KeySerializer is an interface for serializing a key into a proto keyset key.
 type KeySerializer interface {
 	// SerializeKey serializes the given key into a proto keyset key.
+	//
+	// The returned proto keyset key is not fully populated: Status is not set,
+	// and KeyId is not set for keys with no prefix.
 	SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error)
 }
 
