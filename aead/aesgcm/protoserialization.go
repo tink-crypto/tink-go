@@ -25,6 +25,13 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
+const (
+	// protoVersion is the accepted [gcmpb.AesGcmKey] proto version.
+	//
+	// Currently, only version 0 is supported; other versions are rejected.
+	protoVersion = 0
+)
+
 type serializer struct{}
 
 func protoOutputPrefixTypeFromVariant(variant Variant) (tinkpb.OutputPrefixType, error) {
@@ -56,7 +63,7 @@ func (s *serializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
 	keyBytes := actualKey.KeyBytes()
 	protoKey := &gcmpb.AesGcmKey{
 		KeyValue: keyBytes.Data(insecuresecretdataaccess.Token{}),
-		Version:  0,
+		Version:  protoVersion,
 	}
 	serializedKey, err := proto.Marshal(protoKey)
 	if err != nil {
@@ -108,6 +115,9 @@ func (s *parser) ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
 	protoKey := new(gcmpb.AesGcmKey)
 	if err := proto.Unmarshal(keyData.GetValue(), protoKey); err != nil {
 		return nil, err
+	}
+	if protoKey.GetVersion() != protoVersion {
+		return nil, fmt.Errorf("key has unsupported version: %v", protoKey.GetVersion())
 	}
 	variant, err := variantFromProto(keysetKey.GetOutputPrefixType())
 	if err != nil {

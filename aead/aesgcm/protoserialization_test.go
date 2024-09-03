@@ -44,6 +44,14 @@ func TestParseKeyFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proto.Marshal(keyWithInvalidSize) err = %v, want nil", err)
 	}
+	keyWithInvalidVersion := aesgcmpb.AesGcmKey{
+		Version:  1,
+		KeyValue: []byte("1234567890123456"),
+	}
+	serializedKeyWithInvalidVersion, err := proto.Marshal(&keyWithInvalidVersion)
+	if err != nil {
+		t.Fatalf("proto.Marshal(keyWithInvalidVersion) err = %v, want nil", err)
+	}
 	for _, tc := range []struct {
 		name      string
 		keysetKey *tinkpb.Keyset_Key
@@ -93,6 +101,19 @@ func TestParseKeyFails(t *testing.T) {
 				KeyData: &tinkpb.KeyData{
 					TypeUrl:         typeURL,
 					Value:           []byte("invalid proto"),
+					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+				},
+				Status:           tinkpb.KeyStatusType_ENABLED,
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				KeyId:            12345,
+			},
+		},
+		{
+			name: "invalid AES GCM key version",
+			keysetKey: &tinkpb.Keyset_Key{
+				KeyData: &tinkpb.KeyData{
+					TypeUrl:         typeURL,
+					Value:           serializedKeyWithInvalidVersion,
 					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 				},
 				Status:           tinkpb.KeyStatusType_ENABLED,
