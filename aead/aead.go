@@ -20,7 +20,7 @@ package aead
 import (
 	"fmt"
 
-	_ "github.com/tink-crypto/tink-go/v2/aead/aesgcm" // To register the AES-GCM key manager.
+	_ "github.com/tink-crypto/tink-go/v2/aead/aesgcm" // To register the AES-GCM key manager, parser and serializer.
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 )

@@ -20,6 +20,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
 
 func init() {
@@ -27,6 +28,12 @@ func init() {
 		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
 	}
 	if err := internalregistry.AllowKeyDerivation(typeURL); err != nil {
+		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*Key](&serializer{}); err != nil {
+		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(typeURL, &parser{}); err != nil {
 		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
 	}
 }
