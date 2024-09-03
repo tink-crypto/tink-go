@@ -23,7 +23,7 @@ import (
 )
 
 func TestBytesWithStructLiteralAndBuiltInNewHaveZeroLen(t *testing.T) {
-	bytes := &secretdata.Bytes{}
+	bytes := secretdata.Bytes{}
 	if got, want := bytes.Len(), 0; got != want {
 		t.Errorf("bytes.Len() = %v, want %v", got, want)
 	}
@@ -89,11 +89,11 @@ func TestBytesEqualsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("secretdata.NewBytesFromRand(0) = %v, want nil", err)
 	}
-	structLiteralBytes := &secretdata.Bytes{}
+	structLiteralBytes := secretdata.Bytes{}
 	testCases := []struct {
 		name        string
-		firstBytes  *secretdata.Bytes
-		secondBytes *secretdata.Bytes
+		firstBytes  secretdata.Bytes
+		secondBytes secretdata.Bytes
 	}{
 		{
 			name:        "nil vs nil",

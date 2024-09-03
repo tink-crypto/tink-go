@@ -96,15 +96,15 @@ func TestNewKeyFailsIfParametersIsNil(t *testing.T) {
 	if err != nil {
 		t.Fatalf("secretdata.NewBytesFromRand(32) err = %v, want nil", err)
 	}
-	if _, err := aesgcm.NewKey(*keyBytes, 123, nil); err == nil {
-		t.Errorf("aesgcm.NewKey(*keyBytes, 123, nil) err = nil, want error")
+	if _, err := aesgcm.NewKey(keyBytes, 123, nil); err == nil {
+		t.Errorf("aesgcm.NewKey(keyBytes, 123, nil) err = nil, want error")
 	}
 }
 
 func TestNewKeyFailsIfKeySizeIsDifferentThanParameters(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
-		keyBytes *secretdata.Bytes
+		keyBytes secretdata.Bytes
 		opts     aesgcm.ParametersOpts
 	}{
 		{
@@ -133,7 +133,7 @@ func TestNewKeyFailsIfKeySizeIsDifferentThanParameters(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", tc.opts, err)
 			}
-			if _, err := aesgcm.NewKey(*tc.keyBytes, 123, params); err == nil {
+			if _, err := aesgcm.NewKey(tc.keyBytes, 123, params); err == nil {
 				t.Errorf("aesgcm.NewKey(%v, 123, %v) err = nil, want error", tc.keyBytes, params)
 			}
 		})
@@ -150,8 +150,8 @@ func TestNewKeyFailsIfInvalidParams(t *testing.T) {
 		t.Fatalf("secretdata.NewBytesFromRand(32) err = %v, want nil", err)
 	}
 	params := &aesgcm.Parameters{}
-	if _, err := aesgcm.NewKey(*keyBytes, 123, params); err == nil {
-		t.Errorf("aesgcm.NewKey(*keyBytes, 123, nil) err = nil, want error")
+	if _, err := aesgcm.NewKey(keyBytes, 123, params); err == nil {
+		t.Errorf("aesgcm.NewKey(keyBytes, 123, nil) err = nil, want error")
 	}
 }
 
@@ -167,7 +167,7 @@ func TestNewKeyFailsIfNoPrefixAndIDIsNotZero(t *testing.T) {
 		t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", opts, err)
 	}
 	keyBytes := secretdata.NewBytesFromData(key128Bits, insecuresecretdataaccess.Token{})
-	if _, err := aesgcm.NewKey(*keyBytes, 123, params); err == nil {
+	if _, err := aesgcm.NewKey(keyBytes, 123, params); err == nil {
 		t.Errorf("aesgcm.NewKey(keyBytes, 123, %v) err = nil, want error", params)
 	}
 }
@@ -213,7 +213,7 @@ func TestOutputPrefix(t *testing.T) {
 			if err != nil {
 				t.Fatalf("secretdata.NewBytes(32fNewBytesFromRand() err = %v, want nil", err)
 			}
-			key, err := aesgcm.NewKey(*keyBytes, test.id, params)
+			key, err := aesgcm.NewKey(keyBytes, test.id, params)
 			if err != nil {
 				t.Fatalf("aesgcm.NewKey(keyBytes, %v, %v) err = %v, want nil", test.id, params, err)
 			}
@@ -416,7 +416,7 @@ func TestNewKeyWorks(t *testing.T) {
 			keyBytes := secretdata.NewBytesFromData(test.key, insecuresecretdataaccess.Token{})
 
 			// Create two keys with the same parameters and key bytes.
-			key1, err := aesgcm.NewKey(*keyBytes, test.id, params)
+			key1, err := aesgcm.NewKey(keyBytes, test.id, params)
 			if err != nil {
 				t.Fatalf("aesgcm.NewKey(keyBytes, %v, %v) err = %v, want nil", test.id, params, err)
 			}
@@ -424,7 +424,7 @@ func TestNewKeyWorks(t *testing.T) {
 				t.Errorf("key1.Parameters() = %v, want %v", key1.Parameters(), params)
 			}
 			key1Bytes := key1.KeyBytes()
-			if !keyBytes.Equals(&key1Bytes) {
+			if !keyBytes.Equals(key1Bytes) {
 				t.Errorf("keyBytes.Equals(key1Bytes) = false, want true")
 			}
 			keyID1, required := key1.IDRequirement()
@@ -438,7 +438,7 @@ func TestNewKeyWorks(t *testing.T) {
 			if keyID1 != wantID {
 				t.Errorf("keyID1 = %v, want %v", keyID1, wantID)
 			}
-			key2, err := aesgcm.NewKey(*keyBytes, keyID1, params)
+			key2, err := aesgcm.NewKey(keyBytes, keyID1, params)
 			if err != nil {
 				t.Fatalf("aesgcm.NewKey(keyBytes, %v, %v) err = %v, want nil", keyID1, params, err)
 			}
@@ -532,7 +532,7 @@ func TestKeyEqualsReturnsFalseIfDifferent(t *testing.T) {
 				t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", firstOpts, err)
 			}
 			firstKeyBytes := secretdata.NewBytesFromData(test.first.key, insecuresecretdataaccess.Token{})
-			firstKey, err := aesgcm.NewKey(*firstKeyBytes, test.first.id, firstParams)
+			firstKey, err := aesgcm.NewKey(firstKeyBytes, test.first.id, firstParams)
 			if err != nil {
 				t.Fatalf("aesgcm.NewKey(firstKeyBytes, %v, %v) err = %v, want nil", test.first.id, firstParams, err)
 			}
@@ -548,7 +548,7 @@ func TestKeyEqualsReturnsFalseIfDifferent(t *testing.T) {
 				t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", secondOpts, err)
 			}
 			secondKeyBytes := secretdata.NewBytesFromData(test.second.key, insecuresecretdataaccess.Token{})
-			secondKey, err := aesgcm.NewKey(*secondKeyBytes, test.second.id, secondParams)
+			secondKey, err := aesgcm.NewKey(secondKeyBytes, test.second.id, secondParams)
 			if err != nil {
 				t.Fatalf("aesgcm.NewKey(secondKeyBytes, %v, %v) err = %v, want nil", test.second.id, secondParams, err)
 			}

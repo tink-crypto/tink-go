@@ -23,7 +23,7 @@ import (
 )
 
 type Key struct {
-	keyMaterial *secretdata.Bytes
+	keyMaterial secretdata.Bytes
 }
 
 func NewKey() (*Key, error) {
@@ -34,7 +34,7 @@ func NewKey() (*Key, error) {
 	return &Key{keyMaterial: keyMaterial}, nil
 }
 
-func (k *Key) Key() *secretdata.Bytes { return k.keyMaterial }
+func (k *Key) Key() secretdata.Bytes { return k.keyMaterial }
 
 func ExampleBytes() {
 	key, err := NewKey()

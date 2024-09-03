@@ -231,7 +231,7 @@ func TestParseKey(t *testing.T) {
 			if tc.wantVariant != VariantNoPrefix {
 				keyID = 12345
 			}
-			wantKey, err := NewKey(*keyMaterial, keyID, wantParams)
+			wantKey, err := NewKey(keyMaterial, keyID, wantParams)
 			if err != nil {
 				t.Fatalf("NewKey(keyMaterial, %v, wantParams) err = %v, want nil", keyID, err)
 			}
@@ -370,7 +370,7 @@ func TestSerializeKey(t *testing.T) {
 			if tc.variant != VariantNoPrefix {
 				keyID = 12345
 			}
-			key, err := NewKey(*secretKey, keyID, params)
+			key, err := NewKey(secretKey, keyID, params)
 			if err != nil {
 				t.Fatalf("NewKey(secretKey, %v, params) err = %v, want nil", keyID, err)
 			}

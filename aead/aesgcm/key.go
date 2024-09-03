@@ -219,6 +219,6 @@ func (k *Key) Equals(other key.Key) bool {
 	return ok && k.Parameters().Equals(that.Parameters()) &&
 		thisIDRequired == thatIDRequired &&
 		thisIDRequirement == thatIDRequirement &&
-		k.keyBytes.Equals(&that.keyBytes) &&
+		k.keyBytes.Equals(that.keyBytes) &&
 		bytes.Equal(k.outputPrefix, that.outputPrefix)
 }

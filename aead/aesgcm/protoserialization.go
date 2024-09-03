@@ -138,5 +138,5 @@ func (s *parser) ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
 	if variant == VariantNoPrefix {
 		keyID = 0
 	}
-	return NewKey(*keyMaterial, keyID, params)
+	return NewKey(keyMaterial, keyID, params)
 }

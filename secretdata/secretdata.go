@@ -42,10 +42,10 @@ type Bytes struct {
 
 // NewBytesFromRand returns a Bytes value wrapping size bytes of
 // cryptographically strong random data.
-func NewBytesFromRand(size uint32) (*Bytes, error) {
-	b := &Bytes{data: make([]byte, size)}
+func NewBytesFromRand(size uint32) (Bytes, error) {
+	b := Bytes{data: make([]byte, size)}
 	if _, err := rand.Read(b.data); err != nil {
-		return nil, err
+		return Bytes{}, err
 	}
 	return b, nil
 }
@@ -54,25 +54,23 @@ func NewBytesFromRand(size uint32) (*Bytes, error) {
 //
 // This function makes a copy of the data. It requires an
 // [insecuresecretdataaccess.Token] value.
-func NewBytesFromData(data []byte, token insecuresecretdataaccess.Token) *Bytes {
-	return &Bytes{data: bytes.Clone(data)}
+func NewBytesFromData(data []byte, token insecuresecretdataaccess.Token) Bytes {
+	return Bytes{data: bytes.Clone(data)}
 }
 
 // Data returns a copy of the wrapped bytes.
 //
 // It requires an [insecuresecretdataaccess.Token] value to access the data.
-func (b *Bytes) Data(token insecuresecretdataaccess.Token) []byte {
-	return bytes.Clone(b.data)
-}
+func (b Bytes) Data(token insecuresecretdataaccess.Token) []byte { return bytes.Clone(b.data) }
 
 // Len returns the size of the wrapped bytes.
-func (b *Bytes) Len() int { return len(b.data) }
+func (b Bytes) Len() int { return len(b.data) }
 
 // Equals returns true if the two Bytes objects are equal.
 //
 // The comparison is done in constant time. The time taken is a function of the
 // length of the wrapped bytes and is independent of the contents. If the two
 // wrapped slices are of different lengths, the function returns immediately.
-func (b *Bytes) Equals(other *Bytes) bool {
+func (b Bytes) Equals(other Bytes) bool {
 	return subtle.ConstantTimeCompare(b.data, other.data) == 1
 }
