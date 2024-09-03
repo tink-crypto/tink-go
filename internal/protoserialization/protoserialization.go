@@ -70,17 +70,45 @@ func NewKeySerialization(keyData *tinkpb.KeyData, outputPrefixType tinkpb.Output
 	}, nil
 }
 
+// NewKeySerializationFromKeysetKey creates a new KeySerialization from [tinkpb.Keyset_Key].
+//
+// TODO: b/361315786 - Remove this function once refactoring is complete.
+func NewKeySerializationFromKeysetKey(keysetKey *tinkpb.Keyset_Key) (*KeySerialization, error) {
+	keyID := keysetKey.GetKeyId()
+	if keysetKey.GetOutputPrefixType() == tinkpb.OutputPrefixType_RAW {
+		keyID = 0
+	}
+	return NewKeySerialization(keysetKey.GetKeyData(), keysetKey.GetOutputPrefixType(), keyID)
+}
+
+// ToKeysetKey returns the proto keyset key.
+//
+// TODO: b/361315786 - Remove this method once refactoring is complete.
+func (k *KeySerialization) ToKeysetKey() *tinkpb.Keyset_Key {
+	return &tinkpb.Keyset_Key{
+		KeyData:          proto.Clone(k.keyData).(*tinkpb.KeyData),
+		KeyId:            k.idRequirement,
+		OutputPrefixType: k.outputPrefixType,
+		// Status is unset.
+	}
+}
+
 // KeyData returns the proto key data.
 func (k *KeySerialization) KeyData() *tinkpb.KeyData { return k.keyData }
 
 // OutputPrefixType returns the output prefix type of the key.
 func (k *KeySerialization) OutputPrefixType() tinkpb.OutputPrefixType { return k.outputPrefixType }
 
+// HasIDRequirement returns whether the key has an ID requirement.
+func (k *KeySerialization) HasIDRequirement() bool {
+	return k.OutputPrefixType() != tinkpb.OutputPrefixType_RAW
+}
+
 // IDRequirement returns the key ID and whether it is required.
 //
 // If the key ID is not required, the returned ID is zero.
 func (k *KeySerialization) IDRequirement() (uint32, bool) {
-	return k.idRequirement, k.OutputPrefixType() != tinkpb.OutputPrefixType_RAW
+	return k.idRequirement, k.HasIDRequirement()
 }
 
 // Equals reports whether k is equal to other.
@@ -90,14 +118,14 @@ func (k *KeySerialization) Equals(other *KeySerialization) bool {
 		k.idRequirement == other.idRequirement
 }
 
-// FallbackProtoKey is a key that wraps a proto keyset key.
-//
-// This is a fallback key type that is used to wrap individual keyset keys when no concrete key type
-// is available; it is purposely internal and does not allow accessing the internal proto
-// representation to avoid premature use of this type.
+// FallbackProtoKey is a key that wraps a proto key serialization.
+// FallbackProtoKey implements the [key.Key] interface. This is a fallback key
+// type that is used to wrap individual keyset keys when no concrete key type
+// is available; it is purposely internal and does not allow accessing the
+// internal proto representation to avoid premature use of this type.
 type FallbackProtoKey struct {
-	protoKeysetKey *tinkpb.Keyset_Key
-	parameters     *fallbackProtoKeyParams
+	protoKeySerialization *KeySerialization
+	parameters            *fallbackProtoKeyParams
 }
 
 // Parameters returns the parameters of this key.
@@ -110,20 +138,20 @@ func (k *FallbackProtoKey) Equals(other key.Key) bool {
 		return false
 	}
 	return k.parameters.Equals(other.Parameters()) &&
-		proto.Equal(k.protoKeysetKey, otherFallbackProtoKey.protoKeysetKey)
+		k.protoKeySerialization.Equals(otherFallbackProtoKey.protoKeySerialization)
 }
 
 // IDRequirement returns the key ID and whether it is required.
 func (k *FallbackProtoKey) IDRequirement() (uint32, bool) {
-	return k.protoKeysetKey.GetKeyId(), k.parameters.HasIDRequirement()
+	return k.protoKeySerialization.IDRequirement()
 }
 
 // NewFallbackProtoKey creates a new FallbackProtoKey.
-func NewFallbackProtoKey(protoKeysetKey *tinkpb.Keyset_Key) *FallbackProtoKey {
+func NewFallbackProtoKey(protoKeySerialization *KeySerialization) *FallbackProtoKey {
 	return &FallbackProtoKey{
-		protoKeysetKey: protoKeysetKey,
+		protoKeySerialization: protoKeySerialization,
 		parameters: &fallbackProtoKeyParams{
-			hasIDRequirement: protoKeysetKey.GetOutputPrefixType() != tinkpb.OutputPrefixType_RAW,
+			hasIDRequirement: protoKeySerialization.HasIDRequirement(),
 		},
 	}
 }
@@ -135,18 +163,18 @@ type FallbackProtoPrivateKey struct {
 }
 
 // NewFallbackProtoPrivateKey creates a new FallbackProtoPrivateKey.
-func NewFallbackProtoPrivateKey(protoKeysetKey *tinkpb.Keyset_Key) (*FallbackProtoPrivateKey, error) {
-	if protoKeysetKey.GetKeyData().GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PRIVATE {
+func NewFallbackProtoPrivateKey(protoKeySerialization *KeySerialization) (*FallbackProtoPrivateKey, error) {
+	if protoKeySerialization.KeyData().GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PRIVATE {
 		return nil, fmt.Errorf("the key is not a private key")
 	}
 	return &FallbackProtoPrivateKey{
-		FallbackProtoKey: *NewFallbackProtoKey(protoKeysetKey),
+		FallbackProtoKey: *NewFallbackProtoKey(protoKeySerialization),
 	}, nil
 }
 
 // PublicKey returns the public key of the private key.
 func (k *FallbackProtoPrivateKey) PublicKey() (key.Key, error) {
-	privKeyData := k.protoKeysetKey.GetKeyData()
+	privKeyData := k.protoKeySerialization.KeyData()
 	keyManager, err := registry.GetKeyManager(privKeyData.GetTypeUrl())
 	if err != nil {
 		return nil, err
@@ -159,17 +187,19 @@ func (k *FallbackProtoPrivateKey) PublicKey() (key.Key, error) {
 	if err != nil {
 		return nil, err
 	}
+	// ParseKey ignores KeyId if the key is RAW.
+	idRequirement, _ := k.protoKeySerialization.IDRequirement()
 	return ParseKey(&tinkpb.Keyset_Key{
 		KeyData:          publicKeyData,
-		Status:           k.protoKeysetKey.GetStatus(),
-		KeyId:            k.protoKeysetKey.GetKeyId(),
-		OutputPrefixType: k.protoKeysetKey.GetOutputPrefixType(),
+		KeyId:            idRequirement,
+		OutputPrefixType: k.protoKeySerialization.OutputPrefixType(),
+		// Status is expected to be set by the keyset.
 	})
 }
 
 // ProtoKeysetKey returns the proto keyset key wrapped in fallbackProtoKey.
 func ProtoKeysetKey(fallbackProtoKey *FallbackProtoKey) *tinkpb.Keyset_Key {
-	return fallbackProtoKey.protoKeysetKey
+	return fallbackProtoKey.protoKeySerialization.ToKeysetKey()
 }
 
 // KeyParser is an interface for parsing a proto keyset key into a key.
@@ -263,10 +293,14 @@ func RegisterKeyParser(keyTypeURL string, keyParser KeyParser) error {
 func ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
 	parser, found := keyParsers[keysetKey.GetKeyData().GetTypeUrl()]
 	if !found {
-		if keysetKey.GetKeyData().GetKeyMaterialType() == tinkpb.KeyData_ASYMMETRIC_PRIVATE {
-			return NewFallbackProtoPrivateKey(keysetKey)
+		keySerialization, err := NewKeySerializationFromKeysetKey(keysetKey)
+		if err != nil {
+			return nil, err
 		}
-		return NewFallbackProtoKey(keysetKey), nil
+		if keysetKey.GetKeyData().GetKeyMaterialType() == tinkpb.KeyData_ASYMMETRIC_PRIVATE {
+			return NewFallbackProtoPrivateKey(keySerialization)
+		}
+		return NewFallbackProtoKey(keySerialization), nil
 	}
 	return parser.ParseKey(keysetKey)
 }
@@ -278,7 +312,7 @@ func (s *fallbackProtoKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_K
 	if !ok {
 		return nil, fmt.Errorf("key is of type %T; needed *FallbackProtoKey", fallbackKey)
 	}
-	return proto.Clone(fallbackKey.protoKeysetKey).(*tinkpb.Keyset_Key), nil
+	return fallbackKey.protoKeySerialization.ToKeysetKey(), nil
 }
 
 type fallbackProtoPrivateKeySerializer struct{}
@@ -288,7 +322,7 @@ func (s *fallbackProtoPrivateKeySerializer) SerializeKey(key key.Key) (*tinkpb.K
 	if !ok {
 		return nil, fmt.Errorf("key is of type %T; needed *FallbackProtoPrivateKey", fallbackKey)
 	}
-	return proto.Clone(fallbackKey.protoKeysetKey).(*tinkpb.Keyset_Key), nil
+	return fallbackKey.protoKeySerialization.ToKeysetKey(), nil
 }
 
 // ClearKeyParsers clears the global key parsers registry.

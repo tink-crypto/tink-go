@@ -63,12 +63,11 @@ func TestPrimitiveFromKeyErrors(t *testing.T) {
 			key: func() key.Key {
 				key := testutil.NewHMACKeyData(commonpb.HashType_SHA256, 16)
 				key.TypeUrl = "some-unregistered-url"
-				return protoserialization.NewFallbackProtoKey(&tinkpb.Keyset_Key{
-					KeyData:          key,
-					Status:           tinkpb.KeyStatusType_ENABLED,
-					KeyId:            1,
-					OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				})
+				keySerialization, err := protoserialization.NewKeySerialization(key, tinkpb.OutputPrefixType_TINK, 1)
+				if err != nil {
+					t.Fatalf("protoserialization.NewKeySerialization() err = %v, want nil", err)
+				}
+				return protoserialization.NewFallbackProtoKey(keySerialization)
 			}(),
 		},
 		{
@@ -76,12 +75,11 @@ func TestPrimitiveFromKeyErrors(t *testing.T) {
 			key: func() key.Key {
 				key := testutil.NewHMACKeyData(commonpb.HashType_SHA256, 16)
 				key.TypeUrl = testutil.AESGCMTypeURL
-				return protoserialization.NewFallbackProtoKey(&tinkpb.Keyset_Key{
-					KeyData:          key,
-					Status:           tinkpb.KeyStatusType_ENABLED,
-					KeyId:            1,
-					OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				})
+				keySerialization, err := protoserialization.NewKeySerialization(key, tinkpb.OutputPrefixType_TINK, 1)
+				if err != nil {
+					t.Fatalf("protoserialization.NewKeySerialization() err = %v, want nil", err)
+				}
+				return protoserialization.NewFallbackProtoKey(keySerialization)
 			}(),
 		},
 		{

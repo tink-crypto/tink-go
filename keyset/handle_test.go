@@ -940,9 +940,15 @@ func TestPrimaryReturnsPrimaryKey(t *testing.T) {
 	if !ok {
 		t.Fatalf("type mismatch: got %T, want *protoserialization.FallbackProtoKey", primaryEntry.Key())
 	}
+
+	wantKeySerialization, err := protoserialization.NewKeySerializationFromKeysetKey(primaryKey)
+	if err != nil {
+		t.Fatalf("protoserialization.NewKeySerializationFromKeysetKey(%v) err = %v, want nil", primaryKey, err)
+	}
+	wantKeysetKey := wantKeySerialization.ToKeysetKey()
 	primaryProtoKeysetKey := protoserialization.ProtoKeysetKey(primaryProtoKey)
-	if !proto.Equal(primaryProtoKeysetKey, primaryKey) {
-		t.Errorf("primaryProtoKey.ProtoKeysetKey() = %v, want %v", primaryProtoKeysetKey, primaryKey)
+	if !proto.Equal(primaryProtoKeysetKey, wantKeysetKey) {
+		t.Errorf("primaryProtoKeysetKey = %v, want %v", primaryProtoKeysetKey, wantKeysetKey)
 	}
 	// Check that is the same as Entry(1).
 	entry, err := handle.Entry(1)
