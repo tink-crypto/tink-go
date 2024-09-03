@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -31,14 +33,187 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-var (
+const (
 	testKeyURL  = "test-key-url"
 	testKeyURL2 = "test-key-url-2"
+)
 
+var (
 	ErrKeyParsing             = errors.New("key parsing failed")
 	ErrKeySerialization       = errors.New("key serialization failed")
 	ErrParamtersSerialization = errors.New("parameters serialization failed")
 )
+
+func TestNewKeySerializationFailsIfIDRequirementIsSetButOutputPrefixTypeIsRAW(t *testing.T) {
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}
+	if _, err := protoserialization.NewKeySerialization(keyData, tinkpb.OutputPrefixType_RAW, 123); err == nil {
+		t.Errorf("protoserialization.NewKeySerialization(%v, tinkpb.OutputPrefixType_RAW, 123) err = nil, want error", keyData)
+	}
+}
+
+func TestNewKeySerialization(t *testing.T) {
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}
+	for _, tc := range []struct {
+		name             string
+		outputPrefixType tinkpb.OutputPrefixType
+		idRequirement    uint32
+	}{
+		{
+			name:             "TINK output prefix type",
+			outputPrefixType: tinkpb.OutputPrefixType_TINK,
+			idRequirement:    123,
+		},
+		{
+			name:             "CRUNCHY output prefix type",
+			outputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
+			idRequirement:    123,
+		},
+		{
+			name:             "LEGACY output prefix type",
+			outputPrefixType: tinkpb.OutputPrefixType_LEGACY,
+			idRequirement:    123,
+		},
+		{
+			name:             "RAW output prefix type",
+			outputPrefixType: tinkpb.OutputPrefixType_RAW,
+			idRequirement:    0,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			keySerialization := newKeySerialization(t, keyData, tc.outputPrefixType, tc.idRequirement)
+			if diff := cmp.Diff(keySerialization.KeyData(), keyData, protocmp.Transform()); diff != "" {
+				t.Errorf("keySerialization.KeyData() diff (-want +got):\n%s", diff)
+			}
+			if got, want := keySerialization.OutputPrefixType(), tc.outputPrefixType; got != want {
+				t.Errorf("keySerialization.OutputPrefixType() = %v, want %v", got, want)
+			}
+			gotIDRequirement, gotIDRequired := keySerialization.IDRequirement()
+			if gotIDRequirement != tc.idRequirement {
+				t.Errorf("keySerialization.IDRequirement() = %v, want %v", gotIDRequirement, tc.idRequirement)
+			}
+			if gotIDRequired != (tc.outputPrefixType != tinkpb.OutputPrefixType_RAW) {
+				t.Errorf("keySerialization.IDRequirement() = %v, want %v", gotIDRequired, tc.outputPrefixType != tinkpb.OutputPrefixType_RAW)
+			}
+		})
+	}
+}
+
+func newKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
+	t.Helper()
+	ks, err := protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
+	if err != nil {
+		t.Fatalf("protoserialization.NewKeySerialization(%v, %v, %v) err = %v, want nil", keyData, outputPrefixType, idRequirement, err)
+	}
+	return ks
+}
+
+func TestKeySerializationEquals(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		ks1  *protoserialization.KeySerialization
+		ks2  *protoserialization.KeySerialization
+		want bool
+	}{
+		{
+			name: "equal",
+			ks1: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         testKeyURL,
+				Value:           []byte("123"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+			ks2: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         testKeyURL,
+				Value:           []byte("123"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+			want: true,
+		},
+		{
+			name: "different key data value",
+			ks1: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         testKeyURL,
+				Value:           []byte("123"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+			ks2: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         testKeyURL,
+				Value:           []byte("345"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+			want: false,
+		},
+		{
+			name: "different key data type URL",
+			ks1: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         testKeyURL,
+				Value:           []byte("123"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+			ks2: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         testKeyURL2,
+				Value:           []byte("123"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+			want: false,
+		},
+		{
+			name: "different key data key material type",
+			ks1: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         testKeyURL,
+				Value:           []byte("123"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+			ks2: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         testKeyURL,
+				Value:           []byte("123"),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+			want: false,
+		},
+		{
+			name: "different key ID",
+			ks1: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         testKeyURL,
+				Value:           []byte("123"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+			ks2: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         testKeyURL,
+				Value:           []byte("123"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 345),
+			want: false,
+		},
+		{
+			name: "different output prefix type",
+			ks1: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         testKeyURL,
+				Value:           []byte("123"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+			ks2: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         testKeyURL,
+				Value:           []byte("123"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_CRUNCHY, 123),
+			want: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.ks1.Equals(tc.ks2); got != tc.want {
+				t.Errorf("ks1.Equals(ks2) = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
 
 func TestFallbackKeyEquals(t *testing.T) {
 	tests := []struct {

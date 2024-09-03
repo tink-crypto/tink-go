@@ -49,6 +49,47 @@ func (p *fallbackProtoKeyParams) Equals(parameters key.Parameters) bool {
 	return ok && p.hasIDRequirement == parameters.HasIDRequirement()
 }
 
+// KeySerialization represents a Protobuf serialization of a [key.Key].
+type KeySerialization struct {
+	keyData          *tinkpb.KeyData
+	outputPrefixType tinkpb.OutputPrefixType
+	idRequirement    uint32
+}
+
+// NewKeySerialization creates a new KeySerialization.
+//
+// idRequirement must be zero if outputPrefixType is RAW.
+func NewKeySerialization(keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) (*KeySerialization, error) {
+	if outputPrefixType == tinkpb.OutputPrefixType_RAW && idRequirement != 0 {
+		return nil, fmt.Errorf("idRequirement must be zero if hasIDRequirement is false")
+	}
+	return &KeySerialization{
+		keyData:          keyData,
+		outputPrefixType: outputPrefixType,
+		idRequirement:    idRequirement,
+	}, nil
+}
+
+// KeyData returns the proto key data.
+func (k *KeySerialization) KeyData() *tinkpb.KeyData { return k.keyData }
+
+// OutputPrefixType returns the output prefix type of the key.
+func (k *KeySerialization) OutputPrefixType() tinkpb.OutputPrefixType { return k.outputPrefixType }
+
+// IDRequirement returns the key ID and whether it is required.
+//
+// If the key ID is not required, the returned ID is zero.
+func (k *KeySerialization) IDRequirement() (uint32, bool) {
+	return k.idRequirement, k.OutputPrefixType() != tinkpb.OutputPrefixType_RAW
+}
+
+// Equals reports whether k is equal to other.
+func (k *KeySerialization) Equals(other *KeySerialization) bool {
+	return proto.Equal(k.keyData, other.keyData) &&
+		k.outputPrefixType == other.outputPrefixType &&
+		k.idRequirement == other.idRequirement
+}
+
 // FallbackProtoKey is a key that wraps a proto keyset key.
 //
 // This is a fallback key type that is used to wrap individual keyset keys when no concrete key type
