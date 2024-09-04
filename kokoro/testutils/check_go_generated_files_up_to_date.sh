@@ -96,6 +96,9 @@ main() {
           "${temp_dir_current_generated_files}/${generated_file_path}"; then
         echo "ERROR: ${generated_file_path} needs to be updated. Please follow \
 the instructions on go/tink-workflows#update-go-build." >&2
+        echo "Diff for ${generated_file_path}:"
+        diff "${generated_file_path}" \
+          "${temp_dir_current_generated_files}/${generated_file_path}"
         exit 1
       fi
     done
