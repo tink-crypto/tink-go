@@ -229,7 +229,7 @@ type ParametersSerializer interface {
 func RegisterKeySerializer[K key.Key](keySerializer KeySerializer) error {
 	keySerializersMu.Lock()
 	defer keySerializersMu.Unlock()
-	keyType := reflect.TypeOf((*K)(nil)).Elem()
+	keyType := reflect.TypeFor[K]()
 	if _, found := keySerializers[keyType]; found {
 		return fmt.Errorf("serialization.RegisterKeySerializer: type %v already registered", keyType)
 	}
@@ -342,7 +342,7 @@ func ClearKeyParsers() {
 func UnregisterKeySerializer[K key.Key]() {
 	keySerializersMu.Lock()
 	defer keySerializersMu.Unlock()
-	keyType := reflect.TypeOf((*K)(nil)).Elem()
+	keyType := reflect.TypeFor[K]()
 	delete(keySerializers, keyType)
 }
 
