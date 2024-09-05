@@ -695,16 +695,17 @@ var _ key.Key = (*testKey)(nil)
 
 type testKeySerializer struct{}
 
-func (s *testKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
+func (s *testKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
 	actualKey, ok := key.(*testKey)
 	if !ok {
 		return nil, fmt.Errorf("testKeySerializer.SerializeKey: key is not a testKey")
 	}
-	return &tinkpb.Keyset_Key{
-		KeyId:            actualKey.id,
-		KeyData:          &tinkpb.KeyData{TypeUrl: "test_type_url"},
-		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-	}, nil
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         "test_type_url",
+		Value:           []byte{0},
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}
+	return protoserialization.NewKeySerialization(keyData, tinkpb.OutputPrefixType_TINK, actualKey.id)
 }
 
 func TestKeysetManagerAddKeySucceeds(t *testing.T) {

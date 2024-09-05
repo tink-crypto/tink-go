@@ -49,6 +49,7 @@ go_test(
         "//core/registry",
         "//insecuresecretdataaccess",
         "//internal/internalregistry",
+        "//internal/protoserialization",
         "//key",
         "//keyset",
         "//proto/aes_gcm_go_proto",
@@ -58,6 +59,5 @@ go_test(
         "//testutil",
         "@com_github_google_go_cmp//cmp",
         "@org_golang_google_protobuf//proto",
-        "@org_golang_google_protobuf//testing/protocmp",
     ],
 )

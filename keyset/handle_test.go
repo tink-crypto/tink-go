@@ -941,14 +941,13 @@ func TestPrimaryReturnsPrimaryKey(t *testing.T) {
 		t.Fatalf("type mismatch: got %T, want *protoserialization.FallbackProtoKey", primaryEntry.Key())
 	}
 
-	wantKeySerialization, err := protoserialization.NewKeySerializationFromKeysetKey(primaryKey)
+	primaryKeySerialization := protoserialization.GetKeySerialization(primaryProtoKey)
+	wantKeySerialization, err := protoserialization.NewKeySerialization(primaryKey.GetKeyData(), primaryKey.GetOutputPrefixType(), primaryKey.GetKeyId())
 	if err != nil {
-		t.Fatalf("protoserialization.NewKeySerializationFromKeysetKey(%v) err = %v, want nil", primaryKey, err)
+		t.Fatalf("protoserialization.NewKeySerialization(%v) err = %v, want nil", primaryKey, err)
 	}
-	wantKeysetKey := wantKeySerialization.ToKeysetKey()
-	primaryProtoKeysetKey := protoserialization.ProtoKeysetKey(primaryProtoKey)
-	if !proto.Equal(primaryProtoKeysetKey, wantKeysetKey) {
-		t.Errorf("primaryProtoKeysetKey = %v, want %v", primaryProtoKeysetKey, wantKeysetKey)
+	if !primaryKeySerialization.Equals(wantKeySerialization) {
+		t.Errorf("primaryKeySerialization = %v, want %v", primaryKeySerialization, wantKeySerialization)
 	}
 	// Check that is the same as Entry(1).
 	entry, err := handle.Entry(1)
@@ -959,12 +958,9 @@ func TestPrimaryReturnsPrimaryKey(t *testing.T) {
 	if !ok {
 		t.Fatalf("type mismatch: got %T, want *protoserialization.FallbackProtoKey", entry.Key())
 	}
-	entryProtoKeysetKey := protoserialization.ProtoKeysetKey(entryProtoKey)
-	if !proto.Equal(entryProtoKeysetKey, primaryProtoKeysetKey) {
-		t.Errorf("entryProtoKey.ProtoKeysetKey() = %v, want %v", entryProtoKeysetKey, primaryProtoKeysetKey)
-	}
-	if !proto.Equal(entryProtoKeysetKey, primaryProtoKeysetKey) {
-		t.Errorf("proto.Equal(entryProtoKeysetKey, primaryProtoKeysetKey) = false, want true")
+	entryKeySerialization := protoserialization.GetKeySerialization(entryProtoKey)
+	if !entryKeySerialization.Equals(wantKeySerialization) {
+		t.Errorf("entryKeySerialization = %v, want %v", entryKeySerialization, wantKeySerialization)
 	}
 }
 

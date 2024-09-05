@@ -30,11 +30,11 @@ type RegistryConfig struct{}
 
 // PrimitiveFromKey creates a primitive from a Key using the Registry.
 func (c *RegistryConfig) PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error) {
-	protoKey, err := protoserialization.SerializeKey(key)
+	keySerialization, err := protoserialization.SerializeKey(key)
 	if err != nil {
 		return nil, err
 	}
-	return registry.PrimitiveFromKeyData(protoKey.GetKeyData())
+	return registry.PrimitiveFromKeyData(keySerialization.KeyData())
 }
 
 // RegisterKeyManager registers a provided KeyManager by forwarding it directly

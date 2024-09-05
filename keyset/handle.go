@@ -127,16 +127,20 @@ func keyStatusToProto(status KeyStatus) (tinkpb.KeyStatusType, error) {
 
 // entryToProtoKey converts an Entry to a tinkpb.Keyset_Key. Assumes entry is not nil.
 func entryToProtoKey(entry *Entry) (*tinkpb.Keyset_Key, error) {
-	protoKey, err := protoserialization.SerializeKey(entry.Key())
+	protoKeyStatus, err := keyStatusToProto(entry.KeyStatus())
 	if err != nil {
 		return nil, err
 	}
-	protoKey.Status, err = keyStatusToProto(entry.KeyStatus())
+	protoKeySerialization, err := protoserialization.SerializeKey(entry.Key())
 	if err != nil {
 		return nil, err
 	}
-	protoKey.KeyId = entry.KeyID()
-	return protoKey, nil
+	return &tinkpb.Keyset_Key{
+		KeyId:            entry.KeyID(),
+		Status:           protoKeyStatus,
+		OutputPrefixType: protoKeySerialization.OutputPrefixType(),
+		KeyData:          protoKeySerialization.KeyData(),
+	}, nil
 }
 
 func entriesToProtoKeyset(entries []*Entry) (*tinkpb.Keyset, error) {
@@ -167,7 +171,16 @@ func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
 	entries := make([]*Entry, len(ks.GetKey()))
 	var primaryKeyEntry *Entry = nil
 	for i, protoKey := range ks.GetKey() {
-		key, err := protoserialization.ParseKey(protoKey)
+		protoKeyData := protoKey.GetKeyData()
+		keyID := protoKey.GetKeyId()
+		if protoKey.GetOutputPrefixType() == tinkpb.OutputPrefixType_RAW {
+			keyID = 0
+		}
+		protoKeySerialization, err := protoserialization.NewKeySerialization(protoKeyData, protoKey.GetOutputPrefixType(), keyID)
+		if err != nil {
+			return nil, err
+		}
+		key, err := protoserialization.ParseKey(protoKeySerialization)
 		if err != nil {
 			return nil, err
 		}

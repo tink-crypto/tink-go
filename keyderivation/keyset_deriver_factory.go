@@ -76,13 +76,13 @@ func (w *wrappedKeysetDeriver) DeriveKeyset(salt []byte) (*keyset.Handle, error)
 		if err != nil {
 			return nil, fmt.Errorf("keyset_deriver_factory: cannot obtain entry from derived keyset: %v", err)
 		}
-		protoKey, err := protoserialization.SerializeKey(entry.Key())
+		keySerialization, err := protoserialization.SerializeKey(entry.Key())
 		if err != nil {
 			return nil, fmt.Errorf("keyset_deriver_factory: cannot get proto key from entry: %v", err)
 		}
 		// Set all fields, except for KeyData, to match the Entry in the keyset.
 		key := &tinkpb.Keyset_Key{
-			KeyData:          protoKey.GetKeyData(),
+			KeyData:          keySerialization.KeyData(),
 			Status:           e.Status,
 			KeyId:            e.KeyID,
 			OutputPrefixType: e.PrefixType,

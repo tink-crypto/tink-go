@@ -15,6 +15,7 @@
 package protoserialization_test
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"testing"
@@ -25,10 +26,11 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
-	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/signature"
-	"github.com/tink-crypto/tink-go/v2/testkeyset"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	ecdsapb "github.com/tink-crypto/tink-go/v2/proto/ecdsa_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -73,53 +75,50 @@ func TestNewKeySerialization(t *testing.T) {
 		name             string
 		outputPrefixType tinkpb.OutputPrefixType
 		idRequirement    uint32
+		idRequired       bool
 	}{
 		{
 			name:             "TINK output prefix type",
 			outputPrefixType: tinkpb.OutputPrefixType_TINK,
 			idRequirement:    123,
+			idRequired:       true,
 		},
 		{
 			name:             "CRUNCHY output prefix type",
 			outputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
 			idRequirement:    123,
+			idRequired:       true,
 		},
 		{
 			name:             "LEGACY output prefix type",
 			outputPrefixType: tinkpb.OutputPrefixType_LEGACY,
 			idRequirement:    123,
+			idRequired:       true,
 		},
 		{
 			name:             "RAW output prefix type",
 			outputPrefixType: tinkpb.OutputPrefixType_RAW,
 			idRequirement:    0,
+			idRequired:       false,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			keySerialization := newKeySerialization(t, keyData, tc.outputPrefixType, tc.idRequirement)
-			keysetKey := &tinkpb.Keyset_Key{
-				KeyData:          keyData,
-				OutputPrefixType: tc.outputPrefixType,
-				KeyId:            tc.idRequirement,
-			}
-			keySerializationFromKeysetKey, err := protoserialization.NewKeySerializationFromKeysetKey(keysetKey)
+			keySerialization, err := protoserialization.NewKeySerialization(keyData, tc.outputPrefixType, tc.idRequirement)
 			if err != nil {
-				t.Fatalf("protoserialization.NewKeySerializationFromKeysetKey(%v) err = %v, want nil", keysetKey, err)
+				t.Fatalf("protoserialization.NewKeySerialization(%v, %v, %v) err = %v, want nil", keyData, tc.outputPrefixType, tc.idRequirement, err)
 			}
-			for _, ks := range []*protoserialization.KeySerialization{keySerialization, keySerializationFromKeysetKey} {
-				if diff := cmp.Diff(ks.KeyData(), keyData, protocmp.Transform()); diff != "" {
-					t.Errorf("ks.KeyData() diff (-want +got):\n%s", diff)
-				}
-				if got, want := ks.OutputPrefixType(), tc.outputPrefixType; got != want {
-					t.Errorf("ks.OutputPrefixType() = %v, want %v", got, want)
-				}
-				gotIDRequirement, gotIDRequired := ks.IDRequirement()
-				if gotIDRequirement != tc.idRequirement {
-					t.Errorf("ks.IDRequirement() = %v, want %v", gotIDRequirement, tc.idRequirement)
-				}
-				if gotIDRequired != (tc.outputPrefixType != tinkpb.OutputPrefixType_RAW) {
-					t.Errorf("ks.IDRequirement() = %v, want %v", gotIDRequired, tc.outputPrefixType != tinkpb.OutputPrefixType_RAW)
-				}
+			if diff := cmp.Diff(keySerialization.KeyData(), keyData, protocmp.Transform()); diff != "" {
+				t.Errorf("keySerialization.KeyData() diff (-want +got):\n%s", diff)
+			}
+			if got, want := keySerialization.OutputPrefixType(), tc.outputPrefixType; got != want {
+				t.Errorf("keySerialization.OutputPrefixType() = %v, want %v", got, want)
+			}
+			gotIDRequirement, gotIDRequired := keySerialization.IDRequirement()
+			if gotIDRequirement != tc.idRequirement {
+				t.Errorf("keySerialization.IDRequirement() = %v, want %v", gotIDRequirement, tc.idRequirement)
+			}
+			if gotIDRequired != tc.idRequired {
+				t.Errorf("gotIDRequired = %v, want %v", gotIDRequired, tc.idRequired)
 			}
 		})
 	}
@@ -392,29 +391,21 @@ func (k *testKey) IDRequirement() (uint32, bool) { return k.id, k.params.HasIDRe
 
 type testParser struct{}
 
-func (p *testParser) ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
-	return &testKey{keyData: keysetKey.GetKeyData()}, nil
+func (p *testParser) ParseKey(keysetKey *protoserialization.KeySerialization) (key.Key, error) {
+	return &testKey{keyData: keysetKey.KeyData()}, nil
 }
 
 var _ protoserialization.KeyParser = (*testParser)(nil)
 
 type testKeySerializer struct{}
 
-func (s *testKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
+func (s *testKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
 	actualKey, ok := key.(*testKey)
 	if !ok {
 		return nil, fmt.Errorf("type mismatch: got %T, want *testKey", key)
 	}
-	return &tinkpb.Keyset_Key{
-		KeyData: &tinkpb.KeyData{
-			TypeUrl:         testKeyURL,
-			Value:           actualKey.keyData.GetValue(),
-			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-		},
-		Status:           tinkpb.KeyStatusType_ENABLED,
-		KeyId:            actualKey.id,
-		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-	}, nil
+	idReq, _ := actualKey.IDRequirement()
+	return protoserialization.NewKeySerialization(actualKey.keyData, tinkpb.OutputPrefixType_TINK, idReq)
 }
 
 var _ protoserialization.KeySerializer = (*testKeySerializer)(nil)
@@ -450,17 +441,12 @@ func TestParseKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("protoserialization.RegisterKeyParser(%s) err = %v, want nil", testKeyURL, err)
 	}
-	protoKeysetKey := &tinkpb.Keyset_Key{
-		KeyData: &tinkpb.KeyData{
-			TypeUrl:         testKeyURL,
-			Value:           []byte("123"),
-			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-		},
-		Status:           tinkpb.KeyStatusType_ENABLED,
-		KeyId:            123,
-		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-	}
-	key, err := protoserialization.ParseKey(protoKeysetKey)
+	keySerialization := newKeySerialization(t, &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}, tinkpb.OutputPrefixType_TINK, 123)
+	key, err := protoserialization.ParseKey(keySerialization)
 	if err != nil {
 		t.Fatalf("protoserialization.ParseKey(%s) err = %v, want nil", testKeyURL, err)
 	}
@@ -482,16 +468,12 @@ func TestParseKey(t *testing.T) {
 func TestParseKeyReturnsFallbackIfNoParsersRegistered(t *testing.T) {
 	defer protoserialization.ClearKeyParsers()
 	// Empty parser map.
-	key, err := protoserialization.ParseKey(&tinkpb.Keyset_Key{
-		KeyData: &tinkpb.KeyData{
-			TypeUrl:         testKeyURL,
-			Value:           []byte("123"),
-			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-		},
-		Status:           tinkpb.KeyStatusType_ENABLED,
-		KeyId:            123,
-		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-	})
+	keySerialization := newKeySerialization(t, &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}, tinkpb.OutputPrefixType_TINK, 123)
+	key, err := protoserialization.ParseKey(keySerialization)
 	if err != nil {
 		t.Fatalf("protoserialization.ParseKey(%s) err = %v, want nil", testKeyURL, err)
 	}
@@ -518,16 +500,12 @@ func TestParseKeyReturnsFallbackIfDifferentParserRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("protoserialization.RegisterKeyParser(%s) err = %v, want nil", testKeyURL2, err)
 	}
-	key, err := protoserialization.ParseKey(&tinkpb.Keyset_Key{
-		KeyData: &tinkpb.KeyData{
-			TypeUrl:         testKeyURL,
-			Value:           []byte("123"),
-			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-		},
-		Status:           tinkpb.KeyStatusType_ENABLED,
-		KeyId:            123,
-		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-	})
+	keySerialization := newKeySerialization(t, &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}, tinkpb.OutputPrefixType_TINK, 123)
+	key, err := protoserialization.ParseKey(keySerialization)
 	if err != nil {
 		t.Fatalf("protoserialization.ParseKey(%s) err = %v, want nil", testKeyURL, err)
 	}
@@ -539,7 +517,7 @@ func TestParseKeyReturnsFallbackIfDifferentParserRegistered(t *testing.T) {
 
 type alwaysFailingKeyParser struct{}
 
-func (p *alwaysFailingKeyParser) ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
+func (p *alwaysFailingKeyParser) ParseKey(keysetKey *protoserialization.KeySerialization) (key.Key, error) {
 	return nil, ErrKeyParsing
 }
 
@@ -551,16 +529,12 @@ func TestParseKeyFailsIfParserFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("protoserialization.RegisterKeyParser(%s) err = %v, want nil", testKeyURL, err)
 	}
-	_, err = protoserialization.ParseKey(&tinkpb.Keyset_Key{
-		KeyData: &tinkpb.KeyData{
-			TypeUrl:         testKeyURL,
-			Value:           []byte("123"),
-			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-		},
-		Status:           tinkpb.KeyStatusType_ENABLED,
-		KeyId:            123,
-		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-	})
+	keySerialization := newKeySerialization(t, &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}, tinkpb.OutputPrefixType_TINK, 123)
+	_, err = protoserialization.ParseKey(keySerialization)
 	if err == nil {
 		t.Errorf("protoserialization.ParseKey(%s) err = nil, want error", testKeyURL)
 	}
@@ -583,11 +557,11 @@ func TestRegisterKeySerializerAndSerializeKey(t *testing.T) {
 			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 		},
 	}
-	gotKeysetKey, err := protoserialization.SerializeKey(key)
+	gotKeySerialization, err := protoserialization.SerializeKey(key)
 	if err != nil {
 		t.Fatalf("protoserialization.SerializeKey(key) err = %v, want nil", err)
 	}
-	if diff := cmp.Diff(gotKeysetKey.GetKeyData(), key.keyData, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(gotKeySerialization.KeyData(), key.keyData, protocmp.Transform()); diff != "" {
 		t.Errorf("testKey.KeyData() diff (-want +got):\n%s", diff)
 	}
 }
@@ -617,99 +591,65 @@ func TestSerializeKeyFailsIfNoSerializersRegistered(t *testing.T) {
 }
 
 func TestSerializeKeyWithFallbackKey(t *testing.T) {
-	wantProtoKey := &tinkpb.Keyset_Key{
-		KeyData: &tinkpb.KeyData{
-			TypeUrl:         testKeyURL,
-			Value:           []byte("123"),
-			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-		},
-		KeyId:            123,
-		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 	}
-	keySerialization, err := protoserialization.NewKeySerializationFromKeysetKey(wantProtoKey)
-	if err != nil {
-		t.Fatalf("protoserialization.NewKeySerializationFromKeysetKey(wantProtoKey) err = %v, want nil", err)
-	}
+	keySerialization := newKeySerialization(t, keyData, tinkpb.OutputPrefixType_TINK, 123)
 	key := protoserialization.NewFallbackProtoKey(keySerialization)
-	gotProtoKey, err := protoserialization.SerializeKey(key)
+	gotKeySerialization, err := protoserialization.SerializeKey(key)
 	if err != nil {
 		t.Fatalf("protoserialization.SerializeKey(key) err = %v, want nil", err)
 	}
-	if !proto.Equal(gotProtoKey, wantProtoKey) {
-		t.Errorf("proto.Equal(%v, %v) = false, want true", gotProtoKey, wantProtoKey)
+	if !gotKeySerialization.Equals(keySerialization) {
+		t.Errorf("gotKeySerialization.Equals(keySerialization) = false, want true")
 	}
-	// Check that the returned proto is a copy of the original.
-	if gotProtoKey == wantProtoKey {
-		t.Errorf("protoserialization.SerializeKey(key) = %v, want a copy of %v", gotProtoKey, wantProtoKey)
-	}
-	gotProtoKey.GetKeyData().Value = []byte("456")
-	if proto.Equal(gotProtoKey, wantProtoKey) {
-		t.Errorf("proto.Equal(%v, %v) = true, want false", gotProtoKey, wantProtoKey)
+	gotKeySerialization.KeyData().Value = []byte("456")
+	if gotKeySerialization.Equals(keySerialization) {
+		t.Errorf("gotKeySerialization.Equals(keySerialization) = true, want false")
 	}
 }
 
 func TestSerializeKeyWithFallbackPrivateKey(t *testing.T) {
-	wantProtoKey := &tinkpb.Keyset_Key{
-		KeyData: &tinkpb.KeyData{
-			TypeUrl:         testKeyURL,
-			Value:           []byte("123"),
-			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
-		},
-		KeyId:            123,
-		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 	}
-	keySerialization, err := protoserialization.NewKeySerializationFromKeysetKey(wantProtoKey)
-	if err != nil {
-		t.Fatalf("protoserialization.NewKeySerializationFromKeysetKey(wantProtoKey) err = %v, want nil", err)
-	}
+	keySerialization := newKeySerialization(t, keyData, tinkpb.OutputPrefixType_TINK, 123)
 	key, err := protoserialization.NewFallbackProtoPrivateKey(keySerialization)
 	if err != nil {
 		t.Fatalf("protoserialization.NewFallbackProtoPrivateKey(wantProtoKey) err = %v, want nil", err)
 	}
-	gotProtoKey, err := protoserialization.SerializeKey(key)
+	gotProtoSerialization, err := protoserialization.SerializeKey(key)
 	if err != nil {
 		t.Fatalf("protoserialization.SerializeKey(key) err = %v, want nil", err)
 	}
-	if !proto.Equal(gotProtoKey, wantProtoKey) {
-		t.Errorf("proto.Equal(%v, %v) = false, want true", gotProtoKey, wantProtoKey)
+	if !gotProtoSerialization.Equals(keySerialization) {
+		t.Errorf("gotProtoSerialization.Equals(keySerialization) = false, want true")
 	}
 }
 
 func TestNewFallbackProtoPrivateKeyFailsIfNotAsymmetricPrivate(t *testing.T) {
-	protoKey := &tinkpb.Keyset_Key{
-		KeyData: &tinkpb.KeyData{
-			TypeUrl:         testKeyURL,
-			Value:           []byte("123"),
-			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-		},
-		Status:           tinkpb.KeyStatusType_ENABLED,
-		KeyId:            123,
-		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 	}
-	keySerialization, err := protoserialization.NewKeySerializationFromKeysetKey(protoKey)
-	if err != nil {
-		t.Fatalf("protoserialization.NewKeySerializationFromKeysetKey(protoKey) err = %v, want nil", err)
-	}
+	keySerialization := newKeySerialization(t, keyData, tinkpb.OutputPrefixType_TINK, 123)
 	if _, err := protoserialization.NewFallbackProtoPrivateKey(keySerialization); err == nil {
 		t.Errorf("protoserialization.NewFallbackProtoPrivateKey(protoKey) err = nil, want error")
 	}
 }
 
 func TestPublicKeyFailsIfUnsupportedKey(t *testing.T) {
-	protoKey := &tinkpb.Keyset_Key{
-		KeyData: &tinkpb.KeyData{
-			TypeUrl:         testKeyURL,
-			Value:           []byte("123"),
-			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
-		},
-		Status:           tinkpb.KeyStatusType_ENABLED,
-		KeyId:            123,
-		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 	}
-	keySerialization, err := protoserialization.NewKeySerializationFromKeysetKey(protoKey)
-	if err != nil {
-		t.Fatalf("protoserialization.NewKeySerializationFromKeysetKey(protoKey) err = %v, want nil", err)
-	}
+	keySerialization := newKeySerialization(t, keyData, tinkpb.OutputPrefixType_TINK, 123)
 	fallbackPrivateKey, err := protoserialization.NewFallbackProtoPrivateKey(keySerialization)
 	if err != nil {
 		t.Errorf("protoserialization.NewFallbackProtoPrivateKey(protoKey) err = %v, want nil", err)
@@ -722,20 +662,12 @@ func TestPublicKeyFailsIfUnsupportedKey(t *testing.T) {
 
 func TestPublicKeyFailsIfNotPrivateKeyManager(t *testing.T) {
 	registry.RegisterKeyManager(testutil.NewTestKeyManager([]byte(""), "some-test-key-URL"))
-	protoKey := &tinkpb.Keyset_Key{
-		KeyData: &tinkpb.KeyData{
-			TypeUrl:         "some-test-key-URL",
-			Value:           []byte("123"),
-			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
-		},
-		Status:           tinkpb.KeyStatusType_ENABLED,
-		KeyId:            123,
-		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 	}
-	keySerialization, err := protoserialization.NewKeySerializationFromKeysetKey(protoKey)
-	if err != nil {
-		t.Fatalf("protoserialization.NewKeySerializationFromKeysetKey(protoKey) err = %v, want nil", err)
-	}
+	keySerialization := newKeySerialization(t, keyData, tinkpb.OutputPrefixType_TINK, 123)
 	fallbackPrivateKey, err := protoserialization.NewFallbackProtoPrivateKey(keySerialization)
 	if err != nil {
 		t.Errorf("protoserialization.NewFallbackProtoPrivateKey(keySerialization) err = %v, want nil", err)
@@ -748,57 +680,92 @@ func TestPublicKeyFailsIfNotPrivateKeyManager(t *testing.T) {
 }
 
 func TestPublicKey(t *testing.T) {
-	handle, err := keyset.NewHandle(signature.ECDSAP256KeyTemplate())
+	x, err := hex.DecodeString("29578c7ab6ce0d11493c95d5ea05d299d536801ca9cbd50e9924e43b733b83ab")
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(signature.ECDSAP256KeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("hex.DecodeString(x) err = %v, want nil", err)
 	}
-	protoKeyset := testkeyset.KeysetMaterial(handle)
-	protoPrivateKey := protoKeyset.GetKey()[0]
-	privatekey, err := protoserialization.ParseKey(protoPrivateKey)
+	y, err := hex.DecodeString("08c8049879c6278b2273348474158515accaa38344106ef96803c5a05adc4800")
 	if err != nil {
-		t.Fatalf("protoserialization.ParseKey(protoPrivateKey) err = %v, want nil", err)
+		t.Fatalf("hex.DecodeString(y) err = %v, want nil", err)
 	}
-	fallbackPrivateKey, ok := privatekey.(*protoserialization.FallbackProtoPrivateKey)
-	if !ok {
-		t.Fatalf("type mismatch: got %T, want *protoserialization.FallbackProtoPrivateKey", privatekey)
+	d, err := hex.DecodeString("708309a7449e156b0db70e5b52e606c7e094ed676ce8953bf6c14757c826f590")
+	if err != nil {
+		t.Fatalf("hex.DecodeString(d) err = %v, want nil", err)
 	}
+
+	protoPublicKey := &ecdsapb.EcdsaPublicKey{
+		Version: 0,
+		Params: &ecdsapb.EcdsaParams{
+			Curve:    commonpb.EllipticCurveType_NIST_P256,
+			HashType: commonpb.HashType_SHA256,
+			Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+		},
+		X: []byte(x),
+		Y: []byte(y),
+	}
+	protoPrivateKey := &ecdsapb.EcdsaPrivateKey{
+		Version:   0,
+		PublicKey: protoPublicKey,
+		KeyValue:  []byte(d),
+	}
+
+	serializedPrivateProtoKey, err := proto.Marshal(protoPrivateKey)
+	if err != nil {
+		t.Fatalf("proto.Marshal(protoPrivateKey) err = %v, want nil", err)
+	}
+
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         signature.ECDSAP256KeyTemplate().GetTypeUrl(),
+		Value:           serializedPrivateProtoKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}, tinkpb.OutputPrefixType_TINK, 123)
+	if err != nil {
+		t.Fatalf("protoserialization.NewKeySerialization(protoPrivateKey, tinkpb.OutputPrefixType_TINK, 123) err = %v, want nil", err)
+	}
+
+	fallbackPrivateKey, err := protoserialization.NewFallbackProtoPrivateKey(keySerialization)
+	if err != nil {
+		t.Fatalf("protoserialization.NewFallbackProtoPrivateKey(keySerialization) err = %v, want nil", err)
+	}
+
 	publicKey, err := fallbackPrivateKey.PublicKey()
 	if err != nil {
 		t.Fatalf("fallbackPrivateKey.PublicKey() err = %v, want nil", err)
 	}
-	gotPublicKeyProto, err := protoserialization.SerializeKey(publicKey)
-	if err != nil {
-		t.Fatalf("protoserialization.SerializeKey(publicKey) err = %v, want nil", err)
-	}
 
-	// Get the public key from the key manager.
-	keyManager, err := registry.GetKeyManager(signature.ECDSAP256KeyTemplate().GetTypeUrl())
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%s) err = %v, want nil", signature.ECDSAP256KeyTemplate().GetTypeUrl(), err)
-	}
-	privateKeyManager, ok := keyManager.(registry.PrivateKeyManager)
+	// Make sure this is a fallback proto key.
+	fallbackPublicKey, ok := publicKey.(*protoserialization.FallbackProtoKey)
 	if !ok {
-		t.Fatalf("type mismatch: got %T, want registry.PrivateKeyManager", keyManager)
+		t.Fatalf("type mismatch: got %T, want *protoserialization.FallbackProtoKey", publicKey)
 	}
-	wantPublicKeyProtoData, err := privateKeyManager.PublicKeyData(protoPrivateKey.GetKeyData().GetValue())
+	if !fallbackPublicKey.Parameters().HasIDRequirement() {
+		t.Errorf("fallbackPublicKey.Parameters().HasIDRequirement() = false, want true")
+	}
+	// Check that the contents are as expected.
+	serializedProtoPublicKey, err := proto.Marshal(protoPublicKey)
 	if err != nil {
-		t.Fatalf("privateKeyManager.PublicKeyData(protoPrivateKey.GetKeyData().GetValue()) err = %v, want nil", err)
+		t.Fatalf("proto.Marshal(protoPublicKey) err = %v, want nil", err)
 	}
-
-	wantPublicKeyProto := &tinkpb.Keyset_Key{
-		KeyData:          wantPublicKeyProtoData,
-		KeyId:            protoKeyset.GetKey()[0].GetKeyId(),
-		OutputPrefixType: protoKeyset.GetKey()[0].GetOutputPrefixType(),
+	wantPublicKeyData := &tinkpb.KeyData{
+		TypeUrl:         testutil.ECDSAVerifierTypeURL,
+		Value:           serializedProtoPublicKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 	}
-
-	if !proto.Equal(gotPublicKeyProto, wantPublicKeyProto) {
-		t.Errorf("proto.Equal(%v, %v) = false, want true", gotPublicKeyProto, wantPublicKeyProto)
+	publicKeyProtoSerialization := protoserialization.GetKeySerialization(fallbackPublicKey)
+	if diff := cmp.Diff(publicKeyProtoSerialization.KeyData(), wantPublicKeyData, protocmp.Transform()); diff != "" {
+		t.Errorf("fpublicKeyProtoSerialization.KeyData() diff (-want +got):\n%s", diff)
+	}
+	if got, want := publicKeyProtoSerialization.OutputPrefixType(), keySerialization.OutputPrefixType(); got != want {
+		t.Errorf("publicKeyProtoSerialization.OutputPrefixType() = %v, want %v", got, want)
+	}
+	if idRequirement, required := publicKeyProtoSerialization.IDRequirement(); !required || idRequirement != 123 {
+		t.Errorf("publicKeyProtoSerialization.IDRequirement() = (%v, %v), want (true, 123)", idRequirement, required)
 	}
 }
 
 type alwaysFailingKeySerializer struct{}
 
-func (s *alwaysFailingKeySerializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
+func (s *alwaysFailingKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
 	return nil, ErrKeySerialization
 }
 

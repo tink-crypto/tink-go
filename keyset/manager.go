@@ -100,18 +100,22 @@ func (km *Manager) AddKey(key key.Key) (uint32, error) {
 	if key == nil {
 		return 0, fmt.Errorf("keyset.Manager: entry must have Key set")
 	}
-	keysetKey, err := protoserialization.SerializeKey(key)
+	keySerialization, err := protoserialization.SerializeKey(key)
 	if err != nil {
 		return 0, fmt.Errorf("keyset.Manager: %v", err)
 	}
 	// This is going to be either an ID requirement or a new random ID.
-	keysetKey.KeyId, err = km.getIDForKey(key)
+	keyID, err := km.getIDForKey(key)
 	if err != nil {
 		return 0, err
 	}
-	keysetKey.Status = tinkpb.KeyStatusType_ENABLED
-	km.ks.Key = append(km.ks.Key, keysetKey)
-	return keysetKey.KeyId, nil
+	km.ks.Key = append(km.ks.Key, &tinkpb.Keyset_Key{
+		KeyId:            keyID,
+		Status:           tinkpb.KeyStatusType_ENABLED,
+		OutputPrefixType: keySerialization.OutputPrefixType(),
+		KeyData:          keySerialization.KeyData(),
+	})
+	return keyID, nil
 }
 
 // AddNewKeyFromParameters generates a new key from parameters, adds the key to

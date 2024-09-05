@@ -19,6 +19,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
@@ -34,6 +35,8 @@ const (
 
 type serializer struct{}
 
+var _ protoserialization.KeySerializer = (*serializer)(nil)
+
 func protoOutputPrefixTypeFromVariant(variant Variant) (tinkpb.OutputPrefixType, error) {
 	switch variant {
 	case VariantTink:
@@ -47,7 +50,7 @@ func protoOutputPrefixTypeFromVariant(variant Variant) (tinkpb.OutputPrefixType,
 	}
 }
 
-func (s *serializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
+func (s *serializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
 	actualKey, ok := key.(*Key)
 	if !ok {
 		return nil, fmt.Errorf("key is not a Key")
@@ -69,24 +72,19 @@ func (s *serializer) SerializeKey(key key.Key) (*tinkpb.Keyset_Key, error) {
 	if err != nil {
 		return nil, err
 	}
-	protoKeysetKey := &tinkpb.Keyset_Key{
-		KeyData: &tinkpb.KeyData{
-			TypeUrl:         typeURL,
-			Value:           serializedKey,
-			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-		},
-		OutputPrefixType: outputPrefixType,
-		// NOTE: Status is expected to be set by the keyset.
+	// idRequirement is zero if the key doesn't have a key requirement.
+	idRequirement, _ := actualKey.IDRequirement()
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         typeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 	}
-	// Set the key ID only if we have an ID requirement.
-	keyID, isRequired := actualKey.IDRequirement()
-	if isRequired {
-		protoKeysetKey.KeyId = keyID
-	}
-	return protoKeysetKey, nil
+	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
 }
 
 type parser struct{}
+
+var _ protoserialization.KeyParser = (*parser)(nil)
 
 func variantFromProto(prefixType tinkpb.OutputPrefixType) (Variant, error) {
 	switch prefixType {
@@ -101,11 +99,11 @@ func variantFromProto(prefixType tinkpb.OutputPrefixType) (Variant, error) {
 	}
 }
 
-func (s *parser) ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
-	if keysetKey == nil {
-		return nil, fmt.Errorf("keyset key is nil")
+func (s *parser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	if keySerialization == nil {
+		return nil, fmt.Errorf("key serialization is nil")
 	}
-	keyData := keysetKey.GetKeyData()
+	keyData := keySerialization.KeyData()
 	if keyData.GetTypeUrl() != typeURL {
 		return nil, fmt.Errorf("key is not an AES GCM key")
 	}
@@ -119,7 +117,7 @@ func (s *parser) ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
 	if protoKey.GetVersion() != protoVersion {
 		return nil, fmt.Errorf("key has unsupported version: %v", protoKey.GetVersion())
 	}
-	variant, err := variantFromProto(keysetKey.GetOutputPrefixType())
+	variant, err := variantFromProto(keySerialization.OutputPrefixType())
 	if err != nil {
 		return nil, err
 	}
@@ -134,9 +132,7 @@ func (s *parser) ParseKey(keysetKey *tinkpb.Keyset_Key) (key.Key, error) {
 		return nil, err
 	}
 	keyMaterial := secretdata.NewBytesFromData(protoKey.GetKeyValue(), insecuresecretdataaccess.Token{})
-	keyID := keysetKey.GetKeyId()
-	if variant == VariantNoPrefix {
-		keyID = 0
-	}
+	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
+	keyID, _ := keySerialization.IDRequirement()
 	return NewKey(keyMaterial, keyID, params)
 }

@@ -17,10 +17,9 @@ package aesgcm
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	aesgcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
@@ -53,108 +52,99 @@ func TestParseKeyFails(t *testing.T) {
 		t.Fatalf("proto.Marshal(keyWithInvalidVersion) err = %v, want nil", err)
 	}
 	for _, tc := range []struct {
-		name      string
-		keysetKey *tinkpb.Keyset_Key
+		name             string
+		keysetKey        *tinkpb.Keyset_Key
+		keyData          *tinkpb.KeyData
+		outputPrefixType tinkpb.OutputPrefixType
+		keyID            uint32
 	}{
 		{
-			name:      "keyset key is nil",
-			keysetKey: nil,
-		},
-		{
-			name: "key data is nil",
-			keysetKey: &tinkpb.Keyset_Key{
-				KeyData:          nil,
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				KeyId:            12345,
-			},
+			name:             "key data is nil",
+			keyData:          nil,
+			outputPrefixType: tinkpb.OutputPrefixType_TINK,
+			keyID:            12345,
 		},
 		{
 			name: "wrong type URL",
-			keysetKey: &tinkpb.Keyset_Key{
-				KeyData: &tinkpb.KeyData{
-					TypeUrl:         "invalid_type_url",
-					Value:           serializedKey,
-					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-				},
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				KeyId:            12345,
+			keyData: &tinkpb.KeyData{
+				TypeUrl:         "invalid_type_url",
+				Value:           serializedKey,
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 			},
+			outputPrefixType: tinkpb.OutputPrefixType_TINK,
+			keyID:            12345,
 		},
 		{
 			name: "invalid AES GCM key size",
-			keysetKey: &tinkpb.Keyset_Key{
-				KeyData: &tinkpb.KeyData{
-					TypeUrl:         typeURL,
-					Value:           serializedKeyWithInvalidSize,
-					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-				},
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				KeyId:            12345,
+			keyData: &tinkpb.KeyData{
+				TypeUrl:         typeURL,
+				Value:           serializedKeyWithInvalidSize,
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 			},
+			outputPrefixType: tinkpb.OutputPrefixType_TINK,
+			keyID:            12345,
 		},
 		{
 			name: "invalid AES GCM key proto serialization",
-			keysetKey: &tinkpb.Keyset_Key{
-				KeyData: &tinkpb.KeyData{
-					TypeUrl:         typeURL,
-					Value:           []byte("invalid proto"),
-					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-				},
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				KeyId:            12345,
+			keyData: &tinkpb.KeyData{
+				TypeUrl:         typeURL,
+				Value:           []byte("invalid proto"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 			},
+			outputPrefixType: tinkpb.OutputPrefixType_TINK,
+			keyID:            12345,
 		},
 		{
 			name: "invalid AES GCM key version",
-			keysetKey: &tinkpb.Keyset_Key{
-				KeyData: &tinkpb.KeyData{
-					TypeUrl:         typeURL,
-					Value:           serializedKeyWithInvalidVersion,
-					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-				},
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				KeyId:            12345,
+			keyData: &tinkpb.KeyData{
+				TypeUrl:         typeURL,
+				Value:           serializedKeyWithInvalidVersion,
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 			},
+			outputPrefixType: tinkpb.OutputPrefixType_TINK,
+			keyID:            12345,
 		},
 		{
 			name: "invalid key material type",
-			keysetKey: &tinkpb.Keyset_Key{
-				KeyData: &tinkpb.KeyData{
-					TypeUrl:         typeURL,
-					Value:           serializedKey,
-					KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
-				},
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				KeyId:            12345,
+			keyData: &tinkpb.KeyData{
+				TypeUrl:         typeURL,
+				Value:           serializedKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			},
+			outputPrefixType: tinkpb.OutputPrefixType_TINK,
+			keyID:            12345,
 		},
 		{
 			name: "invalid output prefix type",
-			keysetKey: &tinkpb.Keyset_Key{
-				KeyData: &tinkpb.KeyData{
-					TypeUrl:         typeURL,
-					Value:           serializedKey,
-					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-				},
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
-				KeyId:            12345,
+			keyData: &tinkpb.KeyData{
+				TypeUrl:         typeURL,
+				Value:           serializedKey,
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 			},
+			outputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
+			keyID:            12345,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &parser{}
-			if _, err := p.ParseKey(tc.keysetKey); err == nil {
+			keySerialization, err := protoserialization.NewKeySerialization(tc.keyData, tc.outputPrefixType, tc.keyID)
+			if err != nil {
+				t.Fatalf("protoserialization.NewKeySerialization(%v, %v, %v) err = %v, want nil", tc.keyData, tc.outputPrefixType, tc.keyID, err)
+			}
+			if _, err := p.ParseKey(keySerialization); err == nil {
 				t.Errorf("p.ParseKey(%v) err = nil, want non-nil", tc.keysetKey)
 			}
 		})
 	}
+}
+
+func newKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
+	t.Helper()
+	ks, err := protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
+	if err != nil {
+		t.Fatalf("protoserialization.NewKeySerialization(%v, %v, %v) err = %v, want nil", keyData, outputPrefixType, idRequirement, err)
+	}
+	return ks
 }
 
 func TestParseKey(t *testing.T) {
@@ -168,50 +158,35 @@ func TestParseKey(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name        string
-		keysetKey   *tinkpb.Keyset_Key
-		wantVariant Variant
+		name             string
+		keySerialization *protoserialization.KeySerialization
+		wantVariant      Variant
 	}{
 		{
 			name: "key with TINK output prefix type",
-			keysetKey: &tinkpb.Keyset_Key{
-				KeyData: &tinkpb.KeyData{
-					TypeUrl:         typeURL,
-					Value:           serializedKey,
-					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-				},
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				KeyId:            12345,
-			},
+			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         typeURL,
+				Value:           serializedKey,
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
 			wantVariant: VariantTink,
 		},
 		{
 			name: "key with CRUNCHY output prefix type",
-			keysetKey: &tinkpb.Keyset_Key{
-				KeyData: &tinkpb.KeyData{
-					TypeUrl:         typeURL,
-					Value:           serializedKey,
-					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-				},
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				OutputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
-				KeyId:            12345,
-			},
+			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         typeURL,
+				Value:           serializedKey,
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_CRUNCHY, 12345),
 			wantVariant: VariantCrunchy,
 		},
 		{
 			name: "key with RAW output prefix type",
-			keysetKey: &tinkpb.Keyset_Key{
-				KeyData: &tinkpb.KeyData{
-					TypeUrl:         typeURL,
-					Value:           serializedKey,
-					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-				},
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
-				KeyId:            12345,
-			},
+			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         typeURL,
+				Value:           serializedKey,
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_RAW, 0),
 			wantVariant: VariantNoPrefix,
 		},
 	} {
@@ -236,9 +211,9 @@ func TestParseKey(t *testing.T) {
 				t.Fatalf("NewKey(keyMaterial, %v, wantParams) err = %v, want nil", keyID, err)
 			}
 			p := &parser{}
-			gotKey, err := p.ParseKey(tc.keysetKey)
+			gotKey, err := p.ParseKey(tc.keySerialization)
 			if err != nil {
-				t.Errorf("protoserialization.ParseKey(%v) err = %v, want nil", tc.keysetKey, err)
+				t.Errorf("protoserialization.ParseKey(%v) err = %v, want nil", tc.keySerialization, err)
 			}
 			if !gotKey.Equals(wantKey) {
 				t.Errorf("key.Equals(wantKey) = false, want true")
@@ -310,48 +285,37 @@ func TestSerializeKey(t *testing.T) {
 		t.Fatalf("proto.Marshal(&protoKey) err = %v, want nil", err)
 	}
 	for _, tc := range []struct {
-		name         string
-		variant      Variant
-		wantProtoKey *tinkpb.Keyset_Key
+		name                 string
+		variant              Variant
+		wantKeySerialization *protoserialization.KeySerialization
 	}{
 		{
 			name:    "key with TINK output prefix type",
 			variant: VariantTink,
-			wantProtoKey: &tinkpb.Keyset_Key{
-				KeyData: &tinkpb.KeyData{
-					TypeUrl:         typeURL,
-					Value:           serializedProtoKey,
-					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-				},
-				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				KeyId:            12345,
-			},
+			wantKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         typeURL,
+				Value:           serializedProtoKey,
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
 		},
 		{
 			name:    "key with CRUNCHY output prefix type",
 			variant: VariantCrunchy,
-			wantProtoKey: &tinkpb.Keyset_Key{
-				KeyData: &tinkpb.KeyData{
-					TypeUrl:         typeURL,
-					Value:           serializedProtoKey,
-					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-				},
-				OutputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
-				KeyId:            12345,
-			},
+			wantKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         typeURL,
+				Value:           serializedProtoKey,
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_CRUNCHY, 12345),
 		},
 		{
 			// No key ID is set for keys with no prefix.
 			name:    "key with RAW output prefix type",
 			variant: VariantNoPrefix,
-			wantProtoKey: &tinkpb.Keyset_Key{
-				KeyData: &tinkpb.KeyData{
-					TypeUrl:         typeURL,
-					Value:           serializedProtoKey,
-					KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-				},
-				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
-			},
+			wantKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         typeURL,
+				Value:           serializedProtoKey,
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_RAW, 0),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -379,8 +343,8 @@ func TestSerializeKey(t *testing.T) {
 			if err != nil {
 				t.Errorf("protoserialization.SerializeKey(&testKey{}) err = %v, want nil", err)
 			}
-			if diff := cmp.Diff(got, tc.wantProtoKey, protocmp.Transform()); diff != "" {
-				t.Errorf("protoserialization.SerializeKey(&testKey{}) = %v, want %v, diff %v", got, tc.wantProtoKey, diff)
+			if !got.Equals(tc.wantKeySerialization) {
+				t.Errorf("got.Equals(tc.wantKeySerialization) = false, want true")
 			}
 		})
 	}
