@@ -53,7 +53,6 @@ func TestParseKeyFails(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name             string
-		keysetKey        *tinkpb.Keyset_Key
 		keyData          *tinkpb.KeyData
 		outputPrefixType tinkpb.OutputPrefixType
 		keyID            uint32
@@ -132,7 +131,7 @@ func TestParseKeyFails(t *testing.T) {
 				t.Fatalf("protoserialization.NewKeySerialization(%v, %v, %v) err = %v, want nil", tc.keyData, tc.outputPrefixType, tc.keyID, err)
 			}
 			if _, err := p.ParseKey(keySerialization); err == nil {
-				t.Errorf("p.ParseKey(%v) err = nil, want non-nil", tc.keysetKey)
+				t.Errorf("p.ParseKey(%v) err = nil, want non-nil", keySerialization)
 			}
 		})
 	}
