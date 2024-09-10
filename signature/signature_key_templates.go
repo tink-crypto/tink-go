@@ -163,6 +163,10 @@ func createECDSAKeyTemplate(hashType commonpb.HashType, curve commonpb.EllipticC
 	}
 }
 
+const (
+	ed25519SignerTypeURL   = "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey"
+)
+
 // ED25519KeyTemplate is a KeyTemplate that generates a new ED25519 private key.
 func ED25519KeyTemplate() *tinkpb.KeyTemplate {
 	return &tinkpb.KeyTemplate{

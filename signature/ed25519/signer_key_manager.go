@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package signature
+package ed25519
 
 import (
 	"crypto/ed25519"
@@ -29,27 +29,29 @@ import (
 )
 
 const (
-	ed25519SignerKeyVersion = 0
-	ed25519SignerTypeURL    = "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey"
+	signerKeyVersion = 0
+	signerTypeURL    = "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey"
 )
 
 // common errors
-var errInvalidED25519SignKey = errors.New("ed25519_signer_key_manager: invalid key")
-var errInvalidED25519SignKeyFormat = errors.New("ed25519_signer_key_manager: invalid key format")
+var errInvalidSignKey = errors.New("invalid key")
+var errInvalidSignKeyFormat = errors.New("invalid key format")
 
-// ed25519SignerKeyManager is an implementation of KeyManager interface.
-// It generates new ED25519PrivateKeys and produces new instances of ED25519Sign subtle.
-type ed25519SignerKeyManager struct{}
+// signerKeyManager is an implementation of KeyManager interface.
+// It generates new [ed25519pb.Ed25519PrivateKey] and produces new instances of
+// [subtle.ED25519Signer].
+type signerKeyManager struct{}
 
-// Primitive creates an ED25519Sign subtle for the given serialized ED25519PrivateKey proto.
-func (km *ed25519SignerKeyManager) Primitive(serializedKey []byte) (any, error) {
+// Primitive creates a [subtle.ED25519Signer] instance for the given serialized
+// [ed25519pb.Ed25519PrivateKey] proto.
+func (km *signerKeyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
-		return nil, errInvalidED25519SignKey
+		return nil, errInvalidSignKey
 	}
 	key := new(ed25519pb.Ed25519PrivateKey)
 
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidED25519SignKey
+		return nil, errInvalidSignKey
 	}
 	if err := km.validateKey(key); err != nil {
 		return nil, err
@@ -57,110 +59,107 @@ func (km *ed25519SignerKeyManager) Primitive(serializedKey []byte) (any, error) 
 
 	ret, err := subtle.NewED25519Signer(key.KeyValue)
 	if err != nil {
-		return nil, fmt.Errorf("ed25519_signer_key_manager: %s", err)
+		return nil, fmt.Errorf("%s", err)
 	}
 	return ret, nil
 }
 
-// NewKey creates a new ED25519PrivateKey according to specification the given serialized ED25519KeyFormat.
-func (km *ed25519SignerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+// NewKey creates a new [ed25519pb.Ed25519PrivateKey] according to
+// the given serialized [ed25519pb.Ed25519KeyFormat].
+func (km *signerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		return nil, fmt.Errorf("ed25519_signer_key_manager: cannot generate ED25519 key: %s", err)
+		return nil, fmt.Errorf("cannot generate ED25519 key: %s", err)
 	}
 	return &ed25519pb.Ed25519PrivateKey{
-		Version:  ed25519SignerKeyVersion,
+		Version:  signerKeyVersion,
 		KeyValue: priv.Seed(),
 		PublicKey: &ed25519pb.Ed25519PublicKey{
-			Version:  ed25519SignerKeyVersion,
+			Version:  signerKeyVersion,
 			KeyValue: pub,
 		},
 	}, nil
 }
 
 // NewKeyData creates a new KeyData according to specification in  the given
-// serialized ED25519KeyFormat. It should be used solely by the key management API.
-func (km *ed25519SignerKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+// serialized [ed25519pb.Ed25519KeyFormat]. It should be used solely by the key
+// management API.
+func (km *signerKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
 	key, err := km.NewKey(serializedKeyFormat)
 	if err != nil {
 		return nil, err
 	}
 	serializedKey, err := proto.Marshal(key)
 	if err != nil {
-		return nil, errInvalidED25519SignKeyFormat
+		return nil, errInvalidSignKeyFormat
 	}
 	return &tinkpb.KeyData{
-		TypeUrl:         ed25519SignerTypeURL,
+		TypeUrl:         signerTypeURL,
 		Value:           serializedKey,
 		KeyMaterialType: km.KeyMaterialType(),
 	}, nil
 }
 
 // PublicKeyData extracts the public key data from the private key.
-func (km *ed25519SignerKeyManager) PublicKeyData(serializedPrivKey []byte) (*tinkpb.KeyData, error) {
+func (km *signerKeyManager) PublicKeyData(serializedPrivKey []byte) (*tinkpb.KeyData, error) {
 	privKey := new(ed25519pb.Ed25519PrivateKey)
 	if err := proto.Unmarshal(serializedPrivKey, privKey); err != nil {
-		return nil, errInvalidED25519SignKey
+		return nil, errInvalidSignKey
 	}
 	serializedPubKey, err := proto.Marshal(privKey.PublicKey)
 	if err != nil {
-		return nil, errInvalidED25519SignKey
+		return nil, errInvalidSignKey
 	}
 	return &tinkpb.KeyData{
-		TypeUrl:         ed25519VerifierTypeURL,
+		TypeUrl:         verifierTypeURL,
 		Value:           serializedPubKey,
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 	}, nil
 }
 
 // DoesSupport indicates if this key manager supports the given key type.
-func (km *ed25519SignerKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == ed25519SignerTypeURL
-}
+func (km *signerKeyManager) DoesSupport(typeURL string) bool { return typeURL == signerTypeURL }
 
 // TypeURL returns the key type of keys managed by this key manager.
-func (km *ed25519SignerKeyManager) TypeURL() string {
-	return ed25519SignerTypeURL
-}
+func (km *signerKeyManager) TypeURL() string { return signerTypeURL }
 
 // KeyMaterialType returns the key material type of this key manager.
-func (km *ed25519SignerKeyManager) KeyMaterialType() tinkpb.KeyData_KeyMaterialType {
+func (km *signerKeyManager) KeyMaterialType() tinkpb.KeyData_KeyMaterialType {
 	return tinkpb.KeyData_ASYMMETRIC_PRIVATE
 }
 
 // DeriveKey derives a new key from serializedKeyFormat and pseudorandomness.
 // Unlike NewKey, DeriveKey validates serializedKeyFormat's version.
-func (km *ed25519SignerKeyManager) DeriveKey(serializedKeyFormat []byte, pseudorandomness io.Reader) (proto.Message, error) {
+func (km *signerKeyManager) DeriveKey(serializedKeyFormat []byte, pseudorandomness io.Reader) (proto.Message, error) {
 	keyFormat := new(ed25519pb.Ed25519KeyFormat)
 	if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
-		return nil, fmt.Errorf("ed25519_signer_key_manager: %v", err)
+		return nil, err
 	}
-	err := keyset.ValidateKeyVersion(keyFormat.Version, ed25519SignerKeyVersion)
+	err := keyset.ValidateKeyVersion(keyFormat.Version, signerKeyVersion)
 	if err != nil {
-		return nil, fmt.Errorf("ed25519_signer_key_manager: %v", err)
+		return nil, err
 	}
-
 	pub, priv, err := ed25519.GenerateKey(pseudorandomness)
 	if err != nil {
-		return nil, fmt.Errorf("ed25519_signer_key_manager: cannot generate ED25519 key: %s", err)
+		return nil, err
 	}
 	return &ed25519pb.Ed25519PrivateKey{
-		Version:  ed25519SignerKeyVersion,
+		Version:  signerKeyVersion,
 		KeyValue: priv.Seed(),
 		PublicKey: &ed25519pb.Ed25519PublicKey{
-			Version:  ed25519SignerKeyVersion,
+			Version:  signerKeyVersion,
 			KeyValue: pub,
 		},
 	}, nil
 }
 
-// validateKey validates the given ED25519PrivateKey.
-func (km *ed25519SignerKeyManager) validateKey(key *ed25519pb.Ed25519PrivateKey) error {
-	if err := keyset.ValidateKeyVersion(key.Version, ed25519SignerKeyVersion); err != nil {
-		return fmt.Errorf("ed25519_signer_key_manager: invalid key: %s", err)
+// validateKey validates the given [ed25519pb.Ed25519PrivateKey].
+func (km *signerKeyManager) validateKey(key *ed25519pb.Ed25519PrivateKey) error {
+	if err := keyset.ValidateKeyVersion(key.Version, signerKeyVersion); err != nil {
+		return fmt.Errorf("invalid key: %s", err)
 	}
 	if len(key.KeyValue) != ed25519.SeedSize {
-		return fmt.Errorf("ed2219_signer_key_manager: invalid key length, got %d", len(key.KeyValue))
+		return fmt.Errorf("invalid key length, got %d", len(key.KeyValue))
 	}
 	return nil
 }

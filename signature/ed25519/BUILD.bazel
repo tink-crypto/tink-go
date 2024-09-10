@@ -2,10 +2,24 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "ed25519",
-    srcs = ["key.go"],
+    srcs = [
+        "ed25519.go",
+        "key.go",
+        "signer_key_manager.go",
+        "verifier_key_manager.go",
+    ],
     importpath = "github.com/tink-crypto/tink-go/v2/signature/ed25519",
     visibility = ["//visibility:public"],
-    deps = ["//key"],
+    deps = [
+        "//core/registry",
+        "//internal/internalregistry",
+        "//key",
+        "//keyset",
+        "//proto/ed25519_go_proto",
+        "//proto/tink_go_proto",
+        "//signature/subtle",
+        "@org_golang_google_protobuf//proto",
+    ],
 )
 
 alias(
@@ -16,6 +30,21 @@ alias(
 
 go_test(
     name = "ed25519_test",
-    srcs = ["key_test.go"],
-    deps = [":ed25519"],
+    srcs = [
+        "key_test.go",
+        "signer_key_manager_test.go",
+        "verifier_key_manager_test.go",
+    ],
+    deps = [
+        ":ed25519",
+        "//core/registry",
+        "//internal/internalregistry",
+        "//proto/ed25519_go_proto",
+        "//proto/tink_go_proto",
+        "//signature/subtle",
+        "//subtle/random",
+        "//testutil",
+        "@com_github_google_go_cmp//cmp",
+        "@org_golang_google_protobuf//proto",
+    ],
 )

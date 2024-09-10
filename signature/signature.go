@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	_ "github.com/tink-crypto/tink-go/v2/signature/ed25519" // register ed25519 key managers
 )
 
 func init() {
@@ -31,17 +31,6 @@ func init() {
 		panic(fmt.Sprintf("signature.init() failed: %v", err))
 	}
 	if err := registry.RegisterKeyManager(new(ecdsaVerifierKeyManager)); err != nil {
-		panic(fmt.Sprintf("signature.init() failed: %v", err))
-	}
-
-	// ED25519
-	if err := registry.RegisterKeyManager(new(ed25519SignerKeyManager)); err != nil {
-		panic(fmt.Sprintf("signature.init() failed: %v", err))
-	}
-	if err := internalregistry.AllowKeyDerivation(ed25519SignerTypeURL); err != nil {
-		panic(fmt.Sprintf("signature.init() failed: %v", err))
-	}
-	if err := registry.RegisterKeyManager(new(ed25519VerifierKeyManager)); err != nil {
 		panic(fmt.Sprintf("signature.init() failed: %v", err))
 	}
 

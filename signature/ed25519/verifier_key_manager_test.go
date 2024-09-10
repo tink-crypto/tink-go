@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package signature_test
+package ed25519_test
 
 import (
 	"testing"
@@ -22,7 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
-func TestED25519VerifyGetPrimitiveBasic(t *testing.T) {
+func TestVerifierKeyManagerGetPrimitiveBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ED25519VerifierTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain ED25519Verifier key manager: %s", err)
@@ -37,7 +37,7 @@ func TestED25519VerifyGetPrimitiveBasic(t *testing.T) {
 	}
 }
 
-func TestED25519VerifyGetPrimitiveWithInvalidInput(t *testing.T) {
+func TestVerifierKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ED25519VerifierTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain ED25519Verifier key manager: %s", err)

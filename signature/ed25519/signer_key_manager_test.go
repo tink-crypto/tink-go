@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package signature_test
+package ed25519_test
 
 import (
 	"bytes"
@@ -32,7 +32,7 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func TestED25519SignerGetPrimitiveBasic(t *testing.T) {
+func TestSignerKeyManagerGetPrimitiveBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ED25519SignerTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain ED25519Signer key manager: %s", err)
@@ -75,7 +75,7 @@ func TestED25519SignerGetPrimitiveBasic(t *testing.T) {
 
 }
 
-func TestED25519SignGetPrimitiveWithInvalidInput(t *testing.T) {
+func TestSignerKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {
 	// invalid params
 	km, err := registry.GetKeyManager(testutil.ED25519SignerTypeURL)
 	if err != nil {
@@ -101,7 +101,7 @@ func TestED25519SignGetPrimitiveWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestED25519SignNewKeyBasic(t *testing.T) {
+func TestSignerKeyManagerNewKeyBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ED25519SignerTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain ED25519Signer key manager: %s", err)
@@ -120,7 +120,7 @@ func TestED25519SignNewKeyBasic(t *testing.T) {
 	}
 }
 
-func TestED25519PublicKeyDataBasic(t *testing.T) {
+func TestSignerKeyManagerPublicKeyDataBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ED25519SignerTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain ED25519Signer key manager: %s", err)
@@ -152,7 +152,7 @@ func TestED25519PublicKeyDataBasic(t *testing.T) {
 	}
 }
 
-func TestED25519PublicKeyDataWithInvalidInput(t *testing.T) {
+func TestSignerKeyManagerPublicKeyDataWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ED25519SignerTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain ED25519Signer key manager: %s", err)
@@ -177,7 +177,7 @@ func TestED25519PublicKeyDataWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestED25519KeyMaterialType(t *testing.T) {
+func TestSignerKeyManagerKeyMaterialType(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ED25519SignerTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ED25519SignerTypeURL, err)
@@ -191,7 +191,7 @@ func TestED25519KeyMaterialType(t *testing.T) {
 	}
 }
 
-func TestED25519DeriveKey(t *testing.T) {
+func TestSignerKeyManagerDeriveKey(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ED25519SignerTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ED25519SignerTypeURL, err)
@@ -248,7 +248,7 @@ func TestED25519DeriveKey(t *testing.T) {
 	}
 }
 
-func TestED25519DeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
+func TestSignerKeyManagerDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ED25519SignerTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ED25519SignerTypeURL, err)
@@ -289,7 +289,7 @@ func TestED25519DeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	}
 }
 
-func TestED25519DeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
+func TestSignerKeyManagerDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ED25519SignerTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ED25519SignerTypeURL, err)
