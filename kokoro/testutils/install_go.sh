@@ -27,9 +27,9 @@
 
 set -eo pipefail
 
-readonly GO_VERSION="1.21.11"
-readonly GO_DARWIN_AMD64_SHA256="a3efff72f7aba31c85b53ebfd3985d0e3157a87b0e69e178161ba7097c197885"
-readonly GO_LINUX_AMD64_SHA256="54a87a9325155b98c85bc04dc50298ddd682489eb47f486f2e6cb0707554abf0"
+readonly GO_VERSION="1.22.7"
+readonly GO_DARWIN_AMD64_SHA256="2c1b36bf4a21dabe3f23384c8228804c9af4c233de6250ec2e69249c25d15070"
+readonly GO_LINUX_AMD64_SHA256="810e4d9f3f2f03b2f11471a9c7a32302968fc09d51f666cecacedb1055f2f873"
 readonly PLATFORM="$(uname | tr '[:upper:]' '[:lower:]')"
 
 install_temp_go() {
