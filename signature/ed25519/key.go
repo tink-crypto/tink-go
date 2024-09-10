@@ -76,6 +76,9 @@ func NewParameters(variant Variant) (Parameters, error) {
 	return Parameters{variant: variant}, nil
 }
 
+// Variant returns the prefix variant of the parameters.
+func (p *Parameters) Variant() Variant { return p.variant }
+
 // HasIDRequirement returns true if the key has an ID requirement.
 func (p *Parameters) HasIDRequirement() bool { return p.variant != VariantNoPrefix }
 

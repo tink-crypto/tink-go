@@ -43,9 +43,12 @@ func TestNewParameters(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := ed25519.NewParameters(tc.variant)
+			params, err := ed25519.NewParameters(tc.variant)
 			if err != nil {
 				t.Errorf("ed25519.NewParameters(%v) err = %v, want nil", tc.variant, err)
+			}
+			if got := params.Variant(); got != tc.variant {
+				t.Errorf("params.Variant() = %v, want %v", got, tc.variant)
 			}
 		})
 	}
