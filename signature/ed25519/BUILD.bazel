@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ed25519",
+    srcs = ["key.go"],
+    importpath = "github.com/tink-crypto/tink-go/v2/signature/ed25519",
+    visibility = ["//visibility:public"],
+    deps = ["//key"],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":ed25519",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "ed25519_test",
+    srcs = ["key_test.go"],
+    deps = [":ed25519"],
+)
