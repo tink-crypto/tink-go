@@ -15,8 +15,11 @@
 package ed25519_test
 
 import (
+	"bytes"
+	"fmt"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/signature/ed25519"
 )
 
@@ -164,5 +167,242 @@ func TestParametersEquals(t *testing.T) {
 				t.Errorf("tc.firstParams.Equals(&tc.secondParams) = true, want false")
 			}
 		})
+	}
+}
+
+func TestNewPublicKeyFails(t *testing.T) {
+	tinkParams, err := ed25519.NewParameters(ed25519.VariantTink)
+	if err != nil {
+		t.Fatalf("ed25519.NewParameters(%v) err = %v, want nil", ed25519.VariantTink, err)
+	}
+	noPrefixParams, err := ed25519.NewParameters(ed25519.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("ed25519.NewParameters(%v) err = %v, want nil", ed25519.VariantNoPrefix, err)
+	}
+	for _, tc := range []struct {
+		name          string
+		params        ed25519.Parameters
+		keyBytes      []byte
+		idRequirement uint32
+	}{
+		{
+			name:          "nil key bytes",
+			params:        tinkParams,
+			keyBytes:      nil,
+			idRequirement: 123,
+		},
+		{
+			name:          "invalid key bytes size",
+			params:        tinkParams,
+			keyBytes:      []byte("123"),
+			idRequirement: 123,
+		},
+		{
+			name:          "invalid ID requirement",
+			params:        noPrefixParams,
+			keyBytes:      []byte("12345678901234567890123456789012"),
+			idRequirement: 123,
+		},
+		{
+			name:          "invalid params",
+			params:        ed25519.Parameters{},
+			keyBytes:      []byte("12345678901234567890123456789012"),
+			idRequirement: 123,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+
+			if _, err := ed25519.NewPublicKey(tc.keyBytes, tc.idRequirement, tc.params); err == nil {
+				t.Errorf("ed25519.NewPublicKey(%v, %v, %v) err = nil, want error", tc.keyBytes, tc.idRequirement, tc.params)
+			}
+		})
+	}
+}
+
+func TestPublicKey(t *testing.T) {
+	keyBytes := []byte("12345678901234567890123456789012")
+	for _, tc := range []struct {
+		name             string
+		variant          ed25519.Variant
+		keyBytes         []byte
+		idRequirement    uint32
+		wantOutputPrefix []byte
+	}{
+		{
+			name:             "tink",
+			variant:          ed25519.VariantTink,
+			keyBytes:         keyBytes,
+			idRequirement:    uint32(0x01020304),
+			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+		},
+		{
+			name:             "crunchy",
+			variant:          ed25519.VariantCrunchy,
+			keyBytes:         keyBytes,
+			idRequirement:    uint32(0x01020304),
+			wantOutputPrefix: []byte{cryptofmt.LegacyStartByte, 0x01, 0x02, 0x03, 0x04},
+		},
+		{
+			name:             "legacy",
+			variant:          ed25519.VariantLegacy,
+			keyBytes:         keyBytes,
+			idRequirement:    uint32(0x01020304),
+			wantOutputPrefix: []byte{cryptofmt.LegacyStartByte, 0x01, 0x02, 0x03, 0x04},
+		},
+		{
+			name:             "no prefix",
+			variant:          ed25519.VariantNoPrefix,
+			keyBytes:         keyBytes,
+			idRequirement:    0,
+			wantOutputPrefix: nil,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			params, err := ed25519.NewParameters(tc.variant)
+			if err != nil {
+				t.Fatalf("ed25519.NewParameters(%v) err = %v, want nil", tc.variant, err)
+			}
+			pubKey, err := ed25519.NewPublicKey(tc.keyBytes, tc.idRequirement, params)
+			if err != nil {
+				t.Fatalf("ed25519.NewPublicKey(%v, %v, %v) err = %v, want nil", tc.keyBytes, tc.idRequirement, params, err)
+			}
+			if got := pubKey.OutputPrefix(); !bytes.Equal(got, tc.wantOutputPrefix) {
+				t.Errorf("params.OutputPrefix() = %v, want %v", got, tc.wantOutputPrefix)
+			}
+			gotIDRequrement, gotRequired := pubKey.IDRequirement()
+			if got, want := gotRequired, params.HasIDRequirement(); got != want {
+				t.Errorf("params.IDRequirement() = %v, want %v", got, want)
+			}
+			if got, want := gotIDRequrement, tc.idRequirement; got != want {
+				t.Errorf("params.IDRequirement() = %v, want %v", got, want)
+			}
+
+			otherPubKey, err := ed25519.NewPublicKey(tc.keyBytes, tc.idRequirement, params)
+			if err != nil {
+				t.Fatalf("ed25519.NewPublicKey(%v, %v, %v) err = %v, want nil", tc.keyBytes, tc.idRequirement, params, err)
+			}
+			if !otherPubKey.Equals(pubKey) {
+				t.Errorf("otherPubKey.Equals(pubKey) = false, want true")
+			}
+		})
+	}
+}
+
+type TestPublicKeyParams struct {
+	keyBytes      []byte
+	idRequirement uint32
+	variant       ed25519.Variant
+}
+
+func TestPublicKeyEqualsSelf(t *testing.T) {
+	params, err := ed25519.NewParameters(ed25519.VariantTink)
+	if err != nil {
+		t.Fatalf("ed25519.NewParameters(%v) err = %v, want nil", ed25519.VariantTink, err)
+	}
+	keyBytes := []byte("12345678901234567890123456789012")
+	pubKey, err := ed25519.NewPublicKey(keyBytes, 123, params)
+	if err != nil {
+		t.Fatalf("ed25519.NewPublicKey(%v, %v, %v) err = %v, want nil", keyBytes, 123, params, err)
+	}
+	if !pubKey.Equals(pubKey) {
+		t.Errorf("pubKey.Equals(pubKey) = false, want true")
+	}
+}
+
+func TestPublicKeyEqualsFalse(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		firstKey  *TestPublicKeyParams
+		secondKey *TestPublicKeyParams
+	}{
+		{
+			name: "different ID requirement",
+			firstKey: &TestPublicKeyParams{
+				keyBytes:      []byte("12345678901234567890123456789012"),
+				idRequirement: 123,
+				variant:       ed25519.VariantTink,
+			},
+			secondKey: &TestPublicKeyParams{
+				keyBytes:      []byte("12345678901234567890123456789012"),
+				idRequirement: 456,
+				variant:       ed25519.VariantTink,
+			},
+		},
+		{
+			name: "different key bytes",
+			firstKey: &TestPublicKeyParams{
+				keyBytes:      []byte("12345678901234567890123456789012"),
+				idRequirement: 123,
+				variant:       ed25519.VariantTink,
+			},
+			secondKey: &TestPublicKeyParams{
+				keyBytes:      []byte("11111111111111111111111111111111"),
+				idRequirement: 123,
+				variant:       ed25519.VariantTink,
+			},
+		},
+		{
+			name: "different variant",
+			firstKey: &TestPublicKeyParams{
+				keyBytes:      []byte("12345678901234567890123456789012"),
+				idRequirement: 123,
+				variant:       ed25519.VariantTink,
+			},
+			secondKey: &TestPublicKeyParams{
+				keyBytes:      []byte("12345678901234567890123456789012"),
+				idRequirement: 123,
+				variant:       ed25519.VariantCrunchy,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			firstParams, err := ed25519.NewParameters(tc.firstKey.variant)
+			if err != nil {
+				t.Fatalf("ed25519.NewParameters(%v) err = %v, want nil", tc.firstKey.variant, err)
+			}
+			firstPubKey, err := ed25519.NewPublicKey(tc.firstKey.keyBytes, tc.firstKey.idRequirement, firstParams)
+			if err != nil {
+				t.Fatalf("ed25519.NewPublicKey(%v, %v, %v) err = %v, want nil", tc.firstKey.keyBytes, tc.firstKey.idRequirement, firstParams, err)
+			}
+
+			secondParams, err := ed25519.NewParameters(tc.secondKey.variant)
+			if err != nil {
+				t.Fatalf("ed25519.NewParameters(%v) err = %v, want nil", tc.secondKey.variant, err)
+			}
+			secondPubKey, err := ed25519.NewPublicKey(tc.secondKey.keyBytes, tc.secondKey.idRequirement, secondParams)
+			if err != nil {
+				t.Fatalf("ed25519.NewPublicKey(%v, %v, %v) err = %v, want nil", tc.secondKey.keyBytes, tc.secondKey.idRequirement, secondParams, err)
+			}
+			if firstPubKey.Equals(secondPubKey) {
+				t.Errorf("firstPubKey.Equals(secondPubKey) = true, want false")
+			}
+		})
+	}
+}
+
+func TestPublicKeyKeyBytes(t *testing.T) {
+	params, err := ed25519.NewParameters(ed25519.VariantTink)
+	if err != nil {
+		t.Fatalf("ed25519.NewParameters(%v) err = %v, want nil", ed25519.VariantTink, err)
+	}
+	keyBytes := []byte("12345678901234567890123456789012")
+	pubKey, err := ed25519.NewPublicKey(keyBytes, 123, params)
+	if err != nil {
+		t.Fatalf("ed25519.NewPublicKey(%v, %v, %v) err = %v, want nil", keyBytes, 123, params, err)
+	}
+	gotPubKeyBytes := pubKey.KeyBytes()
+	if !bytes.Equal(gotPubKeyBytes, keyBytes) {
+		t.Errorf("bytes.Equal(gotPubKeyBytes, keyBytes) = false, want true")
+	}
+	// Make sure a copy is made when creating the public key.
+	keyBytes[0] = 0x99
+	fmt.Println(keyBytes)
+	if bytes.Equal(pubKey.KeyBytes(), keyBytes) {
+		t.Errorf("bytes.Equal(pubKey.KeyBytes(), keyBytes) = true, want false")
+	}
+	// Make sure no changes are made to the internal state of the public key.
+	gotPubKeyBytes[1] = 0x99
+	if bytes.Equal(pubKey.KeyBytes(), gotPubKeyBytes) {
+		t.Errorf("bytes.Equal((pubKey.KeyBytes(), gotPubKeyBytes) = true, want false")
 	}
 }

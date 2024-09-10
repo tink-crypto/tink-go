@@ -13,6 +13,7 @@ go_library(
     deps = [
         "//core/registry",
         "//internal/internalregistry",
+        "//internal/outputprefix",
         "//key",
         "//keyset",
         "//proto/ed25519_go_proto",
@@ -37,6 +38,7 @@ go_test(
     ],
     deps = [
         ":ed25519",
+        "//core/cryptofmt",
         "//core/registry",
         "//internal/internalregistry",
         "//proto/ed25519_go_proto",

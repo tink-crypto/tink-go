@@ -15,8 +15,11 @@
 package ed25519
 
 import (
+	"bytes"
+	"crypto/ed25519"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
 )
 
@@ -88,4 +91,76 @@ func (p *Parameters) Equals(other key.Parameters) bool {
 	}
 	then, ok := other.(*Parameters)
 	return ok && p.variant == then.variant
+}
+
+// PublicKey represents an ED25519 public key.
+type PublicKey struct {
+	keyBytes      []byte
+	idRequirement uint32
+	params        Parameters
+	outputPrefix  []byte
+}
+
+var _ key.Key = (*PublicKey)(nil)
+
+func calculateOutputPrefix(variant Variant, keyID uint32) ([]byte, error) {
+	switch variant {
+	case VariantTink:
+		return outputprefix.Tink(keyID), nil
+	case VariantCrunchy, VariantLegacy:
+		return outputprefix.Legacy(keyID), nil
+	case VariantNoPrefix:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("invalid output prefix variant: %v", variant)
+	}
+}
+
+// NewPublicKey creates a new ED25519 public key.
+//
+// idRequirement is the ID of the key in the keyset. It must be zero if params
+// doesn't have an ID requirement.
+func NewPublicKey(keyBytes []byte, idRequirement uint32, params Parameters) (*PublicKey, error) {
+	if !params.HasIDRequirement() && idRequirement != 0 {
+		return nil, fmt.Errorf("ed25519.NewPublicKey: idRequirement must be zero if params doesn't have an ID requirement")
+	}
+	if len(keyBytes) != ed25519.PublicKeySize {
+		return nil, fmt.Errorf("ed25519.NewPublicKey: keyBytes must be 32 bytes")
+	}
+	outputPrefix, err := calculateOutputPrefix(params.variant, idRequirement)
+	if err != nil {
+		return nil, fmt.Errorf("ed25519.NewPublicKey: %w", err)
+	}
+	return &PublicKey{
+		keyBytes:      bytes.Clone(keyBytes),
+		idRequirement: idRequirement,
+		params:        params,
+		outputPrefix:  outputPrefix,
+	}, nil
+}
+
+// KeyBytes returns the public key bytes.
+func (k *PublicKey) KeyBytes() []byte { return bytes.Clone(k.keyBytes) }
+
+// OutputPrefix returns the output prefix of this key.
+func (k *PublicKey) OutputPrefix() []byte { return bytes.Clone(k.outputPrefix) }
+
+// Parameters returns the parameters of the key.
+func (k *PublicKey) Parameters() key.Parameters { return &k.params }
+
+// IDRequirement returns the ID requirement of the key, and whether it is
+// required.
+func (k *PublicKey) IDRequirement() (uint32, bool) {
+	return k.idRequirement, k.params.HasIDRequirement()
+}
+
+// Equals returns true if this key is equal to other.
+func (k *PublicKey) Equals(other key.Key) bool {
+	if k == other {
+		return true
+	}
+	that, ok := other.(*PublicKey)
+	return ok && k.params.Equals(that.Parameters()) &&
+		bytes.Equal(k.keyBytes, that.keyBytes) &&
+		k.idRequirement == that.idRequirement
 }
