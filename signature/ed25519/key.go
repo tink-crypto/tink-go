@@ -178,7 +178,7 @@ var _ key.Key = (*PrivateKey)(nil)
 // NewPrivateKey creates a new ED25519 private key from privateKeyBytes, with
 // idRequirement and params.
 func NewPrivateKey(privateKeyBytes secretdata.Bytes, idRequirement uint32, params Parameters) (*PrivateKey, error) {
-	if privateKeyBytes.Len() != ed25519.SeedSize {
+	if privateKeyBytes.Len() != 32 {
 		return nil, fmt.Errorf("ed25519.NewPrivateKey: privateKeyBytes must be 32 bytes")
 	}
 	privKey := ed25519.NewKeyFromSeed(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
@@ -199,7 +199,7 @@ func NewPrivateKeyWithPublicKey(privateKeyBytes secretdata.Bytes, pubKey *Public
 	if pubKey == nil {
 		return nil, fmt.Errorf("ed25519.NewPrivateKeyWithPublicKey: pubKey must not be nil")
 	}
-	if privateKeyBytes.Len() != ed25519.SeedSize {
+	if privateKeyBytes.Len() != 32 {
 		return nil, fmt.Errorf("ed25519.NewPrivateKey: seed must be 32 bytes")
 	}
 	// Make sure the public key is correct.

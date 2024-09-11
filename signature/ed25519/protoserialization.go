@@ -18,8 +18,10 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	ed25519pb "github.com/tink-crypto/tink-go/v2/proto/ed25519_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -30,6 +32,11 @@ const (
 	//
 	// Currently, only version 0 is supported; other versions are rejected.
 	publicKeyProtoVersion = 0
+	// privateKeyProtoVersion is the accepted [ed25519pb.Ed25519PrivateKey] proto
+	// version.
+	//
+	// Currently, only version 0 is supported; other versions are rejected.
+	privateKeyProtoVersion = 0
 )
 
 type publicKeySerializer struct{}
@@ -78,6 +85,45 @@ func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.Key
 	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
 }
 
+type privateKeySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*privateKeySerializer)(nil)
+
+func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	ed25519PrivKey, ok := key.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type: %T, want *ed25519.PrivateKey", key)
+	}
+	if ed25519PrivKey.publicKey == nil {
+		return nil, fmt.Errorf("invalid key: public key is nil")
+	}
+	params := ed25519PrivKey.publicKey.params
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(params.Variant())
+	if err != nil {
+		return nil, err
+	}
+	protoKey := &ed25519pb.Ed25519PrivateKey{
+		KeyValue: ed25519PrivKey.PrivateKeyBytes().Data(insecuresecretdataaccess.Token{}),
+		PublicKey: &ed25519pb.Ed25519PublicKey{
+			KeyValue: ed25519PrivKey.publicKey.KeyBytes(),
+			Version:  publicKeyProtoVersion,
+		},
+		Version: privateKeyProtoVersion,
+	}
+	serializedKey, err := proto.Marshal(protoKey)
+	if err != nil {
+		return nil, err
+	}
+	// idRequirement is zero if the key doesn't have a key requirement.
+	idRequirement, _ := ed25519PrivKey.IDRequirement()
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         signerTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}
+	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
+}
+
 type publicKeyParser struct{}
 
 var _ protoserialization.KeyParser = (*publicKeyParser)(nil)
@@ -103,17 +149,17 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	}
 	keyData := keySerialization.KeyData()
 	if keyData.GetTypeUrl() != verifierTypeURL {
-		return nil, fmt.Errorf("key is not a public key")
+		return nil, fmt.Errorf("invalid key type URL: %v", keyData.GetTypeUrl())
 	}
 	if keyData.GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PUBLIC {
-		return nil, fmt.Errorf("key is not a public key")
+		return nil, fmt.Errorf("invalid key material type: %v", keyData.GetKeyMaterialType())
 	}
 	protoKey := new(ed25519pb.Ed25519PublicKey)
 	if err := proto.Unmarshal(keyData.GetValue(), protoKey); err != nil {
 		return nil, err
 	}
 	if protoKey.GetVersion() != publicKeyProtoVersion {
-		return nil, fmt.Errorf("key has unsupported version: %v", protoKey.GetVersion())
+		return nil, fmt.Errorf("public key has unsupported version: %v", protoKey.GetVersion())
 	}
 	variant, err := variantFromProto(keySerialization.OutputPrefixType())
 	if err != nil {
@@ -126,4 +172,47 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
 	keyID, _ := keySerialization.IDRequirement()
 	return NewPublicKey(protoKey.GetKeyValue(), keyID, params)
+}
+
+type privateKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*privateKeyParser)(nil)
+
+func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	if keySerialization == nil {
+		return nil, fmt.Errorf("key serialization is nil")
+	}
+	keyData := keySerialization.KeyData()
+	if keyData.GetTypeUrl() != signerTypeURL {
+		return nil, fmt.Errorf("invalid key type URL: %v", keyData.GetTypeUrl())
+	}
+	if keyData.GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PRIVATE {
+		return nil, fmt.Errorf("invalid key material type: %v", keyData.GetKeyMaterialType())
+	}
+	protoKey := new(ed25519pb.Ed25519PrivateKey)
+	if err := proto.Unmarshal(keyData.GetValue(), protoKey); err != nil {
+		return nil, err
+	}
+	if protoKey.GetVersion() != privateKeyProtoVersion {
+		return nil, fmt.Errorf("private key has unsupported version: %v", protoKey.GetVersion())
+	}
+	variant, err := variantFromProto(keySerialization.OutputPrefixType())
+	if err != nil {
+		return nil, err
+	}
+	params, err := NewParameters(variant)
+	if err != nil {
+		return nil, err
+	}
+	if protoKey.GetPublicKey().GetVersion() != publicKeyProtoVersion {
+		return nil, fmt.Errorf("public key has unsupported version: %v", protoKey.GetPublicKey().GetVersion())
+	}
+	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
+	keyID, _ := keySerialization.IDRequirement()
+	publicKey, err := NewPublicKey(protoKey.GetPublicKey().GetKeyValue(), keyID, params)
+	if err != nil {
+		return nil, err
+	}
+	privateKeyBytes := secretdata.NewBytesFromData(protoKey.GetKeyValue(), insecuresecretdataaccess.Token{})
+	return NewPrivateKeyWithPublicKey(privateKeyBytes, publicKey)
 }
