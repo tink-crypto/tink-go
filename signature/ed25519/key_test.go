@@ -502,7 +502,11 @@ func TestPrivateKeyNewPrivateKeyWithPublicKey(t *testing.T) {
 			}
 
 			// Test PublicKey.
-			if got := privKey.PublicKey(); !got.Equals(pubKey) {
+			got, err := privKey.PublicKey()
+			if err != nil {
+				t.Fatalf("privKey.PublicKey() err = %v, want nil", err)
+			}
+			if !got.Equals(pubKey) {
 				t.Errorf("privKey.PublicKey().Equals(pubKey) = false, want true")
 			}
 
@@ -552,12 +556,16 @@ func TestPrivateKeyNewPrivateKey(t *testing.T) {
 			}
 
 			// Test PublicKey.
-			pubKey, err := ed25519.NewPublicKey(pubKeyBytes, tc.idRequirement, params)
+			want, err := ed25519.NewPublicKey(pubKeyBytes, tc.idRequirement, params)
 			if err != nil {
 				t.Fatalf("ed25519.NewPublicKey(%v, %v, %v) err = %v, want nil", pubKeyBytes, tc.idRequirement, params, err)
 			}
-			if got := privKey.PublicKey(); !got.Equals(pubKey) {
-				t.Errorf("privKey.PublicKey().Equals(pubKey) = false, want true")
+			got, err := privKey.PublicKey()
+			if err != nil {
+				t.Fatalf("privKey.PublicKey() err = %v, want nil", err)
+			}
+			if !got.Equals(want) {
+				t.Errorf("privKey.PublicKey().Equals(want) = false, want true")
 			}
 
 			// Test Parameters.

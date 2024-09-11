@@ -217,7 +217,9 @@ func NewPrivateKeyWithPublicKey(privateKeyBytes secretdata.Bytes, pubKey *Public
 func (k *PrivateKey) PrivateKeyBytes() secretdata.Bytes { return k.keyBytes }
 
 // PublicKey returns the public key of the key.
-func (k *PrivateKey) PublicKey() *PublicKey { return k.publicKey }
+//
+// This implements the privateKey interface defined in handle.go.
+func (k *PrivateKey) PublicKey() (key.Key, error) { return k.publicKey, nil }
 
 // Parameters returns the parameters of the key.
 func (k *PrivateKey) Parameters() key.Parameters { return &k.publicKey.params }
@@ -235,5 +237,5 @@ func (k *PrivateKey) Equals(other key.Key) bool {
 		return true
 	}
 	that, ok := other.(*PrivateKey)
-	return ok && k.publicKey.Equals(that.PublicKey()) && k.keyBytes.Equals(that.keyBytes)
+	return ok && k.publicKey.Equals(that.publicKey) && k.keyBytes.Equals(that.keyBytes)
 }
