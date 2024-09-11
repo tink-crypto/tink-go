@@ -129,6 +129,9 @@ func (km *eciesAEADHKDFPrivateKeyKeyManager) PublicKeyData(serializedPrivKey []b
 	if err := proto.Unmarshal(serializedPrivKey, privKey); err != nil {
 		return nil, errInvalidECIESAEADHKDFPrivateKeyKey
 	}
+	if err := km.validateKey(privKey); err != nil {
+		return nil, err
+	}
 	serializedPubKey, err := proto.Marshal(privKey.GetPublicKey())
 	if err != nil {
 		return nil, errInvalidECIESAEADHKDFPrivateKeyKey
@@ -153,6 +156,9 @@ func (km *eciesAEADHKDFPrivateKeyKeyManager) TypeURL() string {
 // validateKey validates the given ECDSAPrivateKey.
 func (km *eciesAEADHKDFPrivateKeyKeyManager) validateKey(key *eahpb.EciesAeadHkdfPrivateKey) error {
 	if err := keyset.ValidateKeyVersion(key.GetVersion(), eciesAEADHKDFPrivateKeyKeyVersion); err != nil {
+		return fmt.Errorf("ecies_aead_hkdf_private_key_manager: invalid key: %s", err)
+	}
+	if err := keyset.ValidateKeyVersion(key.GetPublicKey().GetVersion(), eciesAEADHKDFPrivateKeyKeyVersion); err != nil {
 		return fmt.Errorf("ecies_aead_hkdf_private_key_manager: invalid key: %s", err)
 	}
 	return checkECIESAEADHKDFParams(key.GetPublicKey().GetParams())

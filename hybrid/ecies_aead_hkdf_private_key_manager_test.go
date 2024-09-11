@@ -64,6 +64,14 @@ func TestECIESAEADHKDFPrivateKeyManagerPrimitiveErrors(t *testing.T) {
 			}(),
 		},
 		{
+			name: "invalid_private_key_version",
+			key: func() []byte {
+				k := makeValidECIESAEADHKDFPrivateKey(t)
+				k.GetPublicKey().Version = eciesAEADHKDFPrivateKeyKeyVersion + 1
+				return mustMarshal(t, k)
+			}(),
+		},
+		{
 			name: "nil_public_key",
 			key: func() []byte {
 				k := makeValidECIESAEADHKDFPrivateKey(t)
@@ -76,6 +84,54 @@ func TestECIESAEADHKDFPrivateKeyManagerPrimitiveErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := km.Primitive(tc.key); err == nil {
 				t.Fatalf("km.Primitive(serilizedPrivateKey) err = nil, want non-nil")
+			}
+		})
+	}
+}
+
+func TestECIESAEADHKDFPrivateKeyManagerGetPublicKeyErrors(t *testing.T) {
+	km, err := registry.GetKeyManager(eciesAEADHKDFPrivateKeyTypeURL)
+	if err != nil {
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", eciesAEADHKDFPrivateKeyTypeURL, err)
+	}
+
+	testCases := []struct {
+		name string
+		key  []byte
+	}{
+		{
+			name: "nil_key",
+			key:  nil,
+		},
+		{
+			name: "invalid_version",
+			key: func() []byte {
+				k := makeValidECIESAEADHKDFPrivateKey(t)
+				k.Version = eciesAEADHKDFPrivateKeyKeyVersion + 1
+				return mustMarshal(t, k)
+			}(),
+		},
+		{
+			name: "invalid_private_key_version",
+			key: func() []byte {
+				k := makeValidECIESAEADHKDFPrivateKey(t)
+				k.GetPublicKey().Version = eciesAEADHKDFPrivateKeyKeyVersion + 1
+				return mustMarshal(t, k)
+			}(),
+		},
+		{
+			name: "nil_public_key",
+			key: func() []byte {
+				k := makeValidECIESAEADHKDFPrivateKey(t)
+				k.PublicKey = nil
+				return mustMarshal(t, k)
+			}(),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := km.(registry.PrivateKeyManager).PublicKeyData(tc.key); err == nil {
+				t.Fatalf("km.PublicKeyData(serilizedPrivateKey) err = nil, want non-nil")
 			}
 		})
 	}
