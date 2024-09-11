@@ -19,8 +19,10 @@ import (
 	"crypto/ed25519"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
 // Variant is the prefix variant of an ED25519 key.
@@ -124,7 +126,7 @@ func NewPublicKey(keyBytes []byte, idRequirement uint32, params Parameters) (*Pu
 	if !params.HasIDRequirement() && idRequirement != 0 {
 		return nil, fmt.Errorf("ed25519.NewPublicKey: idRequirement must be zero if params doesn't have an ID requirement")
 	}
-	if len(keyBytes) != ed25519.PublicKeySize {
+	if len(keyBytes) != 32 {
 		return nil, fmt.Errorf("ed25519.NewPublicKey: keyBytes must be 32 bytes")
 	}
 	outputPrefix, err := calculateOutputPrefix(params.variant, idRequirement)
@@ -163,4 +165,75 @@ func (k *PublicKey) Equals(other key.Key) bool {
 	return ok && k.params.Equals(that.Parameters()) &&
 		bytes.Equal(k.keyBytes, that.keyBytes) &&
 		k.idRequirement == that.idRequirement
+}
+
+// PrivateKey represents an ED25519 private key.
+type PrivateKey struct {
+	publicKey *PublicKey
+	keyBytes  secretdata.Bytes
+}
+
+var _ key.Key = (*PrivateKey)(nil)
+
+// NewPrivateKey creates a new ED25519 private key from privateKeyBytes, with
+// idRequirement and params.
+func NewPrivateKey(privateKeyBytes secretdata.Bytes, idRequirement uint32, params Parameters) (*PrivateKey, error) {
+	if privateKeyBytes.Len() != ed25519.SeedSize {
+		return nil, fmt.Errorf("ed25519.NewPrivateKey: privateKeyBytes must be 32 bytes")
+	}
+	privKey := ed25519.NewKeyFromSeed(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	pubKeyBytes := privKey.Public().(ed25519.PublicKey)
+	pubKey, err := NewPublicKey(pubKeyBytes, idRequirement, params)
+	if err != nil {
+		return nil, fmt.Errorf("ed25519.NewPrivateKey: %w", err)
+	}
+	return &PrivateKey{
+		publicKey: pubKey,
+		keyBytes:  privateKeyBytes,
+	}, nil
+}
+
+// NewPrivateKeyWithPublicKey creates a new ED25519 private key from
+// privateKeyBytes and a [PublicKey].
+func NewPrivateKeyWithPublicKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey) (*PrivateKey, error) {
+	if pubKey == nil {
+		return nil, fmt.Errorf("ed25519.NewPrivateKeyWithPublicKey: pubKey must not be nil")
+	}
+	if privateKeyBytes.Len() != ed25519.SeedSize {
+		return nil, fmt.Errorf("ed25519.NewPrivateKey: seed must be 32 bytes")
+	}
+	// Make sure the public key is correct.
+	privKey := ed25519.NewKeyFromSeed(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	if !bytes.Equal(privKey.Public().(ed25519.PublicKey), pubKey.KeyBytes()) {
+		return nil, fmt.Errorf("ed25519.NewPrivateKeyWithPublicKey: public key does not match private key")
+	}
+	return &PrivateKey{
+		publicKey: pubKey,
+		keyBytes:  privateKeyBytes,
+	}, nil
+}
+
+// PrivateKeyBytes returns the private key bytes.
+func (k *PrivateKey) PrivateKeyBytes() secretdata.Bytes { return k.keyBytes }
+
+// PublicKey returns the public key of the key.
+func (k *PrivateKey) PublicKey() *PublicKey { return k.publicKey }
+
+// Parameters returns the parameters of the key.
+func (k *PrivateKey) Parameters() key.Parameters { return &k.publicKey.params }
+
+// IDRequirement returns the ID requirement of the key, and whether it is
+// required.
+func (k *PrivateKey) IDRequirement() (uint32, bool) { return k.publicKey.IDRequirement() }
+
+// OutputPrefix returns the output prefix of this key.
+func (k *PrivateKey) OutputPrefix() []byte { return bytes.Clone(k.publicKey.outputPrefix) }
+
+// Equals returns true if this key is equal to other.
+func (k *PrivateKey) Equals(other key.Key) bool {
+	if k == other {
+		return true
+	}
+	that, ok := other.(*PrivateKey)
+	return ok && k.publicKey.Equals(that.PublicKey()) && k.keyBytes.Equals(that.keyBytes)
 }
