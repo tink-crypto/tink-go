@@ -1104,6 +1104,32 @@ func TestPrimitivesWithKeyManagerIsThreadSafe(t *testing.T) {
 	}
 }
 
+func TestPublicKeysetHasPrimaryKey(t *testing.T) {
+	template := signature.ECDSAP256KeyTemplate()
+	manager := keyset.NewManager()
+	// Add 10 keys. Last one is the primary.
+	for i := 0; i < 10; i++ {
+		keyID, err := manager.Add(template)
+		if err != nil {
+			t.Fatalf("manager.Add(template) err = %v, want nil", err)
+		}
+		if err = manager.SetPrimary(keyID); err != nil {
+			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+		}
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+	publicHandle, err := handle.Public()
+	if err != nil {
+		t.Fatalf("handle.Public() err = %v, want nil", err)
+	}
+	if _, err := publicHandle.Primary(); err != nil {
+		t.Errorf("publicHandle.Primary() err = %v, want nil", err)
+	}
+}
+
 func TestPublicIsThreadSafe(t *testing.T) {
 	template := signature.ECDSAP256KeyTemplate()
 	manager := keyset.NewManager()

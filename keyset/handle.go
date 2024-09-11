@@ -306,6 +306,7 @@ func (h *Handle) Public() (*Handle, error) {
 		return nil, fmt.Errorf("keyset.Handle: entries list is empty or nil")
 	}
 	entries := make([]*Entry, h.Len())
+	var primaryKeyEntry *Entry = nil
 	for i, entry := range h.entries {
 		privateKey, ok := entry.Key().(privateKey)
 		if !ok {
@@ -321,10 +322,14 @@ func (h *Handle) Public() (*Handle, error) {
 			keyID:     entry.keyID,
 			status:    entry.status,
 		}
+		if entry.isPrimary {
+			primaryKeyEntry = entries[i]
+		}
 	}
 	return &Handle{
 		entries:          entries,
 		keysetHasSecrets: false,
+		primaryKeyEntry:  primaryKeyEntry,
 	}, nil
 }
 
