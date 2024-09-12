@@ -112,6 +112,9 @@ func (km *ecdsaSignerKeyManager) PublicKeyData(serializedPrivKey []byte) (*tinkp
 	if err := proto.Unmarshal(serializedPrivKey, privKey); err != nil {
 		return nil, errInvalidECDSASignKey
 	}
+	if err := km.validateKey(privKey); err != nil {
+		return nil, err
+	}
 	serializedPubKey, err := proto.Marshal(privKey.PublicKey)
 	if err != nil {
 		return nil, errInvalidECDSASignKey
@@ -138,6 +141,10 @@ func (km *ecdsaSignerKeyManager) validateKey(key *ecdsapb.EcdsaPrivateKey) error
 	if err := keyset.ValidateKeyVersion(key.Version, ecdsaSignerKeyVersion); err != nil {
 		return fmt.Errorf("ecdsa_signer_key_manager: invalid key: %s", err)
 	}
+	if err := keyset.ValidateKeyVersion(key.GetPublicKey().GetVersion(), ecdsaSignerKeyVersion); err != nil {
+		return fmt.Errorf("ecdsa_signer_key_manager: invalid key: %s", err)
+	}
+
 	hash, curve, encoding := getECDSAParamNames(key.GetPublicKey().GetParams())
 	return subtleSignature.ValidateECDSAParams(hash, curve, encoding)
 }

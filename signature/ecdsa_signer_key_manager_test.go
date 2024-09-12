@@ -183,7 +183,46 @@ func TestECDSASignNewKeyWithInvalidInput(t *testing.T) {
 	if _, err := km.NewKey(serializedKeyFormatNilParams); err == nil {
 		t.Errorf("km.newKey(serializedKeyFormatNilParams) err = nil, want not nil")
 	}
+}
 
+func TestECDSASignPrivateKeyManagerGetPublicKeyErrors(t *testing.T) {
+	km, err := registry.GetKeyManager(testutil.ECDSASignerTypeURL)
+	if err != nil {
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ECDSASignerTypeURL, err)
+	}
+
+	testCases := []struct {
+		name string
+		key  []byte
+	}{
+		{
+			name: "nil_key",
+			key:  nil,
+		},
+		{
+			name: "invalid_version",
+			key: func() []byte {
+				k := testutil.NewRandomECDSAPrivateKey(commonpb.HashType_SHA256, commonpb.EllipticCurveType_NIST_P256)
+				k.Version = 1
+				return mustMarshal(t, k)
+			}(),
+		},
+		{
+			name: "invalid_public_key_version",
+			key: func() []byte {
+				k := testutil.NewRandomECDSAPrivateKey(commonpb.HashType_SHA256, commonpb.EllipticCurveType_NIST_P256)
+				k.GetPublicKey().Version = 1
+				return mustMarshal(t, k)
+			}(),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := km.(registry.PrivateKeyManager).PublicKeyData(tc.key); err == nil {
+				t.Fatalf("km.PublicKeyData(serilizedPrivateKey) err = nil, want non-nil")
+			}
+		})
+	}
 }
 
 func TestECDSASignNewKeyMultipleTimes(t *testing.T) {
@@ -466,4 +505,13 @@ func genInvalidECDSAParams() []ecdsaParams {
 			curve:    commonpb.EllipticCurveType_NIST_P256,
 		},
 	}
+}
+
+func mustMarshal(t *testing.T, msg proto.Message) []byte {
+	t.Helper()
+	serialized, err := proto.Marshal(msg)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", msg, err)
+	}
+	return serialized
 }
