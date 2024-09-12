@@ -7,9 +7,6 @@ licenses(["notice"])  # keep
 go_library(
     name = "signature",
     srcs = [
-        "ecdsa_signer_key_manager.go",
-        "ecdsa_verifier_key_manager.go",
-        "proto.go",
         "rsa.go",
         "rsassapkcs1_signer_key_manager.go",
         "rsassapkcs1_verifier_key_manager.go",
@@ -37,9 +34,8 @@ go_library(
         "//proto/rsa_ssa_pkcs1_go_proto",
         "//proto/rsa_ssa_pss_go_proto",
         "//proto/tink_go_proto",
+        "//signature/ecdsa",
         "//signature/ed25519",
-        "//signature/subtle",
-        "//subtle",
         "//tink",
         "@org_golang_google_protobuf//proto",
     ],
@@ -48,8 +44,6 @@ go_library(
 go_test(
     name = "signature_test",
     srcs = [
-        "ecdsa_signer_key_manager_test.go",
-        "ecdsa_verifier_key_manager_test.go",
         "rsassapkcs1_signer_key_manager_test.go",
         "rsassapkcs1_verifier_key_manager_test.go",
         "rsassapss_signer_key_manager_test.go",
@@ -71,11 +65,9 @@ go_test(
         "//mac",
         "//monitoring",
         "//proto/common_go_proto",
-        "//proto/ecdsa_go_proto",
         "//proto/rsa_ssa_pkcs1_go_proto",
         "//proto/rsa_ssa_pss_go_proto",
         "//proto/tink_go_proto",
-        "//signature/subtle",
         "//subtle/random",
         "//testing/fakemonitoring",
         "//testkeyset",

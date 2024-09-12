@@ -29,6 +29,11 @@ import (
 // This file contains pre-generated KeyTemplates for Signer and Verifier.
 // One can use these templates to generate new Keysets.
 
+const (
+	ed25519SignerTypeURL = "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey"
+	ecdsaSignerTypeURL   = "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey"
+)
+
 // ECDSAP256KeyTemplate is a KeyTemplate that generates a new ECDSA private key with the following parameters:
 //   - Hash function: SHA256
 //   - Curve: NIST P-256
@@ -162,10 +167,6 @@ func createECDSAKeyTemplate(hashType commonpb.HashType, curve commonpb.EllipticC
 		OutputPrefixType: prefixType,
 	}
 }
-
-const (
-	ed25519SignerTypeURL   = "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey"
-)
 
 // ED25519KeyTemplate is a KeyTemplate that generates a new ED25519 private key.
 func ED25519KeyTemplate() *tinkpb.KeyTemplate {

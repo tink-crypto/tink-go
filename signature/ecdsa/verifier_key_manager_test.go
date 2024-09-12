@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package signature_test
+package ecdsa_test
 
 import (
 	"testing"
@@ -23,53 +23,53 @@ import (
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 )
 
-func TestECDSAVerifyGetPrimitiveBasic(t *testing.T) {
+func TestVerifierKeyManagerGetPrimitiveBasic(t *testing.T) {
 	testParams := genValidECDSAParams()
-	km, err := registry.GetKeyManager(testutil.ECDSAVerifierTypeURL)
+	keyManager, err := registry.GetKeyManager(testutil.ECDSAVerifierTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain ECDSAVerifier key manager: %s", err)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ECDSAVerifierTypeURL, err)
 	}
 	for i := 0; i < len(testParams); i++ {
 		serializedKey, err := proto.Marshal(testutil.NewRandomECDSAPublicKey(testParams[i].hashType, testParams[i].curve))
 		if err != nil {
 			t.Errorf("proto.Marshal() err = %v, want nil", err)
 		}
-		_, err = km.Primitive(serializedKey)
+		_, err = keyManager.Primitive(serializedKey)
 		if err != nil {
 			t.Errorf("unexpect error in test case %d: %s ", i, err)
 		}
 	}
 }
 
-func TestECDSAVerifyWithInvalidPublicKeyFailsCreatingPrimitive(t *testing.T) {
-	km, err := registry.GetKeyManager(testutil.ECDSAVerifierTypeURL)
+func TestVerifierKeyManagerWithInvalidPublicKeyFailsCreatingPrimitive(t *testing.T) {
+	keyManager, err := registry.GetKeyManager(testutil.ECDSAVerifierTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain ECDSAVerifier key manager: %s", err)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ECDSAVerifierTypeURL, err)
 	}
 	pubKey := testutil.NewRandomECDSAPublicKey(commonpb.HashType_SHA256, commonpb.EllipticCurveType_NIST_P256)
 	pubKey.X = []byte{0, 32, 0}
 	pubKey.Y = []byte{0, 32, 0}
 	serializedPubKey, err := proto.Marshal(pubKey)
 	if err != nil {
-		t.Errorf("proto.Marhsal() err = %v, want nil", err)
+		t.Fatalf("proto.Marhsal() err = %v, want nil", err)
 	}
-	if _, err := km.Primitive(serializedPubKey); err == nil {
-		t.Errorf("km.Primitive() err = nil, want error")
+	if _, err := keyManager.Primitive(serializedPubKey); err == nil {
+		t.Errorf("keyManager.Primitive() err = nil, want error")
 	}
 }
 
-func TestECDSAVerifyGetPrimitiveWithInvalidInput(t *testing.T) {
+func TestVerifierKeyManagerGetPrimitiveWithInvalidInput_InvalidParams(t *testing.T) {
 	testParams := genInvalidECDSAParams()
-	km, err := registry.GetKeyManager(testutil.ECDSAVerifierTypeURL)
+	keyManager, err := registry.GetKeyManager(testutil.ECDSAVerifierTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain ECDSAVerifier key manager: %s", err)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ECDSAVerifierTypeURL, err)
 	}
 	for i := 0; i < len(testParams); i++ {
 		serializedKey, err := proto.Marshal(testutil.NewRandomECDSAPublicKey(testParams[i].hashType, testParams[i].curve))
 		if err != nil {
-			t.Errorf("proto.Marshal() err = %q, want nil", err)
+			t.Fatalf("proto.Marshal() err = %q, want nil", err)
 		}
-		if _, err := km.Primitive(serializedKey); err == nil {
+		if _, err := keyManager.Primitive(serializedKey); err == nil {
 			t.Errorf("expect an error in test case %d", i)
 		}
 	}
@@ -79,39 +79,50 @@ func TestECDSAVerifyGetPrimitiveWithInvalidInput(t *testing.T) {
 		k.GetParams().HashType = tc.hashType
 		serializedKey, err := proto.Marshal(k)
 		if err != nil {
-			t.Errorf("proto.Marshal() err = %q, want nil", err)
+			t.Fatalf("proto.Marshal() err = %q, want nil", err)
 		}
-		if _, err := km.Primitive(serializedKey); err == nil {
+		if _, err := keyManager.Primitive(serializedKey); err == nil {
 			t.Errorf("expect an error in test case with params: (curve = %q, hash = %q)", tc.curve, tc.hashType)
 		}
 	}
-	// invalid version
-	key := testutil.NewRandomECDSAPublicKey(commonpb.HashType_SHA256,
-		commonpb.EllipticCurveType_NIST_P256)
+}
+
+func TestVerifierKeyManagerGetPrimitiveWithInvalidInput_InvalidVersion(t *testing.T) {
+	keyManager, err := registry.GetKeyManager(testutil.ECDSAVerifierTypeURL)
+	if err != nil {
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ECDSAVerifierTypeURL, err)
+	}
+	key := testutil.NewRandomECDSAPublicKey(commonpb.HashType_SHA256, commonpb.EllipticCurveType_NIST_P256)
 	key.Version = testutil.ECDSAVerifierKeyVersion + 1
 	serializedKey, err := proto.Marshal(key)
 	if err != nil {
-		t.Errorf("proto.Marshal() err = %q, want nil", err)
+		t.Fatalf("proto.Marshal() err = %q, want nil", err)
 	}
-	if _, err = km.Primitive(serializedKey); err == nil {
+	if _, err = keyManager.Primitive(serializedKey); err == nil {
 		t.Errorf("expect an error when version is invalid")
 	}
-	// nil input
-	if _, err := km.Primitive(nil); err == nil {
+}
+
+func TestVerifierKeyManagerGetPrimitiveWithInvalidInput_NilInputAndParams(t *testing.T) {
+	keyManager, err := registry.GetKeyManager(testutil.ECDSAVerifierTypeURL)
+	if err != nil {
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ECDSAVerifierTypeURL, err)
+	}
+	// Nil or empty input.
+	if _, err := keyManager.Primitive(nil); err == nil {
 		t.Errorf("expect an error when input is nil")
 	}
-	if _, err := km.Primitive([]byte{}); err == nil {
+	if _, err := keyManager.Primitive([]byte{}); err == nil {
 		t.Errorf("expect an error when input is empty slice")
 	}
-	// params field is nil
-	keyNilParams := testutil.NewRandomECDSAPublicKey(commonpb.HashType_SHA256,
-		commonpb.EllipticCurveType_NIST_P256)
+	// Nil params.
+	keyNilParams := testutil.NewRandomECDSAPublicKey(commonpb.HashType_SHA256, commonpb.EllipticCurveType_NIST_P256)
 	keyNilParams.Params = nil
 	serializedKeyNilParams, err := proto.Marshal(keyNilParams)
 	if err != nil {
 		t.Errorf("proto.Marshal() err = %q, want nil", err)
 	}
-	if _, err := km.Primitive(serializedKeyNilParams); err == nil {
-		t.Errorf("km.Primitive(serializedKeyNilParams); err = nil, want non-nil")
+	if _, err := keyManager.Primitive(serializedKeyNilParams); err == nil {
+		t.Errorf("keyManager.Primitive(serializedKeyNilParams); err = nil, want non-nil")
 	}
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package signature
+package ecdsa
 
 import (
 	"crypto/ecdsa"
@@ -30,31 +30,33 @@ import (
 )
 
 const (
-	ecdsaSignerKeyVersion = 0
-	ecdsaSignerTypeURL    = "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey"
+	signerKeyVersion = 0
+	signerTypeURL    = "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey"
 )
 
 // common errors
-var errInvalidECDSASignKey = errors.New("ecdsa_signer_key_manager: invalid key")
-var errInvalidECDSASignKeyFormat = errors.New("ecdsa_signer_key_manager: invalid key format")
+var errInvalidSignKey = errors.New("ecdsa_signer_key_manager: invalid key")
+var errInvalidSignKeyFormat = errors.New("ecdsa_signer_key_manager: invalid key format")
 
-// ecdsaSignerKeyManager is an implementation of KeyManager interface.
-// It generates new ECDSAPrivateKeys and produces new instances of ECDSASign subtle.
-type ecdsaSignerKeyManager struct{}
+// signerKeyManager is an implementation of KeyManager interface.
+// It generates new ECDSA private keys and produces new instances of
+// [subtleSignature.ECDSASigner].
+type signerKeyManager struct{}
 
-// Primitive creates an ECDSASign subtle for the given serialized ECDSAPrivateKey proto.
-func (km *ecdsaSignerKeyManager) Primitive(serializedKey []byte) (any, error) {
+// Primitive creates an [subtleSignature.ECDSASigner] for the given serialized
+// [ecdsapb.EcdsaPrivateKey] proto.
+func (km *signerKeyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
-		return nil, errInvalidECDSASignKey
+		return nil, errInvalidSignKey
 	}
 	key := new(ecdsapb.EcdsaPrivateKey)
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidECDSASignKey
+		return nil, errInvalidSignKey
 	}
 	if err := km.validateKey(key); err != nil {
 		return nil, err
 	}
-	hash, curve, encoding := getECDSAParamNames(key.GetPublicKey().GetParams())
+	hash, curve, encoding := paramNames(key.GetPublicKey().GetParams())
 	ret, err := subtleSignature.NewECDSASigner(hash, curve, encoding, key.KeyValue)
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa_signer_key_manager: %s", err)
@@ -62,10 +64,11 @@ func (km *ecdsaSignerKeyManager) Primitive(serializedKey []byte) (any, error) {
 	return ret, nil
 }
 
-// NewKey creates a new ECDSAPrivateKey according to specification the given serialized ECDSAKeyFormat.
-func (km *ecdsaSignerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+// NewKey creates a new [ecdsapb.EcdsaPrivateKey] according to specification
+// the given serialized [ecdsapb.EcdsaKeyFormat].
+func (km *signerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
 	if len(serializedKeyFormat) == 0 {
-		return nil, errInvalidECDSASignKeyFormat
+		return nil, errInvalidSignKeyFormat
 	}
 	keyFormat := new(ecdsapb.EcdsaKeyFormat)
 	if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
@@ -83,74 +86,82 @@ func (km *ecdsaSignerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Messa
 	}
 
 	keyValue := tmpKey.D.Bytes()
-	pub := newECDSAPublicKey(ecdsaSignerKeyVersion, params, tmpKey.X.Bytes(), tmpKey.Y.Bytes())
-	priv := newECDSAPrivateKey(ecdsaSignerKeyVersion, pub, keyValue)
+	priv := &ecdsapb.EcdsaPrivateKey{
+		Version: signerKeyVersion,
+		PublicKey: &ecdsapb.EcdsaPublicKey{
+			Version: signerKeyVersion,
+			Params:  params,
+			X:       tmpKey.X.Bytes(),
+			Y:       tmpKey.Y.Bytes(),
+		},
+		KeyValue: keyValue,
+	}
 	return priv, nil
 }
 
-// NewKeyData creates a new KeyData according to specification in  the given
-// serialized ECDSAKeyFormat. It should be used solely by the key management API.
-func (km *ecdsaSignerKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+// NewKeyData creates a new [tinkpb.KeyData] according to specification in then
+// give serialized [ecdsapb.EcdsaKeyFormat]. It should be used solely by the
+// key management API.
+func (km *signerKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
 	key, err := km.NewKey(serializedKeyFormat)
 	if err != nil {
 		return nil, err
 	}
 	serializedKey, err := proto.Marshal(key)
 	if err != nil {
-		return nil, errInvalidECDSASignKeyFormat
+		return nil, errInvalidSignKeyFormat
 	}
 	return &tinkpb.KeyData{
-		TypeUrl:         ecdsaSignerTypeURL,
+		TypeUrl:         signerTypeURL,
 		Value:           serializedKey,
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 	}, nil
 }
 
-// PublicKeyData extracts the public key data from the private key.
-func (km *ecdsaSignerKeyManager) PublicKeyData(serializedPrivKey []byte) (*tinkpb.KeyData, error) {
+// PublicKeyData extracts the public key as [tinkpb.KeyData] from the private
+// key.
+func (km *signerKeyManager) PublicKeyData(serializedPrivKey []byte) (*tinkpb.KeyData, error) {
 	privKey := new(ecdsapb.EcdsaPrivateKey)
 	if err := proto.Unmarshal(serializedPrivKey, privKey); err != nil {
-		return nil, errInvalidECDSASignKey
+		return nil, errInvalidSignKey
 	}
 	if err := km.validateKey(privKey); err != nil {
 		return nil, err
 	}
 	serializedPubKey, err := proto.Marshal(privKey.PublicKey)
 	if err != nil {
-		return nil, errInvalidECDSASignKey
+		return nil, errInvalidSignKey
 	}
 	return &tinkpb.KeyData{
-		TypeUrl:         ecdsaVerifierTypeURL,
+		TypeUrl:         verifierTypeURL,
 		Value:           serializedPubKey,
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 	}, nil
 }
 
 // DoesSupport indicates if this key manager supports the given key type.
-func (km *ecdsaSignerKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == ecdsaSignerTypeURL
+func (km *signerKeyManager) DoesSupport(typeURL string) bool {
+	return typeURL == signerTypeURL
 }
 
 // TypeURL returns the key type of keys managed by this key manager.
-func (km *ecdsaSignerKeyManager) TypeURL() string {
-	return ecdsaSignerTypeURL
-}
+func (km *signerKeyManager) TypeURL() string { return signerTypeURL }
 
-// validateKey validates the given ECDSAPrivateKey.
-func (km *ecdsaSignerKeyManager) validateKey(key *ecdsapb.EcdsaPrivateKey) error {
-	if err := keyset.ValidateKeyVersion(key.Version, ecdsaSignerKeyVersion); err != nil {
-		return fmt.Errorf("ecdsa_signer_key_manager: invalid key: %s", err)
+// validateKey validates the given [ecdsapb.EcdsaPrivateKey].
+func (km *signerKeyManager) validateKey(key *ecdsapb.EcdsaPrivateKey) error {
+	if err := keyset.ValidateKeyVersion(key.Version, signerKeyVersion); err != nil {
+		return fmt.Errorf("invalid key version in key: %s", err)
 	}
-	if err := keyset.ValidateKeyVersion(key.GetPublicKey().GetVersion(), ecdsaSignerKeyVersion); err != nil {
-		return fmt.Errorf("ecdsa_signer_key_manager: invalid key: %s", err)
+	if err := keyset.ValidateKeyVersion(key.GetPublicKey().GetVersion(), signerKeyVersion); err != nil {
+		return fmt.Errorf("invalid public version in key: %s", err)
 	}
 
-	hash, curve, encoding := getECDSAParamNames(key.GetPublicKey().GetParams())
+	hash, curve, encoding := paramNames(key.GetPublicKey().GetParams())
 	return subtleSignature.ValidateECDSAParams(hash, curve, encoding)
 }
 
-// validateKeyFormat validates the given ECDSAKeyFormat.
-func (km *ecdsaSignerKeyManager) validateKeyFormat(format *ecdsapb.EcdsaKeyFormat) error {
-	hash, curve, encoding := getECDSAParamNames(format.GetParams())
+// validateKeyFormat validates the given [ecdsapb.EcdsaKeyFormat].
+func (km *signerKeyManager) validateKeyFormat(format *ecdsapb.EcdsaKeyFormat) error {
+	hash, curve, encoding := paramNames(format.GetParams())
 	return subtleSignature.ValidateECDSAParams(hash, curve, encoding)
 }
