@@ -4,6 +4,7 @@ go_library(
     name = "ecdsa",
     srcs = [
         "ecdsa.go",
+        "key.go",
         "proto.go",
         "signer_key_manager.go",
         "verifier_key_manager.go",
@@ -12,6 +13,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//core/registry",
+        "//key",
         "//keyset",
         "//proto/common_go_proto",
         "//proto/ecdsa_go_proto",
@@ -31,6 +33,7 @@ alias(
 go_test(
     name = "ecdsa_test",
     srcs = [
+        "key_test.go",
         "signer_key_manager_test.go",
         "verifier_key_manager_test.go",
     ],
