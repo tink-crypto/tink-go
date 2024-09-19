@@ -13,6 +13,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//core/registry",
+        "//internal/outputprefix",
         "//key",
         "//keyset",
         "//proto/common_go_proto",
@@ -39,6 +40,7 @@ go_test(
     ],
     deps = [
         ":ecdsa",
+        "//core/cryptofmt",
         "//core/registry",
         "//proto/common_go_proto",
         "//proto/ecdsa_go_proto",

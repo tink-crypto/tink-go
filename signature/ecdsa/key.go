@@ -15,8 +15,11 @@
 package ecdsa
 
 import (
+	"bytes"
+	"crypto/ecdh"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
 )
 
@@ -206,32 +209,43 @@ func checkValidVariant(variant Variant) error {
 	}
 }
 
-// NewParameters creates a new ECDSA Parameters object.
-func NewParameters(curveType CurveType, hashType HashType, signatureEncoding SignatureEncoding, variant Variant) (*Parameters, error) {
-	if err := checkValidHash(hashType); err != nil {
-		return nil, fmt.Errorf("ecdsa.Parameters: %v", err)
+func validateParameters(p *Parameters) error {
+	if p == nil {
+		return fmt.Errorf("parameters is nil")
 	}
-	if err := checkValidSignatureEncoding(signatureEncoding); err != nil {
-		return nil, fmt.Errorf("ecdsa.Parameters: %v", err)
+	if err := checkValidHash(p.HashType()); err != nil {
+		return fmt.Errorf("ecdsa.Parameters: %v", err)
 	}
-	if err := checkValidVariant(variant); err != nil {
-		return nil, fmt.Errorf("ecdsa.Parameters: %v", err)
+	if err := checkValidSignatureEncoding(p.SignatureEncoding()); err != nil {
+		return fmt.Errorf("ecdsa.Parameters: %v", err)
 	}
-	if err := checkValidHashForCurve(curveType, hashType); err != nil {
-		return nil, err
+	if err := checkValidVariant(p.Variant()); err != nil {
+		return fmt.Errorf("ecdsa.Parameters: %v", err)
 	}
-	return &Parameters{
+	if err := checkValidHashForCurve(p.CurveType(), p.HashType()); err != nil {
+		return err
+	}
+	return nil
+}
+
+// NewParameters creates a new ECDSA Parameters value.
+func NewParameters(curveType CurveType, hashType HashType, encoding SignatureEncoding, variant Variant) (*Parameters, error) {
+	p := &Parameters{
 		curveType:         curveType,
 		hashType:          hashType,
-		signatureEncoding: signatureEncoding,
+		signatureEncoding: encoding,
 		variant:           variant,
-	}, nil
+	}
+	if err := validateParameters(p); err != nil {
+		return nil, fmt.Errorf("ecdsa.NewParameters: %v", err)
+	}
+	return p, nil
 }
 
 // HasIDRequirement tells whether the key has an ID requirement.
 func (p *Parameters) HasIDRequirement() bool { return p.variant != VariantNoPrefix }
 
-// Equals tells whether this parameters object is equal to other.
+// Equals tells whether this parameters value is equal to other.
 func (p *Parameters) Equals(other key.Parameters) bool {
 	actualParams, ok := other.(*Parameters)
 	return ok && p.HasIDRequirement() == actualParams.HasIDRequirement() &&
@@ -239,4 +253,101 @@ func (p *Parameters) Equals(other key.Parameters) bool {
 		p.hashType == actualParams.hashType &&
 		p.signatureEncoding == actualParams.signatureEncoding &&
 		p.variant == actualParams.variant
+}
+
+func calculateOutputPrefix(variant Variant, idRequirement uint32) ([]byte, error) {
+	switch variant {
+	case VariantTink:
+		return outputprefix.Tink(idRequirement), nil
+	case VariantCrunchy, VariantLegacy:
+		return outputprefix.Legacy(idRequirement), nil
+	case VariantNoPrefix:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("invalid output prefix variant: %v", variant)
+	}
+}
+
+// ecdhCurveFromCurveType returns the corresponding ecdh.Curve value from ct.
+func ecdhCurveFromCurveType(ct CurveType) (ecdh.Curve, error) {
+	switch ct {
+	case NistP256:
+		return ecdh.P256(), nil
+	case NistP384:
+		return ecdh.P384(), nil
+	case NistP521:
+		return ecdh.P521(), nil
+	default:
+		return nil, fmt.Errorf("invalid curve type: %v", ct)
+	}
+}
+
+// PublicKey represents an ECDSA public key.
+type PublicKey struct {
+	publicPoint   []byte
+	idRequirement uint32
+	outputPrefix  []byte
+	parameters    *Parameters
+}
+
+var _ key.Key = (*PublicKey)(nil)
+
+// NewPublicKey creates a new ECDSA PublicKey value from a public point,
+//
+// The point is expected to be encoded uncompressed as per [SEC 1 v2.0, Section
+// 2.3.3].
+//
+// [SEC 1 v2.0, Section 2.3.3]: https://www.secg.org/sec1-v2.pdf#page=17.08
+func NewPublicKey(publicPoint []byte, idRequirement uint32, parameters *Parameters) (*PublicKey, error) {
+	if err := validateParameters(parameters); err != nil {
+		return nil, fmt.Errorf("ecdsa.NewPublicKey: %v", err)
+	}
+	if parameters.Variant() == VariantNoPrefix && idRequirement != 0 {
+		return nil, fmt.Errorf("ecdsa.NewPublicKey: key ID must be zero for VariantNoPrefix")
+	}
+	outputPrefix, err := calculateOutputPrefix(parameters.Variant(), idRequirement)
+	if err != nil {
+		return nil, fmt.Errorf("ecdsa.NewPublicKey: %v", err)
+	}
+	curve, err := ecdhCurveFromCurveType(parameters.CurveType())
+	if err != nil {
+		return nil, fmt.Errorf("ecdsa.NewPublicKey: %v", err)
+	}
+	// Validate the point.
+	if _, err := curve.NewPublicKey(publicPoint); err != nil {
+		return nil, fmt.Errorf("ecdsa.NewPublicKey: point validation failed: %v", err)
+	}
+	return &PublicKey{
+		publicPoint:   bytes.Clone(publicPoint),
+		idRequirement: idRequirement,
+		outputPrefix:  outputPrefix,
+		parameters:    parameters,
+	}, nil
+}
+
+// PublicPoint returns the public key uncompressed point.
+//
+// Point format as per [SEC 1 v2.0, Section 2.3.3].
+//
+// [SEC 1 v2.0, Section 2.3.3]: https://www.secg.org/sec1-v2.pdf#page=17.08
+func (k *PublicKey) PublicPoint() []byte { return bytes.Clone(k.publicPoint) }
+
+// Parameters returns the parameters of this key.
+func (k *PublicKey) Parameters() key.Parameters { return k.parameters }
+
+// IDRequirement tells whether the key ID and whether it is required.
+func (k *PublicKey) IDRequirement() (uint32, bool) {
+	return k.idRequirement, k.Parameters().HasIDRequirement()
+}
+
+// OutputPrefix returns the output prefix of this key.
+func (k *PublicKey) OutputPrefix() []byte { return bytes.Clone(k.outputPrefix) }
+
+// Equals tells whether this key value is equal to other.
+func (k *PublicKey) Equals(other key.Key) bool {
+	actualKey, ok := other.(*PublicKey)
+	return ok && k.Parameters().Equals(actualKey.Parameters()) &&
+		k.idRequirement == actualKey.idRequirement &&
+		bytes.Equal(k.publicPoint, actualKey.publicPoint) &&
+		bytes.Equal(k.outputPrefix, actualKey.outputPrefix)
 }
