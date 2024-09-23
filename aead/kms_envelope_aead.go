@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	lenDEK        = 4
-	maxUint32Size = 4294967295
+	lenDEK                = 4
+	maxLengthEncryptedDEK = 4096
 )
 
 // KMSEnvelopeAEAD represents an instance of Envelope AEAD.
@@ -105,8 +105,8 @@ func (a *KMSEnvelopeAEAD) Encrypt(pt, aad []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(encryptedDEK) > maxUint32Size {
-		return nil, errors.New("kms_envelope_aead: encrypted dek too large")
+	if len(encryptedDEK) > maxLengthEncryptedDEK {
+		return nil, errors.New("kms_envelope_aead: length of encrypted DEK too large")
 	}
 	res := make([]byte, 0, lenDEK+len(encryptedDEK)+len(payload))
 	res = binary.BigEndian.AppendUint32(res, uint32(len(encryptedDEK)))
@@ -127,12 +127,10 @@ func (a *KMSEnvelopeAEAD) Decrypt(ct, aad []byte) ([]byte, error) {
 
 	// Extract length of encrypted DEK and advance past that length.
 	ed := int(binary.BigEndian.Uint32(ct[:lenDEK]))
-	ct = ct[lenDEK:]
-
-	// Verify we have enough bytes for the encrypted DEK.
-	if ed <= 0 || len(ct) < ed {
-		return nil, errors.New("kms_envelope_aead: invalid ciphertext")
+	if ed <= 0 || ed > maxLengthEncryptedDEK || ed > len(ct)-lenDEK {
+		return nil, errors.New("kms_envelope_aead: length of encrypted DEK too large")
 	}
+	ct = ct[lenDEK:]
 
 	// Extract the encrypted DEK and the payload.
 	encryptedDEK := ct[:ed]
