@@ -6,6 +6,7 @@ go_library(
         "ecdsa.go",
         "key.go",
         "proto.go",
+        "protoserialization.go",
         "signer_key_manager.go",
         "verifier_key_manager.go",
     ],
@@ -14,6 +15,7 @@ go_library(
     deps = [
         "//core/registry",
         "//internal/outputprefix",
+        "//internal/protoserialization",
         "//key",
         "//keyset",
         "//proto/common_go_proto",
@@ -35,13 +37,15 @@ go_test(
     name = "ecdsa_test",
     srcs = [
         "key_test.go",
+        "protoserialization_test.go",
         "signer_key_manager_test.go",
         "verifier_key_manager_test.go",
     ],
+    embed = [":ecdsa"],
     deps = [
-        ":ecdsa",
         "//core/cryptofmt",
         "//core/registry",
+        "//internal/protoserialization",
         "//proto/common_go_proto",
         "//proto/ecdsa_go_proto",
         "//proto/tink_go_proto",
