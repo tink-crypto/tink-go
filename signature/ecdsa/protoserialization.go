@@ -15,6 +15,7 @@
 package ecdsa
 
 import (
+	"bytes"
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
@@ -159,11 +160,18 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 		return nil, err
 	}
 
-	if len(protoECDSAKey.GetX()) > coordinateSize || len(protoECDSAKey.GetY()) > coordinateSize {
-		return nil, fmt.Errorf("public key has invalid coordinate size: (%v, %v)", len(protoECDSAKey.GetX()), len(protoECDSAKey.GetY()))
+	// Tolerate arbitrary leading zeros in the coordinates.
+	// This is to support the case where the curve size in bytes + 1 is the
+	// length of the coordinate. This happens when Tink adds an extra leading
+	// 0x00 byte (see b/264525021).
+	x := bytes.TrimLeft(protoECDSAKey.GetX(), "\x00")
+	y := bytes.TrimLeft(protoECDSAKey.GetY(), "\x00")
+
+	if len(x) > coordinateSize || len(y) > coordinateSize {
+		return nil, fmt.Errorf("public key has invalid coordinate size: (%v, %v)", len(x), len(y))
 	}
 
-	publicPoint := encodePoint(protoECDSAKey.GetX(), protoECDSAKey.GetY(), coordinateSize)
+	publicPoint := encodePoint(x, y, coordinateSize)
 	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
 	keyID, _ := keySerialization.IDRequirement()
 	return NewPublicKey(publicPoint, keyID, params)

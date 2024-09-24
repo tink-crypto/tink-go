@@ -134,7 +134,24 @@ func TestParsePublicKeyFails(t *testing.T) {
 				TypeUrl: verifierTypeURL,
 				Value: marshalPublicKey(t, &ecdsapb.EcdsaPublicKey{
 					X: xP256,
-					Y: []byte("00000000000000000000000000000000"),
+					Y: []byte("00000000000000000000000000000001"),
+					Params: &ecdsapb.EcdsaParams{
+						Curve:    commonpb.EllipticCurveType_NIST_P256,
+						HashType: commonpb.HashType_SHA256,
+						Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+					},
+					Version: verifierKeyVersion,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "point coordinate after leading 0s removal too long",
+			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: verifierTypeURL,
+				Value: marshalPublicKey(t, &ecdsapb.EcdsaPublicKey{
+					X: append(xP256, 0x02),
+					Y: yP256,
 					Params: &ecdsapb.EcdsaParams{
 						Curve:    commonpb.EllipticCurveType_NIST_P256,
 						HashType: commonpb.HashType_SHA256,
@@ -235,6 +252,8 @@ func TestParsePublicKeyFails(t *testing.T) {
 			p := &publicKeyParser{}
 			if _, err := p.ParseKey(tc.keySerialization); err == nil {
 				t.Errorf("p.ParseKey(%v) err = nil, want non-nil", tc.keySerialization)
+			} else {
+				t.Logf("p.ParseKey(%v) err = %v", tc.keySerialization, err)
 			}
 		})
 	}
@@ -257,6 +276,7 @@ func newPublicKey(t *testing.T, uncompressedPoint []byte, idRequirement uint32, 
 type publicKeyTestCase struct {
 	keySerialization *protoserialization.KeySerialization
 	wantPublicKey    *PublicKey
+	hasLeadingZeros  bool
 }
 
 func testCases(t *testing.T) []publicKeyTestCase {
@@ -301,109 +321,126 @@ func testCases(t *testing.T) []publicKeyTestCase {
 			},
 		} {
 			for _, curveType := range []commonpb.EllipticCurveType{commonpb.EllipticCurveType_NIST_P256, commonpb.EllipticCurveType_NIST_P384, commonpb.EllipticCurveType_NIST_P521} {
-				switch curveType {
-				case commonpb.EllipticCurveType_NIST_P256:
-					{
-						x, y := hexDecode(t, pubKeyXP256Hex), hexDecode(t, pubKeyYP256Hex)
-						uncompressedPoint := hexDecode(t, uncompressedP256Hex)
-						tc = append(tc, publicKeyTestCase{
-							keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-								TypeUrl: verifierTypeURL,
-								Value: marshalPublicKey(t, &ecdsapb.EcdsaPublicKey{
-									X: x,
-									Y: y,
-									Params: &ecdsapb.EcdsaParams{
-										Curve:    curveType,
-										HashType: commonpb.HashType_SHA256,
-										Encoding: encoding.protoEncoding,
-									},
-									Version: verifierKeyVersion,
+				for _, hasLeadingZeros := range []bool{false, true} {
+					switch curveType {
+					case commonpb.EllipticCurveType_NIST_P256:
+						{
+							x, y := hexDecode(t, pubKeyXP256Hex), hexDecode(t, pubKeyYP256Hex)
+							if hasLeadingZeros {
+								x = append([]byte{0x00}, x...)
+								y = append([]byte{0x00}, y...)
+							}
+							uncompressedPoint := hexDecode(t, uncompressedP256Hex)
+							tc = append(tc, publicKeyTestCase{
+								keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+									TypeUrl: verifierTypeURL,
+									Value: marshalPublicKey(t, &ecdsapb.EcdsaPublicKey{
+										X: x,
+										Y: y,
+										Params: &ecdsapb.EcdsaParams{
+											Curve:    curveType,
+											HashType: commonpb.HashType_SHA256,
+											Encoding: encoding.protoEncoding,
+										},
+										Version: verifierKeyVersion,
+									}),
+									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+								}, variantAndID.protoPrefixType, variantAndID.id),
+								wantPublicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
+									curveType:         NistP256,
+									hashType:          SHA256,
+									signatureEncoding: encoding.encoding,
+									variant:           variantAndID.variant,
 								}),
-								KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
-							}, variantAndID.protoPrefixType, variantAndID.id),
-							wantPublicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
-								curveType:         NistP256,
-								hashType:          SHA256,
-								signatureEncoding: encoding.encoding,
-								variant:           variantAndID.variant,
-							}),
-						})
-					}
-				case commonpb.EllipticCurveType_NIST_P384:
-					{
-						x, y := hexDecode(t, pubKeyXP384Hex), hexDecode(t, pubKeyYP384Hex)
-						uncompressedPoint := hexDecode(t, uncompressedP384Hex)
-						tc = append(tc, publicKeyTestCase{
-							keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-								TypeUrl: verifierTypeURL,
-								Value: marshalPublicKey(t, &ecdsapb.EcdsaPublicKey{
-									X: x,
-									Y: y,
-									Params: &ecdsapb.EcdsaParams{
-										Curve:    curveType,
-										HashType: commonpb.HashType_SHA384,
-										Encoding: encoding.protoEncoding,
-									},
-									Version: verifierKeyVersion,
+								hasLeadingZeros: hasLeadingZeros,
+							})
+						}
+					case commonpb.EllipticCurveType_NIST_P384:
+						{
+							x, y := hexDecode(t, pubKeyXP384Hex), hexDecode(t, pubKeyYP384Hex)
+							if hasLeadingZeros {
+								x = append([]byte{0x00}, x...)
+								y = append([]byte{0x00}, y...)
+							}
+							uncompressedPoint := hexDecode(t, uncompressedP384Hex)
+							tc = append(tc, publicKeyTestCase{
+								keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+									TypeUrl: verifierTypeURL,
+									Value: marshalPublicKey(t, &ecdsapb.EcdsaPublicKey{
+										X: x,
+										Y: y,
+										Params: &ecdsapb.EcdsaParams{
+											Curve:    curveType,
+											HashType: commonpb.HashType_SHA384,
+											Encoding: encoding.protoEncoding,
+										},
+										Version: verifierKeyVersion,
+									}),
+									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+								}, variantAndID.protoPrefixType, variantAndID.id),
+								wantPublicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
+									curveType:         NistP384,
+									hashType:          SHA384,
+									signatureEncoding: encoding.encoding,
+									variant:           variantAndID.variant,
 								}),
-								KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
-							}, variantAndID.protoPrefixType, variantAndID.id),
-							wantPublicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
-								curveType:         NistP384,
-								hashType:          SHA384,
-								signatureEncoding: encoding.encoding,
-								variant:           variantAndID.variant,
-							}),
-						})
-						tc = append(tc, publicKeyTestCase{
-							keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-								TypeUrl: verifierTypeURL,
-								Value: marshalPublicKey(t, &ecdsapb.EcdsaPublicKey{
-									X: x,
-									Y: y,
-									Params: &ecdsapb.EcdsaParams{
-										Curve:    curveType,
-										HashType: commonpb.HashType_SHA512,
-										Encoding: encoding.protoEncoding,
-									},
-									Version: verifierKeyVersion,
+								hasLeadingZeros: hasLeadingZeros,
+							})
+							tc = append(tc, publicKeyTestCase{
+								keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+									TypeUrl: verifierTypeURL,
+									Value: marshalPublicKey(t, &ecdsapb.EcdsaPublicKey{
+										X: x,
+										Y: y,
+										Params: &ecdsapb.EcdsaParams{
+											Curve:    curveType,
+											HashType: commonpb.HashType_SHA512,
+											Encoding: encoding.protoEncoding,
+										},
+										Version: verifierKeyVersion,
+									}),
+									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+								}, variantAndID.protoPrefixType, variantAndID.id),
+								wantPublicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
+									curveType:         NistP384,
+									hashType:          SHA512,
+									signatureEncoding: encoding.encoding,
+									variant:           variantAndID.variant,
 								}),
-								KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
-							}, variantAndID.protoPrefixType, variantAndID.id),
-							wantPublicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
-								curveType:         NistP384,
-								hashType:          SHA512,
-								signatureEncoding: encoding.encoding,
-								variant:           variantAndID.variant,
-							}),
-						})
-					}
-				case commonpb.EllipticCurveType_NIST_P521:
-					{
-						x, y := hexDecode(t, pubKeyXP521Hex), hexDecode(t, pubKeyYP521Hex)
-						uncompressedPoint := hexDecode(t, uncompressedP521Hex)
-						tc = append(tc, publicKeyTestCase{
-							keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-								TypeUrl: verifierTypeURL,
-								Value: marshalPublicKey(t, &ecdsapb.EcdsaPublicKey{
-									X: x,
-									Y: y,
-									Params: &ecdsapb.EcdsaParams{
-										Curve:    curveType,
-										HashType: commonpb.HashType_SHA512,
-										Encoding: encoding.protoEncoding,
-									},
-									Version: verifierKeyVersion,
+								hasLeadingZeros: hasLeadingZeros,
+							})
+						}
+					case commonpb.EllipticCurveType_NIST_P521:
+						{
+							x, y := hexDecode(t, pubKeyXP521Hex), hexDecode(t, pubKeyYP521Hex)
+							if hasLeadingZeros {
+								x = append([]byte{0x00}, x...)
+								y = append([]byte{0x00}, y...)
+							}
+							uncompressedPoint := hexDecode(t, uncompressedP521Hex)
+							tc = append(tc, publicKeyTestCase{
+								keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+									TypeUrl: verifierTypeURL,
+									Value: marshalPublicKey(t, &ecdsapb.EcdsaPublicKey{
+										X: x,
+										Y: y,
+										Params: &ecdsapb.EcdsaParams{
+											Curve:    curveType,
+											HashType: commonpb.HashType_SHA512,
+											Encoding: encoding.protoEncoding,
+										},
+										Version: verifierKeyVersion,
+									}),
+									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+								}, variantAndID.protoPrefixType, variantAndID.id),
+								wantPublicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
+									curveType:         NistP521,
+									hashType:          SHA512,
+									signatureEncoding: encoding.encoding,
+									variant:           variantAndID.variant,
 								}),
-								KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
-							}, variantAndID.protoPrefixType, variantAndID.id),
-							wantPublicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
-								curveType:         NistP521,
-								hashType:          SHA512,
-								signatureEncoding: encoding.encoding,
-								variant:           variantAndID.variant,
-							}),
-						})
+							})
+						}
 					}
 				}
 			}
@@ -414,7 +451,7 @@ func testCases(t *testing.T) []publicKeyTestCase {
 
 func TestParsePublicKey(t *testing.T) {
 	for _, tc := range testCases(t) {
-		name := fmt.Sprintf("curveType:%v_hashType:%v_encoding:%v_variant:%v_id:%d", tc.wantPublicKey.parameters.curveType, tc.wantPublicKey.parameters.hashType, tc.wantPublicKey.parameters.signatureEncoding, tc.wantPublicKey.parameters.variant, tc.wantPublicKey.idRequirement)
+		name := fmt.Sprintf("curveType:%v_hashType:%v_encoding:%v_variant:%v_id:%d_hasLeadingZeros:%v", tc.wantPublicKey.parameters.curveType, tc.wantPublicKey.parameters.hashType, tc.wantPublicKey.parameters.signatureEncoding, tc.wantPublicKey.parameters.variant, tc.wantPublicKey.idRequirement, tc.hasLeadingZeros)
 		t.Run(name, func(t *testing.T) {
 			p := &publicKeyParser{}
 			gotPublicKey, err := p.ParseKey(tc.keySerialization)
