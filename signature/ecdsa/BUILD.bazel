@@ -46,6 +46,7 @@ go_test(
         "//core/cryptofmt",
         "//core/registry",
         "//internal/protoserialization",
+        "//key",
         "//proto/common_go_proto",
         "//proto/ecdsa_go_proto",
         "//proto/tink_go_proto",

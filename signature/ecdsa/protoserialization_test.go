@@ -21,6 +21,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	ecdsapb "github.com/tink-crypto/tink-go/v2/proto/ecdsa_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -70,6 +71,69 @@ func marshalPublicKey(t *testing.T, protoPubKey *ecdsapb.EcdsaPublicKey) []byte 
 		t.Fatalf("proto.Marshal(protoPubKey) err = %v, want nil", err)
 	}
 	return serializedProtoPubKey
+}
+
+type testParams struct{}
+
+func (p *testParams) HasIDRequirement() bool { return true }
+
+func (p *testParams) Equals(params key.Parameters) bool { return true }
+
+type testKey struct{}
+
+func (k *testKey) Parameters() key.Parameters { return &testParams{} }
+
+func (k *testKey) Equals(other key.Key) bool { return true }
+
+func (k *testKey) IDRequirement() (uint32, bool) { return 123, true }
+
+func TestSerializePublicKeyFails(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		publicKey key.Key
+	}{
+		{
+			name:      "nil key",
+			publicKey: nil,
+		},
+		{
+			name:      "invalid public key",
+			publicKey: &PublicKey{},
+		},
+		{
+			name:      "incorrect key type",
+			publicKey: &testKey{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &publicKeySerializer{}
+			if _, err := s.SerializeKey(tc.publicKey); err == nil {
+				t.Errorf("s.SerializeKey(%v) err = nil, want non-nil", tc.publicKey)
+			}
+		})
+	}
+}
+
+func TestSerializePublicKey(t *testing.T) {
+	for _, tc := range testCases(t) {
+		if !tc.hasLeadingZeros {
+			// We expect coordinates to have a fixed size encoding:
+			// 		 x' = 0x00 || x, y' = 0x00 || y
+			// With: len(x') = len(y') = coordinateSizeForCurve(tc.publicKey.parameters.curveType) + 1.
+			continue
+		}
+		name := fmt.Sprintf("curveType:%v_hashType:%v_encoding:%v_variant:%v_id:%d", tc.publicKey.parameters.curveType, tc.publicKey.parameters.hashType, tc.publicKey.parameters.signatureEncoding, tc.publicKey.parameters.variant, tc.publicKey.idRequirement)
+		t.Run(name, func(t *testing.T) {
+			s := &publicKeySerializer{}
+			got, err := s.SerializeKey(tc.publicKey)
+			if err != nil {
+				t.Fatalf("s.SerializeKey(%v) err = nil, want non-nil", tc.publicKey)
+			}
+			if !got.Equals(tc.keySerialization) {
+				t.Errorf("got = %v, want %v", got, tc.keySerialization)
+			}
+		})
+	}
 }
 
 func TestParsePublicKeyFails(t *testing.T) {
@@ -275,7 +339,7 @@ func newPublicKey(t *testing.T, uncompressedPoint []byte, idRequirement uint32, 
 
 type publicKeyTestCase struct {
 	keySerialization *protoserialization.KeySerialization
-	wantPublicKey    *PublicKey
+	publicKey        *PublicKey
 	hasLeadingZeros  bool
 }
 
@@ -346,7 +410,7 @@ func testCases(t *testing.T) []publicKeyTestCase {
 									}),
 									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 								}, variantAndID.protoPrefixType, variantAndID.id),
-								wantPublicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
+								publicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
 									curveType:         NistP256,
 									hashType:          SHA256,
 									signatureEncoding: encoding.encoding,
@@ -378,7 +442,7 @@ func testCases(t *testing.T) []publicKeyTestCase {
 									}),
 									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 								}, variantAndID.protoPrefixType, variantAndID.id),
-								wantPublicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
+								publicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
 									curveType:         NistP384,
 									hashType:          SHA384,
 									signatureEncoding: encoding.encoding,
@@ -401,7 +465,7 @@ func testCases(t *testing.T) []publicKeyTestCase {
 									}),
 									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 								}, variantAndID.protoPrefixType, variantAndID.id),
-								wantPublicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
+								publicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
 									curveType:         NistP384,
 									hashType:          SHA512,
 									signatureEncoding: encoding.encoding,
@@ -433,7 +497,7 @@ func testCases(t *testing.T) []publicKeyTestCase {
 									}),
 									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 								}, variantAndID.protoPrefixType, variantAndID.id),
-								wantPublicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
+								publicKey: newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
 									curveType:         NistP521,
 									hashType:          SHA512,
 									signatureEncoding: encoding.encoding,
@@ -451,15 +515,15 @@ func testCases(t *testing.T) []publicKeyTestCase {
 
 func TestParsePublicKey(t *testing.T) {
 	for _, tc := range testCases(t) {
-		name := fmt.Sprintf("curveType:%v_hashType:%v_encoding:%v_variant:%v_id:%d_hasLeadingZeros:%v", tc.wantPublicKey.parameters.curveType, tc.wantPublicKey.parameters.hashType, tc.wantPublicKey.parameters.signatureEncoding, tc.wantPublicKey.parameters.variant, tc.wantPublicKey.idRequirement, tc.hasLeadingZeros)
+		name := fmt.Sprintf("curveType:%v_hashType:%v_encoding:%v_variant:%v_id:%d_hasLeadingZeros:%v", tc.publicKey.parameters.curveType, tc.publicKey.parameters.hashType, tc.publicKey.parameters.signatureEncoding, tc.publicKey.parameters.variant, tc.publicKey.idRequirement, tc.hasLeadingZeros)
 		t.Run(name, func(t *testing.T) {
 			p := &publicKeyParser{}
 			gotPublicKey, err := p.ParseKey(tc.keySerialization)
 			if err != nil {
 				t.Fatalf("p.ParseKey(%v) err = %v, want non-nil", tc.keySerialization, err)
 			}
-			if !gotPublicKey.Equals(tc.wantPublicKey) {
-				t.Errorf("%v.Equals(%v) = false, want true", gotPublicKey, tc.wantPublicKey)
+			if !gotPublicKey.Equals(tc.publicKey) {
+				t.Errorf("%v.Equals(%v) = false, want true", gotPublicKey, tc.publicKey)
 			}
 		})
 	}
@@ -486,7 +550,7 @@ func TestParsePublicKey(t *testing.T) {
 			}),
 			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 		}, tinkpb.OutputPrefixType_TINK, 123)
-		wantPublicKey :=
+		publicKey :=
 			newPublicKey(t, uncompressedPoint, 123, &Parameters{
 				curveType:         NistP521,
 				hashType:          SHA512,
@@ -498,8 +562,8 @@ func TestParsePublicKey(t *testing.T) {
 		if err != nil {
 			t.Fatalf("p.ParseKey(%v) err = %v, want non-nil", keySerialization, err)
 		}
-		if !gotPublicKey.Equals(wantPublicKey) {
-			t.Errorf("%v.Equals(%v) = false, want true", gotPublicKey, wantPublicKey)
+		if !gotPublicKey.Equals(publicKey) {
+			t.Errorf("%v.Equals(%v) = false, want true", gotPublicKey, publicKey)
 		}
 	})
 }
