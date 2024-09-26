@@ -19,8 +19,10 @@ import (
 	"crypto/ecdh"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
 // Variant is the prefix variant of an ECDSA key.
@@ -350,4 +352,123 @@ func (k *PublicKey) Equals(other key.Key) bool {
 		k.idRequirement == actualKey.idRequirement &&
 		bytes.Equal(k.publicPoint, actualKey.publicPoint) &&
 		bytes.Equal(k.outputPrefix, actualKey.outputPrefix)
+}
+
+// PrivateKey represents an ECDSA private key.
+type PrivateKey struct {
+	publicKey       *PublicKey
+	privateKeyValue secretdata.Bytes
+}
+
+var _ key.Key = (*PrivateKey)(nil)
+
+// NewPrivateKey creates a new ECDSA PrivateKey object from a secret private
+// key value and parameters.
+//
+// The private key value must be octet encoded as per [SEC 1 v2.0, Section
+// 2.3.5].
+//
+// [SEC 1 v2.0, Section 2.3.5]: https://www.secg.org/sec1-v2.pdf#page=17.08
+func NewPrivateKey(privateKeyValue secretdata.Bytes, idRequirement uint32, params *Parameters) (*PrivateKey, error) {
+	if err := validateParameters(params); err != nil {
+		return nil, fmt.Errorf("ecdsa.NewPrivateKey: %v", err)
+	}
+	curve, err := ecdhCurveFromCurveType(params.CurveType())
+	if err != nil {
+		return nil, fmt.Errorf("ecdsa.NewPrivateKey: %v", err)
+	}
+	ecdhPrivateKey, err := curve.NewPrivateKey(privateKeyValue.Data(insecuresecretdataaccess.Token{}))
+	if err != nil {
+		return nil, fmt.Errorf("ecdsa.NewPrivateKey: point validation failed: %v", err)
+	}
+	publicPoint := ecdhPrivateKey.PublicKey().Bytes()
+	publicKey, err := NewPublicKey(publicPoint, idRequirement, params)
+	if err != nil {
+		return nil, fmt.Errorf("ecdsa.NewPrivateKey: %v", err)
+	}
+	privKey := &PrivateKey{
+		publicKey:       publicKey,
+		privateKeyValue: privateKeyValue,
+	}
+	return privKey, nil
+}
+
+// validatePrivateKey checks that the private key value is valid with respect to
+// the public key.
+//
+// It checks that an [ecdh.PrivateKey] can be constructed from the private key
+// value and that the [ecdh.PublicKey] of that [ecdh.PrivateKey] is equal to the
+// public key constructed from [PublicKey].
+func validatePrivateKey(publicKey *PublicKey, privateKeyValue secretdata.Bytes) error {
+	curve, err := ecdhCurveFromCurveType(publicKey.parameters.CurveType())
+	if err != nil {
+		return err
+	}
+	ecdhPrivateKey, err := curve.NewPrivateKey(privateKeyValue.Data(insecuresecretdataaccess.Token{}))
+	if err != nil {
+		return fmt.Errorf("point validation failed: %v", err)
+	}
+	ecdhPublicKeyFromPublicKey, err := curve.NewPublicKey(publicKey.publicPoint)
+	if err != nil {
+		// Should never happen.
+		return fmt.Errorf("invalid public key point: %v", err)
+	}
+	if !ecdhPrivateKey.PublicKey().Equal(ecdhPublicKeyFromPublicKey) {
+		return fmt.Errorf("invalid private key value")
+	}
+	return nil
+}
+
+// NewPrivateKeyFromPublicKey creates a new ECDSA PrivateKey object from a
+// public key and private key value.
+//
+// The private key value must be octet encoded as per [SEC 1 v2.0, Section
+// 2.3.5].
+//
+// [SEC 1 v2.0, Section 2.3.5]: https://www.secg.org/sec1-v2.pdf#page=17.08
+func NewPrivateKeyFromPublicKey(publicKey *PublicKey, privateKeyValue secretdata.Bytes) (*PrivateKey, error) {
+	// PublicKey can be either nil, PublicKey{} or a valid PublicKey created with
+	// NewPublicKey.
+	if publicKey == nil {
+		return nil, fmt.Errorf("ecdsa.NewPrivateKeyFromPublicKey: publicKey is nil")
+	}
+	// This should suffice to rule out the empty PublicKey{} case.
+	// If parameters are not nil, we know the public key is valid (e.g., it
+	// contains a valid point).
+	if publicKey.parameters == nil {
+		return nil, fmt.Errorf("ecdsa.NewPrivateKeyFromPublicKey: invalid public key")
+	}
+
+	// Check that the private key value is valid with respect to the public key.
+	if err := validatePrivateKey(publicKey, privateKeyValue); err != nil {
+		return nil, fmt.Errorf("ecdsa.NewPrivateKeyFromPublicKey: %v", err)
+	}
+
+	privKey := &PrivateKey{
+		publicKey:       publicKey,
+		privateKeyValue: privateKeyValue,
+	}
+	return privKey, nil
+}
+
+// PrivateKeyValue returns the private key value as [secretdata.Bytes].
+func (k *PrivateKey) PrivateKeyValue() secretdata.Bytes { return k.privateKeyValue }
+
+// PublicKey returns the corresponding public key as [key.Key].
+func (k *PrivateKey) PublicKey() key.Key { return k.publicKey }
+
+// Parameters returns the parameters of this key as [key.Parameters].
+func (k *PrivateKey) Parameters() key.Parameters { return k.PublicKey().Parameters() }
+
+// IDRequirement tells whether the key ID and whether it is required.
+func (k *PrivateKey) IDRequirement() (uint32, bool) { return k.PublicKey().IDRequirement() }
+
+// OutputPrefix returns the output prefix of this key.
+func (k *PrivateKey) OutputPrefix() []byte { return k.publicKey.OutputPrefix() }
+
+// Equals tells whether this key object is equal to other.
+func (k *PrivateKey) Equals(other key.Key) bool {
+	actualKey, ok := other.(*PrivateKey)
+	return ok && k.publicKey.Equals(actualKey.publicKey) &&
+		k.privateKeyValue.Equals(actualKey.privateKeyValue)
 }
