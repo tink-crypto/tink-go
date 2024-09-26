@@ -4,7 +4,7 @@ go_library(
     name = "registryconfig",
     srcs = ["registry_config.go"],
     importpath = "github.com/tink-crypto/tink-go/v2/internal/registryconfig",
-    visibility = ["//keyset:__subpackages__"],
+    visibility = ["//:__subpackages__"],
     deps = [
         "//core/registry",
         "//internal/internalapi",
@@ -16,7 +16,7 @@ go_library(
 alias(
     name = "go_default_library",
     actual = ":registryconfig",
-    visibility = ["//keyset:__subpackages__"],
+    visibility = ["//:__subpackages__"],
 )
 
 go_test(
