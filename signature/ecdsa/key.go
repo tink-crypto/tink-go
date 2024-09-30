@@ -457,13 +457,13 @@ func NewPrivateKeyFromPublicKey(publicKey *PublicKey, privateKeyValue secretdata
 func (k *PrivateKey) PrivateKeyValue() secretdata.Bytes { return k.privateKeyValue }
 
 // PublicKey returns the corresponding public key as [key.Key].
-func (k *PrivateKey) PublicKey() key.Key { return k.publicKey }
+func (k *PrivateKey) PublicKey() (key.Key, error) { return k.publicKey, nil }
 
 // Parameters returns the parameters of this key as [key.Parameters].
-func (k *PrivateKey) Parameters() key.Parameters { return k.PublicKey().Parameters() }
+func (k *PrivateKey) Parameters() key.Parameters { return k.publicKey.Parameters() }
 
 // IDRequirement tells whether the key ID and whether it is required.
-func (k *PrivateKey) IDRequirement() (uint32, bool) { return k.PublicKey().IDRequirement() }
+func (k *PrivateKey) IDRequirement() (uint32, bool) { return k.publicKey.IDRequirement() }
 
 // OutputPrefix returns the output prefix of this key.
 func (k *PrivateKey) OutputPrefix() []byte { return k.publicKey.OutputPrefix() }

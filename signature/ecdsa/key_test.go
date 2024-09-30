@@ -712,7 +712,11 @@ func TestNewPrivateKey(t *testing.T) {
 			if got, want := prvKey.Parameters(), params; !got.Equals(want) {
 				t.Errorf("prvKey.Parameters() = %v, want %v", got, want)
 			}
-			if got, want := prvKey.PublicKey(), publicKey; !got.Equals(want) {
+			want, err := prvKey.PublicKey()
+			if err != nil {
+				t.Fatalf("prvKey.PublicKey() err = %v, want nil", err)
+			}
+			if got := publicKey; !got.Equals(want) {
 				t.Errorf("prvKey.PublicKey() = %v, want %v", got, want)
 			}
 
@@ -809,7 +813,11 @@ func TestNewPrivateKeyFromPublicKey(t *testing.T) {
 			if got, want := prvKey.Parameters(), params; !got.Equals(want) {
 				t.Errorf("prvKey.Parameters() = %v, want %v", got, want)
 			}
-			if got, want := prvKey.PublicKey(), publicKey; !got.Equals(want) {
+			want, err := prvKey.PublicKey()
+			if err != nil {
+				t.Fatalf("prvKey.PublicKey() err = %v, want nil", err)
+			}
+			if got := publicKey; !got.Equals(want) {
 				t.Errorf("prvKey.PublicKey() = %v, want %v", got, want)
 			}
 
