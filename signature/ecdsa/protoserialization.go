@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
@@ -336,4 +337,57 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
 	keyID, _ := keySerialization.IDRequirement()
 	return NewPublicKey(publicPoint, keyID, params)
+}
+
+type privateKeySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*privateKeySerializer)(nil)
+
+func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	ecdsaPrivKey, ok := key.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type: %T, want *ecdsa.PrivateKey", key)
+	}
+	// This is nil if PrivateKey was created as a struct literal.
+	if ecdsaPrivKey.publicKey == nil {
+		return nil, fmt.Errorf("invalid key: public key is nil")
+	}
+	params := ecdsaPrivKey.publicKey.parameters
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(params.Variant())
+	if err != nil {
+		return nil, err
+	}
+
+	protoPublicKey, err := createProtoECDSAPublicKey(ecdsaPrivKey.publicKey, params)
+	if err != nil {
+		return nil, err
+	}
+
+	coordinateSize, err := coordinateSizeForCurve(params.CurveType())
+	if err != nil {
+		return nil, err
+	}
+	// Key value must be fixed size: 1 + coordinateSize (see b/264525021).
+	privateKeyValue := make([]byte, 1, coordinateSize+1)
+	// ecdsaPrivKey.PrivateKeyValue() is guaranteed to have a length of
+	// coordinateSize.
+	privateKeyValue = append(privateKeyValue, ecdsaPrivKey.PrivateKeyValue().Data(insecuresecretdataaccess.Token{})...)
+
+	protoKey := &ecdsapb.EcdsaPrivateKey{
+		KeyValue:  privateKeyValue,
+		PublicKey: protoPublicKey,
+		Version:   signerKeyVersion,
+	}
+	serializedKey, err := proto.Marshal(protoKey)
+	if err != nil {
+		return nil, err
+	}
+	// idRequirement is zero if the key doesn't have a key requirement.
+	idRequirement, _ := ecdsaPrivKey.IDRequirement()
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         signerTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}
+	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
 }

@@ -452,6 +452,8 @@ func NewPrivateKeyFromPublicKey(publicKey *PublicKey, privateKeyValue secretdata
 }
 
 // PrivateKeyValue returns the private key value as [secretdata.Bytes].
+//
+// The returned private key value has length equal to the size of the curve.
 func (k *PrivateKey) PrivateKeyValue() secretdata.Bytes { return k.privateKeyValue }
 
 // PublicKey returns the corresponding public key as [key.Key].
