@@ -15,17 +15,29 @@
 package ecdsa
 
 import (
-	"bytes"
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	ecdsapb "github.com/tink-crypto/tink-go/v2/proto/ecdsa_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
+
+// padBigIntBytesToFixedSizeBuffer pads the given big integer bytes to the given size.
+func padBigIntBytesToFixedSizeBuffer(bigIntBytes []byte, size int) ([]byte, error) {
+	if len(bigIntBytes) > size {
+		return nil, fmt.Errorf("big int has invali size: %d, want at most %d", len(bigIntBytes), size)
+	}
+	if len(bigIntBytes) == size {
+		return bigIntBytes, nil
+	}
+	buf := make([]byte, size-len(bigIntBytes), size)
+	return append(buf, bigIntBytes...), nil
+}
 
 type publicKeySerializer struct{}
 
@@ -122,10 +134,14 @@ func validateEncodingAndGetCoordinates(publicPoint []byte, curveType CurveType) 
 		return nil, nil, fmt.Errorf("public key has invalid 1st byte: got %x, want %x", publicPoint[0], 0x04)
 	}
 	xy := publicPoint[1:]
-	x := make([]byte, 1, coordinateSize+1)
-	y := make([]byte, 1, coordinateSize+1)
-	x = append(x, xy[:coordinateSize]...)
-	y = append(y, xy[coordinateSize:]...)
+	x, err := padBigIntBytesToFixedSizeBuffer(xy[:coordinateSize], coordinateSize+1)
+	if err != nil {
+		return nil, nil, err
+	}
+	y, err := padBigIntBytesToFixedSizeBuffer(xy[coordinateSize:], coordinateSize+1)
+	if err != nil {
+		return nil, nil, err
+	}
 	return x, y, nil
 }
 
@@ -279,25 +295,30 @@ func encodePoint(x, y []byte, coordinateSize int) []byte {
 	return encodedPoint
 }
 
-func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
-	if keySerialization == nil {
-		return nil, fmt.Errorf("key serialization is nil")
+// removeLeftPaddingFromBigInt removes the leading zeros from the
+// given big integer representation.
+//
+// If bigIntValue is smaller than the given size, it is returned as is.
+// If the bytes representation of the big integer is longer than size, an error
+// is returned.
+func removeLeftPaddingFromBigInt(bigIntValue []byte, size int) ([]byte, error) {
+	if len(bigIntValue) <= size {
+		return bigIntValue, nil
 	}
-	keyData := keySerialization.KeyData()
-	if keyData.GetTypeUrl() != verifierTypeURL {
-		return nil, fmt.Errorf("invalid key type URL: %v", keyData.GetTypeUrl())
+	// Remove the leading len(bigIntValue)-size bytes. Fail if any is not zero.
+	for i := 0; i < len(bigIntValue)-size; i++ {
+		if bigIntValue[i] != 0 {
+			return nil, fmt.Errorf("big int has invalid size: %v, want %v", len(bigIntValue)-i, size)
+		}
 	}
-	if keyData.GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PUBLIC {
-		return nil, fmt.Errorf("invalid key material type: %v", keyData.GetKeyMaterialType())
-	}
-	protoECDSAKey := new(ecdsapb.EcdsaPublicKey)
-	if err := proto.Unmarshal(keyData.GetValue(), protoECDSAKey); err != nil {
-		return nil, err
-	}
+	return bigIntValue[len(bigIntValue)-size:], nil
+}
+
+func newPublicKeyFromProto(protoECDSAKey *ecdsapb.EcdsaPublicKey, outputPrefixType tinkpb.OutputPrefixType, keyID uint32) (*PublicKey, error) {
 	if protoECDSAKey.GetVersion() > verifierKeyVersion {
 		return nil, fmt.Errorf("public key has unsupported version: %v", protoECDSAKey.GetVersion())
 	}
-	variant, err := variantFromProto(keySerialization.OutputPrefixType())
+	variant, err := variantFromProto(outputPrefixType)
 	if err != nil {
 		return nil, err
 	}
@@ -326,17 +347,37 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	// This is to support the case where the curve size in bytes + 1 is the
 	// length of the coordinate. This happens when Tink adds an extra leading
 	// 0x00 byte (see b/264525021).
-	x := bytes.TrimLeft(protoECDSAKey.GetX(), "\x00")
-	y := bytes.TrimLeft(protoECDSAKey.GetY(), "\x00")
-
-	if len(x) > coordinateSize || len(y) > coordinateSize {
-		return nil, fmt.Errorf("public key has invalid coordinate size: (%v, %v)", len(x), len(y))
+	x, err := removeLeftPaddingFromBigInt(protoECDSAKey.GetX(), coordinateSize)
+	if err != nil {
+		return nil, err
+	}
+	y, err := removeLeftPaddingFromBigInt(protoECDSAKey.GetY(), coordinateSize)
+	if err != nil {
+		return nil, err
 	}
 
 	publicPoint := encodePoint(x, y, coordinateSize)
+	return NewPublicKey(publicPoint, keyID, params)
+}
+
+func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	if keySerialization == nil {
+		return nil, fmt.Errorf("key serialization is nil")
+	}
+	keyData := keySerialization.KeyData()
+	if keyData.GetTypeUrl() != verifierTypeURL {
+		return nil, fmt.Errorf("invalid key type URL: %v", keyData.GetTypeUrl())
+	}
+	if keyData.GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PUBLIC {
+		return nil, fmt.Errorf("invalid key material type: %v", keyData.GetKeyMaterialType())
+	}
+	protoECDSAKey := new(ecdsapb.EcdsaPublicKey)
+	if err := proto.Unmarshal(keyData.GetValue(), protoECDSAKey); err != nil {
+		return nil, err
+	}
 	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
 	keyID, _ := keySerialization.IDRequirement()
-	return NewPublicKey(publicPoint, keyID, params)
+	return newPublicKeyFromProto(protoECDSAKey, keySerialization.OutputPrefixType(), keyID)
 }
 
 type privateKeySerializer struct{}
@@ -368,11 +409,11 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 		return nil, err
 	}
 	// Key value must be fixed size: 1 + coordinateSize (see b/264525021).
-	privateKeyValue := make([]byte, 1, coordinateSize+1)
-	// ecdsaPrivKey.PrivateKeyValue() is guaranteed to have a length of
-	// coordinateSize.
-	privateKeyValue = append(privateKeyValue, ecdsaPrivKey.PrivateKeyValue().Data(insecuresecretdataaccess.Token{})...)
-
+	privateKeyValue := ecdsaPrivKey.PrivateKeyValue().Data(insecuresecretdataaccess.Token{})
+	privateKeyValue, err = padBigIntBytesToFixedSizeBuffer(privateKeyValue, coordinateSize+1)
+	if err != nil {
+		return nil, err
+	}
 	protoKey := &ecdsapb.EcdsaPrivateKey{
 		KeyValue:  privateKeyValue,
 		PublicKey: protoPublicKey,
@@ -390,4 +431,67 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 	}
 	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
+}
+
+type privateKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*privateKeyParser)(nil)
+
+func privateKeyValue(curveType CurveType, keyBytes []byte) (secretdata.Bytes, error) {
+	// The private key value may be padded with leading zeros (see b/264525021).
+	// We simply make sure the private key value is of the correct size.
+	coordinateSize, err := coordinateSizeForCurve(curveType)
+	if err != nil {
+		return secretdata.Bytes{}, err
+	}
+	var privateKeyBytes []byte
+	if coordinateSize > len(keyBytes) {
+		// Pad with zeros until coordinateSize.
+		privateKeyBytes, err = padBigIntBytesToFixedSizeBuffer(keyBytes, coordinateSize)
+		if err != nil {
+			return secretdata.Bytes{}, err
+		}
+	} else {
+		// Remove leading zeros, if any. Fail if the value is larger than
+		// coordinateSize.
+		privateKeyBytes, err = removeLeftPaddingFromBigInt(keyBytes, coordinateSize)
+		if err != nil {
+			return secretdata.Bytes{}, err
+		}
+	}
+	return secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}), nil
+}
+
+func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	if keySerialization == nil {
+		return nil, fmt.Errorf("key serialization is nil")
+	}
+	keyData := keySerialization.KeyData()
+	if keyData.GetTypeUrl() != signerTypeURL {
+		return nil, fmt.Errorf("invalid key type URL: %v", keyData.GetTypeUrl())
+	}
+	if keyData.GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PRIVATE {
+		return nil, fmt.Errorf("invalid key material type: %v", keyData.GetKeyMaterialType())
+	}
+	protoKey := new(ecdsapb.EcdsaPrivateKey)
+	if err := proto.Unmarshal(keyData.GetValue(), protoKey); err != nil {
+		return nil, err
+	}
+	if protoKey.GetVersion() != signerKeyVersion {
+		return nil, fmt.Errorf("private key has unsupported version: %v", protoKey.GetVersion())
+	}
+
+	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
+	keyID, _ := keySerialization.IDRequirement()
+
+	// Get the inner public key.
+	publicKey, err := newPublicKeyFromProto(protoKey.GetPublicKey(), keySerialization.OutputPrefixType(), keyID)
+	if err != nil {
+		return nil, err
+	}
+	privateKeyValue, err := privateKeyValue(publicKey.parameters.CurveType(), protoKey.GetKeyValue())
+	if err != nil {
+		return nil, err
+	}
+	return NewPrivateKeyFromPublicKey(publicKey, privateKeyValue)
 }

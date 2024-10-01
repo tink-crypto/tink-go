@@ -15,6 +15,7 @@
 package ecdsa
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"testing"
@@ -654,6 +655,214 @@ func TestParsePublicKey(t *testing.T) {
 		}
 		if !gotPublicKey.Equals(publicKey) {
 			t.Errorf("%v.Equals(%v) = false, want true", gotPublicKey, publicKey)
+		}
+	})
+}
+
+func TestParsePrivateKeyFails(t *testing.T) {
+	xP256, yP256, privKeyBytesP256 := hexDecode(t, pubKeyXP256Hex), hexDecode(t, pubKeyYP256Hex), hexDecode(t, privKeyValueP256Hex)
+	protoPublicKey := &ecdsapb.EcdsaPublicKey{
+		X: xP256,
+		Y: yP256,
+		Params: &ecdsapb.EcdsaParams{
+			Curve:    commonpb.EllipticCurveType_NIST_P256,
+			HashType: commonpb.HashType_SHA256,
+			Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+		},
+		Version: verifierKeyVersion,
+	}
+	protoPrivateKey := &ecdsapb.EcdsaPrivateKey{
+		KeyValue:  privKeyBytesP256,
+		PublicKey: protoPublicKey,
+		Version:   signerKeyVersion,
+	}
+	serializedProtoPrivateKey, err := proto.Marshal(protoPrivateKey)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", protoPrivateKey, err)
+	}
+
+	protoPrivateKeyWithWrongPrivateKeyVersion := &ecdsapb.EcdsaPrivateKey{
+		KeyValue:  privKeyBytesP256,
+		PublicKey: protoPublicKey,
+		Version:   signerKeyVersion + 1,
+	}
+	serializedProtoPrivateKeyWithWrongPrivateKeyVersion, err := proto.Marshal(protoPrivateKeyWithWrongPrivateKeyVersion)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", protoPrivateKeyWithWrongPrivateKeyVersion, err)
+	}
+
+	protoPrivateKeyWithWrongPublicKeyVersion := proto.Clone(protoPrivateKey).(*ecdsapb.EcdsaPrivateKey)
+	protoPrivateKeyWithWrongPublicKeyVersion.PublicKey.Version = verifierKeyVersion + 1
+	serializedProtoPrivateKeyWithWrongPublicKeyVersion, err := proto.Marshal(protoPrivateKeyWithWrongPublicKeyVersion)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", protoPrivateKeyWithWrongPublicKeyVersion, err)
+	}
+
+	protoPrivateKeyWithWrongPublicKeyBytes := proto.Clone(protoPrivateKey).(*ecdsapb.EcdsaPrivateKey)
+	protoPrivateKeyWithWrongPublicKeyBytes.PublicKey.X = []byte("12345678901234567890123456789012")
+	serializedProtoPrivateKeyWithWrongPublicKeyBytes, err := proto.Marshal(protoPrivateKeyWithWrongPublicKeyBytes)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", protoPrivateKeyWithWrongPublicKeyBytes, err)
+	}
+
+	protoPrivateKeyWithPublicKeyTooSmall := proto.Clone(protoPrivateKey).(*ecdsapb.EcdsaPrivateKey)
+	protoPrivateKeyWithPublicKeyTooSmall.PublicKey.X = []byte("123")
+	serializedProtoPrivateKeyWithPublicKeyTooSmall, err := proto.Marshal(protoPrivateKeyWithPublicKeyTooSmall)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", protoPrivateKeyWithPublicKeyTooSmall, err)
+	}
+
+	protoPrivateKeyWithPrivateKeyWithInvalidPrefix := proto.Clone(protoPrivateKey).(*ecdsapb.EcdsaPrivateKey)
+	protoPrivateKeyWithPrivateKeyWithInvalidPrefix.KeyValue = append([]byte{0x00, 0x00, 0x01, 0x00}, protoPrivateKeyWithPrivateKeyWithInvalidPrefix.KeyValue...)
+	serializedProtoPrivateKeyWithPrivateKeyWithInvalidPrefix, err := proto.Marshal(protoPrivateKeyWithPrivateKeyWithInvalidPrefix)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", protoPrivateKeyWithPrivateKeyWithInvalidPrefix, err)
+	}
+
+	for _, tc := range []struct {
+		name             string
+		keySerialization *protoserialization.KeySerialization
+	}{
+		{
+			name:             "key data is nil",
+			keySerialization: newKeySerialization(t, nil, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "wrong type URL",
+			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         "invalid_type_url",
+				Value:           serializedProtoPrivateKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "wrong output prefix type",
+			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         signerTypeURL,
+				Value:           serializedProtoPrivateKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_UNKNOWN_PREFIX, 12345),
+		},
+		{
+			name: "wrong private key material type",
+			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         signerTypeURL,
+				Value:           serializedProtoPrivateKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "wrong private key version",
+			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         signerTypeURL,
+				Value:           serializedProtoPrivateKeyWithWrongPrivateKeyVersion,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "wrong private key prefix",
+			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         signerTypeURL,
+				Value:           serializedProtoPrivateKeyWithPrivateKeyWithInvalidPrefix,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "wrong public key version",
+			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         signerTypeURL,
+				Value:           serializedProtoPrivateKeyWithWrongPublicKeyVersion,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "wrong public key too small",
+			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         signerTypeURL,
+				Value:           serializedProtoPrivateKeyWithPublicKeyTooSmall,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "wrong public key",
+			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         signerTypeURL,
+				Value:           serializedProtoPrivateKeyWithWrongPublicKeyBytes,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &privateKeyParser{}
+			if _, err = p.ParseKey(tc.keySerialization); err == nil {
+				t.Errorf("p.ParseKey(%v) err = nil, want non-nil", tc.keySerialization)
+			}
+		})
+	}
+}
+
+func TestParsePrivateKey(t *testing.T) {
+	for _, tc := range testCases(t) {
+		name := fmt.Sprintf("curveType:%v_hashType:%v_encoding:%v_variant:%v_id:%d_hasLeadingZeros:%v", tc.publicKey.parameters.curveType, tc.publicKey.parameters.hashType, tc.publicKey.parameters.signatureEncoding, tc.publicKey.parameters.variant, tc.publicKey.idRequirement, tc.hasLeadingZeros)
+		t.Run(name, func(t *testing.T) {
+			p := &privateKeyParser{}
+			gotPrivateKey, err := p.ParseKey(tc.privateKeySerialization)
+			if err != nil {
+				t.Fatalf("p.ParseKey(%v) err = %v, want non-nil", tc.privateKeySerialization, err)
+			}
+			if !gotPrivateKey.Equals(tc.privateKey) {
+				t.Errorf("%v.Equals(%v) = false, want true", gotPrivateKey, tc.privateKey)
+			}
+		})
+	}
+	// Make sure we can parse private keys where the private key value size is
+	// smaller than the coordinate size.
+	t.Run("curveType:NIST_P521_hashType:SHA512_encoding:DER_variant:TINK_id:12345_hasLeadingZeros:true_PrivateKeyBytesLength:65", func(t *testing.T) {
+		xP521, yP521, privKeyBytesP521 := hexDecode(t, pubKeyXP521Hex), hexDecode(t, pubKeyYP521Hex), hexDecode(t, privKeyValueP521Hex)
+		privKeyBytesP521NoLeadingZeros := bytes.TrimLeft(privKeyBytesP521, "\x00")
+		if len(privKeyBytesP521NoLeadingZeros) != 65 {
+			t.Fatalf("privKeyBytesP521NoLeadingZeros has length %v, want 65", len(privKeyBytesP521NoLeadingZeros))
+		}
+		protoPublicKey := &ecdsapb.EcdsaPublicKey{
+			X: xP521,
+			Y: yP521,
+			Params: &ecdsapb.EcdsaParams{
+				Curve:    commonpb.EllipticCurveType_NIST_P521,
+				HashType: commonpb.HashType_SHA512,
+				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+			},
+			Version: verifierKeyVersion,
+		}
+		protoPrivateKey := &ecdsapb.EcdsaPrivateKey{
+			KeyValue:  privKeyBytesP521NoLeadingZeros,
+			PublicKey: protoPublicKey,
+			Version:   signerKeyVersion,
+		}
+		serializedProtoPrivateKey, err := proto.Marshal(protoPrivateKey)
+		if err != nil {
+			t.Fatalf("proto.Marshal(%v) err = %v, want nil", protoPrivateKey, err)
+		}
+		keySerialization := newKeySerialization(t, &tinkpb.KeyData{
+			TypeUrl:         signerTypeURL,
+			Value:           serializedProtoPrivateKey,
+			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+		}, tinkpb.OutputPrefixType_TINK, 12345)
+		want, err := NewPrivateKey(secretdata.NewBytesFromData(privKeyBytesP521, insecuresecretdataaccess.Token{}), 12345, &Parameters{
+			curveType:         NistP521,
+			hashType:          SHA512,
+			signatureEncoding: DER,
+			variant:           VariantTink,
+		})
+		if err != nil {
+			t.Fatalf("NewPrivateKey(%v, %v, params) err = %v, want nil", privKeyBytesP521, 12345, err)
+		}
+		p := &privateKeyParser{}
+		got, err := p.ParseKey(keySerialization)
+		if err != nil {
+			t.Fatalf("p.ParseKey(%v) err = %v, want non-nil", keySerialization, err)
+		}
+		if !got.Equals(want) {
+			t.Errorf("%v.Equals(%v) = false, want true", got, want)
 		}
 	})
 }
