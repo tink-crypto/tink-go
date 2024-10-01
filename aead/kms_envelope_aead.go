@@ -32,7 +32,7 @@ const (
 // KMSEnvelopeAEAD represents an instance of Envelope AEAD.
 type KMSEnvelopeAEAD struct {
 	dekTemplate *tinkpb.KeyTemplate
-	remote      tink.AEAD
+	kekAEAD     tink.AEAD
 	// if err != nil, then the primitive will always fail with this error.
 	// this is needed because NewKMSEnvelopeAEAD2 doesn't return an error.
 	err error
@@ -53,30 +53,33 @@ func isSupporedKMSEnvelopeDEK(dekKeyTypeURL string) bool {
 
 // NewKMSEnvelopeAEAD2 creates an new instance of KMSEnvelopeAEAD.
 //
-// dekTemplate must be a KeyTemplate for any of these Tink AEAD key types (any
+// dekTemplate specifies the key template of the data encryption key (DEK).
+// It must be a KeyTemplate for any of these Tink AEAD key types (any
 // other key template will be rejected):
 //   - AesCtrHmacAeadKey
 //   - AesGcmKey
 //   - ChaCha20Poly1305Key
 //   - XChaCha20Poly1305
 //   - AesGcmSivKey
-func NewKMSEnvelopeAEAD2(dekTemplate *tinkpb.KeyTemplate, remote tink.AEAD) *KMSEnvelopeAEAD {
+//
+// keyEncryptionAEAD is used to encrypt the DEK.
+func NewKMSEnvelopeAEAD2(dekTemplate *tinkpb.KeyTemplate, keyEncryptionAEAD tink.AEAD) *KMSEnvelopeAEAD {
 	if !isSupporedKMSEnvelopeDEK(dekTemplate.GetTypeUrl()) {
 		return &KMSEnvelopeAEAD{
-			remote:      nil,
+			kekAEAD:     nil,
 			dekTemplate: nil,
 			err:         fmt.Errorf("unsupported DEK key type %s", dekTemplate.GetTypeUrl()),
 		}
 	}
 	return &KMSEnvelopeAEAD{
-		remote:      remote,
+		kekAEAD:     keyEncryptionAEAD,
 		dekTemplate: dekTemplate,
 		err:         nil,
 	}
 }
 
 // Encrypt implements the tink.AEAD interface for encryption.
-func (a *KMSEnvelopeAEAD) Encrypt(pt, aad []byte) ([]byte, error) {
+func (a *KMSEnvelopeAEAD) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
 	if a.err != nil {
 		return nil, a.err
 	}
@@ -85,7 +88,7 @@ func (a *KMSEnvelopeAEAD) Encrypt(pt, aad []byte) ([]byte, error) {
 		return nil, err
 	}
 	dek := dekKeyData.GetValue()
-	encryptedDEK, err := a.remote.Encrypt(dek, []byte{})
+	encryptedDEK, err := a.kekAEAD.Encrypt(dek, []byte{})
 	if err != nil {
 		return nil, err
 	}
@@ -96,12 +99,12 @@ func (a *KMSEnvelopeAEAD) Encrypt(pt, aad []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	primitive, ok := p.(tink.AEAD)
+	dekAEAD, ok := p.(tink.AEAD)
 	if !ok {
 		return nil, errors.New("kms_envelope_aead: failed to convert AEAD primitive")
 	}
 
-	payload, err := primitive.Encrypt(pt, aad)
+	payload, err := dekAEAD.Encrypt(plaintext, associatedData)
 	if err != nil {
 		return nil, err
 	}
@@ -116,29 +119,27 @@ func (a *KMSEnvelopeAEAD) Encrypt(pt, aad []byte) ([]byte, error) {
 }
 
 // Decrypt implements the tink.AEAD interface for decryption.
-func (a *KMSEnvelopeAEAD) Decrypt(ct, aad []byte) ([]byte, error) {
+func (a *KMSEnvelopeAEAD) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
 	if a.err != nil {
 		return nil, a.err
 	}
 	// Verify we have enough bytes for the length of the encrypted DEK.
-	if len(ct) <= lenDEK {
+	if len(ciphertext) <= lenDEK {
 		return nil, errors.New("kms_envelope_aead: invalid ciphertext")
 	}
 
 	// Extract length of encrypted DEK and advance past that length.
-	ed := int(binary.BigEndian.Uint32(ct[:lenDEK]))
-	if ed <= 0 || ed > maxLengthEncryptedDEK || ed > len(ct)-lenDEK {
+	encryptedDEKLen := int(binary.BigEndian.Uint32(ciphertext[:lenDEK]))
+	if encryptedDEKLen <= 0 || encryptedDEKLen > maxLengthEncryptedDEK || encryptedDEKLen > len(ciphertext)-lenDEK {
 		return nil, errors.New("kms_envelope_aead: length of encrypted DEK too large")
 	}
-	ct = ct[lenDEK:]
+	ciphertext = ciphertext[lenDEK:]
 
-	// Extract the encrypted DEK and the payload.
-	encryptedDEK := ct[:ed]
-	payload := ct[ed:]
-	ct = nil
+	encryptedDEK := ciphertext[:encryptedDEKLen]
+	payload := ciphertext[encryptedDEKLen:]
+	ciphertext = nil
 
-	// Decrypt the DEK.
-	dek, err := a.remote.Decrypt(encryptedDEK, []byte{})
+	dek, err := a.kekAEAD.Decrypt(encryptedDEK, []byte{})
 	if err != nil {
 		return nil, err
 	}
@@ -148,11 +149,10 @@ func (a *KMSEnvelopeAEAD) Decrypt(ct, aad []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("kms_envelope_aead: %s", err)
 	}
-	primitive, ok := p.(tink.AEAD)
+	dekAEAD, ok := p.(tink.AEAD)
 	if !ok {
 		return nil, errors.New("kms_envelope_aead: failed to convert AEAD primitive")
 	}
 
-	// Decrypt the payload.
-	return primitive.Decrypt(payload, aad)
+	return dekAEAD.Decrypt(payload, associatedData)
 }
