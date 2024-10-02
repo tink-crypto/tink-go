@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
 
 func init() {
@@ -27,6 +28,18 @@ func init() {
 		panic(fmt.Sprintf("ecdsa.init() failed: %v", err))
 	}
 	if err := registry.RegisterKeyManager(new(verifierKeyManager)); err != nil {
+		panic(fmt.Sprintf("ecdsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*PublicKey](&publicKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("ecdsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(verifierTypeURL, &publicKeyParser{}); err != nil {
+		panic(fmt.Sprintf("ecdsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*PrivateKey](&privateKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("ecdsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(signerTypeURL, &privateKeyParser{}); err != nil {
 		panic(fmt.Sprintf("ecdsa.init() failed: %v", err))
 	}
 }
