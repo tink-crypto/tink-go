@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package configuration_test
+package config_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/v2/internal/configuration"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/key"
 )
@@ -59,21 +59,21 @@ func (tk testKeyUnregistered) Parameters() key.Parameters                { retur
 func (tk testKeyUnregistered) IDRequirement() (id uint32, required bool) { return 0, false }
 func (tk testKeyUnregistered) Equals(other key.Key) bool                 { return false }
 
-func TestConfigurationWorks(t *testing.T) {
-	testConfiguration, err := configuration.New()
+func TestConfigWorks(t *testing.T) {
+	testConfig, err := config.New()
 	if err != nil {
-		t.Fatalf("Configuration.New() err = %v, want nil", err)
+		t.Fatalf("Config.New() err = %v, want nil", err)
 	}
 	token := internalapi.Token{}
 
-	err = testConfiguration.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), func(k key.Key) (any, error) { return testPrimitive0{}, nil }, token)
+	err = testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), func(k key.Key) (any, error) { return testPrimitive0{}, nil }, token)
 	if err != nil {
-		t.Fatalf("testConfiguration.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("testConfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
-	p0, err := testConfiguration.PrimitiveFromKey(testKey0{}, token)
+	p0, err := testConfig.PrimitiveFromKey(testKey0{}, token)
 	if err != nil {
-		t.Fatalf("testConfiguration.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf("testConfig.PrimitiveFromKey() err = %v, want nil", err)
 	}
 	if reflect.TypeOf(p0) != reflect.TypeFor[testPrimitive0]() {
 		t.Errorf("Wrong primitive returned: got %T, want testPrimitive0", p0)
@@ -81,31 +81,31 @@ func TestConfigurationWorks(t *testing.T) {
 }
 
 func TestMultiplePrimitiveConstructors(t *testing.T) {
-	testConfiguration, err := configuration.New()
+	testConfig, err := config.New()
 	if err != nil {
-		t.Fatalf("configuration.New() err = %v, want nil", err)
+		t.Fatalf("config.New() err = %v, want nil", err)
 	}
 	token := internalapi.Token{}
 
-	err = testConfiguration.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), func(k key.Key) (any, error) { return testPrimitive0{}, nil }, token)
+	err = testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), func(k key.Key) (any, error) { return testPrimitive0{}, nil }, token)
 	if err != nil {
-		t.Fatalf("testConfiguration.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("testConfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
-	err = testConfiguration.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), func(k key.Key) (any, error) { return testPrimitive1{}, nil }, token)
+	err = testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), func(k key.Key) (any, error) { return testPrimitive1{}, nil }, token)
 	if err != nil {
-		t.Fatalf("testConfiguration.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("testConfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
-	p0, err := testConfiguration.PrimitiveFromKey(testKey0{}, token)
+	p0, err := testConfig.PrimitiveFromKey(testKey0{}, token)
 	if err != nil {
-		t.Fatalf("testConfiguration.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("testConfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 	if reflect.TypeOf(p0) != reflect.TypeFor[testPrimitive0]() {
 		t.Errorf("Wrong primitive returned: got %T, want testPrimitive0", p0)
 	}
-	p1, err := testConfiguration.PrimitiveFromKey(testKey1{}, token)
+	p1, err := testConfig.PrimitiveFromKey(testKey1{}, token)
 	if err != nil {
-		t.Fatalf("testConfiguration.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("testConfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 	if reflect.TypeOf(p1) != reflect.TypeFor[testPrimitive1]() {
 		t.Errorf("Wrong primitive returned: got %T, want testPrimitive0", p1)
@@ -113,41 +113,41 @@ func TestMultiplePrimitiveConstructors(t *testing.T) {
 }
 
 func TestRegisterDifferentPrimitiveConstructor(t *testing.T) {
-	testConfiguration, err := configuration.New()
+	testConfig, err := config.New()
 	if err != nil {
-		t.Fatalf("configuration.New() err = %v, want nil", err)
+		t.Fatalf("config.New() err = %v, want nil", err)
 	}
 	token := internalapi.Token{}
 
-	err = testConfiguration.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), func(k key.Key) (any, error) { return testPrimitive1{}, nil }, token)
+	err = testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), func(k key.Key) (any, error) { return testPrimitive1{}, nil }, token)
 	if err != nil {
-		t.Fatalf("testConfiguration.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("testConfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	// Register another primitiveCreator for the same key type fails.
-	err = testConfiguration.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), func(k key.Key) (any, error) { return testPrimitive0{}, nil }, token)
+	err = testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), func(k key.Key) (any, error) { return testPrimitive0{}, nil }, token)
 	if err == nil {
-		t.Errorf("testConfiguration.RegisterPrimitiveConstructor() err = nil, want error")
+		t.Errorf("testConfig.RegisterPrimitiveConstructor() err = nil, want error")
 	}
 }
 
 func TestUnregisteredPrimitive(t *testing.T) {
-	testConfiguration, err := configuration.New()
+	testConfig, err := config.New()
 	if err != nil {
-		t.Fatalf("configuration.New() err = %v, want nil", err)
+		t.Fatalf("config.New() err = %v, want nil", err)
 	}
 	token := internalapi.Token{}
 
-	err = testConfiguration.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), func(k key.Key) (any, error) { return testPrimitive0{}, nil }, token)
+	err = testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), func(k key.Key) (any, error) { return testPrimitive0{}, nil }, token)
 	if err != nil {
-		t.Fatalf("testConfiguration.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("testConfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
-	res, err := testConfiguration.PrimitiveFromKey(testKeyUnregistered{}, token)
+	res, err := testConfig.PrimitiveFromKey(testKeyUnregistered{}, token)
 	if res != nil {
-		t.Errorf("testConfiguration.PrimitiveFromKey() return value = %v, want nil", res)
+		t.Errorf("testConfig.PrimitiveFromKey() return value = %v, want nil", res)
 	}
 	if err == nil {
-		t.Errorf("testConfiguration.PrimitiveFromKey() err = nil, want error")
+		t.Errorf("testConfig.PrimitiveFromKey() err = nil, want error")
 	}
 }

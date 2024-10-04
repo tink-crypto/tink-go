@@ -1,9 +1,9 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
-    name = "configuration",
-    srcs = ["configuration.go"],
-    importpath = "github.com/tink-crypto/tink-go/v2/internal/configuration",
+    name = "config",
+    srcs = ["config.go"],
+    importpath = "github.com/tink-crypto/tink-go/v2/internal/config",
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/internalapi",
@@ -13,15 +13,15 @@ go_library(
 
 alias(
     name = "go_default_library",
-    actual = ":configuration",
+    actual = ":config",
     visibility = ["//:__subpackages__"],
 )
 
 go_test(
-    name = "configuration_test",
-    srcs = ["configuration_test.go"],
+    name = "config_test",
+    srcs = ["config_test.go"],
     deps = [
-        ":configuration",
+        ":config",
         "//internal/internalapi",
         "//key",
     ],

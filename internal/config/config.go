@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package configuration provides internal implementation of Configurations.
-package configuration
+// Package config provides internal implementation of Configs.
+package config
 
 import (
 	"fmt"
@@ -23,12 +23,12 @@ import (
 	"github.com/tink-crypto/tink-go/v2/key"
 )
 
-// Configuration keeps a collection of functions that create a primitive from
+// Config keeps a collection of functions that create a primitive from
 // [key.Key].
 //
 // This is an internal API.
-type Configuration struct {
-	primitiveCreators map[reflect.Type]primitiveConstructor
+type Config struct {
+	primitiveConstructors map[reflect.Type]primitiveConstructor
 }
 
 type primitiveConstructor func(key key.Key) (any, error)
@@ -37,9 +37,9 @@ type primitiveConstructor func(key key.Key) (any, error)
 // error if there is no primitiveConstructor registered for the given key.
 //
 // This is an internal API.
-func (c *Configuration) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
+func (c *Config) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
 	keyType := reflect.TypeOf(k)
-	creator, ok := c.primitiveCreators[keyType]
+	creator, ok := c.primitiveConstructors[keyType]
 	if !ok {
 		return nil, fmt.Errorf("PrimitiveFromKey: no primitive creator from key %v registered", keyType)
 	}
@@ -55,15 +55,15 @@ func (c *Configuration) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, e
 // unless they are nil).
 //
 // This is an internal API.
-func (c *Configuration) RegisterPrimitiveConstructor(keyType reflect.Type, constructor primitiveConstructor, _ internalapi.Token) error {
-	if _, ok := c.primitiveCreators[keyType]; ok {
+func (c *Config) RegisterPrimitiveConstructor(keyType reflect.Type, constructor primitiveConstructor, _ internalapi.Token) error {
+	if _, ok := c.primitiveConstructors[keyType]; ok {
 		return fmt.Errorf("RegisterPrimitiveConstructor: attempt to register a different primitive constructor for the same key type %v", keyType)
 	}
-	c.primitiveCreators[keyType] = constructor
+	c.primitiveConstructors[keyType] = constructor
 	return nil
 }
 
-// New creates an empty Configuration.
-func New() (*Configuration, error) {
-	return &Configuration{map[reflect.Type]primitiveConstructor{}}, nil
+// New creates an empty Config.
+func New() (*Config, error) {
+	return &Config{map[reflect.Type]primitiveConstructor{}}, nil
 }
