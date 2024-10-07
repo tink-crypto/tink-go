@@ -15,6 +15,8 @@
 package testutil_test
 
 import (
+	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"testing"
@@ -23,15 +25,14 @@ import (
 )
 
 func TestPopulateSuite(t *testing.T) {
-	// TODO(175520475): Test the HexBytes type.
 	type AeadTest struct {
 		testutil.WycheproofCase
-		Key        string `json:"key"`
-		IV         string `json:"iv"`
-		AAD        string `json:"aad"`
-		Message    string `json:"msg"`
-		Ciphertext string `json:"ct"`
-		Tag        string `json:"tag"`
+		Key        testutil.HexBytes `json:"key"`
+		IV         testutil.HexBytes `json:"iv"`
+		AAD        testutil.HexBytes `json:"aad"`
+		Message    testutil.HexBytes `json:"msg"`
+		Ciphertext testutil.HexBytes `json:"ct"`
+		Tag        testutil.HexBytes `json:"tag"`
 	}
 
 	type AeadGroup struct {
@@ -53,8 +54,8 @@ func TestPopulateSuite(t *testing.T) {
 		t.Errorf("suite.Algorithm=%s, want AES-GCM", suite.Algorithm)
 	}
 
-	if suite.TestGroups[0].Tests[0].Key == "" {
-		t.Error("suite.TestGroups[0].Tests[0].Key is empty")
+	if suite.TestGroups[0].Tests[0].Key == nil {
+		t.Error("suite.TestGroups[0].Tests[0].Key is nil")
 	}
 }
 
@@ -77,5 +78,31 @@ func TestPopulateSuite_DecodeError(t *testing.T) {
 	}
 	if _, ok := err.(*json.InvalidUnmarshalError); !ok {
 		t.Errorf("unexpected error for decode error: %s", err)
+	}
+}
+
+func TestHexBytes(t *testing.T) {
+	validHex := []byte("abc123")
+	want, err := hex.DecodeString(string(validHex))
+	if err != nil {
+		t.Fatalf("hex.DecodeString(%q) err = %v, want nil", validHex, err)
+	}
+
+	var got testutil.HexBytes
+	if err = got.UnmarshalText(validHex); err != nil {
+		t.Fatalf("hb.UnmarshalText(%q) err = %v, want nil", validHex, err)
+	}
+
+	if !bytes.Equal(got, want) {
+		t.Errorf("hb.UnmarshalText(%q); hb = %v, want %v", validHex, got, want)
+	}
+}
+
+func TestHexBytes_DecodeError(t *testing.T) {
+	invalidHex := []byte("xyz")
+	var hb testutil.HexBytes
+	err := hb.UnmarshalText(invalidHex)
+	if err == nil {
+		t.Errorf("hb.UnmarshalText(%q) = nil, want err", invalidHex)
 	}
 }
