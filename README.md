@@ -2,17 +2,14 @@
 
 <!-- GCP Ubuntu --->
 
-[tink_go_bazel_badge_gcp_ubuntu]: https://storage.googleapis.com/tink-kokoro-build-badges/tink-go-bazel-gcp-ubuntu.svg
 [tink_go_gomod_badge_gcp_ubuntu]: https://storage.googleapis.com/tink-kokoro-build-badges/tink-go-gomod-gcp-ubuntu.svg
 
 <!-- MacOS --->
 
-[tink_go_bazel_badge_macos]: https://storage.googleapis.com/tink-kokoro-build-badges/tink-go-bazel-macos-external.svg
 [tink_go_gomod_badge_macos]: https://storage.googleapis.com/tink-kokoro-build-badges/tink-go-gomod-macos-external.svg
 
 **Test**     | **GCP Ubuntu**                                          | **MacOS**
 ------------ | ------------------------------------------------------- | ---------
-Tink (Bazel) | [![Bazel_GcpUbuntu][tink_go_bazel_badge_gcp_ubuntu]](#) | [![Bazel_MacOs][tink_go_bazel_badge_macos]](#)
 Tink Gomod   | [![Gomod_GcpUbuntu][tink_go_gomod_badge_gcp_ubuntu]](#) | [![Gomod_MacOs][tink_go_gomod_badge_macos]](#)
 
 > **NOTE**: **Versions of Tink Go prior to v2.0.0 are located at
