@@ -359,12 +359,11 @@ func aeadRFCVectors(t *testing.T) map[hpkeID]encryptionVector {
 // mode with Diffie-Hellman-based X25519, HKDF-SHA256 KEM as per
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-7.1.
 func baseModeX25519HKDFSHA256Vectors(t *testing.T) map[hpkeID]vector {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
 	t.Helper()
 
 	srcDir, ok := os.LookupEnv("TEST_SRCDIR")
 	if !ok {
-		t.Fatal("TEST_SRCDIR not set")
+		t.Skipf("Skipping test, not running with Bazel")
 	}
 	path := filepath.Join(srcDir, os.Getenv("TEST_WORKSPACE"), "/testdata/testvectors/hpke_boringssl.json")
 	f, err := os.Open(path)

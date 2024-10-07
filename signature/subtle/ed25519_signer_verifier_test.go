@@ -152,8 +152,6 @@ func TestED25519SignVerify(t *testing.T) {
 }
 
 func TestED25519WycheproofCases(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
-
 	suite := new(ed25519Suite)
 	if err := testutil.PopulateSuite(suite, "eddsa_test.json"); err != nil {
 		t.Fatalf("failed populating suite: %s", err)

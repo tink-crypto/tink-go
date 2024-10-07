@@ -122,7 +122,6 @@ func TestVectorsRFC5869(t *testing.T) {
 }
 
 func TestHKDFPRFWycheproofCases(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
 	for _, hash := range []string{"SHA1", "SHA256", "SHA512"} {
 		filename := fmt.Sprintf("hkdf_%s_test.json", strings.ToLower(hash))
 		suite := new(hkdfSuite)

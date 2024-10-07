@@ -210,7 +210,6 @@ func TestChaCha20Poly1305RandomNonce(t *testing.T) {
 }
 
 func TestChaCha20Poly1305WycheproofCases(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
 	suite := new(AEADSuite)
 	if err := testutil.PopulateSuite(suite, "chacha20_poly1305_test.json"); err != nil {
 		t.Fatalf("failed populating suite: %s", err)

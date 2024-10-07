@@ -538,8 +538,6 @@ func convertPointPublicKey(t *testing.T, pk []byte, curve elliptic.Curve, flags 
 }
 
 func TestECWycheproofCases(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
-
 	vectors := []string{
 		"ecdh_test.json",
 		"ecdh_secp224r1_ecpoint_test.json",

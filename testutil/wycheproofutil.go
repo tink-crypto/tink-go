@@ -17,25 +17,11 @@ package testutil
 import (
 	"encoding/hex"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"testing"
 )
-
-const (
-	testvectorsDir = "testdata/testvectors"
-)
-
-// SkipTestIfTestSrcDirIsNotSet skips the test if TEST_SRCDIR is not set.
-// This is necessary when not using Blaze/Bazel, as we don't have a solution for referencing non-Go
-// resources that are external to the repository with Go tooling.
-func SkipTestIfTestSrcDirIsNotSet(t *testing.T) {
-	t.Helper()
-	if _, ok := os.LookupEnv("TEST_SRCDIR"); !ok {
-		t.Skip("TEST_SRCDIR not found")
-	}
-}
 
 // WycheproofSuite represents the common elements of the top level
 // object in a Wycheproof json file. Implementations should embed
@@ -82,21 +68,18 @@ func (a *HexBytes) UnmarshalText(text []byte) error {
 	return nil
 }
 
+const testvectorsDir = "testvectors"
+
+var (
+	// This is populated in init() depending on whether the test is running with
+	// Bazel or not.
+	wycheproofDir string
+)
+
 // PopulateSuite opens filename from the Wycheproof test vectors directory and
 // populates suite with the decoded JSON data.
-//
-// When using this in a test function, the function should start with
-// SkipTestIfTestSrcDirIsNotSet(), to expediently skip the test.
 func PopulateSuite(suite any, filename string) error {
-	srcDir, ok := os.LookupEnv("TEST_SRCDIR")
-	if !ok {
-		return errors.New("TEST_SRCDIR not found")
-	}
-	workspaceDir, ok := os.LookupEnv("TEST_WORKSPACE")
-	if !ok {
-		return errors.New("TEST_WORKSPACE not found")
-	}
-	f, err := os.Open(filepath.Join(srcDir, workspaceDir, testvectorsDir, filename))
+	f, err := os.Open(filepath.Join(wycheproofDir, testvectorsDir, filename))
 	if err != nil {
 		return err
 	}
@@ -105,4 +88,47 @@ func PopulateSuite(suite any, filename string) error {
 		return err
 	}
 	return nil
+}
+
+// Wycheproof version to fetch.
+const wycheproofModVer = "v0.0.0-20240408230514-cd27d6419bed"
+
+// downloadWycheproofTestVectors downloads the JSON test files from
+// the Wycheproof repository with `go mod download -json` and returns the
+// absolute path to the root of the downloaded source tree.
+func downloadWycheproofTestVectors() (string, error) {
+	path := "github.com/C2SP/wycheproof@" + wycheproofModVer
+	cmd := exec.Command("go", "mod", "download", "-json", path)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to run `go mod download -json %s`, output: %s", path, output)
+	}
+	var dm struct {
+		Dir string // absolute path to cached source root directory
+	}
+	if err := json.Unmarshal(output, &dm); err != nil {
+		return "", err
+	}
+	return dm.Dir, nil
+}
+
+const testdataDir = "testdata"
+
+func init() {
+	srcDir, ok := os.LookupEnv("TEST_SRCDIR")
+	if ok {
+		// Running with Bazel.
+		workspaceDir, ok := os.LookupEnv("TEST_WORKSPACE")
+		if !ok {
+			panic("TEST_WORKSPACE not found")
+		}
+		wycheproofDir = filepath.Join(srcDir, workspaceDir, testdataDir)
+	} else {
+		// Not running with Bazel.
+		var err error
+		wycheproofDir, err = downloadWycheproofTestVectors()
+		if err != nil {
+			panic(err)
+		}
+	}
 }

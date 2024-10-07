@@ -188,7 +188,6 @@ type rsaSSAPSSCase struct {
 }
 
 func TestRSASSAPSSWycheproofCases(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
 	ranTestCount := 0
 	vectorsFiles := []string{
 		"rsa_pss_2048_sha512_256_mgf1_28_test.json",

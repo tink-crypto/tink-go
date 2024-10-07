@@ -80,8 +80,6 @@ type x25519Case struct {
 }
 
 func TestComputeSharedSecretX25519WithWycheproofVectors(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
-
 	suite := new(x25519Suite)
 	if err := testutil.PopulateSuite(suite, "x25519_test.json"); err != nil {
 		t.Fatalf("testutil.PopulateSuite: %v", err)

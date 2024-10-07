@@ -59,7 +59,6 @@ type testcase struct {
 }
 
 func TestVectorsWycheproof(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
 	suite := new(AESCMACSuite)
 	if err := testutil.PopulateSuite(suite, "aes_cmac_test.json"); err != nil {
 		t.Fatalf("testutil.PopulateSuite: %v", err)

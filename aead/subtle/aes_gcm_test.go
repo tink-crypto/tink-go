@@ -195,7 +195,6 @@ func TestAESGCMRandomNonce(t *testing.T) {
 }
 
 func TestAESGCMWycheproofCases(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
 	suite := new(AEADSuite)
 	if err := testutil.PopulateSuite(suite, "aes_gcm_test.json"); err != nil {
 		t.Fatalf("failed populating suite: %s", err)

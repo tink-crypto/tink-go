@@ -56,7 +56,6 @@ func TestVectorsRFC4493(t *testing.T) {
 }
 
 func TestAESCMACPRFWycheproofCases(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
 	suite := new(macSuite)
 	if err := testutil.PopulateSuite(suite, "aes_cmac_test.json"); err != nil {
 		t.Fatalf("Failed populating suite: %s", err)

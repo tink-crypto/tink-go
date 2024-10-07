@@ -89,8 +89,6 @@ func TestECDSAInvalidCurve(t *testing.T) {
 }
 
 func TestECDSAWycheproofCases(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
-
 	vectors := []struct {
 		Filename string
 		Encoding string

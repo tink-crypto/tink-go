@@ -109,7 +109,6 @@ func TestVectorsRFC4868(t *testing.T) {
 }
 
 func TestHMACPRFWycheproofCases(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
 	for _, hash := range []string{"SHA1", "SHA256", "SHA512"} {
 		filename := fmt.Sprintf("hmac_%s_test.json", strings.ToLower(hash))
 		suite := new(macSuite)

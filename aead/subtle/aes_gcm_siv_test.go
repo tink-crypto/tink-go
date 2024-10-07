@@ -105,7 +105,6 @@ func TestAESGCMSIVModifyCiphertext(t *testing.T) {
 }
 
 func TestAESGCMSIVWycheproofCases(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
 	suite := new(AEADSuite)
 	if err := testutil.PopulateSuite(suite, "aes_gcm_siv_test.json"); err != nil {
 		t.Fatalf("failed populating suite: %s", err)

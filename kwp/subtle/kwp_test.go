@@ -106,7 +106,6 @@ type KwpSuite struct {
 }
 
 func TestWycheproofCases(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
 	suite := new(KwpSuite)
 	if err := testutil.PopulateSuite(suite, "kwp_test.json"); err != nil {
 		t.Fatalf("testutil.PopulateSuite: %v", err)

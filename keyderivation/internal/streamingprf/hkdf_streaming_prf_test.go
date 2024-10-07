@@ -142,8 +142,6 @@ func TestHKDFStreamingPRFWithRFCVector(t *testing.T) {
 }
 
 func TestHKDFStreamingPRFWithWycheproof(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
-
 	type hkdfCase struct {
 		testutil.WycheproofCase
 		IKM  testutil.HexBytes `json:"ikm"`

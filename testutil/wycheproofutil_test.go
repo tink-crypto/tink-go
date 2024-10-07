@@ -23,8 +23,6 @@ import (
 )
 
 func TestPopulateSuite(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
-
 	// TODO(175520475): Test the HexBytes type.
 	type AeadTest struct {
 		testutil.WycheproofCase
@@ -61,8 +59,6 @@ func TestPopulateSuite(t *testing.T) {
 }
 
 func TestPopulateSuite_FileOpenError(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
-
 	suite := new(testutil.WycheproofSuite)
 	err := testutil.PopulateSuite(suite, "NON_EXISTENT_FILE")
 	if err == nil {
@@ -74,8 +70,6 @@ func TestPopulateSuite_FileOpenError(t *testing.T) {
 }
 
 func TestPopulateSuite_DecodeError(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
-
 	var suite *testutil.WycheproofSuite
 	err := testutil.PopulateSuite(suite, "aes_gcm_test.json")
 	if err == nil {

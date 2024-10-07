@@ -268,7 +268,6 @@ func TestAESSIV_CiphertextModifications(t *testing.T) {
 }
 
 func TestAESSIV_WycheproofVectors(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
 	suite := new(AESSIVSuite)
 	if err := testutil.PopulateSuite(suite, "aes_siv_cmac_test.json"); err != nil {
 		t.Fatalf("testutil.PopulateSuite: %v", err)

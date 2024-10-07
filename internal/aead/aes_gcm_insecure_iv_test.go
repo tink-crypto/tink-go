@@ -291,8 +291,6 @@ func TestAESGCMInsecureIVModifyCiphertext(t *testing.T) {
 }
 
 func TestAESGCMInsecureIVWycheproofVectors(t *testing.T) {
-	testutil.SkipTestIfTestSrcDirIsNotSet(t)
-
 	suite := new(AEADSuite)
 	if err := testutil.PopulateSuite(suite, "aes_gcm_test.json"); err != nil {
 		t.Fatalf("failed to populate suite: %s", err)
