@@ -355,18 +355,28 @@ func aeadRFCVectors(t *testing.T) map[hpkeID]encryptionVector {
 	return m
 }
 
+const testVectorsDir = "testdata/testvectors"
+
+func getTestVectorsFilePath(t *testing.T) string {
+	t.Helper()
+	srcDir, ok := os.LookupEnv("TEST_SRCDIR")
+	if ok {
+		workspaceDir, ok := os.LookupEnv("TEST_WORKSPACE")
+		if !ok {
+			t.Fatal("TEST_WORKSPACE not found")
+		}
+		return filepath.Join(srcDir, workspaceDir, testVectorsDir, "hpke_boringssl.json")
+	}
+	return filepath.Join("../../../", testVectorsDir, "hpke_boringssl.json")
+}
+
 // baseModeX25519HKDFSHA256Vectors returns BoringSSL test vectors for HPKE base
 // mode with Diffie-Hellman-based X25519, HKDF-SHA256 KEM as per
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-7.1.
 func baseModeX25519HKDFSHA256Vectors(t *testing.T) map[hpkeID]vector {
 	t.Helper()
 
-	srcDir, ok := os.LookupEnv("TEST_SRCDIR")
-	if !ok {
-		t.Skipf("Skipping test, not running with Bazel")
-	}
-	path := filepath.Join(srcDir, os.Getenv("TEST_WORKSPACE"), "/testdata/testvectors/hpke_boringssl.json")
-	f, err := os.Open(path)
+	f, err := os.Open(getTestVectorsFilePath(t))
 	if err != nil {
 		t.Fatal(err)
 	}
