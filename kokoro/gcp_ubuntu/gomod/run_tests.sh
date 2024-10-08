@@ -42,5 +42,7 @@ readonly TINK_VERSION="$(cat tink/version.go \
                         | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')"
 
 ./kokoro/testutils/run_command.sh "${RUN_COMMAND_ARGS[@]}" \
+  ./kokoro/testutils/check_go_generated_files_up_to_date.sh .
+./kokoro/testutils/run_command.sh "${RUN_COMMAND_ARGS[@]}" \
   ./kokoro/testutils/run_go_mod_tests.sh "${TINK_GO_MODULE_URL}" \
     . "${TINK_VERSION}" "main"

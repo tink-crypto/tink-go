@@ -17,13 +17,6 @@
 # This scripts checks that a given Go workspace has its generated Bazel files up
 # to date.
 
-BAZEL_CMD="bazel"
-# Use Bazelisk (https://github.com/bazelbuild/bazelisk) if available.
-if command -v "bazelisk" &> /dev/null; then
-  BAZEL_CMD="bazelisk"
-  "${BAZEL_CMD}" version
-fi
-
 usage() {
   echo "Usage: $0 [-h] [-c <compat value (default 1.19)>] <go project dir>"
   echo "  -c: Value to pass to `-compat`. Default to 1.19."
@@ -59,16 +52,10 @@ main() {
     local -r go_generated_files=(
       ./go.mod
       ./go.sum
-      ./deps.bzl
     )
 
     # Copy all current generated files into temp_dir_current_generated_files.
-    local current_go_generated_files=( "${go_generated_files[@]}" )
-    while read -r -d $'\0' generated_file; do
-      current_go_generated_files+=("${generated_file}")
-    done < <(find . -name BUILD.bazel -print0)
-    readonly current_go_generated_files
-
+    local -r current_go_generated_files=( "${go_generated_files[@]}" )
     for generated_file_path in "${current_go_generated_files[@]}"; do
       mkdir -p \
         "$(dirname \
@@ -79,17 +66,9 @@ main() {
 
     # Update build files.
     go mod tidy -compat="${COMPAT}"
-    # Update deps.bzl.
-    "${BAZEL_CMD}" run //:gazelle-update-repos
-    # Update all BUILD.bazel files.
-    "${BAZEL_CMD}" run //:gazelle
 
     # Compare current with new build files.
-    local new_go_generated_files=( "${go_generated_files[@]}" )
-    while read -r -d $'\0' generated_file; do
-      new_go_generated_files+=("${generated_file}")
-    done < <(find . -name BUILD.bazel -print0)
-    readonly new_go_generated_files
+    local -r new_go_generated_files=( "${go_generated_files[@]}" )
 
     for generated_file_path in "${new_go_generated_files[@]}"; do
       if ! cmp -s "${generated_file_path}" \
