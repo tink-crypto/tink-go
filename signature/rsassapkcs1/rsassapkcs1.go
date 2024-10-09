@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package signature
+// Package rsassapkcs1 defines RSA-SSA-PKCS1 key managers.
+package rsassapkcs1
 
 import (
-	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	"fmt"
+
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 )
 
-func hashName(h commonpb.HashType) string {
-	return commonpb.HashType_name[int32(h)]
+func init() {
+	if err := registry.RegisterKeyManager(new(signerKeyManager)); err != nil {
+		panic(fmt.Sprintf("rsassapkcs1.init() failed: %v", err))
+	}
+	if err := registry.RegisterKeyManager(new(verifierKeyManager)); err != nil {
+		panic(fmt.Sprintf("rsassapkcs1.init() failed: %v", err))
+	}
 }

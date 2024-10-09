@@ -30,8 +30,9 @@ import (
 // One can use these templates to generate new Keysets.
 
 const (
-	ed25519SignerTypeURL = "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey"
-	ecdsaSignerTypeURL   = "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey"
+	ed25519SignerTypeURL     = "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey"
+	ecdsaSignerTypeURL       = "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey"
+	rsaSSAPKCS1SignerTypeURL = "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey"
 )
 
 // ECDSAP256KeyTemplate is a KeyTemplate that generates a new ECDSA private key with the following parameters:

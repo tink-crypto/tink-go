@@ -22,19 +22,12 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	_ "github.com/tink-crypto/tink-go/v2/signature/ecdsa"     // register ECDSA key managers
-	_ "github.com/tink-crypto/tink-go/v2/signature/ed25519" // register ed25519 key managers and keys
+	_ "github.com/tink-crypto/tink-go/v2/signature/ecdsa"             // register ECDSA key managers and keys
+	_ "github.com/tink-crypto/tink-go/v2/signature/ed25519"         // register ed25519 key managers and keys
+	_ "github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1" // register rsassapkcs1 key managers
 )
 
 func init() {
-	// RSA SSA PKCS1
-	if err := registry.RegisterKeyManager(new(rsaSSAPKCS1SignerKeyManager)); err != nil {
-		panic(fmt.Sprintf("signature.init() failed: %v", err))
-	}
-	if err := registry.RegisterKeyManager(new(rsaSSAPKCS1VerifierKeyManager)); err != nil {
-		panic(fmt.Sprintf("signature.init() failed: %v", err))
-	}
-
 	// RSA SSA PSS
 	if err := registry.RegisterKeyManager(new(rsaSSAPSSSignerKeyManager)); err != nil {
 		panic(fmt.Sprintf("signature.init() failed: %v", err))

@@ -70,10 +70,7 @@ func validateRSAPSSPublicKey(pubKey *rsassapsspb.RsaSsaPssPublicKey) error {
 	if pubKey.GetParams().GetSaltLength() < 0 {
 		return fmt.Errorf("salt length can't be negative")
 	}
-	return validateRSAPubKeyParams(
-		pubKey.GetParams().GetSigHash(),
-		new(big.Int).SetBytes(pubKey.GetN()).BitLen(),
-		pubKey.GetE())
+	return internal.ValidateRSAPublicKeyParams(pubKey.GetParams().GetSigHash(), new(big.Int).SetBytes(pubKey.GetN()).BitLen(), pubKey.GetE())
 }
 
 func (km *rsaSSAPSSVerifierKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {

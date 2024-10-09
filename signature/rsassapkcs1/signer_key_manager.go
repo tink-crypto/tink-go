@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package signature
+package rsassapkcs1
 
 import (
 	"crypto/rand"
@@ -23,47 +23,50 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
+	"github.com/tink-crypto/tink-go/v2/internal/signature"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	rsassapkcs1pb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pkcs1_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (
-	rsaSSAPKCS1SignerKeyVersion = 0
-	rsaSSAPKCS1SignerTypeURL    = "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey"
+	signerKeyVersion = 0
+	signerTypeURL    = "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey"
 )
 
 var (
-	errInvalidRSASSAPKCS1SignKey       = errors.New("rsassapkcs1_signer_key_manager: invalid key")
-	errInvalidRSASSAPKCS1SignKeyFormat = errors.New("rsassapkcs1_signer_key_manager: invalid key format")
+	errInvalidSignKey       = errors.New("rsassapkcs1_signer_key_manager: invalid key")
+	errInvalidSignKeyFormat = errors.New("rsassapkcs1_signer_key_manager: invalid key format")
 )
 
-type rsaSSAPKCS1SignerKeyManager struct{}
+type signerKeyManager struct{}
 
-var _ registry.PrivateKeyManager = (*rsaSSAPKCS1SignerKeyManager)(nil)
+var _ registry.PrivateKeyManager = (*signerKeyManager)(nil)
 
-func (km *rsaSSAPKCS1SignerKeyManager) Primitive(serializedKey []byte) (any, error) {
-	if false {
-		return nil, errInvalidRSASSAPKCS1SignKey
+func hashName(h commonpb.HashType) string { return commonpb.HashType_name[int32(h)] }
+
+func (km *signerKeyManager) Primitive(serializedKey []byte) (any, error) {
+	if len(serializedKey) == 0 {
+		return nil, errInvalidSignKey
 	}
 	key := &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{}
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
 		return nil, err
 	}
-	if err := validateRSAPKCS1PrivateKey(key); err != nil {
+	if err := validatePrivateKey(key); err != nil {
 		return nil, err
 	}
 
 	privKey := &rsa.PrivateKey{
-		D: bytesToBigInt(key.GetD()),
+		D: new(big.Int).SetBytes(key.GetD()),
 		PublicKey: rsa.PublicKey{
-			N: bytesToBigInt(key.GetPublicKey().GetN()),
-			E: int(bytesToBigInt(key.GetPublicKey().GetE()).Int64()),
+			N: new(big.Int).SetBytes(key.GetPublicKey().GetN()),
+			E: int(new(big.Int).SetBytes(key.GetPublicKey().GetE()).Int64()),
 		},
 		Primes: []*big.Int{
-			bytesToBigInt(key.GetP()),
-			bytesToBigInt(key.GetQ()),
+			new(big.Int).SetBytes(key.GetP()),
+			new(big.Int).SetBytes(key.GetQ()),
 		},
 	}
 	if err := privKey.Validate(); err != nil {
@@ -77,14 +80,14 @@ func (km *rsaSSAPKCS1SignerKeyManager) Primitive(serializedKey []byte) (any, err
 	privKey.Precompute()
 
 	h := hashName(key.GetPublicKey().GetParams().GetHashType())
-	if err := internal.Validate_RSA_SSA_PKCS1(h, privKey); err != nil {
+	if err := signature.Validate_RSA_SSA_PKCS1(h, privKey); err != nil {
 		return nil, err
 	}
-	return internal.New_RSA_SSA_PKCS1_Signer(h, privKey)
+	return signature.New_RSA_SSA_PKCS1_Signer(h, privKey)
 }
 
-func validateRSAPKCS1PrivateKey(privKey *rsassapkcs1pb.RsaSsaPkcs1PrivateKey) error {
-	if err := keyset.ValidateKeyVersion(privKey.GetVersion(), rsaSSAPKCS1SignerKeyVersion); err != nil {
+func validatePrivateKey(privKey *rsassapkcs1pb.RsaSsaPkcs1PrivateKey) error {
+	if err := keyset.ValidateKeyVersion(privKey.GetVersion(), signerKeyVersion); err != nil {
 		return err
 	}
 	if len(privKey.GetD()) == 0 ||
@@ -95,23 +98,20 @@ func validateRSAPKCS1PrivateKey(privKey *rsassapkcs1pb.RsaSsaPkcs1PrivateKey) er
 		len(privKey.GetDp()) == 0 ||
 		len(privKey.GetDq()) == 0 ||
 		len(privKey.GetCrt()) == 0 {
-		return errInvalidRSASSAPKCS1SignKey
+		return errInvalidSignKey
 	}
-	return validateRSAPKCS1PublicKey(privKey.GetPublicKey())
+	return validatePublicKey(privKey.GetPublicKey())
 }
 
-func (km *rsaSSAPKCS1SignerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+func (km *signerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
 	if len(serializedKeyFormat) == 0 {
-		return nil, errInvalidRSASSAPKCS1SignKeyFormat
+		return nil, errInvalidSignKeyFormat
 	}
 	keyFormat := &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{}
 	if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
 		return nil, err
 	}
-	if err := validateRSAPubKeyParams(
-		keyFormat.GetParams().GetHashType(),
-		int(keyFormat.GetModulusSizeInBits()),
-		keyFormat.GetPublicExponent()); err != nil {
+	if err := signature.ValidateRSAPublicKeyParams(keyFormat.GetParams().GetHashType(), int(keyFormat.GetModulusSizeInBits()), keyFormat.GetPublicExponent()); err != nil {
 		return nil, err
 	}
 	rsaKey, err := rsa.GenerateKey(rand.Reader, int(keyFormat.GetModulusSizeInBits()))
@@ -119,7 +119,7 @@ func (km *rsaSSAPKCS1SignerKeyManager) NewKey(serializedKeyFormat []byte) (proto
 		return nil, fmt.Errorf("generating RSA key: %s", err)
 	}
 	pubKey := &rsassapkcs1pb.RsaSsaPkcs1PublicKey{
-		Version: rsaSSAPKCS1SignerKeyVersion,
+		Version: signerKeyVersion,
 		Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 			HashType: keyFormat.GetParams().GetHashType(),
 		},
@@ -127,7 +127,7 @@ func (km *rsaSSAPKCS1SignerKeyManager) NewKey(serializedKeyFormat []byte) (proto
 		E: big.NewInt(int64(rsaKey.PublicKey.E)).Bytes(),
 	}
 	return &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
-		Version:   rsaSSAPKCS1SignerKeyVersion,
+		Version:   signerKeyVersion,
 		PublicKey: pubKey,
 		D:         rsaKey.D.Bytes(),
 		P:         rsaKey.Primes[0].Bytes(),
@@ -143,29 +143,29 @@ func (km *rsaSSAPKCS1SignerKeyManager) NewKey(serializedKeyFormat []byte) (proto
 	}, nil
 }
 
-func (km *rsaSSAPKCS1SignerKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+func (km *signerKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
 	key, err := km.NewKey(serializedKeyFormat)
 	if err != nil {
 		return nil, err
 	}
 	serializedKey, err := proto.Marshal(key)
 	if err != nil {
-		return nil, errInvalidRSASSAPKCS1SignKeyFormat
+		return nil, errInvalidSignKeyFormat
 	}
 	return &tinkpb.KeyData{
-		TypeUrl:         rsaSSAPKCS1SignerTypeURL,
+		TypeUrl:         signerTypeURL,
 		Value:           serializedKey,
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 	}, nil
 }
 
 // PublicKeyData extracts the public key data from the private key.
-func (km *rsaSSAPKCS1SignerKeyManager) PublicKeyData(serializedPrivKey []byte) (*tinkpb.KeyData, error) {
+func (km *signerKeyManager) PublicKeyData(serializedPrivKey []byte) (*tinkpb.KeyData, error) {
 	privKey := &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{}
 	if err := proto.Unmarshal(serializedPrivKey, privKey); err != nil {
 		return nil, err
 	}
-	if err := validateRSAPKCS1PrivateKey(privKey); err != nil {
+	if err := validatePrivateKey(privKey); err != nil {
 		return nil, err
 	}
 	serializedPubKey, err := proto.Marshal(privKey.GetPublicKey())
@@ -173,18 +173,14 @@ func (km *rsaSSAPKCS1SignerKeyManager) PublicKeyData(serializedPrivKey []byte) (
 		return nil, err
 	}
 	return &tinkpb.KeyData{
-		TypeUrl:         rsaSSAPKCS1VerifierTypeURL,
+		TypeUrl:         verifierTypeURL,
 		Value:           serializedPubKey,
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 	}, nil
 }
 
 // DoesSupport indicates if this key manager supports the given key type.
-func (km *rsaSSAPKCS1SignerKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == rsaSSAPKCS1SignerTypeURL
-}
+func (km *signerKeyManager) DoesSupport(typeURL string) bool { return typeURL == signerTypeURL }
 
 // TypeURL returns the key type of keys managed by this key manager.
-func (km *rsaSSAPKCS1SignerKeyManager) TypeURL() string {
-	return rsaSSAPKCS1SignerTypeURL
-}
+func (km *signerKeyManager) TypeURL() string { return signerTypeURL }

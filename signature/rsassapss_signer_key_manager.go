@@ -57,13 +57,13 @@ func (km *rsaSSAPSSSignerKeyManager) Primitive(serializedKey []byte) (any, error
 
 	privKey := &rsa.PrivateKey{
 		PublicKey: rsa.PublicKey{
-			N: bytesToBigInt(key.GetPublicKey().GetN()),
-			E: int(bytesToBigInt(key.GetPublicKey().GetE()).Uint64()),
+			N: new(big.Int).SetBytes(key.GetPublicKey().GetN()),
+			E: int(new(big.Int).SetBytes(key.GetPublicKey().GetE()).Uint64()),
 		},
-		D: bytesToBigInt(key.GetD()),
+		D: new(big.Int).SetBytes(key.GetD()),
 		Primes: []*big.Int{
-			bytesToBigInt(key.GetP()),
-			bytesToBigInt(key.GetQ()),
+			new(big.Int).SetBytes(key.GetP()),
+			new(big.Int).SetBytes(key.GetQ()),
 		},
 	}
 	if err := privKey.Validate(); err != nil {
@@ -140,10 +140,7 @@ func (km *rsaSSAPSSSignerKeyManager) NewKey(serializedKeyFormat []byte) (proto.M
 	if params.GetSaltLength() < 0 {
 		return nil, fmt.Errorf("salt length can't be negative")
 	}
-	if err := validateRSAPubKeyParams(
-		params.GetSigHash(),
-		int(keyFormat.GetModulusSizeInBits()),
-		keyFormat.GetPublicExponent()); err != nil {
+	if err := internal.ValidateRSAPublicKeyParams(params.GetSigHash(), int(keyFormat.GetModulusSizeInBits()), keyFormat.GetPublicExponent()); err != nil {
 		return nil, err
 	}
 	privKey, err := rsa.GenerateKey(rand.Reader, int(keyFormat.GetModulusSizeInBits()))

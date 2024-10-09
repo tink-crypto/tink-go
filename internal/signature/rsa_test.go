@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 )
 
 func TestValidatePublicExponent(t *testing.T) {
@@ -157,6 +158,66 @@ func TestRSAKeySelfTestWithCorruptedKeysFails(t *testing.T) {
 			}
 			if err := internal.Validate_RSA_SSA_PSS(tc.hash, saltLen, tc.key); err == nil {
 				t.Errorf("internal.Validate_RSA_SSA_PSS(hash = %d saltLen = %q, key) err = nil, want error", saltLen, tc.hash)
+			}
+		})
+	}
+}
+
+func TestValidateRSAPublicKeyParams(t *testing.T) {
+	f4 := new(big.Int).SetInt64(65537).Bytes()
+	invalidPubExponent := new(big.Int).SetInt64(65537 + 1).Bytes()
+	publicExponentTooLarge := make([]byte, 65)
+	publicExponentTooLarge[0] = 0xff
+	for _, tc := range []struct {
+		name            string
+		hashType        commonpb.HashType
+		modulusSizeBits int
+		pubExponent     []byte
+		wantErr         bool
+	}{
+		{
+			name:            "valid",
+			hashType:        commonpb.HashType_SHA256,
+			modulusSizeBits: 2048,
+			pubExponent:     f4,
+			wantErr:         false,
+		},
+		{
+			name:            "hash unsafe for signature",
+			hashType:        commonpb.HashType_SHA1,
+			modulusSizeBits: 2048,
+			pubExponent:     f4,
+			wantErr:         true,
+		},
+		{
+			name:            "modulus size too small",
+			hashType:        commonpb.HashType_SHA256,
+			modulusSizeBits: 1024,
+			pubExponent:     f4,
+			wantErr:         true,
+		},
+		{
+			name:            "public exponent not F4",
+			hashType:        commonpb.HashType_SHA256,
+			modulusSizeBits: 2048,
+			pubExponent:     invalidPubExponent,
+			wantErr:         true,
+		},
+		{
+			name:            "public exponent too large",
+			hashType:        commonpb.HashType_SHA256,
+			modulusSizeBits: 2048,
+			pubExponent:     publicExponentTooLarge,
+			wantErr:         true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := internal.ValidateRSAPublicKeyParams(tc.hashType, tc.modulusSizeBits, tc.pubExponent)
+			if tc.wantErr && err == nil {
+				t.Errorf("ValidateRSAPublicKeyParams(%v, %v, %v) err = nil, want error", tc.hashType, tc.modulusSizeBits, tc.pubExponent)
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("ValidateRSAPublicKeyParams(%v, %v, %v) err = %v, want nil", tc.hashType, tc.modulusSizeBits, tc.pubExponent, err)
 			}
 		})
 	}

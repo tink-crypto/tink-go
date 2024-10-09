@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package signature_test
+package rsassapkcs1_test
 
 import (
 	"crypto/rand"
@@ -23,16 +23,14 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
+	"github.com/tink-crypto/tink-go/v2/internal/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	rsassapkcs1pb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pkcs1_go_proto"
 )
 
-const (
-	rsaPKCS1PublicTypeURL = "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PublicKey"
-)
+const publicKeyTypeURL = "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PublicKey"
 
 func makeValidRSAPKCS1Key() (*rsassapkcs1pb.RsaSsaPkcs1PrivateKey, error) {
 	rsaKey, err := rsa.GenerateKey(rand.Reader, 3072)
@@ -58,33 +56,33 @@ func makeValidRSAPKCS1Key() (*rsassapkcs1pb.RsaSsaPkcs1PrivateKey, error) {
 	}, nil
 }
 
-func TestRSASSAPKCS1VerifierDoesSupport(t *testing.T) {
-	vkm, err := registry.GetKeyManager(rsaPKCS1PublicTypeURL)
+func TestVerifierKeyManagerDoesSupport(t *testing.T) {
+	vkm, err := registry.GetKeyManager(publicKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", rsaPKCS1PublicTypeURL, err)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", publicKeyTypeURL, err)
 	}
-	if !vkm.DoesSupport(rsaPKCS1PublicTypeURL) {
-		t.Errorf("DoesSupport(%q) = false, want true", rsaPKCS1PublicTypeURL)
+	if !vkm.DoesSupport(publicKeyTypeURL) {
+		t.Errorf("DoesSupport(%q) = false, want true", publicKeyTypeURL)
 	}
 	if vkm.DoesSupport("invalid.type.url") {
 		t.Error("DoesSupport('invalid.type.url') = true, want false")
 	}
 }
 
-func TestRSASSAPKCS1VerifierTypeURL(t *testing.T) {
-	vkm, err := registry.GetKeyManager(rsaPKCS1PublicTypeURL)
+func TestVerifierKeyManagerTypeURL(t *testing.T) {
+	vkm, err := registry.GetKeyManager(publicKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", rsaPKCS1PublicTypeURL, err)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", publicKeyTypeURL, err)
 	}
-	if vkm.TypeURL() != rsaPKCS1PublicTypeURL {
-		t.Errorf("TypeURL() = %q, want %q", vkm.TypeURL(), rsaPKCS1PublicTypeURL)
+	if vkm.TypeURL() != publicKeyTypeURL {
+		t.Errorf("TypeURL() = %q, want %q", vkm.TypeURL(), publicKeyTypeURL)
 	}
 }
 
-func TestRSASSAPKCS1VerifierNotImplemented(t *testing.T) {
-	vkm, err := registry.GetKeyManager(rsaPKCS1PublicTypeURL)
+func TestVerifierKeyManagerNotImplemented(t *testing.T) {
+	vkm, err := registry.GetKeyManager(publicKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", rsaPKCS1PublicTypeURL, err)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", publicKeyTypeURL, err)
 	}
 	serializedFormat, err := proto.Marshal(&rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 		Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
@@ -104,10 +102,10 @@ func TestRSASSAPKCS1VerifierNotImplemented(t *testing.T) {
 	}
 }
 
-func TestRSASSAPKCS1VerifierPrimitive(t *testing.T) {
-	vkm, err := registry.GetKeyManager(rsaPKCS1PublicTypeURL)
+func TestVerifierKeyManagerPrimitive(t *testing.T) {
+	vkm, err := registry.GetKeyManager(publicKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", rsaPKCS1PublicTypeURL, err)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", publicKeyTypeURL, err)
 	}
 	privKey, err := makeValidRSAPKCS1Key()
 	if err != nil {
@@ -121,12 +119,12 @@ func TestRSASSAPKCS1VerifierPrimitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Primitive() err = %v, want nil", err)
 	}
-	if _, ok := p.(*internal.RSA_SSA_PKCS1_Verifier); !ok {
+	if _, ok := p.(*signature.RSA_SSA_PKCS1_Verifier); !ok {
 		t.Fatalf("primitive isn't a RSA_SSA_PKCS1_Verifier")
 	}
 }
 
-func TestRSASSAPKCS1VerifierPrimitiveWithInvalidInput(t *testing.T) {
+func TestVerifierKeyManagerPrimitiveWithInvalidInput(t *testing.T) {
 	type testCase struct {
 		name   string
 		pubKey *rsassapkcs1pb.RsaSsaPkcs1PublicKey
@@ -135,9 +133,9 @@ func TestRSASSAPKCS1VerifierPrimitiveWithInvalidInput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("makeValidRSAPKCS1Key() err = %v, want nil", err)
 	}
-	vkm, err := registry.GetKeyManager(rsaPKCS1PublicTypeURL)
+	vkm, err := registry.GetKeyManager(publicKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", rsaPKCS1PublicTypeURL, err)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", publicKeyTypeURL, err)
 	}
 	for _, tc := range []testCase{
 		{
@@ -215,6 +213,18 @@ func TestRSASSAPKCS1VerifierPrimitiveWithInvalidInput(t *testing.T) {
 			}
 		})
 	}
+}
+
+type nistRSATestKey struct {
+	// public keys only require `n` and `e` to be set.
+	n   string
+	e   string
+	d   string
+	p   string
+	q   string
+	dp  string
+	dq  string
+	crt string
 }
 
 // The following keys are from:
@@ -388,10 +398,10 @@ var nistPKCS1TestVectors = []nistRSAPKCS1TestVector{
 	},
 }
 
-func TestRSASSAPKCS1VerifierPrimitiveNISTTestVectors(t *testing.T) {
-	vkm, err := registry.GetKeyManager(rsaPKCS1PublicTypeURL)
+func TestVerifierKeyManagerPrimitiveNISTTestVectors(t *testing.T) {
+	vkm, err := registry.GetKeyManager(publicKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", rsaPKCS1PublicTypeURL, err)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", publicKeyTypeURL, err)
 	}
 	for _, tc := range nistPKCS1TestVectors {
 		t.Run(tc.name, func(t *testing.T) {

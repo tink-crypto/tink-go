@@ -19,9 +19,11 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"hash"
+	"math/big"
 
 	"github.com/tink-crypto/tink-go/v2/subtle"
 	"github.com/tink-crypto/tink-go/v2/tink"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 )
 
 const (
@@ -55,6 +57,21 @@ func HashSafeForSignature(hashAlg string) error {
 	default:
 		return fmt.Errorf("hash function not safe for digital signatures: %q", hashAlg)
 	}
+}
+
+// ValidateRSAPublicKeyParams validates a public RSA key parameters.
+func ValidateRSAPublicKeyParams(hashAlg commonpb.HashType, modSizeBits int, pubExponent []byte) error {
+	if err := HashSafeForSignature(commonpb.HashType_name[int32(hashAlg)]); err != nil {
+		return err
+	}
+	if err := RSAValidModulusSizeInBits(modSizeBits); err != nil {
+		return err
+	}
+	e := new(big.Int).SetBytes(pubExponent)
+	if !e.IsInt64() {
+		return fmt.Errorf("public exponent can't fit in a 64 bit integer")
+	}
+	return RSAValidPublicExponent(int(e.Int64()))
 }
 
 const (

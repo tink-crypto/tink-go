@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package signature
+package rsassapkcs1
 
 import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
@@ -28,19 +29,17 @@ import (
 )
 
 const (
-	rsaSSAPKCS1VerifierKeyVersion = 0
-	rsaSSAPKCS1VerifierTypeURL    = "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PublicKey"
+	verifierKeyVersion = 0
+	verifierTypeURL    = "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PublicKey"
 )
 
-var (
-	errRSASSAPKCS1NotImplemented = errors.New("rsassapkcs1_verifier_key_manager: not implemented")
-)
+var errUnimplemented = errors.New("rsassapkcs1_verifier_key_manager: not implemented")
 
-type rsaSSAPKCS1VerifierKeyManager struct{}
+type verifierKeyManager struct{}
 
-var _ registry.KeyManager = (*rsaSSAPKCS1VerifierKeyManager)(nil)
+var _ registry.KeyManager = (*verifierKeyManager)(nil)
 
-func (km *rsaSSAPKCS1VerifierKeyManager) Primitive(serializedKey []byte) (any, error) {
+func (km *verifierKeyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
 		return nil, fmt.Errorf("rsassapkcs1_verifier_key_manager: invalid serialized public key")
 	}
@@ -48,38 +47,35 @@ func (km *rsaSSAPKCS1VerifierKeyManager) Primitive(serializedKey []byte) (any, e
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
 		return nil, err
 	}
-	if err := validateRSAPKCS1PublicKey(key); err != nil {
+	if err := validatePublicKey(key); err != nil {
 		return nil, err
 	}
 	keyData := &rsa.PublicKey{
-		E: int(bytesToBigInt(key.GetE()).Int64()),
-		N: bytesToBigInt(key.GetN()),
+		E: int(new(big.Int).SetBytes(key.GetE()).Int64()),
+		N: new(big.Int).SetBytes(key.GetN()),
 	}
 	return internal.New_RSA_SSA_PKCS1_Verifier(hashName(key.GetParams().GetHashType()), keyData)
 }
 
-func validateRSAPKCS1PublicKey(pubKey *rsassapkcs1pb.RsaSsaPkcs1PublicKey) error {
-	if err := keyset.ValidateKeyVersion(pubKey.GetVersion(), rsaSSAPKCS1VerifierKeyVersion); err != nil {
+func validatePublicKey(pubKey *rsassapkcs1pb.RsaSsaPkcs1PublicKey) error {
+	if err := keyset.ValidateKeyVersion(pubKey.GetVersion(), verifierKeyVersion); err != nil {
 		return err
 	}
-	return validateRSAPubKeyParams(
-		pubKey.GetParams().GetHashType(),
-		bytesToBigInt(pubKey.GetN()).BitLen(),
-		pubKey.GetE())
+	return internal.ValidateRSAPublicKeyParams(pubKey.GetParams().GetHashType(), new(big.Int).SetBytes(pubKey.GetN()).BitLen(), pubKey.GetE())
 }
 
-func (km *rsaSSAPKCS1VerifierKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
-	return nil, errRSASSAPKCS1NotImplemented
+func (km *verifierKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+	return nil, errUnimplemented
 }
 
-func (km *rsaSSAPKCS1VerifierKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
-	return nil, errRSASSAPKCS1NotImplemented
+func (km *verifierKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+	return nil, errUnimplemented
 }
 
-func (km *rsaSSAPKCS1VerifierKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == rsaSSAPKCS1VerifierTypeURL
+func (km *verifierKeyManager) DoesSupport(typeURL string) bool {
+	return typeURL == verifierTypeURL
 }
 
-func (km *rsaSSAPKCS1VerifierKeyManager) TypeURL() string {
-	return rsaSSAPKCS1VerifierTypeURL
+func (km *verifierKeyManager) TypeURL() string {
+	return verifierTypeURL
 }
