@@ -23,7 +23,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/keyset"
 )
 
-func TestGetAESGCMKeyFromHandle(t *testing.T) {
+func TestGetKeyFromHandle(t *testing.T) {
 	keysetHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
 	if err != nil {
 		t.Fatalf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
@@ -59,7 +59,7 @@ func TestGetAESGCMKeyFromHandle(t *testing.T) {
 	}
 }
 
-func TestCreateKeysetHandleFromAESGCMKey(t *testing.T) {
+func TestCreateKeysetHandleFromKey(t *testing.T) {
 	keysetHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
 	if err != nil {
 		t.Fatalf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
@@ -109,5 +109,44 @@ func TestCreateKeysetHandleFromAESGCMKey(t *testing.T) {
 	}
 	if !bytes.Equal(decrypt, plaintext) {
 		t.Errorf("decrypt = %v, want %v", decrypt, plaintext)
+	}
+}
+
+func TestCreateKeysetHandleFromParameters(t *testing.T) {
+	params, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", params, err)
+	}
+	manager := keyset.NewManager()
+	keyID, err := manager.AddNewKeyFromParameters(params)
+	if err != nil {
+		t.Fatalf("manager.AddNewKeyFromParameters(%v) err = %v, want nil", params, err)
+	}
+	manager.SetPrimary(keyID)
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+	aeadPrimitive, err := aead.New(handle)
+	if err != nil {
+		t.Fatalf("aead.New(handle) err = %v, want nil", err)
+	}
+	plaintext := []byte("plaintext")
+	additionalData := []byte("additionalData")
+	ciphertext, err := aeadPrimitive.Encrypt(plaintext, additionalData)
+	if err != nil {
+		t.Fatalf("aeadPrimitive.Encrypt(%v, %v) err = %v, want nil", plaintext, additionalData, err)
+	}
+	decrypted, err := aeadPrimitive.Decrypt(ciphertext, additionalData)
+	if err != nil {
+		t.Fatalf("aeadPrimitive.Decrypt(%v, %v) err = %v, want nil", ciphertext, additionalData, err)
+	}
+	if !bytes.Equal(decrypted, plaintext) {
+		t.Errorf("decrypted = %v, want %v", decrypted, plaintext)
 	}
 }

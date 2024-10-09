@@ -33,9 +33,9 @@ const (
 	protoVersion = 0
 )
 
-type serializer struct{}
+type keySerializer struct{}
 
-var _ protoserialization.KeySerializer = (*serializer)(nil)
+var _ protoserialization.KeySerializer = (*keySerializer)(nil)
 
 func protoOutputPrefixTypeFromVariant(variant Variant) (tinkpb.OutputPrefixType, error) {
 	switch variant {
@@ -50,7 +50,7 @@ func protoOutputPrefixTypeFromVariant(variant Variant) (tinkpb.OutputPrefixType,
 	}
 }
 
-func (s *serializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+func (s *keySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
 	actualKey, ok := key.(*Key)
 	if !ok {
 		return nil, fmt.Errorf("key is not a Key")
@@ -82,9 +82,9 @@ func (s *serializer) SerializeKey(key key.Key) (*protoserialization.KeySerializa
 	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
 }
 
-type parser struct{}
+type keyParser struct{}
 
-var _ protoserialization.KeyParser = (*parser)(nil)
+var _ protoserialization.KeyParser = (*keyParser)(nil)
 
 func variantFromProto(prefixType tinkpb.OutputPrefixType) (Variant, error) {
 	switch prefixType {
@@ -99,7 +99,7 @@ func variantFromProto(prefixType tinkpb.OutputPrefixType) (Variant, error) {
 	}
 }
 
-func (s *parser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+func (s *keyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
 	if keySerialization == nil {
 		return nil, fmt.Errorf("key serialization is nil")
 	}
@@ -132,7 +132,35 @@ func (s *parser) ParseKey(keySerialization *protoserialization.KeySerialization)
 		return nil, err
 	}
 	keyMaterial := secretdata.NewBytesFromData(protoKey.GetKeyValue(), insecuresecretdataaccess.Token{})
-	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
+	// keySerialization.IDRequirement() returns zero if the key doesn't have a
+	// key requirement.
 	keyID, _ := keySerialization.IDRequirement()
 	return NewKey(keyMaterial, keyID, params)
+}
+
+type parametersSerializer struct{}
+
+var _ protoserialization.ParametersSerializer = (*parametersSerializer)(nil)
+
+func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.KeyTemplate, error) {
+	actualParameters, ok := parameters.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want *aesgcm.Parameters", parameters)
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(actualParameters.Variant())
+	if err != nil {
+		return nil, err
+	}
+	format := &gcmpb.AesGcmKeyFormat{
+		KeySize: uint32(actualParameters.KeySizeInBytes()),
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		return nil, err
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          typeURL,
+		OutputPrefixType: outputPrefixType,
+		Value:            serializedFormat,
+	}, nil
 }

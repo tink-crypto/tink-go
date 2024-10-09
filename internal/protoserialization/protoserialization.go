@@ -201,7 +201,8 @@ type KeySerializer interface {
 	SerializeKey(key key.Key) (*KeySerialization, error)
 }
 
-// ParametersSerializer is an interface for serializing parameters into a proto key template.
+// ParametersSerializer is an interface for serializing parameters into a proto
+// key template.
 type ParametersSerializer interface {
 	// Serialize serializes the given parameters into a proto key template.
 	Serialize(parameters key.Parameters) (*tinkpb.KeyTemplate, error)
@@ -221,7 +222,8 @@ func RegisterKeySerializer[K key.Key](keySerializer KeySerializer) error {
 	return nil
 }
 
-// RegisterParametersSerializer registers the given parameter serializer for parameters of type P.
+// RegisterParametersSerializer registers the given parameter serializer for
+// parameters of type P.
 //
 // It doesn't allow replacing existing serializers.
 func RegisterParametersSerializer[P key.Parameters](parameterSerializer ParametersSerializer) error {
