@@ -216,3 +216,30 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 	privateKeyBytes := secretdata.NewBytesFromData(protoKey.GetKeyValue(), insecuresecretdataaccess.Token{})
 	return NewPrivateKeyWithPublicKey(privateKeyBytes, publicKey)
 }
+
+type parametersSerializer struct{}
+
+var _ protoserialization.ParametersSerializer = (*parametersSerializer)(nil)
+
+func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.KeyTemplate, error) {
+	ed25519Parameters, ok := parameters.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want *ed25519.Parameters", parameters)
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(ed25519Parameters.Variant())
+	if err != nil {
+		return nil, err
+	}
+	format := &ed25519pb.Ed25519KeyFormat{
+		Version: 0,
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		return nil, err
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          signerTypeURL,
+		OutputPrefixType: outputPrefixType,
+		Value:            serializedFormat,
+	}, nil
+}

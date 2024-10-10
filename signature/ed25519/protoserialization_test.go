@@ -18,7 +18,9 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -389,7 +391,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		{
 			name: "wrong output prefix type",
 			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_UNKNOWN_PREFIX, 12345),
@@ -397,7 +399,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		{
 			name: "wrong private key material type",
 			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_TINK, 12345),
@@ -405,7 +407,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		{
 			name: "wrong private key version",
 			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKeyWithWrongPrivateKeyVersion,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 12345),
@@ -413,7 +415,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		{
 			name: "wrong public key version",
 			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKeyWithWrongPublicKeyVersion,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 12345),
@@ -421,7 +423,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		{
 			name: "wrong public key bytes",
 			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKeyWithWrongPublicKeyBytes,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 12345),
@@ -460,7 +462,7 @@ func TestParsePrivateKey(t *testing.T) {
 		{
 			name: "key with TINK output prefix type",
 			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 12345),
@@ -469,7 +471,7 @@ func TestParsePrivateKey(t *testing.T) {
 		{
 			name: "key with LEGACY output prefix type",
 			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_LEGACY, 12345),
@@ -478,7 +480,7 @@ func TestParsePrivateKey(t *testing.T) {
 		{
 			name: "key with CRUNCHY output prefix type",
 			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_CRUNCHY, 12345),
@@ -487,7 +489,7 @@ func TestParsePrivateKey(t *testing.T) {
 		{
 			name: "key with RAW output prefix type",
 			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_RAW, 0),
@@ -591,7 +593,7 @@ func TestSerializePrivateKey(t *testing.T) {
 			name:       "Public key with TINK output prefix type",
 			privateKey: newPrivateKey(t, privateKeyBytes, 12345, VariantTink),
 			want: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 12345),
@@ -600,7 +602,7 @@ func TestSerializePrivateKey(t *testing.T) {
 			name:       "Public key with LEGACY output prefix type",
 			privateKey: newPrivateKey(t, privateKeyBytes, 12345, VariantLegacy),
 			want: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_LEGACY, 12345),
@@ -609,7 +611,7 @@ func TestSerializePrivateKey(t *testing.T) {
 			name:       "Public key with CRUNCHY output prefix type",
 			privateKey: newPrivateKey(t, privateKeyBytes, 12345, VariantCrunchy),
 			want: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_CRUNCHY, 12345),
@@ -618,7 +620,7 @@ func TestSerializePrivateKey(t *testing.T) {
 			name:       "Public key with RAW output prefix type",
 			privateKey: newPrivateKey(t, privateKeyBytes, 0, VariantNoPrefix),
 			want: newKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl:         signerTypeURL,
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_RAW, 0),
@@ -632,6 +634,96 @@ func TestSerializePrivateKey(t *testing.T) {
 			}
 			if !got.Equals(tc.want) {
 				t.Errorf("s.SerializeKey(%v) = %v, want %v", tc.privateKey, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSerializeParametersFailsWithWrongParameters(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		parameters key.Parameters
+	}{
+		{
+			name:       "empty parameters",
+			parameters: &Parameters{},
+		},
+		{
+			name:       "nil",
+			parameters: nil,
+		},
+		{
+			name:       "wrong type",
+			parameters: &testParams{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			serializer := &parametersSerializer{}
+			if _, err := serializer.Serialize(tc.parameters); err == nil {
+				t.Errorf("serializer.Serialize(%v) err = nil, want error", tc.parameters)
+			}
+		})
+	}
+}
+
+func TestSerializeParameters(t *testing.T) {
+	format := &ed25519pb.Ed25519KeyFormat{
+		Version: 0,
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		t.Fatalf("proto.Marshal(format) err = %v, want nil", err)
+	}
+	for _, tc := range []struct {
+		name            string
+		parameters      key.Parameters
+		wantKeyTemplate *tinkpb.KeyTemplate
+	}{
+		{
+			name:       "parameters with TINK variant",
+			parameters: &Parameters{variant: VariantTink},
+			wantKeyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value:            serializedFormat,
+			},
+		},
+		{
+			name:       "parameters with CRUNCHY variant",
+			parameters: &Parameters{variant: VariantCrunchy},
+			wantKeyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
+				Value:            serializedFormat,
+			},
+		},
+		{
+			name:       "parameters with LEGACY variant",
+			parameters: &Parameters{variant: VariantLegacy},
+			wantKeyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_LEGACY,
+				Value:            serializedFormat,
+			},
+		},
+		{
+			name:       "parameters with NO_PREFIX variant",
+			parameters: &Parameters{variant: VariantNoPrefix},
+			wantKeyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+				Value:            serializedFormat,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			serializer := &parametersSerializer{}
+			gotKeyTemplate, err := serializer.Serialize(tc.parameters)
+			if err != nil {
+				t.Errorf("serializer.Serialize(%v) err = %v, want nil", tc.parameters, err)
+			}
+			if diff := cmp.Diff(tc.wantKeyTemplate, gotKeyTemplate, protocmp.Transform()); diff != "" {
+				t.Errorf("serializer.Serialize(%v) returned unexpected diff (-want +got):\n%s", tc.parameters, diff)
 			}
 		})
 	}

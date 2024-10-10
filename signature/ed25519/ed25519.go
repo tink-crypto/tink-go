@@ -46,4 +46,7 @@ func init() {
 	if err := protoserialization.RegisterKeyParser(signerTypeURL, &privateKeyParser{}); err != nil {
 		panic(fmt.Sprintf("ed25519.init() failed: %v", err))
 	}
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
+		panic(fmt.Sprintf("ed25519.init() failed: %v", err))
+	}
 }
