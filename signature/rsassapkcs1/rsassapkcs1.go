@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package rsassapkcs1 defines RSA-SSA-PKCS1 key managers.
+// Package rsassapkcs1 defines RSA-SSA-PKCS1 key managers, key and parameters.
 package rsassapkcs1
 
 import (
