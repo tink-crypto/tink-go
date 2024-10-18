@@ -495,3 +495,34 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 	}
 	return NewPrivateKeyFromPublicKey(publicKey, privateKeyValue)
 }
+
+type parametersSerializer struct{}
+
+var _ protoserialization.ParametersSerializer = (*parametersSerializer)(nil)
+
+func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.KeyTemplate, error) {
+	ecdsaParameters, ok := parameters.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want *ecdsa.Parameters", parameters)
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(ecdsaParameters.Variant())
+	if err != nil {
+		return nil, err
+	}
+	protoECDSAParams, err := createProtoECDSAParams(ecdsaParameters)
+	if err != nil {
+		return nil, err
+	}
+	format := &ecdsapb.EcdsaKeyFormat{
+		Params: protoECDSAParams,
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		return nil, err
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          signerTypeURL,
+		OutputPrefixType: outputPrefixType,
+		Value:            serializedFormat,
+	}, nil
+}
