@@ -15,24 +15,13 @@
 // Package signature provides implementations of the Signer and Verifier
 // primitives.
 //
-// To sign data using Tink you can use ECDSA, ED25519 or RSA-SSA-PKCS1 key templates.
+// To sign data using Tink you can use ECDSA, ED25519 or RSA-SSA-PSS or
+// RSA-SSA-PKCS1 key templates.
 package signature
 
 import (
-	"fmt"
-
-	"github.com/tink-crypto/tink-go/v2/core/registry"
-	_ "github.com/tink-crypto/tink-go/v2/signature/ecdsa"             // register ECDSA key managers and keys
+	_ "github.com/tink-crypto/tink-go/v2/signature/ecdsa"             // register ecdsa key managers and keys
 	_ "github.com/tink-crypto/tink-go/v2/signature/ed25519"         // register ed25519 key managers and keys
 	_ "github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1" // register rsassapkcs1 key managers
+	_ "github.com/tink-crypto/tink-go/v2/signature/rsassapss"     // register rsassapss key managers
 )
-
-func init() {
-	// RSA SSA PSS
-	if err := registry.RegisterKeyManager(new(rsaSSAPSSSignerKeyManager)); err != nil {
-		panic(fmt.Sprintf("signature.init() failed: %v", err))
-	}
-	if err := registry.RegisterKeyManager(new(rsaSSAPSSVerifierKeyManager)); err != nil {
-		panic(fmt.Sprintf("signature.init() failed: %v", err))
-	}
-}

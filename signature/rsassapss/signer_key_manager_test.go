@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package signature_test
+package rsassapss_test
 
 import (
 	"math/big"
@@ -22,6 +22,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	_ "github.com/tink-crypto/tink-go/v2/signature/rsassapss" // register rsassapss key managers
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	cpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
@@ -30,37 +31,37 @@ import (
 )
 
 const (
-	rsaPSSTestPrivateKeyTypeURL = "type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey"
-	rsaPSSTestPrivateKeyVersion = 0
+	privateKeyTypeURL = "type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey"
+	privateKeyVersion = 0
 )
 
-func TestRSASSAPSSSignerKeyManagerDoesSupport(t *testing.T) {
-	skm, err := registry.GetKeyManager(rsaPSSTestPrivateKeyTypeURL)
+func TestSignerKeyManagerKeyManagerDoesSupport(t *testing.T) {
+	skm, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, rsaPSSTestPrivateKeyTypeURL)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, privateKeyTypeURL)
 	}
-	if !skm.DoesSupport(rsaPSSTestPrivateKeyTypeURL) {
-		t.Errorf("DoesSupport(%q) err = false, want true", rsaPSSTestPrivateKeyTypeURL)
+	if !skm.DoesSupport(privateKeyTypeURL) {
+		t.Errorf("DoesSupport(%q) err = false, want true", privateKeyTypeURL)
 	}
 	if skm.DoesSupport("fake.type.url") {
 		t.Errorf("DoesSupport(%q) err = true, want false", "fake.type.url")
 	}
 }
 
-func TestRSASSAPSSSignerKeyManagerTypeURL(t *testing.T) {
-	skm, err := registry.GetKeyManager(rsaPSSTestPrivateKeyTypeURL)
+func TestSignerKeyManagerKeyManagerTypeURL(t *testing.T) {
+	skm, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, rsaPSSTestPrivateKeyTypeURL)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, privateKeyTypeURL)
 	}
-	if skm.TypeURL() != rsaPSSTestPrivateKeyTypeURL {
-		t.Errorf("TypeURL() = %q, want %q", skm.TypeURL(), rsaPSSTestPrivateKeyTypeURL)
+	if skm.TypeURL() != privateKeyTypeURL {
+		t.Errorf("TypeURL() = %q, want %q", skm.TypeURL(), privateKeyTypeURL)
 	}
 }
 
-func TestRSASSAPSSSignerGetPrimitive(t *testing.T) {
-	skm, err := registry.GetKeyManager(rsaPSSTestPrivateKeyTypeURL)
+func TestSignerKeyManagerGetPrimitive(t *testing.T) {
+	skm, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, rsaPSSTestPrivateKeyTypeURL)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, privateKeyTypeURL)
 	}
 	privKey, err := makeValidRSAPSSKey()
 	if err != nil {
@@ -75,9 +76,9 @@ func TestRSASSAPSSSignerGetPrimitive(t *testing.T) {
 		t.Fatalf("Primitive() err = %v, want nil", err)
 	}
 	signer := p.(tink.Signer)
-	vkm, err := registry.GetKeyManager(rsaPSSTestPublicKeyTypeURL)
+	vkm, err := registry.GetKeyManager(publicKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, rsaPSSTestPublicKeyTypeURL)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, publicKeyTypeURL)
 	}
 	serializedPublic, err := proto.Marshal(privKey.GetPublicKey())
 	if err != nil {
@@ -111,14 +112,14 @@ func mergePrivPub(priv *rsppb.RsaSsaPssPrivateKey, pub *rsppb.RsaSsaPssPublicKey
 	}
 }
 
-func TestRSASSAPSSSignerGetPrimitiveWithInvalidInput(t *testing.T) {
+func TestSignerKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {
 	type testCase struct {
 		tag     string
 		privKey *rsppb.RsaSsaPssPrivateKey
 	}
-	skm, err := registry.GetKeyManager(rsaPSSTestPrivateKeyTypeURL)
+	skm, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, rsaPSSTestPrivateKeyTypeURL)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, privateKeyTypeURL)
 	}
 	validPrivKey, err := makeValidRSAPSSKey()
 	if err != nil {
@@ -355,10 +356,10 @@ func TestRSASSAPSSSignerGetPrimitiveWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestRSASSAPSSSignerGetPrimitiveWithCorruptedPrivateKey(t *testing.T) {
-	skm, err := registry.GetKeyManager(rsaPSSTestPrivateKeyTypeURL)
+func TestSignerKeyManagerGetPrimitiveWithCorruptedPrivateKey(t *testing.T) {
+	skm, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, rsaPSSTestPrivateKeyTypeURL)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, privateKeyTypeURL)
 	}
 	validPrivKey, err := makeValidRSAPSSKey()
 	if err != nil {
@@ -376,7 +377,7 @@ func TestRSASSAPSSSignerGetPrimitiveWithCorruptedPrivateKey(t *testing.T) {
 	}
 }
 
-func TestRSASSAPSSSignerNewKey(t *testing.T) {
+func TestSignerKeyManagerNewKey(t *testing.T) {
 	keyFormat := &rsppb.RsaSsaPssKeyFormat{
 		Params: &rsppb.RsaSsaPssParams{
 			SigHash:    cpb.HashType_SHA256,
@@ -390,9 +391,9 @@ func TestRSASSAPSSSignerNewKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proto.Marshal() err = %v, want nil", err)
 	}
-	skm, err := registry.GetKeyManager(rsaPSSTestPrivateKeyTypeURL)
+	skm, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, rsaPSSTestPrivateKeyTypeURL)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, privateKeyTypeURL)
 	}
 	key, err := skm.NewKey(serializedKeyFormat)
 	if err != nil {
@@ -402,8 +403,8 @@ func TestRSASSAPSSSignerNewKey(t *testing.T) {
 	if !ok {
 		t.Fatalf("key isn't a *rsppb.RsaSsaPssPrivateKey")
 	}
-	if privKey.GetVersion() != rsaPSSTestPrivateKeyVersion {
-		t.Errorf("privKey.GetVersion() = %d, want %d", privKey.GetVersion(), rsaPSSTestPrivateKeyVersion)
+	if privKey.GetVersion() != privateKeyVersion {
+		t.Errorf("privKey.GetVersion() = %d, want %d", privKey.GetVersion(), privateKeyVersion)
 	}
 	if privKey.GetD() == nil {
 		t.Error("GetD() == nil, want []byte{}")
@@ -436,7 +437,7 @@ func TestRSASSAPSSSignerNewKey(t *testing.T) {
 	}
 }
 
-func TestRSASSAPSSSignerNewKeyData(t *testing.T) {
+func TestSignerKeyManagerNewKeyData(t *testing.T) {
 	keyFormat := &rsppb.RsaSsaPssKeyFormat{
 		Params: &rsppb.RsaSsaPssParams{
 			SigHash:    cpb.HashType_SHA256,
@@ -450,13 +451,13 @@ func TestRSASSAPSSSignerNewKeyData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proto.Marshal() err = %v, want nil", err)
 	}
-	skm, err := registry.GetKeyManager(rsaPSSTestPrivateKeyTypeURL)
+	skm, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, rsaPSSTestPrivateKeyTypeURL)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, privateKeyTypeURL)
 	}
-	vkm, err := registry.GetKeyManager(rsaPSSTestPublicKeyTypeURL)
+	vkm, err := registry.GetKeyManager(publicKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, rsaPSSTestPublicKeyTypeURL)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, publicKeyTypeURL)
 	}
 	keyData, err := skm.NewKeyData(serializedKeyFormat)
 	if err != nil {
@@ -465,8 +466,8 @@ func TestRSASSAPSSSignerNewKeyData(t *testing.T) {
 	if keyData.GetKeyMaterialType() != tpb.KeyData_ASYMMETRIC_PRIVATE {
 		t.Errorf("keyData.GetKeyMaterialType() = %v, want %v", keyData.GetKeyMaterialType(), tpb.KeyData_ASYMMETRIC_PRIVATE)
 	}
-	if keyData.GetTypeUrl() != rsaPSSTestPrivateKeyTypeURL {
-		t.Errorf("keyData.GetTypeUrl() = %q, want %q", keyData.GetTypeUrl(), rsaPSSTestPrivateKeyTypeURL)
+	if keyData.GetTypeUrl() != privateKeyTypeURL {
+		t.Errorf("keyData.GetTypeUrl() = %q, want %q", keyData.GetTypeUrl(), privateKeyTypeURL)
 	}
 	// Creating a primitive does a self key test which signs and verifies data.
 	s, err := skm.Primitive(keyData.GetValue())
@@ -499,14 +500,14 @@ func TestRSASSAPSSSignerNewKeyData(t *testing.T) {
 	}
 }
 
-func TestRSASSAPSSSignerNewKeyFailsWithInvalidFormat(t *testing.T) {
+func TestSignerKeyManagerNewKeyFailsWithInvalidFormat(t *testing.T) {
 	type testCase struct {
 		tag       string
 		keyFormat *rsppb.RsaSsaPssKeyFormat
 	}
-	skm, err := registry.GetKeyManager(rsaPSSTestPrivateKeyTypeURL)
+	skm, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, rsaPSSTestPrivateKeyTypeURL)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, privateKeyTypeURL)
 	}
 	validKeyFormat := &rsppb.RsaSsaPssKeyFormat{
 		Params: &rsppb.RsaSsaPssParams{
@@ -601,14 +602,44 @@ func TestRSASSAPSSSignerNewKeyFailsWithInvalidFormat(t *testing.T) {
 	}
 }
 
-func TestRSASSAPSSSignerPublicKeyData(t *testing.T) {
-	skm, err := registry.GetKeyManager(rsaPSSTestPrivateKeyTypeURL)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, rsaPSSTestPrivateKeyTypeURL)
+func TestSignerKeyManagerPublicKeyInvalidInput(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		serializedPrivKey []byte
+	}{
+		{
+			name:              "nil private key",
+			serializedPrivKey: nil,
+		},
+		{
+			name:              "empty private key",
+			serializedPrivKey: []byte{},
+		},
+		{
+			name:              "invalid private key bytes",
+			serializedPrivKey: []byte("1234"),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			skm, err := registry.GetKeyManager(privateKeyTypeURL)
+			if err != nil {
+				t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, privateKeyTypeURL)
+			}
+			if _, err := skm.(registry.PrivateKeyManager).PublicKeyData(tc.serializedPrivKey); err == nil {
+				t.Errorf("PublicKeyData() err = nil, want error")
+			}
+		})
 	}
-	vkm, err := registry.GetKeyManager(rsaPSSTestPublicKeyTypeURL)
+}
+
+func TestSignerKeyManagerPublicKeyData(t *testing.T) {
+	skm, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, rsaPSSTestPublicKeyTypeURL)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, privateKeyTypeURL)
+	}
+	vkm, err := registry.GetKeyManager(publicKeyTypeURL)
+	if err != nil {
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", err, publicKeyTypeURL)
 	}
 	validPrivKey, err := makeValidRSAPSSKey()
 	if err != nil {
@@ -625,8 +656,8 @@ func TestRSASSAPSSSignerPublicKeyData(t *testing.T) {
 	if pubKeyData.GetKeyMaterialType() != tpb.KeyData_ASYMMETRIC_PUBLIC {
 		t.Errorf("GetKeyMaterialType() = %v, want %v", pubKeyData.GetKeyMaterialType(), tpb.KeyData_ASYMMETRIC_PUBLIC)
 	}
-	if pubKeyData.GetTypeUrl() != rsaPSSTestPublicKeyTypeURL {
-		t.Errorf("GetTypeUrl() = %q, want %q", pubKeyData.GetTypeUrl(), rsaPSSTestPublicKeyTypeURL)
+	if pubKeyData.GetTypeUrl() != publicKeyTypeURL {
+		t.Errorf("GetTypeUrl() = %q, want %q", pubKeyData.GetTypeUrl(), publicKeyTypeURL)
 	}
 	if _, err := vkm.Primitive(pubKeyData.GetValue()); err != nil {
 		t.Fatalf("vkm.Primitive() err = %v, want nil", err)

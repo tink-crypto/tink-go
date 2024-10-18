@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package signature
+package rsassapss
 
 import (
 	"crypto/rsa"
@@ -29,26 +29,26 @@ import (
 )
 
 const (
-	rsaSSAPSSVerifierKeyVersion = 0
-	rsaSSAPSSVerifierTypeURL    = "type.googleapis.com/google.crypto.tink.RsaSsaPssPublicKey"
+	verifierKeyVersion = 0
+	verifierTypeURL    = "type.googleapis.com/google.crypto.tink.RsaSsaPssPublicKey"
 )
 
 var (
-	errInvalidRSASSAPSSVerifierKey = errors.New("rsassapss_verifier_key_manager: invalid key")
-	errRSASSAPSSNotImplemented     = errors.New("rsassapss_verifier_key_manager: not implemented")
+	errInvalidVerifierKey = errors.New("rsassapss_verifier_key_manager: invalid key")
+	errUnimplemented      = errors.New("rsassapss_verifier_key_manager: not implemented")
 )
 
-type rsaSSAPSSVerifierKeyManager struct{}
+type verifierKeyManager struct{}
 
-var _ (registry.KeyManager) = (*rsaSSAPSSVerifierKeyManager)(nil)
+var _ (registry.KeyManager) = (*verifierKeyManager)(nil)
 
-func (km *rsaSSAPSSVerifierKeyManager) Primitive(serializedKey []byte) (any, error) {
+func (km *verifierKeyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
-		return nil, errInvalidRSASSAPSSVerifierKey
+		return nil, errInvalidVerifierKey
 	}
 	key := &rsassapsspb.RsaSsaPssPublicKey{}
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidRSASSAPSSVerifierKey
+		return nil, errInvalidVerifierKey
 	}
 	if err := validateRSAPSSPublicKey(key); err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (km *rsaSSAPSSVerifierKeyManager) Primitive(serializedKey []byte) (any, err
 }
 
 func validateRSAPSSPublicKey(pubKey *rsassapsspb.RsaSsaPssPublicKey) error {
-	if err := keyset.ValidateKeyVersion(pubKey.GetVersion(), rsaSSAPSSVerifierKeyVersion); err != nil {
+	if err := keyset.ValidateKeyVersion(pubKey.GetVersion(), verifierKeyVersion); err != nil {
 		return err
 	}
 	if pubKey.GetParams().GetSigHash() != pubKey.GetParams().GetMgf1Hash() {
@@ -73,18 +73,18 @@ func validateRSAPSSPublicKey(pubKey *rsassapsspb.RsaSsaPssPublicKey) error {
 	return internal.ValidateRSAPublicKeyParams(pubKey.GetParams().GetSigHash(), new(big.Int).SetBytes(pubKey.GetN()).BitLen(), pubKey.GetE())
 }
 
-func (km *rsaSSAPSSVerifierKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
-	return nil, errRSASSAPSSNotImplemented
+func (km *verifierKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+	return nil, errUnimplemented
 }
 
-func (km *rsaSSAPSSVerifierKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
-	return nil, errRSASSAPSSNotImplemented
+func (km *verifierKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+	return nil, errUnimplemented
 }
 
-func (km *rsaSSAPSSVerifierKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == rsaSSAPSSVerifierTypeURL
+func (km *verifierKeyManager) DoesSupport(typeURL string) bool {
+	return typeURL == verifierTypeURL
 }
 
-func (km *rsaSSAPSSVerifierKeyManager) TypeURL() string {
-	return rsaSSAPSSVerifierTypeURL
+func (km *verifierKeyManager) TypeURL() string {
+	return verifierTypeURL
 }
