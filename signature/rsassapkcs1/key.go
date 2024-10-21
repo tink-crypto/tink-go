@@ -15,8 +15,11 @@
 package rsassapkcs1
 
 import (
+	"bytes"
 	"fmt"
+	"math/big"
 
+	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
 )
 
@@ -165,4 +168,83 @@ func (p *Parameters) Equals(other key.Parameters) bool {
 		p.hashType == that.hashType &&
 		p.publicExponent == that.publicExponent &&
 		p.variant == that.variant
+}
+
+// PublicKey represents a function that can verify RSA-SSA-PKCS1 v1.5 signatures
+// as defined in [RFC 3447, Section 8.2].
+type PublicKey struct {
+	modulus       []byte // Big integer value in big-endian encoding.
+	idRequirement uint32
+	outputPrefix  []byte
+	parameters    *Parameters
+}
+
+var _ key.Key = (*PublicKey)(nil)
+
+func calculateOutputPrefix(variant Variant, idRequirement uint32) ([]byte, error) {
+	switch variant {
+	case VariantTink:
+		return outputprefix.Tink(idRequirement), nil
+	case VariantCrunchy, VariantLegacy:
+		return outputprefix.Legacy(idRequirement), nil
+	case VariantNoPrefix:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("invalid output prefix variant: %v", variant)
+	}
+}
+
+// NewPublicKey creates a new RSA=SSA-PKCS1 PublicKey object from modulus,
+// ID requirement and parameters.
+//
+// modulus is a Big integer value in big-endian encoding. Parameters must be
+// non-nil.
+func NewPublicKey(modulus []byte, idRequirement uint32, parameters *Parameters) (*PublicKey, error) {
+	// This is set to UnknownHashType if the parameters is a struct literal.
+	if parameters.HashType() == UnknownHashType {
+		return nil, fmt.Errorf("rsassapkcs1.NewPublicKey: invalid parameters")
+	}
+	// We want modulus to fix exactly parameters.ModulusSizeBits() bits.
+	if len(modulus) != parameters.ModulusSizeBits()/8 {
+		return nil, fmt.Errorf("rsassapkcs1.NewPublicKey: invalid modulus length: %v, want %v", len(modulus), parameters.ModulusSizeBits()/8)
+	}
+	bitLength := new(big.Int).SetBytes(modulus).BitLen()
+	if bitLength != parameters.ModulusSizeBits() {
+		return nil, fmt.Errorf("rsassapkcs1.NewPublicKey: invalid modulus bit-length: %v, want %v", bitLength, parameters.ModulusSizeBits())
+	}
+	if parameters.Variant() == VariantNoPrefix && idRequirement != 0 {
+		return nil, fmt.Errorf("rsassapkcs1.NewPublicKey: key ID must be zero for VariantNoPrefix")
+	}
+	outputPrefix, err := calculateOutputPrefix(parameters.Variant(), idRequirement)
+	if err != nil {
+		return nil, fmt.Errorf("rsassapkcs1.NewPublicKey: %v", err)
+	}
+	return &PublicKey{
+		modulus:       modulus,
+		idRequirement: idRequirement,
+		outputPrefix:  outputPrefix,
+		parameters:    parameters,
+	}, nil
+}
+
+// Modulus returns the public key modulus.
+func (k *PublicKey) Modulus() []byte { return bytes.Clone(k.modulus) }
+
+// Parameters returns the parameters of this key.
+func (k *PublicKey) Parameters() key.Parameters { return k.parameters }
+
+// IDRequirement returns the key ID requirement and whether it is required.
+func (k *PublicKey) IDRequirement() (uint32, bool) {
+	return k.idRequirement, k.Parameters().HasIDRequirement()
+}
+
+// OutputPrefix returns the output prefix of this key.
+func (k *PublicKey) OutputPrefix() []byte { return bytes.Clone(k.outputPrefix) }
+
+// Equals tells whether this key object is equal to other.
+func (k *PublicKey) Equals(other key.Key) bool {
+	actualKey, ok := other.(*PublicKey)
+	return ok && bytes.Equal(k.modulus, actualKey.modulus) &&
+		k.idRequirement == actualKey.idRequirement &&
+		k.parameters.Equals(actualKey.parameters)
 }
