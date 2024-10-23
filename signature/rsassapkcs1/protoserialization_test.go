@@ -21,6 +21,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	rsassapkcs1pb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pkcs1_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -189,7 +190,7 @@ func newPublicKey(t *testing.T, modulus []byte, idRequirement uint32, parameters
 	return key
 }
 
-func TestParsePublicKey(t *testing.T) {
+func TestParseAndSerializePublicKey(t *testing.T) {
 	proto2048PublicKey := rsassapkcs1pb.RsaSsaPkcs1PublicKey{
 		Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 			HashType: commonpb.HashType_SHA256,
@@ -240,163 +241,214 @@ func TestParsePublicKey(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name             string
-		keySerialization *protoserialization.KeySerialization
-		wantKey          *PublicKey
+		name                   string
+		publicKeySerialization *protoserialization.KeySerialization
+		publicKey              *PublicKey
 	}{
 		{
 			name: "2048-SHA256-TINK",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized2048ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_TINK, 123),
-			wantKey: newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, 2048, SHA256, f4, VariantTink)),
+			publicKey: newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, 2048, SHA256, f4, VariantTink)),
 		},
 		{
 			name: "2048-SHA256-LEGACY",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized2048ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_LEGACY, 123),
-			wantKey: newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, 2048, SHA256, f4, VariantLegacy)),
+			publicKey: newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, 2048, SHA256, f4, VariantLegacy)),
 		},
 		{
 			name: "2048-SHA256-CRUNCHY",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized2048ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_CRUNCHY, 123),
-			wantKey: newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, 2048, SHA256, f4, VariantCrunchy)),
+			publicKey: newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, 2048, SHA256, f4, VariantCrunchy)),
 		},
 		{
 			name: "2048-SHA256-RAW",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized2048ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_RAW, 0),
-			wantKey: newPublicKey(t, base64Decode(t, n2048Base64), 0, newParameters(t, 2048, SHA256, f4, VariantNoPrefix)),
+			publicKey: newPublicKey(t, base64Decode(t, n2048Base64), 0, newParameters(t, 2048, SHA256, f4, VariantNoPrefix)),
 		},
 		{
 			name: "3072-SHA384-TINK",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized3072SHA384ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_TINK, 123),
-			wantKey: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, 3072, SHA384, f4, VariantTink)),
+			publicKey: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, 3072, SHA384, f4, VariantTink)),
 		},
 		{
 			name: "3072-SHA384-LEGACY",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized3072SHA384ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_LEGACY, 123),
-			wantKey: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, 3072, SHA384, f4, VariantLegacy)),
+			publicKey: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, 3072, SHA384, f4, VariantLegacy)),
 		},
 		{
 			name: "3072-SHA384-CRUNCHY",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized3072SHA384ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_CRUNCHY, 123),
-			wantKey: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, 3072, SHA384, f4, VariantCrunchy)),
+			publicKey: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, 3072, SHA384, f4, VariantCrunchy)),
 		},
 		{
 			name: "3072-SHA384-RAW",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized3072SHA384ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_RAW, 0),
-			wantKey: newPublicKey(t, base64Decode(t, n3072Base64), 0, newParameters(t, 3072, SHA384, f4, VariantNoPrefix)),
+			publicKey: newPublicKey(t, base64Decode(t, n3072Base64), 0, newParameters(t, 3072, SHA384, f4, VariantNoPrefix)),
 		},
 		{
 			name: "3072-SHA512-TINK",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized3072SHA512ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_TINK, 123),
-			wantKey: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, 3072, SHA512, f4, VariantTink)),
+			publicKey: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, 3072, SHA512, f4, VariantTink)),
 		},
 		{
 			name: "3072-SHA512-LEGACY",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized3072SHA512ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_LEGACY, 123),
-			wantKey: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, 3072, SHA512, f4, VariantLegacy)),
+			publicKey: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, 3072, SHA512, f4, VariantLegacy)),
 		},
 		{
 			name: "3072-SHA512-CRUNCHY",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized3072SHA512ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_CRUNCHY, 123),
-			wantKey: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, 3072, SHA512, f4, VariantCrunchy)),
+			publicKey: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, 3072, SHA512, f4, VariantCrunchy)),
 		},
 		{
 			name: "3072-SHA512-RAW",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized3072SHA512ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_RAW, 0),
-			wantKey: newPublicKey(t, base64Decode(t, n3072Base64), 0, newParameters(t, 3072, SHA512, f4, VariantNoPrefix)),
+			publicKey: newPublicKey(t, base64Decode(t, n3072Base64), 0, newParameters(t, 3072, SHA512, f4, VariantNoPrefix)),
 		},
 		{
 			name: "4096-SHA512-TINK",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized4096ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_TINK, 123),
-			wantKey: newPublicKey(t, base64Decode(t, n4096Base64), 123, newParameters(t, 4096, SHA512, f4, VariantTink)),
+			publicKey: newPublicKey(t, base64Decode(t, n4096Base64), 123, newParameters(t, 4096, SHA512, f4, VariantTink)),
 		},
 		{
 			name: "4096-SHA512-LEGACY",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized4096ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_LEGACY, 123),
-			wantKey: newPublicKey(t, base64Decode(t, n4096Base64), 123, newParameters(t, 4096, SHA512, f4, VariantLegacy)),
+			publicKey: newPublicKey(t, base64Decode(t, n4096Base64), 123, newParameters(t, 4096, SHA512, f4, VariantLegacy)),
 		},
 		{
 			name: "4096-SHA512-CRUNCHY",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized4096ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_CRUNCHY, 123),
-			wantKey: newPublicKey(t, base64Decode(t, n4096Base64), 123, newParameters(t, 4096, SHA512, f4, VariantCrunchy)),
+			publicKey: newPublicKey(t, base64Decode(t, n4096Base64), 123, newParameters(t, 4096, SHA512, f4, VariantCrunchy)),
 		},
 		{
 			name: "4096-SHA512-RAW",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serialized4096ProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_RAW, 0),
-			wantKey: newPublicKey(t, base64Decode(t, n4096Base64), 0, newParameters(t, 4096, SHA512, f4, VariantNoPrefix)),
+			publicKey: newPublicKey(t, base64Decode(t, n4096Base64), 0, newParameters(t, 4096, SHA512, f4, VariantNoPrefix)),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &publicKeyParser{}
-			gotKey, err := p.ParseKey(tc.keySerialization)
+			gotKey, err := p.ParseKey(tc.publicKeySerialization)
 			if err != nil {
-				t.Fatalf("p.ParseKey(%v) err = %v, want non-nil", tc.keySerialization, err)
+				t.Fatalf("p.ParseKey(%v) err = %v, want non-nil", tc.publicKeySerialization, err)
 			}
-			if !gotKey.Equals(tc.wantKey) {
-				t.Errorf("%v.Equals(%v) = false, want true", gotKey, tc.wantKey)
+			if !gotKey.Equals(tc.publicKey) {
+				t.Errorf("%v.Equals(%v) = false, want true", gotKey, tc.publicKey)
+			}
+
+			// Make sure we can serialize back the key serialization.
+			s := &publicKeySerializer{}
+			gotSerialization, err := s.SerializeKey(gotKey)
+			if err != nil {
+				t.Errorf("s.SerializeKey(%v) err = %v, want nil", tc.publicKeySerialization, err)
+			}
+			if !gotSerialization.Equals(tc.publicKeySerialization) {
+				t.Errorf("gotSerialization.Equals(tc.publicKeySerialization) = false, want true")
+			}
+		})
+	}
+}
+
+type testParams struct{}
+
+func (p *testParams) HasIDRequirement() bool { return true }
+
+func (p *testParams) Equals(params key.Parameters) bool { return true }
+
+type testKey struct{}
+
+func (k *testKey) Parameters() key.Parameters { return &testParams{} }
+
+func (k *testKey) Equals(other key.Key) bool { return true }
+
+func (k *testKey) IDRequirement() (uint32, bool) { return 123, true }
+
+func TestSerializePublicKeyFails(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		publicKey key.Key
+	}{
+		{
+			name:      "nil public key",
+			publicKey: nil,
+		},
+		{
+			name:      "invalid public key",
+			publicKey: &PublicKey{},
+		},
+		{
+			name:      "incorrect key type",
+			publicKey: &testKey{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &publicKeySerializer{}
+			if _, err := s.SerializeKey(tc.publicKey); err == nil {
+				t.Errorf("s.SerializeKey(%v) err = nil, want non-nil", tc.publicKey)
 			}
 		})
 	}

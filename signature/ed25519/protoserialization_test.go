@@ -204,7 +204,7 @@ func TestSerializePublicKeyFails(t *testing.T) {
 			publicKey: nil,
 		},
 		{
-			name:      "invlid public key",
+			name:      "invalid public key",
 			publicKey: &PublicKey{},
 		},
 		{

@@ -34,6 +34,76 @@ const (
 	publicKeyProtoVersion = 0
 )
 
+type publicKeySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*publicKeySerializer)(nil)
+
+func protoOutputPrefixTypeFromVariant(variant Variant) (tinkpb.OutputPrefixType, error) {
+	switch variant {
+	case VariantTink:
+		return tinkpb.OutputPrefixType_TINK, nil
+	case VariantCrunchy:
+		return tinkpb.OutputPrefixType_CRUNCHY, nil
+	case VariantLegacy:
+		return tinkpb.OutputPrefixType_LEGACY, nil
+	case VariantNoPrefix:
+		return tinkpb.OutputPrefixType_RAW, nil
+	default:
+		return tinkpb.OutputPrefixType_UNKNOWN_PREFIX, fmt.Errorf("unknown output prefix variant: %v", variant)
+	}
+}
+
+func protoHashValueFromHashType(hashType HashType) (commonpb.HashType, error) {
+	switch hashType {
+	case SHA256:
+		return commonpb.HashType_SHA256, nil
+	case SHA384:
+		return commonpb.HashType_SHA384, nil
+	case SHA512:
+		return commonpb.HashType_SHA512, nil
+	default:
+		return commonpb.HashType_UNKNOWN_HASH, fmt.Errorf("unknown hash type: %v", hashType)
+	}
+}
+
+func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	rsaPublicKey, ok := key.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type: %T, want *rsassapkcs1.PublicKey", key)
+	}
+	if rsaPublicKey.parameters == nil {
+		return nil, fmt.Errorf("invalid key")
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(rsaPublicKey.parameters.Variant())
+	if err != nil {
+		return nil, err
+	}
+	hashType, err := protoHashValueFromHashType(rsaPublicKey.parameters.HashType())
+	if err != nil {
+		return nil, err
+	}
+	protoKey := &rsassapkcs1pb.RsaSsaPkcs1PublicKey{
+		Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+			HashType: hashType,
+		},
+		N:       rsaPublicKey.Modulus(),
+		E:       new(big.Int).SetUint64(uint64(rsaPublicKey.parameters.PublicExponent())).Bytes(),
+		Version: publicKeyProtoVersion,
+	}
+	serializedKey, err := proto.Marshal(protoKey)
+	if err != nil {
+		return nil, err
+	}
+	// idRequirement is zero if the key doesn't have a key requirement.
+	idRequirement, _ := rsaPublicKey.IDRequirement()
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         verifierTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+	}
+	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
+}
+
 type publicKeyParser struct{}
 
 var _ protoserialization.KeyParser = (*publicKeyParser)(nil)
