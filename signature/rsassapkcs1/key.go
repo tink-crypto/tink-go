@@ -16,11 +16,14 @@ package rsassapkcs1
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"fmt"
 	"math/big"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
 // Variant is the prefix variant of an RSA-SSA-PKCS1 key.
@@ -194,7 +197,7 @@ func calculateOutputPrefix(variant Variant, idRequirement uint32) ([]byte, error
 	}
 }
 
-// NewPublicKey creates a new RSA=SSA-PKCS1 PublicKey object from modulus,
+// NewPublicKey creates a new RSA-SSA-PKCS1 PublicKey object from modulus,
 // ID requirement and parameters.
 //
 // modulus is a Big integer value in big-endian encoding. Parameters must be
@@ -247,4 +250,96 @@ func (k *PublicKey) Equals(other key.Key) bool {
 	return ok && bytes.Equal(k.modulus, actualKey.modulus) &&
 		k.idRequirement == actualKey.idRequirement &&
 		k.parameters.Equals(actualKey.parameters)
+}
+
+// PrivateKey represents a function that can produce RSA-SSA-PKCS1 v1.5
+// signatures as defined in [RFC 3447, Section 8.2].
+type PrivateKey struct {
+	publicKey  *PublicKey
+	privateKey *rsa.PrivateKey
+}
+
+// PrivateKeyValues contains the values of a private key.
+type PrivateKeyValues struct {
+	P, Q secretdata.Bytes
+	D    secretdata.Bytes
+	// dp, dq and QInv must be computed by the Go library.
+	// See https://pkg.go.dev/crypto/rsa#PrivateKey.
+}
+
+// NewPrivateKey creates a new RSA-SSA-PKCS1 PrivateKey value from a public key
+// and private key values.
+//
+// publicKey must be non-nil.
+func NewPrivateKey(publicKey *PublicKey, opts PrivateKeyValues) (*PrivateKey, error) {
+	if publicKey.parameters == nil {
+		return nil, fmt.Errorf("rsassapkcs1.NewPrivateKey: invalid public key")
+	}
+	privateKey := rsa.PrivateKey{
+		PublicKey: rsa.PublicKey{
+			N: new(big.Int).SetBytes(publicKey.Modulus()),
+			E: publicKey.parameters.PublicExponent(),
+		},
+		D: new(big.Int).SetBytes(opts.D.Data(insecuresecretdataaccess.Token{})),
+		Primes: []*big.Int{
+			new(big.Int).SetBytes(opts.P.Data(insecuresecretdataaccess.Token{})),
+			new(big.Int).SetBytes(opts.Q.Data(insecuresecretdataaccess.Token{})),
+		},
+	}
+	if err := privateKey.Validate(); err != nil {
+		return nil, fmt.Errorf("rsassapkcs1.NewPrivateKey: %v", err)
+	}
+	privateKey.Precompute()
+	return &PrivateKey{
+		publicKey:  publicKey,
+		privateKey: &privateKey,
+	}, nil
+}
+
+// P returns the prime P.
+func (k *PrivateKey) P() secretdata.Bytes {
+	return secretdata.NewBytesFromData(k.privateKey.Primes[0].Bytes(), insecuresecretdataaccess.Token{})
+}
+
+// Q returns the prime Q.
+func (k *PrivateKey) Q() secretdata.Bytes {
+	return secretdata.NewBytesFromData(k.privateKey.Primes[1].Bytes(), insecuresecretdataaccess.Token{})
+}
+
+// D returns the private exponent D.
+func (k *PrivateKey) D() secretdata.Bytes {
+	return secretdata.NewBytesFromData(k.privateKey.D.Bytes(), insecuresecretdataaccess.Token{})
+}
+
+// DP returns the private prime factor P-1.
+func (k *PrivateKey) DP() secretdata.Bytes {
+	return secretdata.NewBytesFromData(k.privateKey.Precomputed.Dp.Bytes(), insecuresecretdataaccess.Token{})
+}
+
+// DQ returns the private prime factor Q-1.
+func (k *PrivateKey) DQ() secretdata.Bytes {
+	return secretdata.NewBytesFromData(k.privateKey.Precomputed.Dq.Bytes(), insecuresecretdataaccess.Token{})
+}
+
+// QInv returns the inverse of Q.
+func (k *PrivateKey) QInv() secretdata.Bytes {
+	return secretdata.NewBytesFromData(k.privateKey.Precomputed.Qinv.Bytes(), insecuresecretdataaccess.Token{})
+}
+
+// PublicKey returns the corresponding public key.
+func (k *PrivateKey) PublicKey() (key.Key, error) { return k.publicKey, nil }
+
+// Parameters returns the parameters of this key.
+func (k *PrivateKey) Parameters() key.Parameters { return k.publicKey.Parameters() }
+
+// IDRequirement tells whether the key ID and whether it is required.
+func (k *PrivateKey) IDRequirement() (uint32, bool) { return k.publicKey.IDRequirement() }
+
+// OutputPrefix returns the output prefix of this key.
+func (k *PrivateKey) OutputPrefix() []byte { return k.publicKey.OutputPrefix() }
+
+// Equals tells whether this key object is equal to other.
+func (k *PrivateKey) Equals(other key.Key) bool {
+	that, ok := other.(*PrivateKey)
+	return ok && k.publicKey.Equals(that.publicKey) && k.privateKey.Equal(that.privateKey)
 }
