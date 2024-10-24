@@ -286,3 +286,38 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 	}
 	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
 }
+
+type parametersSerializer struct{}
+
+var _ protoserialization.ParametersSerializer = (*parametersSerializer)(nil)
+
+func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.KeyTemplate, error) {
+	rsaSsaPkcs1Parameters, ok := parameters.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want *rsassapkcs1.Parameters", parameters)
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(rsaSsaPkcs1Parameters.Variant())
+	if err != nil {
+		return nil, err
+	}
+	hashType, err := protoHashValueFromHashType(rsaSsaPkcs1Parameters.HashType())
+	if err != nil {
+		return nil, err
+	}
+	format := &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+		Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+			HashType: hashType,
+		},
+		ModulusSizeInBits: uint32(rsaSsaPkcs1Parameters.ModulusSizeBits()),
+		PublicExponent:    new(big.Int).SetUint64(uint64(rsaSsaPkcs1Parameters.PublicExponent())).Bytes(),
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		return nil, err
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          signerTypeURL,
+		OutputPrefixType: outputPrefixType,
+		Value:            serializedFormat,
+	}, nil
+}
