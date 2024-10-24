@@ -166,15 +166,16 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	if err != nil {
 		return nil, err
 	}
-	modulus := protoKey.GetN()
+	// Tolerate leading zeros in modulus encoding.
+	modulus := new(big.Int).SetBytes(protoKey.GetN())
 	exponent := new(big.Int).SetBytes(protoKey.GetE())
-	params, err := NewParameters(new(big.Int).SetBytes(modulus).BitLen(), hashType, int(exponent.Int64()), variant)
+	params, err := NewParameters(modulus.BitLen(), hashType, int(exponent.Int64()), variant)
 	if err != nil {
 		return nil, err
 	}
 	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
 	keyID, _ := keySerialization.IDRequirement()
-	return NewPublicKey(modulus, keyID, params)
+	return NewPublicKey(modulus.Bytes(), keyID, params)
 }
 
 type privateKeyParser struct{}
@@ -208,9 +209,10 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 	if err != nil {
 		return nil, err
 	}
-	modulus := protoPublicKey.GetN()
+	// Tolerate leading zeros in modulus encoding.
+	modulus := new(big.Int).SetBytes(protoPublicKey.GetN())
 	exponent := new(big.Int).SetBytes(protoPublicKey.GetE())
-	params, err := NewParameters(new(big.Int).SetBytes(modulus).BitLen(), hashType, int(exponent.Int64()), variant)
+	params, err := NewParameters(modulus.BitLen(), hashType, int(exponent.Int64()), variant)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +221,7 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 	}
 	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
 	keyID, _ := keySerialization.IDRequirement()
-	publicKey, err := NewPublicKey(modulus, keyID, params)
+	publicKey, err := NewPublicKey(modulus.Bytes(), keyID, params)
 	if err != nil {
 		return nil, err
 	}

@@ -210,6 +210,40 @@ func newPublicKey(t *testing.T, modulus []byte, idRequirement uint32, parameters
 	return key
 }
 
+func TestParsePublicKeyWithZeroPaddingModulus(t *testing.T) {
+	n := base64Decode(t, n2048Base64)
+	publicKey := &rsassapkcs1pb.RsaSsaPkcs1PublicKey{
+		Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+			HashType: commonpb.HashType_SHA256,
+		},
+		N:       append([]byte{0, 0, 0, 0}, n...),
+		E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
+		Version: publicKeyProtoVersion,
+	}
+	serializedPublicKey, err := proto.Marshal(publicKey)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", publicKey, err)
+	}
+
+	keySerialization := newKeySerialization(t, &tinkpb.KeyData{
+		TypeUrl:         "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PublicKey",
+		Value:           serializedPublicKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+	}, tinkpb.OutputPrefixType_TINK, 123)
+
+	wantPublicKey :=
+		newPublicKey(t, n, 123, newParameters(t, 2048, SHA256, f4, VariantTink))
+
+	parser := &publicKeyParser{}
+	parsedPublicKey, err := parser.ParseKey(keySerialization)
+	if err != nil {
+		t.Fatalf("parser.ParseKey(%v) err = %v, want non-nil", keySerialization, err)
+	}
+	if got, want := parsedPublicKey, wantPublicKey; !got.Equals(want) {
+		t.Errorf("got.Equals(want) = false, want true")
+	}
+}
+
 func TestParseAndSerializePublicKey(t *testing.T) {
 	publicKey2048 := rsassapkcs1pb.RsaSsaPkcs1PublicKey{
 		Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
@@ -600,6 +634,57 @@ func newPrivateKey(t *testing.T, publicKey *PublicKey, privateKeyValues PrivateK
 		t.Fatalf("NewPrivateKey(%v, %v) err = %v, want nil", publicKey, privateKeyValues, err)
 	}
 	return privateKey
+}
+
+func TestParsePrivateKeyWithZeroPaddingModulus(t *testing.T) {
+	n := base64Decode(t, n2048Base64)
+	p := base64Decode(t, p2048Base64)
+	q := base64Decode(t, q2048Base64)
+	d := base64Decode(t, d2048Base64)
+	dp := base64Decode(t, dp2048Base64)
+	dq := base64Decode(t, dq2048Base64)
+	qInv := base64Decode(t, qInv2048Base64)
+	privateKey := &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
+		D:   d,
+		P:   p,
+		Q:   q,
+		Dp:  dp,
+		Dq:  dq,
+		Crt: qInv,
+		PublicKey: &rsassapkcs1pb.RsaSsaPkcs1PublicKey{
+			Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+				HashType: commonpb.HashType_SHA256,
+			},
+			// Pad with zeros.
+			N:       append([]byte{0, 0, 0, 0}, base64Decode(t, n2048Base64)...),
+			E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			Version: publicKeyProtoVersion,
+		},
+		Version: privateKeyProtoVersion,
+	}
+	serializedPrivateKey, err := proto.Marshal(privateKey)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", privateKey, err)
+	}
+	token := insecuresecretdataaccess.Token{}
+	keySerialization := newKeySerialization(t, &tinkpb.KeyData{
+		TypeUrl:         "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey",
+		Value:           serializedPrivateKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}, tinkpb.OutputPrefixType_TINK, 12345)
+	wantPrivateKey := newPrivateKey(t, newPublicKey(t, n, 12345, newParameters(t, 2048, SHA256, f4, VariantTink)), PrivateKeyValues{
+		P: secretdata.NewBytesFromData(p, token),
+		Q: secretdata.NewBytesFromData(q, token),
+		D: secretdata.NewBytesFromData(d, token),
+	})
+	parser := &privateKeyParser{}
+	parsedPrivateKey, err := parser.ParseKey(keySerialization)
+	if err != nil {
+		t.Fatalf("parser.ParseKey(%v) err = %v, want non-nil", keySerialization, err)
+	}
+	if got, want := parsedPrivateKey, wantPrivateKey; !got.Equals(want) {
+		t.Errorf("got.Equals(want) = false, want true")
+	}
 }
 
 func TestParseAndSerializePrivateKey(t *testing.T) {
