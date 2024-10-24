@@ -602,7 +602,7 @@ func newPrivateKey(t *testing.T, publicKey *PublicKey, privateKeyValues PrivateK
 	return privateKey
 }
 
-func TestParsePrivateKey(t *testing.T) {
+func TestParseAndSerializePrivateKey(t *testing.T) {
 	privateKey2048 := &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
 		D:   base64Decode(t, d2048Base64),
 		P:   base64Decode(t, p2048Base64),
@@ -673,7 +673,7 @@ func TestParsePrivateKey(t *testing.T) {
 	for _, tc := range []struct {
 		name             string
 		keySerialization *protoserialization.KeySerialization
-		wantPrivateKey   *PrivateKey
+		privateKey       *PrivateKey
 	}{
 		{
 			name: "2048-SHA256-TINK",
@@ -682,7 +682,7 @@ func TestParsePrivateKey(t *testing.T) {
 				Value:           serializedPrivateKey2048,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 12345),
-			wantPrivateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n2048Base64), 12345, newParameters(t, 2048, SHA256, f4, VariantTink)), PrivateKeyValues{
+			privateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n2048Base64), 12345, newParameters(t, 2048, SHA256, f4, VariantTink)), PrivateKeyValues{
 				P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
 				Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
 				D: secretdata.NewBytesFromData(base64Decode(t, d2048Base64), token),
@@ -695,7 +695,7 @@ func TestParsePrivateKey(t *testing.T) {
 				Value:           serializedPrivateKey2048,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_LEGACY, 12345),
-			wantPrivateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n2048Base64), 12345, newParameters(t, 2048, SHA256, f4, VariantLegacy)), PrivateKeyValues{
+			privateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n2048Base64), 12345, newParameters(t, 2048, SHA256, f4, VariantLegacy)), PrivateKeyValues{
 				P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
 				Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
 				D: secretdata.NewBytesFromData(base64Decode(t, d2048Base64), token),
@@ -708,7 +708,7 @@ func TestParsePrivateKey(t *testing.T) {
 				Value:           serializedPrivateKey2048,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_CRUNCHY, 12345),
-			wantPrivateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n2048Base64), 12345, newParameters(t, 2048, SHA256, f4, VariantCrunchy)), PrivateKeyValues{
+			privateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n2048Base64), 12345, newParameters(t, 2048, SHA256, f4, VariantCrunchy)), PrivateKeyValues{
 				P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
 				Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
 				D: secretdata.NewBytesFromData(base64Decode(t, d2048Base64), token),
@@ -721,7 +721,7 @@ func TestParsePrivateKey(t *testing.T) {
 				Value:           serializedPrivateKey2048,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_RAW, 0),
-			wantPrivateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n2048Base64), 0, newParameters(t, 2048, SHA256, f4, VariantNoPrefix)), PrivateKeyValues{
+			privateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n2048Base64), 0, newParameters(t, 2048, SHA256, f4, VariantNoPrefix)), PrivateKeyValues{
 				P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
 				Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
 				D: secretdata.NewBytesFromData(base64Decode(t, d2048Base64), token),
@@ -734,7 +734,7 @@ func TestParsePrivateKey(t *testing.T) {
 				Value:           serializedPrivateKey3072,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 12345),
-			wantPrivateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n3072Base64), 12345, newParameters(t, 3072, SHA256, f4, VariantTink)), PrivateKeyValues{
+			privateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n3072Base64), 12345, newParameters(t, 3072, SHA256, f4, VariantTink)), PrivateKeyValues{
 				P: secretdata.NewBytesFromData(base64Decode(t, p3072Base64), token),
 				Q: secretdata.NewBytesFromData(base64Decode(t, q3072Base64), token),
 				D: secretdata.NewBytesFromData(base64Decode(t, d3072Base64), token),
@@ -747,7 +747,7 @@ func TestParsePrivateKey(t *testing.T) {
 				Value:           serializedPrivateKey3072,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_LEGACY, 12345),
-			wantPrivateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n3072Base64), 12345, newParameters(t, 3072, SHA256, f4, VariantLegacy)), PrivateKeyValues{
+			privateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n3072Base64), 12345, newParameters(t, 3072, SHA256, f4, VariantLegacy)), PrivateKeyValues{
 				P: secretdata.NewBytesFromData(base64Decode(t, p3072Base64), token),
 				Q: secretdata.NewBytesFromData(base64Decode(t, q3072Base64), token),
 				D: secretdata.NewBytesFromData(base64Decode(t, d3072Base64), token),
@@ -760,7 +760,7 @@ func TestParsePrivateKey(t *testing.T) {
 				Value:           serializedPrivateKey3072,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_CRUNCHY, 12345),
-			wantPrivateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n3072Base64), 12345, newParameters(t, 3072, SHA256, f4, VariantCrunchy)), PrivateKeyValues{
+			privateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n3072Base64), 12345, newParameters(t, 3072, SHA256, f4, VariantCrunchy)), PrivateKeyValues{
 				P: secretdata.NewBytesFromData(base64Decode(t, p3072Base64), token),
 				Q: secretdata.NewBytesFromData(base64Decode(t, q3072Base64), token),
 				D: secretdata.NewBytesFromData(base64Decode(t, d3072Base64), token),
@@ -773,7 +773,7 @@ func TestParsePrivateKey(t *testing.T) {
 				Value:           serializedPrivateKey3072,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_RAW, 0),
-			wantPrivateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n3072Base64), 0, newParameters(t, 3072, SHA256, f4, VariantNoPrefix)), PrivateKeyValues{
+			privateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n3072Base64), 0, newParameters(t, 3072, SHA256, f4, VariantNoPrefix)), PrivateKeyValues{
 				P: secretdata.NewBytesFromData(base64Decode(t, p3072Base64), token),
 				Q: secretdata.NewBytesFromData(base64Decode(t, q3072Base64), token),
 				D: secretdata.NewBytesFromData(base64Decode(t, d3072Base64), token),
@@ -786,7 +786,7 @@ func TestParsePrivateKey(t *testing.T) {
 				Value:           serializedPrivateKey4096,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 12345),
-			wantPrivateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n4096Base64), 12345, newParameters(t, 4096, SHA256, f4, VariantTink)), PrivateKeyValues{
+			privateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n4096Base64), 12345, newParameters(t, 4096, SHA256, f4, VariantTink)), PrivateKeyValues{
 				P: secretdata.NewBytesFromData(base64Decode(t, p4096Base64), token),
 				Q: secretdata.NewBytesFromData(base64Decode(t, q4096Base64), token),
 				D: secretdata.NewBytesFromData(base64Decode(t, d4096Base64), token),
@@ -799,7 +799,7 @@ func TestParsePrivateKey(t *testing.T) {
 				Value:           serializedPrivateKey4096,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_LEGACY, 12345),
-			wantPrivateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n4096Base64), 12345, newParameters(t, 4096, SHA256, f4, VariantLegacy)), PrivateKeyValues{
+			privateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n4096Base64), 12345, newParameters(t, 4096, SHA256, f4, VariantLegacy)), PrivateKeyValues{
 				P: secretdata.NewBytesFromData(base64Decode(t, p4096Base64), token),
 				Q: secretdata.NewBytesFromData(base64Decode(t, q4096Base64), token),
 				D: secretdata.NewBytesFromData(base64Decode(t, d4096Base64), token),
@@ -812,7 +812,7 @@ func TestParsePrivateKey(t *testing.T) {
 				Value:           serializedPrivateKey4096,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_CRUNCHY, 12345),
-			wantPrivateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n4096Base64), 12345, newParameters(t, 4096, SHA256, f4, VariantCrunchy)), PrivateKeyValues{
+			privateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n4096Base64), 12345, newParameters(t, 4096, SHA256, f4, VariantCrunchy)), PrivateKeyValues{
 				P: secretdata.NewBytesFromData(base64Decode(t, p4096Base64), token),
 				Q: secretdata.NewBytesFromData(base64Decode(t, q4096Base64), token),
 				D: secretdata.NewBytesFromData(base64Decode(t, d4096Base64), token),
@@ -825,7 +825,7 @@ func TestParsePrivateKey(t *testing.T) {
 				Value:           serializedPrivateKey4096,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_RAW, 0),
-			wantPrivateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n4096Base64), 0, newParameters(t, 4096, SHA256, f4, VariantNoPrefix)), PrivateKeyValues{
+			privateKey: newPrivateKey(t, newPublicKey(t, base64Decode(t, n4096Base64), 0, newParameters(t, 4096, SHA256, f4, VariantNoPrefix)), PrivateKeyValues{
 				P: secretdata.NewBytesFromData(base64Decode(t, p4096Base64), token),
 				Q: secretdata.NewBytesFromData(base64Decode(t, q4096Base64), token),
 				D: secretdata.NewBytesFromData(base64Decode(t, d4096Base64), token),
@@ -838,8 +838,44 @@ func TestParsePrivateKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("p.ParseKey(%v) err = %v, want non-nil", tc.keySerialization, err)
 			}
-			if !gotKey.Equals(tc.wantPrivateKey) {
-				t.Errorf("%v.Equals(%v) = false, want true", gotKey, tc.wantPrivateKey)
+			if !gotKey.Equals(tc.privateKey) {
+				t.Errorf("%v.Equals(%v) = false, want true", gotKey, tc.privateKey)
+			}
+
+			s := &privateKeySerializer{}
+			gotKeySerialization, err := s.SerializeKey(gotKey)
+			if err != nil {
+				t.Fatalf("s.SerializeKey(%v) err = %v, want nil", gotKey, err)
+			}
+			if !gotKeySerialization.Equals(tc.keySerialization) {
+				t.Errorf("gotKeySerialization.Equals(tc.keySerialization) = false, want true")
+			}
+		})
+	}
+}
+
+func TestSerializePrivateKeyFails(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		privateKey key.Key
+	}{
+		{
+			name:       "nil private key",
+			privateKey: nil,
+		},
+		{
+			name:       "invlid private key",
+			privateKey: &PrivateKey{},
+		},
+		{
+			name:       "incorrect key type",
+			privateKey: &testKey{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &privateKeySerializer{}
+			if _, err := s.SerializeKey(tc.privateKey); err == nil {
+				t.Errorf("s.SerializeKey(%v) err = nil, want non-nil", tc.privateKey)
 			}
 		})
 	}

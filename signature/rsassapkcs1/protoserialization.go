@@ -230,3 +230,57 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 		D: secretdata.NewBytesFromData(protoPrivateKey.GetD(), token),
 	})
 }
+
+type privateKeySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*privateKeySerializer)(nil)
+
+func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	rsaSsaPrivKey, ok := key.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type: %T, want *rsassapkcs1.PrivateKey", key)
+	}
+	if rsaSsaPrivKey.publicKey == nil {
+		return nil, fmt.Errorf("invalid key: public key is nil")
+	}
+	params := rsaSsaPrivKey.publicKey.parameters
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(params.Variant())
+	if err != nil {
+		return nil, err
+	}
+	hashType, err := protoHashValueFromHashType(params.HashType())
+	if err != nil {
+		return nil, err
+	}
+
+	token := insecuresecretdataaccess.Token{}
+	protoKey := &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
+		P:   rsaSsaPrivKey.P().Data(token),
+		Q:   rsaSsaPrivKey.Q().Data(token),
+		D:   rsaSsaPrivKey.D().Data(token),
+		Dp:  rsaSsaPrivKey.DP().Data(token),
+		Dq:  rsaSsaPrivKey.DQ().Data(token),
+		Crt: rsaSsaPrivKey.QInv().Data(token),
+		PublicKey: &rsassapkcs1pb.RsaSsaPkcs1PublicKey{
+			Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+				HashType: hashType,
+			},
+			N:       rsaSsaPrivKey.publicKey.Modulus(),
+			E:       new(big.Int).SetUint64(uint64(rsaSsaPrivKey.publicKey.parameters.PublicExponent())).Bytes(),
+			Version: publicKeyProtoVersion,
+		},
+		Version: privateKeyProtoVersion,
+	}
+	serializedKey, err := proto.Marshal(protoKey)
+	if err != nil {
+		return nil, err
+	}
+	// idRequirement is zero if the key doesn't have a key requirement.
+	idRequirement, _ := rsaSsaPrivKey.IDRequirement()
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         signerTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}
+	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
+}
