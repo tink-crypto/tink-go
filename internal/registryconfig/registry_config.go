@@ -24,8 +24,8 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 var (
@@ -39,6 +39,11 @@ type primitiveConstructor func(key key.Key) (any, error)
 // old global Registry through the new Configuration interface.
 type RegistryConfig struct{}
 
+// PrimitiveFromKeyData constructs a primitive from a [key.Key] using the registry.
+func (c *RegistryConfig) PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error) {
+	return registry.PrimitiveFromKeyData(keyData)
+}
+
 // PrimitiveFromKey constructs a primitive from a [key.Key] using the registry.
 func (c *RegistryConfig) PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error) {
 	if key == nil {
@@ -46,12 +51,7 @@ func (c *RegistryConfig) PrimitiveFromKey(key key.Key, _ internalapi.Token) (any
 	}
 	constructor, found := primitiveConstructors[reflect.TypeOf(key)]
 	if !found {
-		// Fallback to using the key manager.
-		keySerialization, err := protoserialization.SerializeKey(key)
-		if err != nil {
-			return nil, err
-		}
-		return registry.PrimitiveFromKeyData(keySerialization.KeyData())
+		return nil, fmt.Errorf("no constructor found for key %T", key)
 	}
 	return constructor(key)
 }

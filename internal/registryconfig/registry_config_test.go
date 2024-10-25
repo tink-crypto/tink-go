@@ -19,21 +19,21 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/aead"
+	aeadsubtle "github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
-	"github.com/tink-crypto/tink-go/v2/mac"
-	"github.com/tink-crypto/tink-go/v2/mac/subtle"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestPrimitiveFromKey(t *testing.T) {
-	keyset, err := keyset.NewHandle(mac.HMACSHA256Tag256KeyTemplate())
+	keyset, err := keyset.NewHandle(aead.AES256GCMKeyTemplate())
 	if err != nil {
 		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
 	}
@@ -47,51 +47,90 @@ func TestPrimitiveFromKey(t *testing.T) {
 	if err != nil {
 		t.Errorf("registryConfig.PrimitiveFromKey() err = %v, want nil", err)
 	}
-	if _, ok := p.(*subtle.HMAC); !ok {
-		t.Error("p is not of type *subtle.HMAC")
+	if _, ok := p.(*aeadsubtle.AESGCM); !ok {
+		t.Errorf("p is not of type *aeadsubtle.AESGCM; got %T", p)
+	}
+}
+
+func TestPrimitiveFromKeyData(t *testing.T) {
+	keyset, err := keyset.NewHandle(aead.AES256GCMKeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
+	}
+	entry, err := keyset.Entry(0)
+	if err != nil {
+		t.Fatalf("keyset.Entry() err = %v, want nil", err)
+	}
+	protoKey, err := protoserialization.SerializeKey(entry.Key())
+	if err != nil {
+		t.Fatalf("protoserialization.SerializeKey() err = %v, want nil", err)
+	}
+	registryConfig := &registryconfig.RegistryConfig{}
+	p, err := registryConfig.PrimitiveFromKeyData(protoKey.KeyData(), internalapi.Token{})
+	if err != nil {
+		t.Errorf("registryConfig.PrimitiveFromKey() err = %v, want nil", err)
+	}
+	if _, ok := p.(*aeadsubtle.AESGCM); !ok {
+		t.Error("p is not of type *aeadsubtle.AESGCM")
 	}
 }
 
 func TestPrimitiveFromKeyErrors(t *testing.T) {
 	registryConfig := &registryconfig.RegistryConfig{}
-
 	testCases := []struct {
 		name string
 		key  key.Key
 	}{
 		{
-			name: "unregistered url",
-			key: func() key.Key {
-				key := testutil.NewHMACKeyData(commonpb.HashType_SHA256, 16)
-				key.TypeUrl = "some-unregistered-url"
-				keySerialization, err := protoserialization.NewKeySerialization(key, tinkpb.OutputPrefixType_TINK, 1)
-				if err != nil {
-					t.Fatalf("protoserialization.NewKeySerialization() err = %v, want nil", err)
-				}
-				return protoserialization.NewFallbackProtoKey(keySerialization)
-			}(),
-		},
-		{
-			name: "mismatching url",
-			key: func() key.Key {
-				key := testutil.NewHMACKeyData(commonpb.HashType_SHA256, 16)
-				key.TypeUrl = testutil.AESGCMTypeURL
-				keySerialization, err := protoserialization.NewKeySerialization(key, tinkpb.OutputPrefixType_TINK, 1)
-				if err != nil {
-					t.Fatalf("protoserialization.NewKeySerialization() err = %v, want nil", err)
-				}
-				return protoserialization.NewFallbackProtoKey(keySerialization)
-			}(),
+			name: "unregistered key type",
+			key:  &stubKey{},
 		},
 		{
 			name: "nil key",
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := registryConfig.PrimitiveFromKey(tc.key, internalapi.Token{}); err == nil {
 				t.Errorf("registryConfig.PrimitiveFromKey() err = nil, want error")
+			}
+		})
+	}
+}
+
+func TestPrimitiveFromKeyDataErrors(t *testing.T) {
+	registryConfig := &registryconfig.RegistryConfig{}
+
+	testCases := []struct {
+		name    string
+		keyData *tinkpb.KeyData
+	}{
+		{
+			name: "unregistered url",
+			keyData: func() *tinkpb.KeyData {
+				kd := testutil.NewHMACKeyData(commonpb.HashType_SHA256, 16)
+				kd.TypeUrl = "some url"
+				return kd
+			}(),
+		},
+		{
+			name: "mismatching url",
+			keyData: func() *tinkpb.KeyData {
+				kd := testutil.NewHMACKeyData(commonpb.HashType_SHA256, 16)
+				kd.TypeUrl = testutil.AESGCMTypeURL
+				return kd
+			}(),
+		},
+		{
+			name:    "nil KeyData",
+			keyData: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := registryConfig.PrimitiveFromKeyData(tc.keyData, internalapi.Token{}); err == nil {
+				t.Errorf("registryConfig.Primitive() err = nil, want not-nil")
 			}
 		})
 	}
@@ -168,41 +207,6 @@ func stubPrimitiveConstructorFromFallbackProtoKey(k key.Key) (any, error) {
 		return nil, fmt.Errorf("key is of type %T; needed *protoserialization.FallbackProtoKey", k)
 	}
 	return &stubPrimitive{}, nil
-}
-
-func TestRegisterPrimitiveConstructorUsesCreatorFirst(t *testing.T) {
-	defer registryconfig.ClearPrimitiveConstructors()
-	keyset, err := keyset.NewHandle(mac.HMACSHA256Tag256KeyTemplate())
-	if err != nil {
-		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
-	}
-	entry, err := keyset.Entry(0)
-	if err != nil {
-		t.Fatalf("keyset.Entry() err = %v, want nil", err)
-	}
-
-	registryConfig := &registryconfig.RegistryConfig{}
-	p, err := registryConfig.PrimitiveFromKey(entry.Key(), internalapi.Token{})
-	if err != nil {
-		t.Errorf("registryConfig.PrimitiveFromKey() err = %v, want nil", err)
-	}
-	if _, ok := p.(*subtle.HMAC); !ok {
-		t.Error("p is not of type *subtle.HMAC")
-	}
-
-	rc := &registryconfig.RegistryConfig{}
-	// We now register a constructor for protoserialization.FallbackProtoKey that
-	// returns a stubPrimitive instead of a HMAC.
-	if err := registryconfig.RegisterPrimitiveConstructor[*protoserialization.FallbackProtoKey](stubPrimitiveConstructorFromFallbackProtoKey); err != nil {
-		t.Errorf("registryconfig.RegisterPrimitiveConstructor[*protoserialization.FallbackProtoKey](stubPrimitiveConstructorFromFallbackProtoKey) err = %v, want nil", err)
-	}
-	p, err = rc.PrimitiveFromKey(entry.Key(), internalapi.Token{})
-	if err != nil {
-		t.Errorf("registryConfig.PrimitiveFromKey() err = %v, want nil", err)
-	}
-	if _, ok := p.(*stubPrimitive); !ok {
-		t.Error("p is not of type *stubPrimitive")
-	}
 }
 
 func TestPrimitiveFromKeyFailsIfCreatorFails(t *testing.T) {

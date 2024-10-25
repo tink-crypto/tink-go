@@ -400,6 +400,7 @@ func (h *Handle) WriteWithNoSecrets(w Writer) error {
 // Config defines methods in the config.Config concrete type that are used by keyset.Handle.
 // The config.Config concrete type is not used directly due to circular dependencies.
 type Config interface {
+	PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error)
 	// PrimitiveFromKey creates a primitive from a key.Key.
 	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
 }
@@ -494,7 +495,9 @@ func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*
 		if km != nil && km.DoesSupport(protoKey.GetKeyData().GetTypeUrl()) {
 			primitive, err = km.Primitive(protoKey.GetKeyData().GetValue())
 		} else {
-			primitive, err = config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
+			// TODO: b/369551049 - Use the new PrimitiveFromKey method once we have
+			// added tooling to distinguish between "full" and "partial" primitives.
+			primitive, err = config.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})
 		}
 		if err != nil {
 			return nil, fmt.Errorf("cannot get primitive from key: %v", err)
