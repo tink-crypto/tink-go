@@ -46,32 +46,35 @@ func (a *aesGCMAEAD) seal(key, nonce, plaintext, associatedData []byte) ([]byte,
 	if len(key) != a.keyLen {
 		return nil, fmt.Errorf("unexpected key length: got %d, want %d", len(key), a.keyLen)
 	}
-	i, err := internalaead.NewAESGCMInsecureIV(key, false /*=prependIV*/)
-	if err != nil {
-		return nil, fmt.Errorf("NewAESGCMInsecureIV: %v", err)
+	if len(nonce) != a.nonceLength() {
+		return nil, fmt.Errorf("unexpected nonce length: got %d, want %d", len(nonce), a.nonceLength())
 	}
-	return i.Encrypt(nonce, plaintext, associatedData)
+	if err := internalaead.CheckPlaintextSize(uint64(len(plaintext))); err != nil {
+		return nil, err
+	}
+	c, err := internalaead.NewAESGCMCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	return c.Seal(nil, nonce, plaintext, associatedData), nil
 }
 
 func (a *aesGCMAEAD) open(key, nonce, ciphertext, associatedData []byte) ([]byte, error) {
 	if len(key) != a.keyLen {
 		return nil, fmt.Errorf("unexpected key length: got %d, want %d", len(key), a.keyLen)
 	}
-	i, err := internalaead.NewAESGCMInsecureIV(key, false /*=prependIV*/)
-	if err != nil {
-		return nil, fmt.Errorf("NewAESGCMInsecureIV: %v", err)
+	if len(nonce) != a.nonceLength() {
+		return nil, fmt.Errorf("unexpected nonce length: got %d, want %d", len(nonce), a.nonceLength())
 	}
-	return i.Decrypt(nonce, ciphertext, associatedData)
+	c, err := internalaead.NewAESGCMCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	return c.Open(nil, nonce, ciphertext, associatedData)
 }
 
-func (a *aesGCMAEAD) id() uint16 {
-	return a.aeadID
-}
+func (a *aesGCMAEAD) id() uint16 { return a.aeadID }
 
-func (a *aesGCMAEAD) keyLength() int {
-	return a.keyLen
-}
+func (a *aesGCMAEAD) keyLength() int { return a.keyLen }
 
-func (a *aesGCMAEAD) nonceLength() int {
-	return internalaead.AESGCMIVSize
-}
+func (a *aesGCMAEAD) nonceLength() int { return internalaead.AESGCMIVSize }

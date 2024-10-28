@@ -15,6 +15,7 @@
 package subtle
 
 import (
+	"crypto/cipher"
 	"fmt"
 
 	internalaead "github.com/tink-crypto/tink-go/v2/internal/aead"
@@ -27,11 +28,13 @@ const (
 	AESGCMIVSize = 12
 	// AESGCMTagSize is the acceptable tag size defined by RFC 5116.
 	AESGCMTagSize = 16
+
+	maxIntPlaintextSize = maxInt - AESGCMIVSize - AESGCMTagSize
 )
 
 // AESGCM is an implementation of AEAD interface.
 type AESGCM struct {
-	aesGCMInsecureIV *internalaead.AESGCMInsecureIV
+	cipher cipher.AEAD
 }
 
 // Assert that AESGCM implements the AEAD interface.
@@ -40,8 +43,11 @@ var _ tink.AEAD = (*AESGCM)(nil)
 // NewAESGCM returns an AESGCM instance, where key is the AES key with length
 // 16 bytes (AES-128) or 32 bytes (AES-256).
 func NewAESGCM(key []byte) (*AESGCM, error) {
-	aesGCMInsecureIV, err := internalaead.NewAESGCMInsecureIV(key, true /*=prependIV*/)
-	return &AESGCM{aesGCMInsecureIV}, err
+	c, err := internalaead.NewAESGCMCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	return &AESGCM{cipher: c}, nil
 }
 
 // Encrypt encrypts plaintext with associatedData. The returned ciphertext
@@ -50,15 +56,20 @@ func NewAESGCM(key []byte) (*AESGCM, error) {
 // Note: The crypto library's AES-GCM implementation always returns the
 // ciphertext with an AESGCMTagSize (16-byte) tag.
 func (a *AESGCM) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
+	if err := internalaead.CheckPlaintextSize(uint64(len(plaintext))); err != nil {
+		return nil, err
+	}
 	iv := random.GetRandomBytes(AESGCMIVSize)
-	return a.aesGCMInsecureIV.Encrypt(iv, plaintext, associatedData)
+	dst := make([]byte, 0, len(iv)+len(plaintext)+a.cipher.Overhead())
+	dst = append(dst, iv...)
+	return a.cipher.Seal(dst, iv, plaintext, associatedData), nil
 }
 
 // Decrypt decrypts ciphertext with associatedData.
 func (a *AESGCM) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
-	if len(ciphertext) < AESGCMIVSize {
+	if len(ciphertext) < AESGCMIVSize+AESGCMTagSize {
 		return nil, fmt.Errorf("ciphertext with size %d is too short", len(ciphertext))
 	}
 	iv := ciphertext[:AESGCMIVSize]
-	return a.aesGCMInsecureIV.Decrypt(iv, ciphertext, associatedData)
+	return a.cipher.Open(nil, iv, ciphertext[AESGCMIVSize:], associatedData)
 }

@@ -47,7 +47,7 @@ func TestAESGCMTagLength(t *testing.T) {
 		}
 		actualTagSize := len(ct) - subtle.AESGCMIVSize - len(pt)
 		if actualTagSize != subtle.AESGCMTagSize {
-			t.Errorf("tag size is not 128 bit, it is %d bit", actualTagSize*8)
+			t.Errorf("tag size is not 16, it is %d", actualTagSize)
 		}
 	}
 }
