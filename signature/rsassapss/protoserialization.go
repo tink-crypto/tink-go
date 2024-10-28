@@ -318,3 +318,44 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 	}
 	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
 }
+
+type parametersSerializer struct{}
+
+var _ protoserialization.ParametersSerializer = (*parametersSerializer)(nil)
+
+func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.KeyTemplate, error) {
+	rsaSsaPssParameters, ok := parameters.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want *rsassapss.Parameters", parameters)
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(rsaSsaPssParameters.Variant())
+	if err != nil {
+		return nil, err
+	}
+	sigHashType, err := protoHashValueFromHashType(rsaSsaPssParameters.SigHashType())
+	if err != nil {
+		return nil, err
+	}
+	mgf1HashType, err := protoHashValueFromHashType(rsaSsaPssParameters.MGF1HashType())
+	if err != nil {
+		return nil, err
+	}
+	format := &rsassapsspb.RsaSsaPssKeyFormat{
+		Params: &rsassapsspb.RsaSsaPssParams{
+			SigHash:    sigHashType,
+			Mgf1Hash:   mgf1HashType,
+			SaltLength: int32(rsaSsaPssParameters.SaltLengthBytes()),
+		},
+		ModulusSizeInBits: uint32(rsaSsaPssParameters.ModulusSizeBits()),
+		PublicExponent:    new(big.Int).SetUint64(uint64(rsaSsaPssParameters.PublicExponent())).Bytes(),
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		return nil, err
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          signerTypeURL,
+		OutputPrefixType: outputPrefixType,
+		Value:            serializedFormat,
+	}, nil
+}

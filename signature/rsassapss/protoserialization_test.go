@@ -19,7 +19,9 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -1106,6 +1108,786 @@ func TestSerializePrivateKeyFails(t *testing.T) {
 			s := &privateKeySerializer{}
 			if _, err := s.SerializeKey(tc.privateKey); err == nil {
 				t.Errorf("s.SerializeKey(%v) err = nil, want non-nil", tc.privateKey)
+			}
+		})
+	}
+}
+
+func TestSerializeParametersFailsWithWrongParameters(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		parameters key.Parameters
+	}{
+		{
+			name:       "struct literal",
+			parameters: &Parameters{},
+		},
+		{
+			name:       "nil",
+			parameters: nil,
+		},
+		{
+			name:       "wrong type",
+			parameters: &testParams{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			serializer := &parametersSerializer{}
+			if _, err := serializer.Serialize(tc.parameters); err == nil {
+				t.Errorf("serializer.Serialize(%v) err = nil, want error", tc.parameters)
+			}
+		})
+	}
+}
+
+func newKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixType, format *rsassapsspb.RsaSsaPssKeyFormat) *tinkpb.KeyTemplate {
+	t.Helper()
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", format, err)
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey",
+		OutputPrefixType: outputPrefixType,
+		Value:            serializedFormat,
+	}
+}
+
+func TestSerializeParameters(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		parameters      key.Parameters
+		wantKeyTemplate *tinkpb.KeyTemplate
+	}{
+		{
+			name: "2048-SHA256-VariantTink",
+			parameters: &Parameters{
+				sigHashType:     SHA256,
+				mgf1HashType:    SHA256,
+				saltLengthBytes: 42,
+				variant:         VariantTink,
+				modulusSizeBits: 2048,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA256,
+					SigHash:    commonpb.HashType_SHA256,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 2048,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "2048-SHA256-VariantCrunchy",
+			parameters: &Parameters{
+				sigHashType:     SHA256,
+				mgf1HashType:    SHA256,
+				saltLengthBytes: 42,
+				variant:         VariantCrunchy,
+				modulusSizeBits: 2048,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA256,
+					SigHash:    commonpb.HashType_SHA256,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 2048,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "2048-SHA256-VariantLegacy",
+			parameters: &Parameters{
+				sigHashType:     SHA256,
+				mgf1HashType:    SHA256,
+				saltLengthBytes: 42,
+				variant:         VariantLegacy,
+				modulusSizeBits: 2048,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA256,
+					SigHash:    commonpb.HashType_SHA256,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 2048,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "2048-SHA256-VariantNoPrefix",
+			parameters: &Parameters{
+				sigHashType:     SHA256,
+				mgf1HashType:    SHA256,
+				saltLengthBytes: 42,
+				variant:         VariantNoPrefix,
+				modulusSizeBits: 2048,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA256,
+					SigHash:    commonpb.HashType_SHA256,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 2048,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "2048-SHA384-VariantTink",
+			parameters: &Parameters{
+				sigHashType:     SHA384,
+				mgf1HashType:    SHA384,
+				saltLengthBytes: 42,
+				variant:         VariantTink,
+				modulusSizeBits: 2048,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA384,
+					SigHash:    commonpb.HashType_SHA384,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 2048,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "2048-SHA384-VariantCrunchy",
+			parameters: &Parameters{
+				sigHashType:     SHA384,
+				mgf1HashType:    SHA384,
+				saltLengthBytes: 42,
+				variant:         VariantCrunchy,
+				modulusSizeBits: 2048,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA384,
+					SigHash:    commonpb.HashType_SHA384,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 2048,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "2048-SHA384-VariantLegacy",
+			parameters: &Parameters{
+				sigHashType:     SHA384,
+				mgf1HashType:    SHA384,
+				saltLengthBytes: 42,
+				variant:         VariantLegacy,
+				modulusSizeBits: 2048,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA384,
+					SigHash:    commonpb.HashType_SHA384,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 2048,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "2048-SHA384-VariantNoPrefix",
+			parameters: &Parameters{
+				sigHashType:     SHA384,
+				mgf1HashType:    SHA384,
+				saltLengthBytes: 42,
+				variant:         VariantNoPrefix,
+				modulusSizeBits: 2048,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA384,
+					SigHash:    commonpb.HashType_SHA384,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 2048,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "2048-SHA512-VariantTink",
+			parameters: &Parameters{
+				sigHashType:     SHA512,
+				mgf1HashType:    SHA512,
+				saltLengthBytes: 42,
+				variant:         VariantTink,
+				modulusSizeBits: 2048,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA512,
+					SigHash:    commonpb.HashType_SHA512,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 2048,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "2048-SHA512-VariantCrunchy",
+			parameters: &Parameters{
+				sigHashType:     SHA512,
+				mgf1HashType:    SHA512,
+				saltLengthBytes: 42,
+				variant:         VariantCrunchy,
+				modulusSizeBits: 2048,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA512,
+					SigHash:    commonpb.HashType_SHA512,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 2048,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "2048-SHA512-VariantLegacy",
+			parameters: &Parameters{
+				sigHashType:     SHA512,
+				mgf1HashType:    SHA512,
+				saltLengthBytes: 42,
+				variant:         VariantLegacy,
+				modulusSizeBits: 2048,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA512,
+					SigHash:    commonpb.HashType_SHA512,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 2048,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "2048-SHA512-VariantNoPrefix",
+			parameters: &Parameters{
+				sigHashType:     SHA512,
+				mgf1HashType:    SHA512,
+				saltLengthBytes: 42,
+				variant:         VariantNoPrefix,
+				modulusSizeBits: 2048,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA512,
+					SigHash:    commonpb.HashType_SHA512,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 2048,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "3072-SHA256-VariantTink",
+			parameters: &Parameters{
+				sigHashType:     SHA256,
+				mgf1HashType:    SHA256,
+				saltLengthBytes: 42,
+				variant:         VariantTink,
+				modulusSizeBits: 3072,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA256,
+					SigHash:    commonpb.HashType_SHA256,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 3072,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "3072-SHA256-VariantCrunchy",
+			parameters: &Parameters{
+				sigHashType:     SHA256,
+				mgf1HashType:    SHA256,
+				saltLengthBytes: 42,
+				variant:         VariantCrunchy,
+				modulusSizeBits: 3072,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA256,
+					SigHash:    commonpb.HashType_SHA256,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 3072,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "3072-SHA256-VariantLegacy",
+			parameters: &Parameters{
+				sigHashType:     SHA256,
+				mgf1HashType:    SHA256,
+				saltLengthBytes: 42,
+				variant:         VariantLegacy,
+				modulusSizeBits: 3072,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA256,
+					SigHash:    commonpb.HashType_SHA256,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 3072,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "3072-SHA256-VariantNoPrefix",
+			parameters: &Parameters{
+				sigHashType:     SHA256,
+				mgf1HashType:    SHA256,
+				saltLengthBytes: 42,
+				variant:         VariantNoPrefix,
+				modulusSizeBits: 3072,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA256,
+					SigHash:    commonpb.HashType_SHA256,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 3072,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "3072-SHA384-VariantTink",
+			parameters: &Parameters{
+				sigHashType:     SHA384,
+				mgf1HashType:    SHA384,
+				saltLengthBytes: 42,
+				variant:         VariantTink,
+				modulusSizeBits: 3072,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA384,
+					SigHash:    commonpb.HashType_SHA384,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 3072,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "3072-SHA384-VariantCrunchy",
+			parameters: &Parameters{
+				sigHashType:     SHA384,
+				mgf1HashType:    SHA384,
+				saltLengthBytes: 42,
+				variant:         VariantCrunchy,
+				modulusSizeBits: 3072,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA384,
+					SigHash:    commonpb.HashType_SHA384,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 3072,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "3072-SHA384-VariantLegacy",
+			parameters: &Parameters{
+				sigHashType:     SHA384,
+				mgf1HashType:    SHA384,
+				saltLengthBytes: 42,
+				variant:         VariantLegacy,
+				modulusSizeBits: 3072,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA384,
+					SigHash:    commonpb.HashType_SHA384,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 3072,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "3072-SHA384-VariantNoPrefix",
+			parameters: &Parameters{
+				sigHashType:     SHA384,
+				mgf1HashType:    SHA384,
+				saltLengthBytes: 42,
+				variant:         VariantNoPrefix,
+				modulusSizeBits: 3072,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA384,
+					SigHash:    commonpb.HashType_SHA384,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 3072,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "3072-SHA512-VariantTink",
+			parameters: &Parameters{
+				sigHashType:     SHA512,
+				mgf1HashType:    SHA512,
+				saltLengthBytes: 42,
+				variant:         VariantTink,
+				modulusSizeBits: 3072,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA512,
+					SigHash:    commonpb.HashType_SHA512,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 3072,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "3072-SHA512-VariantCrunchy",
+			parameters: &Parameters{
+				sigHashType:     SHA512,
+				mgf1HashType:    SHA512,
+				saltLengthBytes: 42,
+				variant:         VariantCrunchy,
+				modulusSizeBits: 3072,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA512,
+					SigHash:    commonpb.HashType_SHA512,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 3072,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "3072-SHA512-VariantLegacy",
+			parameters: &Parameters{
+				sigHashType:     SHA512,
+				mgf1HashType:    SHA512,
+				saltLengthBytes: 42,
+				variant:         VariantLegacy,
+				modulusSizeBits: 3072,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA512,
+					SigHash:    commonpb.HashType_SHA512,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 3072,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "3072-SHA512-VariantNoPrefix",
+			parameters: &Parameters{
+				sigHashType:     SHA512,
+				mgf1HashType:    SHA512,
+				saltLengthBytes: 42,
+				variant:         VariantNoPrefix,
+				modulusSizeBits: 3072,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA512,
+					SigHash:    commonpb.HashType_SHA512,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 3072,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "4096-SHA256-VariantTink",
+			parameters: &Parameters{
+				sigHashType:     SHA256,
+				mgf1HashType:    SHA256,
+				saltLengthBytes: 42,
+				variant:         VariantTink,
+				modulusSizeBits: 4096,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA256,
+					SigHash:    commonpb.HashType_SHA256,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 4096,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "4096-SHA256-VariantCrunchy",
+			parameters: &Parameters{
+				sigHashType:     SHA256,
+				mgf1HashType:    SHA256,
+				saltLengthBytes: 42,
+				variant:         VariantCrunchy,
+				modulusSizeBits: 4096,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA256,
+					SigHash:    commonpb.HashType_SHA256,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 4096,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "4096-SHA256-VariantLegacy",
+			parameters: &Parameters{
+				sigHashType:     SHA256,
+				mgf1HashType:    SHA256,
+				saltLengthBytes: 42,
+				variant:         VariantLegacy,
+				modulusSizeBits: 4096,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA256,
+					SigHash:    commonpb.HashType_SHA256,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 4096,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "4096-SHA256-VariantNoPrefix",
+			parameters: &Parameters{
+				sigHashType:     SHA256,
+				mgf1HashType:    SHA256,
+				saltLengthBytes: 42,
+				variant:         VariantNoPrefix,
+				modulusSizeBits: 4096,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA256,
+					SigHash:    commonpb.HashType_SHA256,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 4096,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "4096-SHA384-VariantTink",
+			parameters: &Parameters{
+				sigHashType:     SHA384,
+				mgf1HashType:    SHA384,
+				saltLengthBytes: 42,
+				variant:         VariantTink,
+				modulusSizeBits: 4096,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA384,
+					SigHash:    commonpb.HashType_SHA384,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 4096,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "4096-SHA384-VariantCrunchy",
+			parameters: &Parameters{
+				sigHashType:     SHA384,
+				mgf1HashType:    SHA384,
+				saltLengthBytes: 42,
+				variant:         VariantCrunchy,
+				modulusSizeBits: 4096,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA384,
+					SigHash:    commonpb.HashType_SHA384,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 4096,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "4096-SHA384-VariantLegacy",
+			parameters: &Parameters{
+				sigHashType:     SHA384,
+				mgf1HashType:    SHA384,
+				saltLengthBytes: 42,
+				variant:         VariantLegacy,
+				modulusSizeBits: 4096,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA384,
+					SigHash:    commonpb.HashType_SHA384,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 4096,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "4096-SHA384-VariantNoPrefix",
+			parameters: &Parameters{
+				sigHashType:     SHA384,
+				mgf1HashType:    SHA384,
+				saltLengthBytes: 42,
+				variant:         VariantNoPrefix,
+				modulusSizeBits: 4096,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA384,
+					SigHash:    commonpb.HashType_SHA384,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 4096,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "4096-SHA512-VariantTink",
+			parameters: &Parameters{
+				sigHashType:     SHA512,
+				mgf1HashType:    SHA512,
+				saltLengthBytes: 42,
+				variant:         VariantTink,
+				modulusSizeBits: 4096,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA512,
+					SigHash:    commonpb.HashType_SHA512,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 4096,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "4096-SHA512-VariantCrunchy",
+			parameters: &Parameters{
+				sigHashType:     SHA512,
+				mgf1HashType:    SHA512,
+				saltLengthBytes: 42,
+				variant:         VariantCrunchy,
+				modulusSizeBits: 4096,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA512,
+					SigHash:    commonpb.HashType_SHA512,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 4096,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "4096-SHA512-VariantLegacy",
+			parameters: &Parameters{
+				sigHashType:     SHA512,
+				mgf1HashType:    SHA512,
+				saltLengthBytes: 42,
+				variant:         VariantLegacy,
+				modulusSizeBits: 4096,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA512,
+					SigHash:    commonpb.HashType_SHA512,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 4096,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+		{
+			name: "4096-SHA512-VariantNoPrefix",
+			parameters: &Parameters{
+				sigHashType:     SHA512,
+				mgf1HashType:    SHA512,
+				saltLengthBytes: 42,
+				variant:         VariantNoPrefix,
+				modulusSizeBits: 4096,
+				publicExponent:  f4,
+			},
+			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
+				Params: &rsassapsspb.RsaSsaPssParams{
+					Mgf1Hash:   commonpb.HashType_SHA512,
+					SigHash:    commonpb.HashType_SHA512,
+					SaltLength: 42,
+				},
+				ModulusSizeInBits: 4096,
+				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			}),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			serializer := &parametersSerializer{}
+			gotKeyTemplate, err := serializer.Serialize(tc.parameters)
+			if err != nil {
+				t.Errorf("serializer.Serialize(%v) err = %v, want nil", tc.parameters, err)
+			}
+			if diff := cmp.Diff(tc.wantKeyTemplate, gotKeyTemplate, protocmp.Transform()); diff != "" {
+				t.Errorf("serializer.Serialize(%v) returned unexpected diff (-want +got):\n%s", tc.parameters, diff)
 			}
 		})
 	}
