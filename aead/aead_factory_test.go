@@ -27,8 +27,10 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/signature"
@@ -102,6 +104,46 @@ func TestFactoryMultipleKeys(t *testing.T) {
 	err = validateAEADFactoryCipher(a2, a, expectedPrefix)
 	if err == nil || !strings.Contains(err.Error(), "decryption failed") {
 		t.Errorf("expect decryption to fail with random key: %s", err)
+	}
+}
+
+type stubAEAD struct{}
+
+func (a *stubAEAD) Encrypt(_, _ []byte) ([]byte, error) {
+	return []byte("stubAEAD Encrypt"), nil
+}
+func (a *stubAEAD) Decrypt(_, _ []byte) ([]byte, error) {
+	return []byte("stubAEAD Decrypt"), nil
+}
+
+type stubConfig struct{}
+
+func (sc *stubConfig) PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error) {
+	return new(stubAEAD), nil
+}
+
+func (sc *stubConfig) PrimitiveFromKey(_ key.Key, _ internalapi.Token) (any, error) {
+	return new(stubAEAD), nil
+}
+
+func TestNewWithConfig(t *testing.T) {
+	keysetHandle, err := keyset.NewHandle(aead.AES256GCMNoPrefixKeyTemplate())
+	if err != nil {
+		t.Fatalf("testkeyset.NewHandle(keyset) err = %v, want nil", err)
+	}
+
+	config := &stubConfig{}
+	a, err := aead.NewWithConfig(keysetHandle, config)
+	if err != nil {
+		t.Fatalf("aead.NewWithConfig(keysetHandle, config) err = %v, want nil", err)
+	}
+	ct, err := a.Encrypt([]byte("plaintext"), []byte("aad"))
+	if err != nil {
+		t.Fatalf("aead.Encrypt() err = %v, want nil", err)
+	}
+
+	if wantCT := "stubAEAD Encrypt"; !bytes.Equal(ct, []byte(wantCT)) {
+		t.Errorf("aead.Encrypt() = %q, want %q", ct, wantCT)
 	}
 }
 
