@@ -12,40 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package aesgcm_test
+package chacha20poly1305_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead"
-	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 )
 
 func TestGetKeyFromHandle(t *testing.T) {
-	keysetHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
+	keysetHandle, err := keyset.NewHandle(aead.ChaCha20Poly1305KeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(aead.ChaCha20Poly1305KeyTemplate()) err = %v, want nil", err)
 	}
 	entry, err := keysetHandle.Entry(0)
 	if err != nil {
 		t.Fatalf("keysetHandle.Entry(0) err = %v, want nil", err)
 	}
-	key, ok := entry.Key().(*aesgcm.Key)
+	key, ok := entry.Key().(*chacha20poly1305.Key)
 	if !ok {
-		t.Errorf("entry.Key() is not an *Key")
+		t.Errorf("entry.Key() is not a *chacha20poly1305.Key")
 	}
-	keySize := 16
-	opts := aesgcm.ParametersOpts{
-		KeySizeInBytes: keySize,
-		IVSizeInBytes:  12,
-		TagSizeInBytes: 16,
-		Variant:        aesgcm.VariantTink,
-	}
-	expectedParameters, err := aesgcm.NewParameters(opts)
+	expectedParameters, err := chacha20poly1305.NewParameters(chacha20poly1305.VariantTink)
 	if err != nil {
-		t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", opts, err)
+		t.Fatalf("chacha20poly1305.NewParameters(%v) err = %v, want nil", chacha20poly1305.VariantTink, err)
 	}
 	if !key.Parameters().Equals(expectedParameters) {
 		t.Errorf("key.Parameters().Equals(expectedParameters) = false, want true")
@@ -54,15 +47,15 @@ func TestGetKeyFromHandle(t *testing.T) {
 		t.Errorf("expected ID requirement, got none")
 	}
 	keyBytes := key.KeyBytes()
-	if keyBytes.Len() != keySize {
-		t.Errorf("keyBytes.Len() = %v, want %v", keyBytes.Len(), keySize)
+	if keyBytes.Len() != 32 {
+		t.Errorf("keyBytes.Len() = %v, want %v", keyBytes.Len(), 32)
 	}
 }
 
 func TestCreateKeysetHandleFromKey(t *testing.T) {
-	keysetHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
+	keysetHandle, err := keyset.NewHandle(aead.ChaCha20Poly1305KeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(aead.ChaCha20Poly1305KeyTemplate()) err = %v, want nil", err)
 	}
 	aeadPrimitive, err := aead.New(keysetHandle)
 	if err != nil {
@@ -79,9 +72,9 @@ func TestCreateKeysetHandleFromKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("keysetHandle.Entry(0) err = %v, want nil", err)
 	}
-	key, ok := entry.Key().(*aesgcm.Key)
+	key, ok := entry.Key().(*chacha20poly1305.Key)
 	if !ok {
-		t.Errorf("entry.Key() is not *aesgcm.Key")
+		t.Errorf("entry.Key() is not *chacha20poly1305.Key")
 	}
 
 	// Create a new keyset handle with the same key.
@@ -113,15 +106,9 @@ func TestCreateKeysetHandleFromKey(t *testing.T) {
 }
 
 func TestCreateKeysetHandleFromParameters(t *testing.T) {
-	opts := aesgcm.ParametersOpts{
-		KeySizeInBytes: 32,
-		IVSizeInBytes:  12,
-		TagSizeInBytes: 16,
-		Variant:        aesgcm.VariantTink,
-	}
-	params, err := aesgcm.NewParameters(opts)
+	params, err := chacha20poly1305.NewParameters(chacha20poly1305.VariantTink)
 	if err != nil {
-		t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", opts, err)
+		t.Fatalf("chacha20poly1305.NewParameters(%v) err = %v, want nil", chacha20poly1305.VariantTink, err)
 	}
 	manager := keyset.NewManager()
 	keyID, err := manager.AddNewKeyFromParameters(params)

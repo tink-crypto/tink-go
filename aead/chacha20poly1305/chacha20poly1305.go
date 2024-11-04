@@ -18,10 +18,20 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
 
 func init() {
 	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
-		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
+		panic(fmt.Sprintf("chacha20poly1305.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*Key](&keySerializer{}); err != nil {
+		panic(fmt.Sprintf("chacha20poly1305.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(typeURL, &keyParser{}); err != nil {
+		panic(fmt.Sprintf("chacha20poly1305.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
+		panic(fmt.Sprintf("chacha20poly1305.init() failed: %v", err))
 	}
 }
