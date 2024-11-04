@@ -20,7 +20,8 @@ package aead
 import (
 	"fmt"
 
-	_ "github.com/tink-crypto/tink-go/v2/aead/aesgcm" // To register the AES-GCM key manager, parser and serializer.
+	_ "github.com/tink-crypto/tink-go/v2/aead/aesgcm"                     // To register the AES-GCM key manager, parser and serializer.
+	_ "github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305" // To register the key manager.
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 )
@@ -29,22 +30,15 @@ func init() {
 	if err := registry.RegisterKeyManager(new(aesCTRHMACAEADKeyManager)); err != nil {
 		panic(fmt.Sprintf("aead.init() failed: %v", err))
 	}
-
-	if err := registry.RegisterKeyManager(new(chaCha20Poly1305KeyManager)); err != nil {
-		panic(fmt.Sprintf("aead.init() failed: %v", err))
-	}
-
 	if err := registry.RegisterKeyManager(new(xChaCha20Poly1305KeyManager)); err != nil {
 		panic(fmt.Sprintf("aead.init() failed: %v", err))
 	}
 	if err := internalregistry.AllowKeyDerivation(xChaCha20Poly1305TypeURL); err != nil {
 		panic(fmt.Sprintf("aead.init() failed: %v", err))
 	}
-
 	if err := registry.RegisterKeyManager(new(kmsEnvelopeAEADKeyManager)); err != nil {
 		panic(fmt.Sprintf("aead.init() failed: %v", err))
 	}
-
 	if err := registry.RegisterKeyManager(new(aesGCMSIVKeyManager)); err != nil {
 		panic(fmt.Sprintf("aead.init() failed: %v", err))
 	}

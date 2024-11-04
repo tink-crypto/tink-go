@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package aead_test
+package chacha20poly1305_test
 
 import (
 	"bytes"
@@ -25,12 +25,13 @@ import (
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 
+	_ "github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	cppb "github.com/tink-crypto/tink-go/v2/proto/chacha20_poly1305_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func TestChaCha20Poly1305GetPrimitive(t *testing.T) {
+func TestKeyManagerGetPrimitive(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ChaCha20Poly1305TypeURL)
 	if err != nil {
 		t.Fatalf("cannot obtain ChaCha20Poly1305 key manager: %s", err)
@@ -56,7 +57,7 @@ func TestChaCha20Poly1305GetPrimitive(t *testing.T) {
 	}
 }
 
-func TestChaCha20Poly1305GetPrimitiveWithInvalidKeys(t *testing.T) {
+func TestKeyManagerGetPrimitiveWithInvalidKeys(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ChaCha20Poly1305TypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain ChaCha20Poly1305 key manager: %s", err)
@@ -73,7 +74,7 @@ func TestChaCha20Poly1305GetPrimitiveWithInvalidKeys(t *testing.T) {
 	}
 }
 
-func TestChaCha20Poly1305NewKey(t *testing.T) {
+func TestKeyManagerNewKey(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ChaCha20Poly1305TypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain ChaCha20Poly1305 key manager: %s", err)
@@ -91,7 +92,7 @@ func TestChaCha20Poly1305NewKey(t *testing.T) {
 	}
 }
 
-func TestChaCha20Poly1305NewKeyData(t *testing.T) {
+func TestKeyManagerNewKeyData(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ChaCha20Poly1305TypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain ChaCha20Poly1305 key manager: %s", err)
@@ -123,7 +124,7 @@ func TestChaCha20Poly1305NewKeyData(t *testing.T) {
 	}
 }
 
-func TestChaCha20Poly1305DoesSupport(t *testing.T) {
+func TestKeyManagerDoesSupport(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ChaCha20Poly1305TypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain ChaCha20Poly1305 key manager: %s", err)
@@ -136,7 +137,7 @@ func TestChaCha20Poly1305DoesSupport(t *testing.T) {
 	}
 }
 
-func TestChaCha20Poly1305TypeURL(t *testing.T) {
+func TestKeyManagerTypeURL(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ChaCha20Poly1305TypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain ChaCha20Poly1305 key manager: %s", err)
