@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package aead_test
+package xchacha20poly1305_test
 
 import (
 	"bytes"
@@ -29,14 +29,15 @@ import (
 	"github.com/tink-crypto/tink-go/v2/testutil"
 
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	_ "github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
 	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	xpb "github.com/tink-crypto/tink-go/v2/proto/xchacha20_poly1305_go_proto"
 )
 
-func TestXChaCha20Poly1305GetPrimitive(t *testing.T) {
+func TestKeyManagerGetPrimitive(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain XChaCha20Poly1305 key manager: %s", err)
+		t.Errorf("registry.GetKeyManager(%s) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
 	}
 	m, err := km.NewKey(nil)
 	if err != nil {
@@ -59,10 +60,10 @@ func TestXChaCha20Poly1305GetPrimitive(t *testing.T) {
 	}
 }
 
-func TestXChaCha20Poly1305GetPrimitiveWithInvalidKeys(t *testing.T) {
+func TestKeyManagerGetPrimitiveWithInvalidKeys(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain XChaCha20Poly1305 key manager: %s", err)
+		t.Errorf("registry.GetKeyManager(%s) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
 	}
 	invalidKeys := []*xpb.XChaCha20Poly1305Key{
 		// Bad key size.
@@ -95,10 +96,10 @@ func TestXChaCha20Poly1305GetPrimitiveWithInvalidKeys(t *testing.T) {
 	}
 }
 
-func TestXChaCha20Poly1305NewKey(t *testing.T) {
+func TestKeyManagerNewKey(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain XChaCha20Poly1305 key manager: %s", err)
+		t.Errorf("registry.GetKeyManager(%s) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
 	}
 	m, err := km.NewKey(nil)
 	if err != nil {
@@ -113,10 +114,10 @@ func TestXChaCha20Poly1305NewKey(t *testing.T) {
 	}
 }
 
-func TestXChaCha20Poly1305NewKeyData(t *testing.T) {
+func TestKeyManagerNewKeyData(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain XChaCha20Poly1305 key manager: %s", err)
+		t.Errorf("registry.GetKeyManager(%s) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
 	}
 	kd, err := km.NewKeyData(nil)
 	if err != nil {
@@ -145,10 +146,10 @@ func TestXChaCha20Poly1305NewKeyData(t *testing.T) {
 	}
 }
 
-func TestXChaCha20Poly1305DoesSupport(t *testing.T) {
+func TestKeyManagerDoesSupport(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain XChaCha20Poly1305 key manager: %s", err)
+		t.Errorf("registry.GetKeyManager(%s) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
 	}
 	if !km.DoesSupport(testutil.XChaCha20Poly1305TypeURL) {
 		t.Errorf("XChaCha20Poly1305KeyManager must support %s", testutil.XChaCha20Poly1305TypeURL)
@@ -158,17 +159,17 @@ func TestXChaCha20Poly1305DoesSupport(t *testing.T) {
 	}
 }
 
-func TestXChaCha20Poly1305TypeURL(t *testing.T) {
+func TestKeyManagerTypeURL(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain XChaCha20Poly1305 key manager: %s", err)
+		t.Errorf("registry.GetKeyManager(%s) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
 	}
 	if kt := km.TypeURL(); kt != testutil.XChaCha20Poly1305TypeURL {
 		t.Errorf("km.TypeURL() = %s; want %s", kt, testutil.XChaCha20Poly1305TypeURL)
 	}
 }
 
-func TestXChaCha20Poly1305KeyMaterialType(t *testing.T) {
+func TestKeyManagerKeyMaterialType(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
@@ -182,7 +183,7 @@ func TestXChaCha20Poly1305KeyMaterialType(t *testing.T) {
 	}
 }
 
-func TestXChaCha20Poly1305DeriveKey(t *testing.T) {
+func TestKeyManagerDeriveKey(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
@@ -233,7 +234,7 @@ func TestXChaCha20Poly1305DeriveKey(t *testing.T) {
 	}
 }
 
-func TestXChaCha20Poly1305DeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
@@ -274,7 +275,7 @@ func TestXChaCha20Poly1305DeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	}
 }
 
-func TestXChaCha20Poly1305DeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
