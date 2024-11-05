@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package aead
+package aesctrhmac
 
 import (
 	"errors"
@@ -31,28 +31,22 @@ import (
 )
 
 const (
-	aesCTRHMACAEADKeyVersion = 0
-	aesCTRHMACAEADTypeURL    = "type.googleapis.com/google.crypto.tink.AesCtrHmacAeadKey"
-	minHMACKeySizeInBytes    = 16
-	minTagSizeInBytes        = 10
+	keyVersion            = 0
+	typeURL               = "type.googleapis.com/google.crypto.tink.AesCtrHmacAeadKey"
+	minHMACKeySizeInBytes = 16
+	minTagSizeInBytes     = 10
 )
 
-// common errors
-var errInvalidAESCTRHMACAEADKey = fmt.Errorf("aes_ctr_hmac_aead_key_manager: invalid key")
-var errInvalidAESCTRHMACAEADKeyFormat = fmt.Errorf("aes_ctr_hmac_aead_key_manager: invalid key format")
+// keyManager generates [subtle.NewEncryptThenAuthenticate] primitives and
+// [aeadpb.AesCtrHmacAeadKey] keys
+type keyManager struct{}
 
-// aesCTRHMACAEADKeyManager is an implementation of KeyManager interface.
-// It generates new AESCTRHMACAEADKey keys and produces new instances of EncryptThenAuthenticate subtle.
-type aesCTRHMACAEADKeyManager struct{}
-
-// Primitive creates an AEAD for the given serialized AESCTRHMACAEADKey proto.
-func (km *aesCTRHMACAEADKeyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, errInvalidAESCTRHMACAEADKey
-	}
+// Primitive creates a [subtle.NewEncryptThenAuthenticate] primitive for the given
+// serialized [aeadpb.AesCtrHmacAeadKey].
+func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
 	key := new(aeadpb.AesCtrHmacAeadKey)
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidAESCTRHMACAEADKey
+		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: invalid key")
 	}
 	if err := km.validateKey(key); err != nil {
 		return nil, err
@@ -76,27 +70,25 @@ func (km *aesCTRHMACAEADKeyManager) Primitive(serializedKey []byte) (any, error)
 	return aead, nil
 }
 
-// NewKey creates a new key according to the given serialized AesCtrHmacAeadKeyFormat.
-func (km *aesCTRHMACAEADKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
-	if len(serializedKeyFormat) == 0 {
-		return nil, errInvalidAESCTRHMACAEADKeyFormat
-	}
+// NewKey creates a new key according to the given serialized
+// [aeadpb.AesCtrHmacAeadKeyFormat].
+func (km *keyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
 	keyFormat := new(aeadpb.AesCtrHmacAeadKeyFormat)
 	if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
-		return nil, errInvalidAESCTRHMACAEADKeyFormat
+		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: invalid key format: %v", err)
 	}
 	if err := km.validateKeyFormat(keyFormat); err != nil {
 		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: invalid key format: %v", err)
 	}
 	return &aeadpb.AesCtrHmacAeadKey{
-		Version: aesCTRHMACAEADKeyVersion,
+		Version: keyVersion,
 		AesCtrKey: &ctrpb.AesCtrKey{
-			Version:  aesCTRHMACAEADKeyVersion,
+			Version:  keyVersion,
 			KeyValue: random.GetRandomBytes(keyFormat.GetAesCtrKeyFormat().GetKeySize()),
 			Params:   keyFormat.GetAesCtrKeyFormat().GetParams(),
 		},
 		HmacKey: &hmacpb.HmacKey{
-			Version:  aesCTRHMACAEADKeyVersion,
+			Version:  keyVersion,
 			KeyValue: random.GetRandomBytes(keyFormat.GetHmacKeyFormat().GetKeySize()),
 			Params:   keyFormat.GetHmacKeyFormat().GetParams(),
 		},
@@ -104,9 +96,10 @@ func (km *aesCTRHMACAEADKeyManager) NewKey(serializedKeyFormat []byte) (proto.Me
 }
 
 // NewKeyData creates a new KeyData according to specification in the given serialized
-// AesCtrHmacAeadKeyFormat.
+// [aeadpb.AesCtrHmacAeadKeyFormat].
+//
 // It should be used solely by the key management API.
-func (km *aesCTRHMACAEADKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+func (km *keyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
 	key, err := km.NewKey(serializedKeyFormat)
 	if err != nil {
 		return nil, err
@@ -123,24 +116,20 @@ func (km *aesCTRHMACAEADKeyManager) NewKeyData(serializedKeyFormat []byte) (*tin
 }
 
 // DoesSupport indicates if this key manager supports the given key type.
-func (km *aesCTRHMACAEADKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == aesCTRHMACAEADTypeURL
-}
+func (km *keyManager) DoesSupport(typeURL string) bool { return km.TypeURL() == typeURL }
 
 // TypeURL returns the key type of keys managed by this key manager.
-func (km *aesCTRHMACAEADKeyManager) TypeURL() string {
-	return aesCTRHMACAEADTypeURL
-}
+func (km *keyManager) TypeURL() string { return typeURL }
 
-// validateKey validates the given AesCtrHmacAeadKey proto.
-func (km *aesCTRHMACAEADKeyManager) validateKey(key *aeadpb.AesCtrHmacAeadKey) error {
-	if err := keyset.ValidateKeyVersion(key.GetVersion(), aesCTRHMACAEADKeyVersion); err != nil {
+// validateKey validates the given [aeadpb.AesCtrHmacAeadKey] proto.
+func (km *keyManager) validateKey(key *aeadpb.AesCtrHmacAeadKey) error {
+	if err := keyset.ValidateKeyVersion(key.GetVersion(), keyVersion); err != nil {
 		return fmt.Errorf("aes_ctr_hmac_aead_key_manager: %v", err)
 	}
-	if err := keyset.ValidateKeyVersion(key.GetAesCtrKey().GetVersion(), aesCTRHMACAEADKeyVersion); err != nil {
+	if err := keyset.ValidateKeyVersion(key.GetAesCtrKey().GetVersion(), keyVersion); err != nil {
 		return fmt.Errorf("aes_ctr_hmac_aead_key_manager: %v", err)
 	}
-	if err := keyset.ValidateKeyVersion(key.GetHmacKey().GetVersion(), aesCTRHMACAEADKeyVersion); err != nil {
+	if err := keyset.ValidateKeyVersion(key.GetHmacKey().GetVersion(), keyVersion); err != nil {
 		return fmt.Errorf("aes_ctr_hmac_aead_key_manager: %v", err)
 	}
 	// Validate AesCtrKey.
@@ -155,8 +144,9 @@ func (km *aesCTRHMACAEADKeyManager) validateKey(key *aeadpb.AesCtrHmacAeadKey) e
 	return nil
 }
 
-// validateKeyFormat validates the given AesCtrHmacAeadKeyFormat proto.
-func (km *aesCTRHMACAEADKeyManager) validateKeyFormat(format *aeadpb.AesCtrHmacAeadKeyFormat) error {
+// validateKeyFormat validates the given [aeadpb.AesCtrHmacAeadKeyFormat]
+// proto.
+func (km *keyManager) validateKeyFormat(format *aeadpb.AesCtrHmacAeadKeyFormat) error {
 	// Validate AesCtrKeyFormat.
 	if err := subtle.ValidateAESKeySize(format.GetAesCtrKeyFormat().GetKeySize()); err != nil {
 		return fmt.Errorf("aes_ctr_hmac_aead_key_manager: %s", err)
@@ -179,7 +169,8 @@ func (km *aesCTRHMACAEADKeyManager) validateKeyFormat(format *aeadpb.AesCtrHmacA
 		commonpb.HashType_SHA224: 28,
 		commonpb.HashType_SHA256: 32,
 		commonpb.HashType_SHA384: 48,
-		commonpb.HashType_SHA512: 64}
+		commonpb.HashType_SHA512: 64,
+	}
 
 	maxTagSize, ok := maxTagSizes[hmacKeyFormat.GetParams().GetHash()]
 	if !ok {

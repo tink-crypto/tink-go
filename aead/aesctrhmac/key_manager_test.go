@@ -12,32 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package aead_test
+package aesctrhmac_test
 
 import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead"
+	_ "github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	ctrpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_go_proto"
-	aeadpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
-	ctrhmacpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
+	achpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_go_proto"
 )
 
-func TestAESCTRHMACNewKeyMultipleTimes(t *testing.T) {
+func TestKeyManagerNewKeyMultipleTimes(t *testing.T) {
 	keyTemplate := aead.AES128CTRHMACSHA256KeyTemplate()
-	aeadKeyFormat := new(ctrhmacpb.AesCtrHmacAeadKeyFormat)
+	aeadKeyFormat := new(achpb.AesCtrHmacAeadKeyFormat)
 	if err := proto.Unmarshal(keyTemplate.Value, aeadKeyFormat); err != nil {
-		t.Fatalf("cannot unmarshal AES128CTRHMACSHA256 key template")
+		t.Fatalf("proto.Unmarshal(keyTemplate.Value, aeadKeyFormat) err = %v, want nil", err)
 	}
 
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACAEADTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-CTR-HMAC-AEAD key manager: %s", err)
+		t.Errorf("registry.GetKeyManager(%s) err = %v, want nil", testutil.AESCTRHMACAEADTypeURL, err)
 	}
 
 	keys := make(map[string]bool)
@@ -52,7 +52,7 @@ func TestAESCTRHMACNewKeyMultipleTimes(t *testing.T) {
 			t.Fatalf("cannot serialize key, error: %v", err)
 		}
 
-		key := new(ctrhmacpb.AesCtrHmacAeadKey)
+		key := new(achpb.AesCtrHmacAeadKey)
 		proto.Unmarshal(sk, key)
 
 		keys[string(key.AesCtrKey.KeyValue)] = true
@@ -69,59 +69,69 @@ func TestAESCTRHMACNewKeyMultipleTimes(t *testing.T) {
 	}
 }
 
-func TestAESCTRHMACNewKeyWithInvalidSerializedKeyFormat(t *testing.T) {
+func TestKeyManagerNewKeyWithInvalidSerializedKeyFormat(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACAEADTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-CTR-HMAC-AEAD key manager: %s", err)
+		t.Errorf("registry.GetKeyManager(%s) err = %v, want nil", testutil.AESCTRHMACAEADTypeURL, err)
+	}
+
+	keyFormatWithNilParams := &achpb.AesCtrHmacAeadKeyFormat{
+		AesCtrKeyFormat: &ctrpb.AesCtrKeyFormat{
+			Params:  nil,
+			KeySize: 32,
+		},
+		HmacKeyFormat: &hmacpb.HmacKeyFormat{
+			Params:  nil,
+			KeySize: 32,
+		},
+	}
+	serializedKeyFormatWithNilParams, err := proto.Marshal(keyFormatWithNilParams)
+	if err != nil {
+		t.Fatalf("failed to marshal key: %s", err)
+	}
+
+	keyFormatWithNilNestedKeyFormats := &achpb.AesCtrHmacAeadKeyFormat{
+		AesCtrKeyFormat: nil,
+		HmacKeyFormat:   nil,
+	}
+	serializedKeyFormatWithNilNestedKeyFormats, err := proto.Marshal(keyFormatWithNilNestedKeyFormats)
+	if err != nil {
+		t.Fatalf("failed to marshal key: %s", err)
 	}
 
 	testcases := []struct {
 		name                string
 		serializedKeyFormat []byte
-		keyFormat           *ctrhmacpb.AesCtrHmacAeadKeyFormat
 	}{
 		{
-			name:                "empty",
+			name:                "nil",
+			serializedKeyFormat: nil,
+		},
+		{
+			name:                "empty slice",
+			serializedKeyFormat: []byte{},
+		},
+		{
+			name:                "slice with invalid data",
 			serializedKeyFormat: make([]byte, 128),
 		},
 		{
-			name: "params_unset",
-			keyFormat: &ctrhmacpb.AesCtrHmacAeadKeyFormat{
-				AesCtrKeyFormat: &ctrpb.AesCtrKeyFormat{
-					Params:  nil,
-					KeySize: 32,
-				},
-				HmacKeyFormat: &hmacpb.HmacKeyFormat{
-					Params:  nil,
-					KeySize: 32,
-				},
-			},
+			name:                "unset params",
+			serializedKeyFormat: serializedKeyFormatWithNilParams,
 		},
 		{
-			name: "nested_key_formats_unset",
-			keyFormat: &ctrhmacpb.AesCtrHmacAeadKeyFormat{
-				AesCtrKeyFormat: nil,
-				HmacKeyFormat:   nil,
-			},
+			name:                "unset nested key formats",
+			serializedKeyFormat: serializedKeyFormatWithNilNestedKeyFormats,
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			serializedKeyFormat := tc.serializedKeyFormat
-			if serializedKeyFormat == nil {
-				var err error
-				serializedKeyFormat, err = proto.Marshal(tc.keyFormat)
-				if err != nil {
-					t.Fatalf("failed to marshal key format: %s", err)
-				}
-			}
-
-			_, err = keyManager.NewKey(serializedKeyFormat)
+			_, err = keyManager.NewKey(tc.serializedKeyFormat)
 			if err == nil {
 				t.Error("NewKey() err = nil, want not error")
 			}
 
-			_, err = keyManager.NewKeyData(serializedKeyFormat)
+			_, err = keyManager.NewKeyData(tc.serializedKeyFormat)
 			if err == nil {
 				t.Error("NewKeyData() err = nil, want error")
 			}
@@ -129,13 +139,13 @@ func TestAESCTRHMACNewKeyWithInvalidSerializedKeyFormat(t *testing.T) {
 	}
 }
 
-func TestAESCTRHMACPrimitive(t *testing.T) {
+func TestKeyManagerPrimitive(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACAEADTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-CTR-HMAC-AEAD key manager: %s", err)
+		t.Errorf("registry.GetKeyManager(%s) err = %v, want nil", testutil.AESCTRHMACAEADTypeURL, err)
 	}
 
-	key := &aeadpb.AesCtrHmacAeadKey{
+	key := &achpb.AesCtrHmacAeadKey{
 		Version: 0,
 		AesCtrKey: &ctrpb.AesCtrKey{
 			Version:  0,
@@ -159,49 +169,74 @@ func TestAESCTRHMACPrimitive(t *testing.T) {
 	}
 }
 
-func TestAESCTRHMACPrimitiveWithInvalidKey(t *testing.T) {
+func TestKeyManagerPrimitiveWithInvalidKey(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACAEADTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-CTR-HMAC-AEAD key manager: %s", err)
+		t.Errorf("registry.GetKeyManager(%s) err = %v, want nil", testutil.AESCTRHMACAEADTypeURL, err)
+	}
+
+	emptyKey := &achpb.AesCtrHmacAeadKey{}
+	serializedEmptyKey, err := proto.Marshal(emptyKey)
+	if err != nil {
+		t.Fatalf("failed to marshal key: %s", err)
+	}
+
+	keyWithNilKeyParams := &achpb.AesCtrHmacAeadKey{
+		Version: 0,
+		AesCtrKey: &ctrpb.AesCtrKey{
+			Version:  0,
+			KeyValue: make([]byte, 32),
+			Params:   nil,
+		},
+		HmacKey: &hmacpb.HmacKey{
+			Version:  0,
+			KeyValue: make([]byte, 32),
+			Params:   nil,
+		},
+	}
+	serializedkeyWithNilKeyParams, err := proto.Marshal(keyWithNilKeyParams)
+	if err != nil {
+		t.Fatalf("failed to marshal key: %s", err)
+	}
+
+	wrongKeyType := &hmacpb.HmacKey{
+		Version:  0,
+		KeyValue: make([]byte, 32),
+		Params:   nil,
+	}
+	serializedWronKeyType, err := proto.Marshal(wrongKeyType)
+	if err != nil {
+		t.Fatalf("failed to marshal key: %s", err)
 	}
 
 	testcases := []struct {
 		name string
-		key  *ctrhmacpb.AesCtrHmacAeadKey
+		key  []byte
 	}{
 		{
-			name: "nil_nested_keys",
-			key: &aeadpb.AesCtrHmacAeadKey{
-				Version:   0,
-				AesCtrKey: nil,
-				HmacKey:   nil,
-			},
+			name: "nil input",
+			key:  nil,
 		},
 		{
-			name: "nil_key_params",
-			key: &aeadpb.AesCtrHmacAeadKey{
-				Version: 0,
-				AesCtrKey: &ctrpb.AesCtrKey{
-					Version:  0,
-					KeyValue: make([]byte, 32),
-					Params:   nil,
-				},
-				HmacKey: &hmacpb.HmacKey{
-					Version:  0,
-					KeyValue: make([]byte, 32),
-					Params:   nil,
-				},
-			},
+			name: "empty slice",
+			key:  []byte{},
+		},
+		{
+			name: "empty key",
+			key:  serializedEmptyKey,
+		},
+		{
+			name: "key with nil params",
+			key:  serializedkeyWithNilKeyParams,
+		},
+		{
+			name: "wrong key type",
+			key:  serializedWronKeyType,
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			serializedKey, err := proto.Marshal(tc.key)
-			if err != nil {
-				t.Fatalf("failed to marshal key: %s", err)
-			}
-
-			_, err = keyManager.Primitive(serializedKey)
+			_, err = keyManager.Primitive(tc.key)
 			if err == nil {
 				t.Error("Primitive() err = nil, want error")
 			}
