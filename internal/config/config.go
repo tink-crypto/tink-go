@@ -79,14 +79,14 @@ func (c *Config) RegisterPrimitiveConstructor(keyType reflect.Type, constructor 
 	return nil
 }
 
-// RegisterKeyManger registers a key manager for a key type URL.
+// RegisterKeyManager registers a key manager for a key type URL.
 //
 // Not thread-safe.
 //
 // This is an internal API.
-func (c *Config) RegisterKeyManger(keyTypeURL string, km registry.KeyManager, _ internalapi.Token) error {
+func (c *Config) RegisterKeyManager(keyTypeURL string, km registry.KeyManager, _ internalapi.Token) error {
 	if _, ok := c.keysetManagers[keyTypeURL]; ok {
-		return fmt.Errorf("RegisterKeyManger: attempt to register a different key manager for %v", keyTypeURL)
+		return fmt.Errorf("RegisterKeyManager: attempt to register a different key manager for %v", keyTypeURL)
 	}
 	c.keysetManagers[keyTypeURL] = km
 	return nil

@@ -112,9 +112,9 @@ func TestConfigPrimitiveFromKeDataWorks(t *testing.T) {
 	}
 	token := internalapi.Token{}
 
-	err = testConfig.RegisterKeyManger(typeURL0, &stubKeyManager0{}, token)
+	err = testConfig.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token)
 	if err != nil {
-		t.Fatalf("testConfig.RegisterKeyManger() err = %v, want nil", err)
+		t.Fatalf("testConfig.RegisterKeyManager() err = %v, want nil", err)
 	}
 
 	keyData := &tinkpb.KeyData{
@@ -169,13 +169,13 @@ func TestMultipleKeyManagers(t *testing.T) {
 	}
 	token := internalapi.Token{}
 
-	err = testConfig.RegisterKeyManger(typeURL0, &stubKeyManager0{}, token)
+	err = testConfig.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token)
 	if err != nil {
-		t.Fatalf("testConfig.RegisterKeyManger() err = %v, want nil", err)
+		t.Fatalf("testConfig.RegisterKeyManager() err = %v, want nil", err)
 	}
-	err = testConfig.RegisterKeyManger(typeURL1, &stubKeyManager1{}, token)
+	err = testConfig.RegisterKeyManager(typeURL1, &stubKeyManager1{}, token)
 	if err != nil {
-		t.Fatalf("testConfig.RegisterKeyManger() err = %v, want nil", err)
+		t.Fatalf("testConfig.RegisterKeyManager() err = %v, want nil", err)
 	}
 
 	p0, err := testConfig.PrimitiveFromKeyData(&tinkpb.KeyData{TypeUrl: typeURL0, Value: []byte("key")}, token)
@@ -220,14 +220,14 @@ func TestRegisterDifferentKeyManagers(t *testing.T) {
 	}
 	token := internalapi.Token{}
 
-	err = testConfig.RegisterKeyManger(typeURL0, &stubKeyManager0{}, token)
+	err = testConfig.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token)
 	if err != nil {
-		t.Fatalf("testConfig.RegisterKeyManger() err = %v, want nil", err)
+		t.Fatalf("testConfig.RegisterKeyManager() err = %v, want nil", err)
 	}
 
 	// Register another primitiveCreator for the same key type fails.
-	if err = testConfig.RegisterKeyManger(typeURL0, &stubKeyManager1{}, token); err == nil {
-		t.Errorf("testConfig.RegisterKeyManger() err = nil, want error")
+	if err = testConfig.RegisterKeyManager(typeURL0, &stubKeyManager1{}, token); err == nil {
+		t.Errorf("testConfig.RegisterKeyManager() err = nil, want error")
 	}
 }
 
@@ -259,8 +259,8 @@ func TestUnregisteredKeyManager(t *testing.T) {
 	}
 	token := internalapi.Token{}
 
-	if err = testConfig.RegisterKeyManger(typeURL0, &stubKeyManager0{}, token); err != nil {
-		t.Fatalf("testConfig.RegisterKeyManger() err = %v, want nil", err)
+	if err = testConfig.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token); err != nil {
+		t.Fatalf("testConfig.RegisterKeyManager() err = %v, want nil", err)
 	}
 
 	if _, err := testConfig.PrimitiveFromKeyData(&tinkpb.KeyData{TypeUrl: typeURL1, Value: []byte("key")}, token); err == nil {
