@@ -25,9 +25,9 @@ supported properties. This interface supports a streaming interface for symmetri
 authentication. The underlying encryption modes are selected so that partial plaintext can be
 obtained fast by decrypting and authenticating just a part of the ciphertext.
 
-Instances of StreamingAEAD must follow the OAE2 definition as proposed in the paper "Online
+Instances of StreamingAEAD must follow the nOAE definition as proposed in the paper "Online
 Authenticated-Encryption and its Nonce-Reuse Misuse-Resistance" by Hoang, Reyhanitabar, Rogaway
-and Vizár https://eprint.iacr.org/2015/189.pdf
+and Vizár https://eprint.iacr.org/2015/189.pdf.
 */
 type StreamingAEAD interface {
 	// NewEncryptingWriter returns a wrapper around underlying io.Writer, such that any write-operation
