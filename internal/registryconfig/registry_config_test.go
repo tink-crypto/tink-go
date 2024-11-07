@@ -20,6 +20,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	aeadsubtle "github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -47,8 +48,8 @@ func TestPrimitiveFromKey(t *testing.T) {
 	if err != nil {
 		t.Errorf("registryConfig.PrimitiveFromKey() err = %v, want nil", err)
 	}
-	if _, ok := p.(*aeadsubtle.AESGCM); !ok {
-		t.Errorf("p is not of type *aeadsubtle.AESGCM; got %T", p)
+	if _, ok := p.(*aesgcm.AEAD); !ok {
+		t.Errorf("p is not of type *aesgcm.AEAD; got %T", p)
 	}
 }
 

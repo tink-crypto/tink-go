@@ -15,12 +15,100 @@
 package aesgcm
 
 import (
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/aead"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
+
+const (
+	// ivSize is the acceptable IV size defined by RFC 5116.
+	ivSize = 12
+	// tagSize is the acceptable tag size defined by RFC 5116.
+	tagSize = 16
+)
+
+// AEAD is an implementation of the [tink.AEAD] interface with AES-GCM.
+//
+// It implements RFC 5116 Section 5.1 and 5.2.
+type AEAD struct {
+	cipher cipher.AEAD
+	prefix []byte
+}
+
+var _ tink.AEAD = (*AEAD)(nil)
+
+// Encrypt encrypts plaintext with associatedData.
+//
+// The returned ciphertext is of the form:
+//
+//	prefix || iv || ciphertext || tag
+//
+// where prefix is the key's output prefix, iv is a random 12-byte IV,
+// ciphertext is the encrypted plaintext, and tag is a 16-byte tag.
+func (a *AEAD) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
+	if err := aead.CheckPlaintextSize(uint64(len(plaintext))); err != nil {
+		return nil, err
+	}
+	iv := random.GetRandomBytes(ivSize)
+	dst := make([]byte, 0, len(a.prefix)+len(iv)+len(plaintext)+a.cipher.Overhead())
+	dst = append(dst, a.prefix...)
+	dst = append(dst, iv...)
+	return a.cipher.Seal(dst, iv, plaintext, associatedData), nil
+}
+
+// Decrypt decrypts ciphertext with associatedData.
+//
+// The ciphertext is assumed to be of the form:
+//
+//	<prefix> || iv || ciphertext || tag
+//
+// where prefix is the key's output prefix, iv is the 12-byte IV, ciphertext is
+// the encrypted plaintext, and tag is the 16-byte tag.
+// prefix must match the key's output prefix. The prefix may be empty.
+func (a *AEAD) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
+	if len(ciphertext) < len(a.prefix)+ivSize+tagSize {
+		return nil, fmt.Errorf("ciphertext with size %d is too short", len(ciphertext))
+	}
+	prefix := ciphertext[:len(a.prefix)]
+	if !bytes.Equal(prefix, a.prefix) {
+		return nil, fmt.Errorf("ciphertext prefix does not match")
+	}
+	iv := ciphertext[len(a.prefix) : len(a.prefix)+ivSize]
+	ciphertextWithTag := ciphertext[len(a.prefix)+ivSize:]
+	return a.cipher.Open(nil, iv, ciphertextWithTag, associatedData)
+}
+
+// NewAEAD creates a [AEAD] from a [Key].
+func NewAEAD(k *Key) (*AEAD, error) {
+	if k.parameters.KeySizeInBytes() != 16 && k.parameters.KeySizeInBytes() != 32 {
+		return nil, fmt.Errorf("aesgcm.NewAEAD: unsupported key size: got %v, want 16 or 32", k.parameters.KeySizeInBytes())
+	}
+	if k.parameters.IVSizeInBytes() != ivSize {
+		return nil, fmt.Errorf("aesgcm.NewAEAD: unsupported IV size: got %v, want %v", k.parameters.IVSizeInBytes(), ivSize)
+	}
+	if k.parameters.TagSizeInBytes() != tagSize {
+		return nil, fmt.Errorf("aesgcm.NewAEAD: unsupported tag size: got %v, want %v", k.parameters.TagSizeInBytes(), tagSize)
+	}
+	c, err := aes.NewCipher(k.KeyBytes().Data(insecuresecretdataaccess.Token{}))
+	if err != nil {
+		return nil, fmt.Errorf("aesgcm.NewAEAD: failed to initialize cipher")
+	}
+	aeadCipher, err := cipher.NewGCM(c)
+	if err != nil {
+		return nil, fmt.Errorf("aesgcm.NewAEAD: failed to create cipher.AEAD")
+	}
+	return &AEAD{
+		cipher: aeadCipher,
+		prefix: k.OutputPrefix(),
+	}, nil
+}
 
 // primitiveConstructor creates a [subtle.AESGCM] from a [key.Key].
 //
@@ -28,14 +116,7 @@ import (
 func primitiveConstructor(k key.Key) (any, error) {
 	that, ok := k.(*Key)
 	if !ok {
-		return nil, fmt.Errorf("key is of type %T; needed *Key", k)
+		return nil, fmt.Errorf("key is of type %T; needed *aesgcm.Key", k)
 	}
-	// Key by design ensures that the key size is
-	if that.parameters.IVSizeInBytes() != subtle.AESGCMIVSize {
-		return nil, fmt.Errorf("unsupported IV size: got %v, want %v", that.parameters.IVSizeInBytes(), subtle.AESGCMIVSize)
-	}
-	if that.parameters.TagSizeInBytes() != subtle.AESGCMTagSize {
-		return nil, fmt.Errorf("unsupported tag size: got %v, want %v", that.parameters.TagSizeInBytes(), subtle.AESGCMTagSize)
-	}
-	return subtle.NewAESGCM(that.KeyBytes().Data(insecuresecretdataaccess.Token{}))
+	return NewAEAD(that)
 }

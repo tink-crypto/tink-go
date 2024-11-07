@@ -18,9 +18,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
@@ -61,6 +61,267 @@ func hexDecode(t *testing.T, hexStr string) []byte {
 	return x
 }
 
+// Key allows sizes of IV, tag and key that are not supported by the primitive.
+func TestNewAEADFailures(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts ParametersOpts
+	}{
+		{
+			name: "AES128-TINK-IV:11",
+			opts: ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 11, TagSizeInBytes: 16, Variant: VariantTink},
+		},
+		{
+			name: "AES256-TINK-IV:11",
+			opts: ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 11, TagSizeInBytes: 16, Variant: VariantTink},
+		},
+		{
+			name: "AES128-TINK-Tag:12",
+			opts: ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 12, Variant: VariantTink},
+		},
+		{
+			name: "AES256-TINK-Tag:12",
+			opts: ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 12, Variant: VariantTink},
+		},
+		{
+			name: "AES192-TINK",
+			opts: ParametersOpts{KeySizeInBytes: 24, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			key := newKey(t, random.GetRandomBytes(uint32(tc.opts.KeySizeInBytes)), tc.opts)
+			if _, err := NewAEAD(key); err == nil {
+				t.Errorf("NewAEAD(%v) err = nil, want error", key)
+			}
+		})
+	}
+}
+
+func TestAEAD(t *testing.T) {
+	largePlaintext := random.GetRandomBytes(1 << 24)
+	for _, tc := range []struct {
+		name      string
+		opts      ParametersOpts
+		plaintext []byte
+	}{
+		{
+			name:      "AES128-TINK-Empty",
+			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
+			plaintext: []byte{},
+		},
+		{
+			name:      "AES128-CRUNCHY-Empty",
+			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantCrunchy},
+			plaintext: []byte{},
+		},
+		{
+			name:      "AES128-NO_PREFIX-Empty",
+			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantNoPrefix},
+			plaintext: []byte{},
+		},
+		{
+			name:      "AES256-TINK-Empty",
+			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
+			plaintext: []byte{},
+		},
+		{
+			name:      "AES256-CRUNCHY-Empty",
+			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantCrunchy},
+			plaintext: []byte{},
+		},
+		{
+			name:      "AES256-NO_PREFIX-Empty",
+			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantNoPrefix},
+			plaintext: []byte{},
+		},
+		{
+			name:      "AES128-TINK-Small",
+			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
+			plaintext: []byte("Some small plaintext"),
+		},
+		{
+			name:      "AES128-CRUNCHY-Small",
+			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantCrunchy},
+			plaintext: []byte("Some small plaintext"),
+		},
+		{
+			name:      "AES128-NO_PREFIX-Small",
+			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantNoPrefix},
+			plaintext: []byte("Some small plaintext"),
+		},
+		{
+			name:      "AES256-TINK-Small",
+			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
+			plaintext: []byte("Some small plaintext"),
+		},
+		{
+			name:      "AES256-CRUNCHY-Small",
+			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantCrunchy},
+			plaintext: []byte("Some small plaintext"),
+		},
+		{
+			name:      "AES256-NO_PREFIX-Small",
+			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantNoPrefix},
+			plaintext: []byte("Some small plaintext"),
+		},
+		{
+			name:      "AES128-TINK-Large",
+			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
+			plaintext: largePlaintext,
+		},
+		{
+			name:      "AES128-CRUNCHY-Large",
+			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantCrunchy},
+			plaintext: largePlaintext,
+		},
+		{
+			name:      "AES128-NO_PREFIX-Large",
+			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantNoPrefix},
+			plaintext: largePlaintext,
+		},
+		{
+			name:      "AES256-TINK-Large",
+			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
+			plaintext: largePlaintext,
+		},
+		{
+			name:      "AES256-CRUNCHY-Large",
+			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantCrunchy},
+			plaintext: largePlaintext,
+		},
+		{
+			name:      "AES256-NO_PREFIX-Large",
+			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantNoPrefix},
+			plaintext: largePlaintext,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			keyValue := random.GetRandomBytes(uint32(tc.opts.KeySizeInBytes))
+			key := newKey(t, keyValue, tc.opts)
+			aead, err := NewAEAD(key)
+			if err != nil {
+				t.Fatalf("NewAEAD(%v) err = %v, want nil", key, err)
+			}
+			associatedData := []byte("associatedData")
+			ciphertext, err := aead.Encrypt(tc.plaintext, associatedData)
+			if err != nil {
+				t.Fatalf("aead.Encrypt(%v, %v) err = %v, want nil", tc.plaintext, associatedData, err)
+			}
+
+			if got, want := len(ciphertext), len(key.OutputPrefix())+len(tc.plaintext)+ivSize+tagSize; got != want {
+				t.Errorf("ciphertext has wrong length: got %d, want %d", got, want)
+			}
+
+			// Check the prefix is correct.
+			wantPrefix, err := calculateOutputPrefix(tc.opts.Variant, key.idRequirement)
+			if err != nil {
+				t.Fatalf("calculateOutputPrefix(%v, %v) err = %v, want nil", tc.opts.Variant, key.idRequirement, err)
+			}
+			if !bytes.Equal(ciphertext[:len(wantPrefix)], wantPrefix) {
+				t.Errorf("ciphertext has wrong prefix: got %x, want %x", ciphertext[:len(wantPrefix)], wantPrefix)
+			}
+
+			// Check the tag length is 16 bytes.
+			if want, got := tagSize, len(ciphertext)-len(key.OutputPrefix())-len(tc.plaintext)-ivSize; want != got {
+				t.Errorf("ciphertext has wrong tag length: want %d, got %d", want, got)
+			}
+
+			decrypted, err := aead.Decrypt(ciphertext, associatedData)
+			if err != nil {
+				t.Fatalf("aead.Decrypt(%v, %v) err = %v, want nil", ciphertext, associatedData, err)
+			}
+			if got, want := decrypted, tc.plaintext; !bytes.Equal(got, want) {
+				t.Errorf("aead.Decrypt(%v, %v) = %v, want %v", ciphertext, associatedData, got, want)
+			}
+		})
+	}
+}
+
+func TestAEADDecryptFailsIfCiphertextIsCorruptedOrTruncated(t *testing.T) {
+	ad := random.GetRandomBytes(33)
+	key := random.GetRandomBytes(16)
+	pt := random.GetRandomBytes(32)
+	a, err := NewAEAD(newKey(t, key, ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink}))
+	if err != nil {
+		t.Fatalf("NewAEAD() err = %q, want nil", err)
+	}
+	ct, err := a.Encrypt(pt, ad)
+	if err != nil {
+		t.Fatalf("a.Encrypt() err = %q, want nil", err)
+	}
+	// flipping bits
+	for i := 0; i < len(ct); i++ {
+		tmp := ct[i]
+		for j := 0; j < 8; j++ {
+			ct[i] ^= 1 << uint8(j)
+			if _, err := a.Decrypt(ct, ad); err == nil {
+				t.Errorf("a.Decrypt(ct, ad) err = nil, want error when flipping bit of ciphertext: byte %d, bit %d", i, j)
+			}
+			ct[i] = tmp
+		}
+	}
+	// truncated ciphertext
+	for i := 1; i < len(ct); i++ {
+		if _, err := a.Decrypt(ct[:i], ad); err == nil {
+			t.Errorf("a.Decrypt(ct[:%d], ad) err = nil, want error", i)
+		}
+	}
+	// modify associated data
+	for i := 0; i < len(ad); i++ {
+		tmp := ad[i]
+		for j := 0; j < 8; j++ {
+			ad[i] ^= 1 << uint8(j)
+			if _, err := a.Decrypt(ct, ad); err == nil {
+				t.Errorf("a.Decrypt(ct, ad) err = nil, want error when flipping bit of ad: byte %d, bit %d", i, j)
+			}
+			ad[i] = tmp
+		}
+	}
+	// replace ciphertext with a random string with a small, unacceptable size
+	for _, ctSize := range []uint32{ivSize / 2, ivSize - 1} {
+		smallCT := random.GetRandomBytes(ctSize)
+		emptyAD := []byte{}
+		if _, err := a.Decrypt(smallCT, emptyAD); err == nil {
+			t.Error("a.Decrypt(smallCT, emptyAD) err = nil, want error")
+		}
+	}
+}
+
+// Checks that the nonce is random by making sure that the multiple ciphertexts
+// of the same message are distinct.
+func TestAEADEncryptUsesRandomNonce(t *testing.T) {
+	nSample := 1 << 17
+	keyValue := random.GetRandomBytes(16)
+	pt := []byte{}
+	ad := []byte{}
+	opts := ParametersOpts{
+		KeySizeInBytes: 16,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        VariantTink,
+	}
+	key := newKey(t, keyValue, opts)
+	a, err := NewAEAD(key)
+	if err != nil {
+		t.Fatalf("NewAEAD() err = %q, want nil", err)
+	}
+	ctSet := make(map[string]bool)
+	for i := 0; i < nSample; i++ {
+		ct, err := a.Encrypt(pt, ad)
+		if err != nil {
+			t.Fatalf("a.Encrypt() err = %q, want nil", err)
+		}
+		ctHex := hex.EncodeToString(ct)
+		_, existed := ctSet[ctHex]
+		if existed {
+			t.Fatalf("nonce is repeated after %d samples", i)
+		}
+		ctSet[ctHex] = true
+	}
+}
+
+// TODO: b/376258584 - Add wycheproof tests.
+
 func TestPrimitiveCreator(t *testing.T) {
 	// Test vectors from
 	// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/aes_gcm_test.json.
@@ -72,6 +333,17 @@ func TestPrimitiveCreator(t *testing.T) {
 	key2 := hexDecode(t, "51e4bf2bad92b7aff1a4bc05550ba81df4b96fabf41c12c7b00e60e48db7e152")
 	ciphertext2 := hexDecode(t, "4f07afedfdc3b6c2361823d3cf332a12fdee800b602e8d7c4799d62c140c9bb834876b09")
 	wantMessage2 := hexDecode(t, "be3308f72a2c6aed")
+
+	// Prefixes.
+	tinkPrefix, err := calculateOutputPrefix(VariantTink, 123)
+	if err != nil {
+		t.Fatalf("calculateOutputPrefix(VariantTink, 123) err = %v, want nil", err)
+	}
+	crunchyPrefix, err := calculateOutputPrefix(VariantCrunchy, 123)
+	if err != nil {
+		t.Fatalf("calculateOutputPrefix(VariantTink, 123) err = %v, want nil", err)
+	}
+
 	for _, testCase := range []struct {
 		name          string
 		opts          ParametersOpts
@@ -88,7 +360,7 @@ func TestPrimitiveCreator(t *testing.T) {
 				Variant:        VariantTink,
 			},
 			keyBytes:      key1,
-			ciphertext:    ciphertext1,
+			ciphertext:    slices.Concat(tinkPrefix, ciphertext1),
 			wantPlaintext: wantMessage1,
 		},
 		{
@@ -100,7 +372,7 @@ func TestPrimitiveCreator(t *testing.T) {
 				Variant:        VariantCrunchy,
 			},
 			keyBytes:      key1,
-			ciphertext:    ciphertext1,
+			ciphertext:    slices.Concat(crunchyPrefix, ciphertext1),
 			wantPlaintext: wantMessage1,
 		},
 		{
@@ -124,7 +396,7 @@ func TestPrimitiveCreator(t *testing.T) {
 				Variant:        VariantTink,
 			},
 			keyBytes:      key2,
-			ciphertext:    ciphertext2,
+			ciphertext:    slices.Concat(tinkPrefix, ciphertext2),
 			wantPlaintext: wantMessage2,
 		},
 		{
@@ -136,7 +408,7 @@ func TestPrimitiveCreator(t *testing.T) {
 				Variant:        VariantCrunchy,
 			},
 			keyBytes:      key2,
-			ciphertext:    ciphertext2,
+			ciphertext:    slices.Concat(crunchyPrefix, ciphertext2),
 			wantPlaintext: wantMessage2,
 		},
 		{
@@ -158,9 +430,9 @@ func TestPrimitiveCreator(t *testing.T) {
 			if err != nil {
 				t.Fatalf("primitiveConstructor(key) err = %v, want nil", err)
 			}
-			aesgcmPrimitive := primitive.(*subtle.AESGCM)
+			aesgcmPrimitive := primitive.(*AEAD)
 			if aesgcmPrimitive == nil {
-				t.Errorf("primitiveConstructor(key) has type %T, wanted *subtle.AESGCM", primitive)
+				t.Errorf("primitiveConstructor(key) has type %T, wanted *aesgcm.AEAD", primitive)
 			}
 			decrypted, err := aesgcmPrimitive.Decrypt(testCase.ciphertext, []byte{})
 			if err != nil {
