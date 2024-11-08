@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/aead"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
@@ -195,7 +196,7 @@ func TestAESGCMRandomNonce(t *testing.T) {
 }
 
 func TestAESGCMWycheproofCases(t *testing.T) {
-	suite := new(AEADSuite)
+	suite := new(aead.WycheproofSuite)
 	if err := testutil.PopulateSuite(suite, "aes_gcm_test.json"); err != nil {
 		t.Fatalf("failed populating suite: %s", err)
 	}
@@ -214,7 +215,7 @@ func TestAESGCMWycheproofCases(t *testing.T) {
 	}
 }
 
-func runAESGCMWycheproofCase(t *testing.T, tc *AEADCase) {
+func runAESGCMWycheproofCase(t *testing.T, tc *aead.WycheproofCase) {
 	var combinedCt []byte
 	combinedCt = append(combinedCt, tc.Iv...)
 	combinedCt = append(combinedCt, tc.Ct...)

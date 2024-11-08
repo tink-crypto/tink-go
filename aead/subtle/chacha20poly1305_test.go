@@ -23,6 +23,7 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/aead"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
@@ -221,7 +222,7 @@ func TestChaCha20Poly1305RandomNonce(t *testing.T) {
 }
 
 func TestChaCha20Poly1305WycheproofCases(t *testing.T) {
-	suite := new(AEADSuite)
+	suite := new(aead.WycheproofSuite)
 	if err := testutil.PopulateSuite(suite, "chacha20_poly1305_test.json"); err != nil {
 		t.Fatalf("failed populating suite: %s", err)
 	}
@@ -240,7 +241,7 @@ func TestChaCha20Poly1305WycheproofCases(t *testing.T) {
 	}
 }
 
-func runChaCha20Poly1305WycheproofCase(t *testing.T, tc *AEADCase) {
+func runChaCha20Poly1305WycheproofCase(t *testing.T, tc *aead.WycheproofCase) {
 	var combinedCT []byte
 	combinedCT = append(combinedCT, tc.Iv...)
 	combinedCT = append(combinedCT, tc.Ct...)

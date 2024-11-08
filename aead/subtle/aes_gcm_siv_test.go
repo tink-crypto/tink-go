@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/aead"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
@@ -105,7 +106,7 @@ func TestAESGCMSIVModifyCiphertext(t *testing.T) {
 }
 
 func TestAESGCMSIVWycheproofCases(t *testing.T) {
-	suite := new(AEADSuite)
+	suite := new(aead.WycheproofSuite)
 	if err := testutil.PopulateSuite(suite, "aes_gcm_siv_test.json"); err != nil {
 		t.Fatalf("failed populating suite: %s", err)
 	}
@@ -118,7 +119,7 @@ func TestAESGCMSIVWycheproofCases(t *testing.T) {
 	}
 }
 
-func runWycheproofDecryptOnly(t *testing.T, testCase *AEADCase) {
+func runWycheproofDecryptOnly(t *testing.T, testCase *aead.WycheproofCase) {
 	aead, err := subtle.NewAESGCMSIV(testCase.Key)
 	if err != nil {
 		t.Fatalf("cannot create aead, error: %v", err)
@@ -147,7 +148,7 @@ func runWycheproofDecryptOnly(t *testing.T, testCase *AEADCase) {
 	}
 }
 
-func runWycheproofEncryptDecrypt(t *testing.T, testCase *AEADCase) {
+func runWycheproofEncryptDecrypt(t *testing.T, testCase *aead.WycheproofCase) {
 	aead, err := subtle.NewAESGCMSIV(testCase.Key)
 	if err != nil {
 		t.Fatalf("cannot create aead, error: %v", err)

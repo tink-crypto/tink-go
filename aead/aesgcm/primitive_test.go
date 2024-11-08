@@ -22,8 +22,11 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/aead"
+	testingaead "github.com/tink-crypto/tink-go/v2/internal/testing/aead"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 type testCase struct {
@@ -320,7 +323,55 @@ func TestAEADEncryptUsesRandomNonce(t *testing.T) {
 	}
 }
 
-// TODO: b/376258584 - Add wycheproof tests.
+func TestAEADWycheproofCases(t *testing.T) {
+	suite := new(testingaead.WycheproofSuite)
+	if err := testutil.PopulateSuite(suite, "aes_gcm_test.json"); err != nil {
+		t.Fatalf("failed populating suite: %s", err)
+	}
+	for _, group := range suite.TestGroups {
+		// Skip unsupported key and IV sizes.
+		if err := aead.ValidateAESKeySize(group.KeySize / 8); err != nil {
+			continue
+		}
+		if group.IvSize != ivSize*8 {
+			continue
+		}
+		for _, tc := range group.Tests {
+			caseName := fmt.Sprintf("%s-%s(%d,%d):Case-%d",
+				suite.Algorithm, group.Type, group.KeySize, group.TagSize, tc.CaseID)
+			t.Run(caseName, func(t *testing.T) {
+				var combinedCt []byte
+				combinedCt = append(combinedCt, tc.Iv...)
+				combinedCt = append(combinedCt, tc.Ct...)
+				combinedCt = append(combinedCt, tc.Tag...)
+				key := newKey(t, tc.Key, ParametersOpts{
+					KeySizeInBytes: len(tc.Key),
+					IVSizeInBytes:  len(tc.Iv),
+					TagSizeInBytes: len(tc.Tag),
+					Variant:        VariantNoPrefix,
+				})
+				a, err := NewAEAD(key)
+				if err != nil {
+					t.Fatalf("NewAEAD(key) err = %v, want nil", err)
+				}
+				decrypted, err := a.Decrypt(combinedCt, tc.Aad)
+				if err != nil {
+					if tc.Result == "valid" {
+						t.Errorf("unexpected error in test case: %s", err)
+					}
+				} else {
+					if tc.Result == "invalid" {
+						t.Error("decrypted invalid test case")
+					}
+					if !bytes.Equal(decrypted, tc.Msg) {
+						t.Error("incorrect decryption in test case")
+					}
+				}
+
+			})
+		}
+	}
+}
 
 func TestPrimitiveCreator(t *testing.T) {
 	// Test vectors from
