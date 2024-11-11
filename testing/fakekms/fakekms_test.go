@@ -16,6 +16,8 @@ package fakekms_test
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/testing/fakekms"
@@ -60,6 +62,11 @@ func TestValidKeyURIs(t *testing.T) {
 			}
 			if !bytes.Equal(plaintext, decrypted) {
 				t.Fatalf("decrypted data doesn't match plaintext, got: %q, want: %q", decrypted, plaintext)
+			}
+			invalidAssociatedData := []byte("invalid")
+			_, err = primitive.Decrypt(ciphertext, invalidAssociatedData)
+			if err == nil {
+				t.Fatalf("primitive.Decrypt(ciphertext, invalidAssociatedData) err = nil, want error")
 			}
 		})
 	}
@@ -110,5 +117,106 @@ func TestGetAeadFailsWithBadKeysetEncoding(t *testing.T) {
 	_, err = client.GetAEAD("fake-kms://badencoding")
 	if err == nil {
 		t.Fatalf("client.GetAEAD('fake-kms://badencoding') succeeded, want fail")
+	}
+}
+
+func TestAEAD(t *testing.T) {
+	primitive, err := fakekms.NewAEAD(keyURI)
+	if err != nil {
+		t.Fatalf("fakems.NewAEAD(keyURI) failed: %v", err)
+	}
+	plaintext := []byte("plaintext")
+	associatedData := []byte("associatedData")
+	ciphertext, err := primitive.Encrypt(plaintext, associatedData)
+	if err != nil {
+		t.Fatalf("primitive.Encrypt(ctx, plaintext, associatedData) failed: %v", err)
+	}
+	decrypted, err := primitive.Decrypt(ciphertext, associatedData)
+	if err != nil {
+		t.Fatalf("primitive.Decrypt(ctx, ciphertext, aad) failed: %v", err)
+	}
+	if !bytes.Equal(decrypted, plaintext) {
+		t.Fatalf("decrypted data doesn't match plaintext, got: %q, want: %q", decrypted, plaintext)
+	}
+	invalidAssociatedData := []byte("invalid")
+	_, err = primitive.Decrypt(ciphertext, invalidAssociatedData)
+	if err == nil {
+		t.Fatalf("primitive.Decrypt(ciphertext, invalidAssociatedData) err = nil, want error")
+	}
+}
+
+func TestNewAEADWithContext(t *testing.T) {
+	primitive, err := fakekms.NewAEADWithContext(keyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEADWithContext(keyURI) failed: %v", err)
+	}
+	plaintext := []byte("plaintext")
+	associatedData := []byte("associatedData")
+	ctx := context.Background()
+	ciphertext, err := primitive.EncryptWithContext(ctx, plaintext, associatedData)
+	if err != nil {
+		t.Fatalf("primitive.Encrypt(ctx, plaintext, associatedData) failed: %v", err)
+	}
+	decrypted, err := primitive.DecryptWithContext(ctx, ciphertext, associatedData)
+	if err != nil {
+		t.Fatalf("primitive.Decrypt(ctx, ciphertext, aad) failed: %v", err)
+	}
+	if !bytes.Equal(decrypted, plaintext) {
+		t.Fatalf("decrypted data doesn't match plaintext, got: %q, want: %q", decrypted, plaintext)
+	}
+	invalidAssociatedData := []byte("invalid")
+	_, err = primitive.DecryptWithContext(ctx, ciphertext, invalidAssociatedData)
+	if err == nil {
+		t.Fatalf("primitive.DecryptWithContext(ciphertext, invalidAssociatedData) err = nil, want error")
+	}
+}
+
+func TestCompatibility_AEAD_AEADWithContext(t *testing.T) {
+	primitive, err := fakekms.NewAEAD(keyURI)
+	if err != nil {
+		t.Fatalf("fakekms.GetAEAD(keyURI) failed: %v", err)
+	}
+	plaintext := []byte("plaintext")
+	associatedData := []byte("associatedData")
+	ciphertext, err := primitive.Encrypt(plaintext, associatedData)
+	if err != nil {
+		t.Fatalf("primitive.Encrypt(plaintext, associatedData) failed: %v", err)
+	}
+	remotePrimitive, err := fakekms.NewAEADWithContext(keyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEADWithContext(keyURI) failed: %v", err)
+	}
+	ctx := context.Background()
+	decrypted, err := remotePrimitive.DecryptWithContext(ctx, ciphertext, associatedData)
+	if err != nil {
+		t.Fatalf("remotePrimitive.DecryptWithContext(ctx, ciphertext, associatedData) failed: %v", err)
+	}
+	if !bytes.Equal(decrypted, plaintext) {
+		t.Fatalf("decrypted data doesn't match plaintext, got: %q, want: %q", decrypted, plaintext)
+	}
+}
+
+func TestAEADWithContext_canceledContextFails(t *testing.T) {
+	primitive, err := fakekms.NewAEADWithContext(keyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEADWithContext(keyURI) failed: %v", err)
+	}
+	plaintext := []byte("plaintext")
+	associatedData := []byte("associatedData")
+	ctx := context.Background()
+	ciphertext, err := primitive.EncryptWithContext(ctx, plaintext, associatedData)
+	if err != nil {
+		t.Fatalf("primitive.EncryptWithContext(ctx, plaintext, associatedData) failed: %v", err)
+	}
+	canceledCtx, cancel := context.WithCancelCause(ctx)
+	causeErr := errors.New("cause error message")
+	cancel(causeErr)
+	_, err = primitive.EncryptWithContext(canceledCtx, plaintext, associatedData)
+	if err == nil {
+		t.Fatal("primitive.EncryptWithContext(canceledCtx, plaintext, associatedData) err = nil, want error")
+	}
+	_, err = primitive.DecryptWithContext(canceledCtx, ciphertext, associatedData)
+	if err == nil {
+		t.Fatalf("primitive.DecryptWithContext(canceledCtx, ciphertext, associatedData) err = nil, want error")
 	}
 }

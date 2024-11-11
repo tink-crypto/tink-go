@@ -15,6 +15,7 @@
 package keyset
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -260,6 +261,20 @@ func ReadWithAssociatedData(reader Reader, masterKey tink.AEAD, associatedData [
 	return newWithOptions(protoKeyset)
 }
 
+// ReadWithContext creates a keyset.Handle from an encrypted keyset obtained via
+// reader using the provided AEADWithContext.
+func ReadWithContext(ctx context.Context, reader Reader, keyEncryptionAEAD tink.AEADWithContext, associatedData []byte) (*Handle, error) {
+	encryptedKeyset, err := reader.ReadEncrypted()
+	if err != nil {
+		return nil, err
+	}
+	protoKeyset, err := decryptWithContext(ctx, encryptedKeyset, keyEncryptionAEAD, associatedData)
+	if err != nil {
+		return nil, err
+	}
+	return newWithOptions(protoKeyset)
+}
+
 // ReadWithNoSecrets tries to create a keyset.Handle from a keyset obtained via reader.
 func ReadWithNoSecrets(reader Reader) (*Handle, error) {
 	protoKeyset, err := reader.Read()
@@ -377,6 +392,22 @@ func (h *Handle) WriteWithAssociatedData(writer Writer, masterKey tink.AEAD, ass
 	encrypted, err := encrypt(protoKeyset, masterKey, associatedData)
 	if err != nil {
 		return err
+	}
+	return writer.WriteEncrypted(encrypted)
+}
+
+// WriteWithContext encrypts and writes the keyset using the provided AEADWithContext.
+func (h *Handle) WriteWithContext(ctx context.Context, writer Writer, keyEncryptionAEAD tink.AEADWithContext, associatedData []byte) error {
+	if h == nil {
+		return fmt.Errorf("keyset.Handle: nil handle")
+	}
+	protoKeyset, err := entriesToProtoKeyset(h.entries)
+	if err != nil {
+		return fmt.Errorf("keyset.Handle: %v", err)
+	}
+	encrypted, err := encryptWithContext(ctx, protoKeyset, keyEncryptionAEAD, associatedData)
+	if err != nil {
+		return fmt.Errorf("keyset.Handle: %v", err)
 	}
 	return writer.WriteEncrypted(encrypted)
 }
@@ -530,11 +561,11 @@ func hasSecrets(ks *tinkpb.Keyset) bool {
 	return false
 }
 
-func decrypt(encryptedKeyset *tinkpb.EncryptedKeyset, masterKey tink.AEAD, associatedData []byte) (*tinkpb.Keyset, error) {
-	if encryptedKeyset == nil || masterKey == nil {
+func decrypt(encryptedKeyset *tinkpb.EncryptedKeyset, keyEncryptionAEAD tink.AEAD, associatedData []byte) (*tinkpb.Keyset, error) {
+	if encryptedKeyset == nil || keyEncryptionAEAD == nil {
 		return nil, fmt.Errorf("keyset.Handle: invalid encrypted keyset")
 	}
-	decrypted, err := masterKey.Decrypt(encryptedKeyset.GetEncryptedKeyset(), associatedData)
+	decrypted, err := keyEncryptionAEAD.Decrypt(encryptedKeyset.GetEncryptedKeyset(), associatedData)
 	if err != nil {
 		return nil, fmt.Errorf("keyset.Handle: decryption failed: %v", err)
 	}
@@ -545,12 +576,46 @@ func decrypt(encryptedKeyset *tinkpb.EncryptedKeyset, masterKey tink.AEAD, assoc
 	return keyset, nil
 }
 
-func encrypt(keyset *tinkpb.Keyset, masterKey tink.AEAD, associatedData []byte) (*tinkpb.EncryptedKeyset, error) {
+// decryptWithContext does the same as decrypt, but uses an AEADWithContext instead of an AEAD.
+func decryptWithContext(ctx context.Context, encryptedKeyset *tinkpb.EncryptedKeyset, keyEncryptionAEAD tink.AEADWithContext, associatedData []byte) (*tinkpb.Keyset, error) {
+	if encryptedKeyset == nil || keyEncryptionAEAD == nil {
+		return nil, fmt.Errorf("keyset.Handle: invalid encrypted keyset")
+	}
+	decrypted, err := keyEncryptionAEAD.DecryptWithContext(ctx, encryptedKeyset.GetEncryptedKeyset(), associatedData)
+	if err != nil {
+		return nil, fmt.Errorf("keyset.Handle: decryption failed: %v", err)
+	}
+	keyset := new(tinkpb.Keyset)
+	if err := proto.Unmarshal(decrypted, keyset); err != nil {
+		return nil, errInvalidKeyset
+	}
+	return keyset, nil
+}
+
+func encrypt(keyset *tinkpb.Keyset, keyEncryptionAEAD tink.AEAD, associatedData []byte) (*tinkpb.EncryptedKeyset, error) {
 	serializedKeyset, err := proto.Marshal(keyset)
 	if err != nil {
 		return nil, errInvalidKeyset
 	}
-	encrypted, err := masterKey.Encrypt(serializedKeyset, associatedData)
+	encrypted, err := keyEncryptionAEAD.Encrypt(serializedKeyset, associatedData)
+	if err != nil {
+		return nil, fmt.Errorf("keyset.Handle: encryption failed: %v", err)
+	}
+	// get keyset info
+	encryptedKeyset := &tinkpb.EncryptedKeyset{
+		EncryptedKeyset: encrypted,
+		KeysetInfo:      getKeysetInfo(keyset),
+	}
+	return encryptedKeyset, nil
+}
+
+// encryptWithContext does the same as encrypt, but uses an AEADWithContext instead of an AEAD.
+func encryptWithContext(ctx context.Context, keyset *tinkpb.Keyset, keyEncryptionAEAD tink.AEADWithContext, associatedData []byte) (*tinkpb.EncryptedKeyset, error) {
+	serializedKeyset, err := proto.Marshal(keyset)
+	if err != nil {
+		return nil, errInvalidKeyset
+	}
+	encrypted, err := keyEncryptionAEAD.EncryptWithContext(ctx, serializedKeyset, associatedData)
 	if err != nil {
 		return nil, fmt.Errorf("keyset.Handle: encryption failed: %v", err)
 	}

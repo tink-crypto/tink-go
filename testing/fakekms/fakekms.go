@@ -25,6 +25,7 @@ package fakekms
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"strings"
@@ -42,6 +43,32 @@ var _ registry.KMSClient = (*fakeClient)(nil)
 
 type fakeClient struct {
 	uriPrefix string
+}
+
+type fakeAEADWithContext struct {
+	aead tink.AEAD
+}
+
+// EncryptWithContext implements the [tink.AEADWithContext] interface for encryption.
+// The call fails if the context is canceled.
+func (a *fakeAEADWithContext) EncryptWithContext(ctx context.Context, plaintext, associatedData []byte) ([]byte, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		return a.aead.Encrypt(plaintext, associatedData)
+	}
+}
+
+// DecryptWithContext implements the [tink.AEADWithContext] interface for decryption.
+// The call fails if the context is canceled.
+func (a *fakeAEADWithContext) DecryptWithContext(ctx context.Context, ciphertext, associatedData []byte) ([]byte, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		return a.aead.Decrypt(ciphertext, associatedData)
+	}
 }
 
 // NewClient returns a fake KMS client which will handle keys with uriPrefix prefix.
@@ -65,6 +92,11 @@ func (c *fakeClient) GetAEAD(keyURI string) (tink.AEAD, error) {
 	if !c.Supported(keyURI) {
 		return nil, fmt.Errorf("keyURI must start with prefix %s, but got %s", c.uriPrefix, keyURI)
 	}
+	return NewAEAD(keyURI)
+}
+
+// NewAEAD returns a new [tink.AEAD] for the given keyURI.
+func NewAEAD(keyURI string) (tink.AEAD, error) {
 	encodeKeyset := strings.TrimPrefix(keyURI, fakePrefix)
 	keysetData, err := base64.RawURLEncoding.DecodeString(encodeKeyset)
 	if err != nil {
@@ -76,6 +108,17 @@ func (c *fakeClient) GetAEAD(keyURI string) (tink.AEAD, error) {
 		return nil, err
 	}
 	return aead.New(handle)
+}
+
+// NewAEADWithContext returns a new [tink.AeadWithContext] for the given keyURI.
+//
+// The returned AEADWithContext will fail if the context is canceled.
+func NewAEADWithContext(keyURI string) (tink.AEADWithContext, error) {
+	aead, err := NewAEAD(keyURI)
+	if err != nil {
+		return nil, err
+	}
+	return &fakeAEADWithContext{aead: aead}, nil
 }
 
 // NewKeyURI returns a new, random fake KMS key URI.

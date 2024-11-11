@@ -16,6 +16,8 @@ package keyset_test
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -28,6 +30,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/signature"
+	"github.com/tink-crypto/tink-go/v2/testing/fakekms"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -207,14 +210,12 @@ func TestWriteAndReadInJSON(t *testing.T) {
 	}
 }
 
+const fakeKeyURI = "fake-kms://CM2b3_MDElQKSAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EhIaEIK75t5L-adlUwVhWvRuWUwYARABGM2b3_MDIAE"
+
 func TestWriteAndReadWithAssociatedData(t *testing.T) {
-	keysetEncryptionHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
+	keysetEncryptionAead, err := fakekms.NewAEAD(fakeKeyURI)
 	if err != nil {
-		t.Errorf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
-	}
-	keysetEncryptionAead, err := aead.New(keysetEncryptionHandle)
-	if err != nil {
-		t.Errorf("aead.New(keysetEncryptionHandle) err = %v, want nil", err)
+		t.Fatalf("fakekms.NewAEAD(fakeKeyURI) err = %v, want nil", err)
 	}
 
 	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
@@ -237,6 +238,20 @@ func TestWriteAndReadWithAssociatedData(t *testing.T) {
 
 	if !proto.Equal(testkeyset.KeysetMaterial(handle), testkeyset.KeysetMaterial(handle2)) {
 		t.Errorf("keyset.ReadWithAssociatedData() = %v, want %v", handle2, handle)
+	}
+
+	// Test that ReadWithContext is compatible with WriteWithAssociatedData
+	kekAEADWithContext, err := fakekms.NewAEADWithContext(fakeKeyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEADWithContext(fakeKeyURI) err = %v, want nil", err)
+	}
+	ctx := context.Background()
+	handle3, err := keyset.ReadWithContext(ctx, keyset.NewBinaryReader(bytes.NewBuffer(encrypted)), kekAEADWithContext, associatedData)
+	if err != nil {
+		t.Fatalf("keyset.ReadWithContext() err = %v, want nil", err)
+	}
+	if !proto.Equal(testkeyset.KeysetMaterial(handle), testkeyset.KeysetMaterial(handle3)) {
+		t.Errorf("keyset.ReadWithContext() = %v, want %v", handle3, handle)
 	}
 }
 
@@ -267,6 +282,108 @@ func TestReadWithMismatchedAssociatedData(t *testing.T) {
 	_, err = keyset.ReadWithAssociatedData(keyset.NewBinaryReader(bytes.NewBuffer(encrypted)), keysetEncryptionAead, invalidAssociatedData)
 	if err == nil {
 		t.Errorf("keyset.ReadWithAssociatedData() err = nil, want err")
+	}
+}
+
+func TestWriteAndReadWithContext(t *testing.T) {
+	kekAEADWithContext, err := fakekms.NewAEADWithContext(fakeKeyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEADWithContext(fakeKeyURI) err = %v, want nil", err)
+	}
+
+	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
+	}
+	associatedData := []byte{0x01, 0x02}
+
+	ctx := context.Background()
+	buff := &bytes.Buffer{}
+	err = handle.WriteWithContext(ctx, keyset.NewBinaryWriter(buff), kekAEADWithContext, associatedData)
+	if err != nil {
+		t.Fatalf("handle.WriteWithContext() err = %v, want nil", err)
+	}
+	encrypted := buff.Bytes()
+
+	handle2, err := keyset.ReadWithContext(ctx, keyset.NewBinaryReader(bytes.NewBuffer(encrypted)), kekAEADWithContext, associatedData)
+	if err != nil {
+		t.Fatalf("keyset.ReadWithContext() err = %v, want nil", err)
+	}
+
+	if !proto.Equal(testkeyset.KeysetMaterial(handle), testkeyset.KeysetMaterial(handle2)) {
+		t.Errorf("keyset.ReadWithContext() = %v, want %v", handle2, handle)
+	}
+
+	invalidAssociatedData := []byte{0x01, 0x03}
+	_, err = keyset.ReadWithContext(ctx, keyset.NewBinaryReader(bytes.NewBuffer(encrypted)), kekAEADWithContext, invalidAssociatedData)
+	if err == nil {
+		t.Errorf("keyset.ReadWithContext() err = nil, want err")
+	}
+
+	// Test that ReadWithAssociatedData is compatible with WriteWithContext
+	kekAEAD, err := fakekms.NewAEAD(fakeKeyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEAD(fakeKeyURI) err = %v, want nil", err)
+	}
+	handle3, err := keyset.ReadWithAssociatedData(keyset.NewBinaryReader(bytes.NewBuffer(encrypted)), kekAEAD, associatedData)
+	if err != nil {
+		t.Fatalf("keyset.ReadWithAssociatedData() err = %v, want nil", err)
+	}
+	if !proto.Equal(testkeyset.KeysetMaterial(handle), testkeyset.KeysetMaterial(handle3)) {
+		t.Errorf("keyset.ReadWithAssociatedData() = %v, want %v", handle3, handle)
+	}
+}
+
+func TestWriteWithContextDoesNotIgnoreContext(t *testing.T) {
+	kekAEADWithContext, err := fakekms.NewAEADWithContext(fakeKeyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEADWithContext(fakeKeyURI) err = %v, want nil", err)
+	}
+
+	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
+	}
+	associatedData := []byte{0x01, 0x02}
+
+	canceledCtx, cancel := context.WithCancelCause(context.Background())
+	causeErr := errors.New("cause error message")
+	cancel(causeErr)
+
+	buff := &bytes.Buffer{}
+	err = handle.WriteWithContext(canceledCtx, keyset.NewBinaryWriter(buff), kekAEADWithContext, associatedData)
+	if err == nil {
+		t.Errorf("handle.WriteWithContext() err = nil, want error")
+	}
+}
+
+func TestReadWithContextDoesNotIgnoreContext(t *testing.T) {
+	kekAEADWithContext, err := fakekms.NewAEADWithContext(fakeKeyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEADWithContext(fakeKeyURI) err = %v, want nil", err)
+	}
+
+	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
+	}
+	associatedData := []byte{0x01, 0x02}
+
+	ctx := context.Background()
+	buff := &bytes.Buffer{}
+	err = handle.WriteWithContext(ctx, keyset.NewBinaryWriter(buff), kekAEADWithContext, associatedData)
+	if err != nil {
+		t.Fatalf("handle.WriteWithContext() err = %v, want nil", err)
+	}
+	encrypted := buff.Bytes()
+
+	canceledCtx, cancel := context.WithCancelCause(ctx)
+	causeErr := errors.New("cause error message")
+	cancel(causeErr)
+
+	_, err = keyset.ReadWithContext(canceledCtx, keyset.NewBinaryReader(bytes.NewBuffer(encrypted)), kekAEADWithContext, associatedData)
+	if err == nil {
+		t.Errorf("keyset.ReadWithContext() err = nil, want error")
 	}
 }
 

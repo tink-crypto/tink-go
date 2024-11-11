@@ -14,6 +14,8 @@
 
 package tink
 
+import "context"
+
 /*
 AEAD is the interface for authenticated encryption with associated data.
 Implementations of this interface are secure against adaptive chosen ciphertext attacks.
@@ -30,4 +32,23 @@ type AEAD interface {
 	// The decryption verifies the authenticity and integrity of the associated data, but there are
 	// no guarantees with respect to secrecy of that data.
 	Decrypt(ciphertext, associatedData []byte) ([]byte, error)
+}
+
+/*
+AEADWithContext offers the same functionality as [AEAD], but in each call a
+[context.Context] parameter is passed along.
+
+This is the prefered interface for e.g., AEAD primitives implemented with RPC
+calls.
+*/
+type AEADWithContext interface {
+	// Encrypt encrypts plaintext with associatedData as associated data.
+	// The resulting ciphertext allows for checking authenticity and integrity of associated data
+	// associatedData, but does not guarantee its secrecy.
+	EncryptWithContext(ctx context.Context, plaintext, associatedData []byte) ([]byte, error)
+
+	// Decrypt decrypts ciphertext with associatedData as associated data.
+	// The decryption verifies the authenticity and integrity of the associated data, but there are
+	// no guarantees with respect to secrecy of that data.
+	DecryptWithContext(ctx context.Context, ciphertext, associatedData []byte) ([]byte, error)
 }
