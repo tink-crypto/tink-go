@@ -22,10 +22,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
-	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
@@ -435,16 +436,30 @@ func validateAESGCMKey(key *gcmpb.AesGcmKey, format *gcmpb.AesGcmKeyFormat) erro
 	if key.Version != testutil.AESGCMKeyVersion {
 		return fmt.Errorf("incorrect key version")
 	}
-	// try to encrypt and decrypt
-	p, err := subtle.NewAESGCM(key.KeyValue)
+	keyValue := secretdata.NewBytesFromData(key.GetKeyValue(), insecuresecretdataaccess.Token{})
+	opts := aesgcm.ParametersOpts{
+		KeySizeInBytes: keyValue.Len(),
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	}
+	params, err := aesgcm.NewParameters(opts)
 	if err != nil {
-		return fmt.Errorf("invalid key")
+		return fmt.Errorf("aesgcm.NewParameters(%v) err = %v, want nil", opts, err)
+	}
+	k, err := aesgcm.NewKey(keyValue, 0, params)
+	if err != nil {
+		return fmt.Errorf("aesgcm.NewKey() err = %v, want nil", err)
+	}
+	p, err := aesgcm.NewAEAD(k)
+	if err != nil {
+		return fmt.Errorf("aesgcm.NewAEAD() err = %v, want nil", err)
 	}
 	return validateAESGCMPrimitive(p, key)
 }
 
 func validateAESGCMPrimitive(p any, key *gcmpb.AesGcmKey) error {
-	cipher := p.(*subtle.AESGCM)
+	cipher := p.(*aesgcm.AEAD)
 	// try to encrypt and decrypt
 	pt := random.GetRandomBytes(32)
 	aad := random.GetRandomBytes(32)

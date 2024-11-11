@@ -15,12 +15,11 @@
 package subtle
 
 import (
-	"crypto/cipher"
 	"fmt"
 
-	internalaead "github.com/tink-crypto/tink-go/v2/internal/aead"
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
-	"github.com/tink-crypto/tink-go/v2/tink"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
 const (
@@ -32,44 +31,29 @@ const (
 	maxIntPlaintextSize = maxInt - AESGCMIVSize - AESGCMTagSize
 )
 
-// AESGCM is an implementation of AEAD interface.
-type AESGCM struct {
-	cipher cipher.AEAD
-}
-
-// Assert that AESGCM implements the AEAD interface.
-var _ tink.AEAD = (*AESGCM)(nil)
-
-// NewAESGCM returns an AESGCM instance, where key is the AES key with length
-// 16 bytes (AES-128) or 32 bytes (AES-256).
-func NewAESGCM(key []byte) (*AESGCM, error) {
-	c, err := internalaead.NewAESGCMCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	return &AESGCM{cipher: c}, nil
-}
-
-// Encrypt encrypts plaintext with associatedData. The returned ciphertext
-// contains both the IV used for encryption and the actual ciphertext.
+// AESGCM is an implementation of the [tink.AEAD] interface.
 //
-// Note: The crypto library's AES-GCM implementation always returns the
-// ciphertext with an AESGCMTagSize (16-byte) tag.
-func (a *AESGCM) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
-	if err := internalaead.CheckPlaintextSize(uint64(len(plaintext))); err != nil {
-		return nil, err
-	}
-	iv := random.GetRandomBytes(AESGCMIVSize)
-	dst := make([]byte, 0, len(iv)+len(plaintext)+a.cipher.Overhead())
-	dst = append(dst, iv...)
-	return a.cipher.Seal(dst, iv, plaintext, associatedData), nil
-}
+// This primitive adds no prefix to the ciphertext.
+type AESGCM = aesgcm.AEAD
 
-// Decrypt decrypts ciphertext with associatedData.
-func (a *AESGCM) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
-	if len(ciphertext) < AESGCMIVSize+AESGCMTagSize {
-		return nil, fmt.Errorf("ciphertext with size %d is too short", len(ciphertext))
+// NewAESGCM returns an [*AESGCM] value from the given key.
+//
+// The key must be of length 16 or 32 bytes. IV and TAG sizes are fixed to 12
+// and 16 bytes respectively.
+func NewAESGCM(key []byte) (*AESGCM, error) {
+	opts := aesgcm.ParametersOpts{
+		KeySizeInBytes: len(key),
+		IVSizeInBytes:  AESGCMIVSize,
+		TagSizeInBytes: AESGCMTagSize,
+		Variant:        aesgcm.VariantNoPrefix,
 	}
-	iv := ciphertext[:AESGCMIVSize]
-	return a.cipher.Open(nil, iv, ciphertext[AESGCMIVSize:], associatedData)
+	params, err := aesgcm.NewParameters(opts)
+	if err != nil {
+		return nil, fmt.Errorf("subtle.NewAESGCM: %v", err)
+	}
+	k, err := aesgcm.NewKey(secretdata.NewBytesFromData(key, insecuresecretdataaccess.Token{}), 0, params)
+	if err != nil {
+		return nil, fmt.Errorf("subtle.NewAESGCM: %v", err)
+	}
+	return aesgcm.NewAEAD(k)
 }

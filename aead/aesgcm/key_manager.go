@@ -19,10 +19,12 @@ import (
 	"io"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/aead"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -49,18 +51,34 @@ func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
 		return nil, errInvalidKey
 	}
-	key := new(gcmpb.AesGcmKey)
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
+	protoKey := new(gcmpb.AesGcmKey)
+	if err := proto.Unmarshal(serializedKey, protoKey); err != nil {
 		return nil, errInvalidKey
 	}
-	if err := km.validateKey(key); err != nil {
+	if err := km.validateKey(protoKey); err != nil {
 		return nil, err
 	}
-	ret, err := subtle.NewAESGCM(key.KeyValue)
-	if err != nil {
-		return nil, fmt.Errorf("aes_gcm_key_manager: cannot create new primitive: %s", err)
+
+	keyBytes := secretdata.NewBytesFromData(protoKey.GetKeyValue(), insecuresecretdataaccess.Token{})
+	opts := ParametersOpts{
+		KeySizeInBytes: keyBytes.Len(),
+		IVSizeInBytes:  ivSize,
+		TagSizeInBytes: tagSize,
+		Variant:        VariantNoPrefix,
 	}
-	return ret, nil
+	parameters, err := NewParameters(opts)
+	if err != nil {
+		return nil, fmt.Errorf("aes_gcm_key_manager: cannot create new parameters: %s", err)
+	}
+	key, err := NewKey(keyBytes, 0, parameters)
+	if err != nil {
+		return nil, fmt.Errorf("aes_gcm_key_manager: cannot create new key: %s", err)
+	}
+	primitive, err := NewAEAD(key)
+	if err != nil {
+		return nil, fmt.Errorf("aes_gcm_key_manager: cannot create new AEAD: %s", err)
+	}
+	return primitive, nil
 }
 
 // NewKey creates a new key according to specification the given serialized AESGCMKeyFormat.
@@ -75,10 +93,10 @@ func (km *keyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) 
 	if err := km.validateKeyFormat(keyFormat); err != nil {
 		return nil, fmt.Errorf("aes_gcm_key_manager: invalid key format: %s", err)
 	}
-	keyValue := random.GetRandomBytes(keyFormat.KeySize)
+	keyBytes := random.GetRandomBytes(keyFormat.KeySize)
 	return &gcmpb.AesGcmKey{
 		Version:  keyVersion,
-		KeyValue: keyValue,
+		KeyValue: keyBytes,
 	}, nil
 }
 
@@ -128,14 +146,14 @@ func (km *keyManager) DeriveKey(serializedKeyFormat []byte, pseudorandomness io.
 		return nil, fmt.Errorf("aes_gcm_key_manager: invalid key version: %s", err)
 	}
 
-	keyValue := make([]byte, keyFormat.GetKeySize())
-	if _, err := io.ReadFull(pseudorandomness, keyValue); err != nil {
+	keyBytes := make([]byte, keyFormat.GetKeySize())
+	if _, err := io.ReadFull(pseudorandomness, keyBytes); err != nil {
 		return nil, fmt.Errorf("aes_gcm_key_manager: not enough pseudorandomness given")
 	}
 
 	return &gcmpb.AesGcmKey{
 		Version:  keyVersion,
-		KeyValue: keyValue,
+		KeyValue: keyBytes,
 	}, nil
 }
 
@@ -144,8 +162,8 @@ func (km *keyManager) validateKey(key *gcmpb.AesGcmKey) error {
 	if err := keyset.ValidateKeyVersion(key.Version, keyVersion); err != nil {
 		return fmt.Errorf("aes_gcm_key_manager: %s", err)
 	}
-	keySize := uint32(len(key.KeyValue))
-	if err := subtle.ValidateAESKeySize(keySize); err != nil {
+	keySize := uint32(len(key.GetKeyValue()))
+	if err := aead.ValidateAESKeySize(keySize); err != nil {
 		return fmt.Errorf("aes_gcm_key_manager: %s", err)
 	}
 	return nil
@@ -153,7 +171,7 @@ func (km *keyManager) validateKey(key *gcmpb.AesGcmKey) error {
 
 // validateKeyFormat validates the given AESGCMKeyFormat.
 func (km *keyManager) validateKeyFormat(format *gcmpb.AesGcmKeyFormat) error {
-	if err := subtle.ValidateAESKeySize(format.KeySize); err != nil {
+	if err := aead.ValidateAESKeySize(format.KeySize); err != nil {
 		return fmt.Errorf("aes_gcm_key_manager: %s", err)
 	}
 	return nil
