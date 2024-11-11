@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"

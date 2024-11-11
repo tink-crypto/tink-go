@@ -18,7 +18,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -31,7 +32,7 @@ func New(handle *keyset.Handle) (KeysetDeriver, error) {
 	if handle == nil {
 		return nil, errors.New("keyset_deriver_factory: keyset handle can't be nil")
 	}
-	ps, err := handle.Primitives()
+	ps, err := handle.Primitives(internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("keyset_deriver_factory: cannot obtain primitive set: %v", err)
 	}

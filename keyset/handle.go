@@ -22,9 +22,9 @@ import (
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -467,7 +467,9 @@ func WithConfig(c Config) PrimitivesOption {
 //
 // The returned set is usually later "wrapped" into a class that implements
 // the corresponding Primitive-interface.
-func (h *Handle) Primitives(opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
+//
+// NOTE: This is an internal API.
+func (h *Handle) Primitives(_ internalapi.Token, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
 	p, err := h.primitives(nil, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("keyset.Handle: %v", err)
@@ -487,7 +489,9 @@ func (h *Handle) Primitives(opts ...PrimitivesOption) (*primitiveset.PrimitiveSe
 //
 // The returned set is usually later "wrapped" into a class that implements
 // the corresponding Primitive-interface.
-func (h *Handle) PrimitivesWithKeyManager(km registry.KeyManager) (*primitiveset.PrimitiveSet, error) {
+//
+// NOTE: This is an internal API.
+func (h *Handle) PrimitivesWithKeyManager(km registry.KeyManager, _ internalapi.Token) (*primitiveset.PrimitiveSet, error) {
 	p, err := h.primitives(km)
 	if err != nil {
 		return nil, fmt.Errorf("keyset.Handle: %v", err)

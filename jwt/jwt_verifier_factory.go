@@ -17,9 +17,10 @@ package jwt
 import (
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -30,7 +31,7 @@ func NewVerifier(handle *keyset.Handle) (Verifier, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := handle.Primitives()
+	ps, err := handle.Primitives(internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("jwt_verifier_factory: cannot obtain primitive set: %v", err)
 	}

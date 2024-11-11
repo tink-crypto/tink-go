@@ -20,7 +20,8 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
-	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -76,9 +77,9 @@ func TestNewWrappedKeysetDeriverWrongPrimitiveFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
 	}
-	ps, err := handle.Primitives()
+	ps, err := handle.Primitives(internalapi.Token{})
 	if err != nil {
-		t.Fatalf("handle.Primitives() err = %v, want nil", err)
+		t.Fatalf("handle.Primitives(internalapi.Token{}, ) err = %v, want nil", err)
 	}
 	if _, err := newWrappedKeysetDeriver(ps); err == nil {
 		t.Errorf("newWrappedKeysetDeriver() err = nil, want non-nil")

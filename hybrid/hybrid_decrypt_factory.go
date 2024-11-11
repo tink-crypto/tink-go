@@ -18,9 +18,10 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
-	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -28,7 +29,7 @@ import (
 
 // NewHybridDecrypt returns an HybridDecrypt primitive from the given keyset handle.
 func NewHybridDecrypt(handle *keyset.Handle) (tink.HybridDecrypt, error) {
-	ps, err := handle.Primitives()
+	ps, err := handle.Primitives(internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("hybrid_factory: cannot obtain primitive set: %s", err)
 	}

@@ -17,16 +17,17 @@ package prf
 import (
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 )
 
 // NewPRFSet creates a prf.Set primitive from the given keyset handle.
 func NewPRFSet(handle *keyset.Handle) (*Set, error) {
-	ps, err := handle.Primitives()
+	ps, err := handle.Primitives(internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("prf_set_factory: cannot obtain primitive set: %s", err)
 	}

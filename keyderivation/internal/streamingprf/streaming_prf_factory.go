@@ -19,7 +19,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/tink-crypto/tink-go/v2/core/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -29,7 +30,7 @@ func New(h *keyset.Handle) (StreamingPRF, error) {
 	if h == nil {
 		return nil, errors.New("keyset handle can't be nil")
 	}
-	ps, err := h.PrimitivesWithKeyManager(new(HKDFStreamingPRFKeyManager))
+	ps, err := h.PrimitivesWithKeyManager(new(HKDFStreamingPRFKeyManager), internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("streaming_prf_factory: cannot obtain primitive set: %v", err)
 	}

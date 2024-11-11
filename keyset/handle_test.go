@@ -499,9 +499,9 @@ func TestPrimitivesReturnsError(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := tc.handle.Primitives()
+			_, err := tc.handle.Primitives(internalapi.Token{})
 			if err == nil {
-				t.Errorf("handle.Primitives() err = nil, want err")
+				t.Errorf("handle.Primitives(internalapi.Token{}, ) err = nil, want err")
 			}
 		})
 	}
@@ -523,9 +523,9 @@ func TestPrimitivesWithKeyManagerReturnsError(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := tc.handle.PrimitivesWithKeyManager(&testKeyManager{})
+			_, err := tc.handle.PrimitivesWithKeyManager(&testKeyManager{}, internalapi.Token{})
 			if err == nil {
-				t.Errorf("handle.PrimitivesWithKeyManager(&testKeyManager{}) err = nil, want err")
+				t.Errorf("handle.PrimitivesWithKeyManager() err = nil, want err")
 			}
 		})
 	}
@@ -884,15 +884,15 @@ func TestPrimitivesWithConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", template, err)
 	}
-	primitives, err := handle.Primitives(keyset.WithConfig(&testConfig{}))
+	primitives, err := handle.Primitives(internalapi.Token{}, keyset.WithConfig(&testConfig{}))
 	if err != nil {
-		t.Fatalf("handle.Primitives(keyset.WithConfig(&testConfig{})) err = %v, want nil", err)
+		t.Fatalf("handle.Primitives(internalapi.Token{}, keyset.WithConfig(&testConfig{})) err = %v, want nil", err)
 	}
 	if len(primitives.EntriesInKeysetOrder) != 1 {
-		t.Fatalf("len(handle.Primitives()) = %d, want 1", len(primitives.EntriesInKeysetOrder))
+		t.Fatalf("len(handle.Primitives(internalapi.Token{}, )) = %d, want 1", len(primitives.EntriesInKeysetOrder))
 	}
 	if _, ok := (primitives.Primary.Primitive).(testPrimitive); !ok {
-		t.Errorf("handle.Primitives().Primary = %v, want instance of `testPrimitive`", primitives.Primary.Primitive)
+		t.Errorf("handle.Primitives(internalapi.Token{}, ).Primary = %v, want instance of `testPrimitive`", primitives.Primary.Primitive)
 	}
 }
 
@@ -903,9 +903,9 @@ func TestPrimitivesWithMultipleConfigs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", template, err)
 	}
-	_, err = handle.Primitives(keyset.WithConfig(&testConfig{}), keyset.WithConfig(&testConfig{}))
+	_, err = handle.Primitives(internalapi.Token{}, keyset.WithConfig(&testConfig{}), keyset.WithConfig(&testConfig{}))
 	if err == nil { // if NO error
-		t.Error("handle.Primitives(keyset.WithConfig(&testConfig{}), keyset.WithConfig(&testConfig{})) err = nil, want error")
+		t.Error("handle.Primitives(internalapi.Token{}, keyset.WithConfig(&testConfig{}), keyset.WithConfig(&testConfig{})) err = nil, want error")
 	}
 }
 
@@ -934,9 +934,9 @@ func TestPrimitivesWithKeyManager(t *testing.T) {
 	}
 
 	// Verify that with the custom key manager provided we get the custom primitive.
-	primitives, err := handle.PrimitivesWithKeyManager(&testKeyManager{})
+	primitives, err := handle.PrimitivesWithKeyManager(&testKeyManager{}, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("handle.PrimitivesWithKeyManager(testKeyManager) err = %v, want nil", err)
+		t.Fatalf("handle.PrimitivesWithKeyManager() err = %v, want nil", err)
 	}
 	if len(primitives.EntriesInKeysetOrder) != 1 {
 		t.Fatalf("len(handle.PrimitivesWithKeyManager()) = %d, want 1", len(primitives.EntriesInKeysetOrder))
@@ -1188,9 +1188,9 @@ func TestPrimitivesIsThreadSafe(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
 			t.Parallel()
-			_, err := handle.Primitives()
+			_, err := handle.Primitives(internalapi.Token{})
 			if err != nil {
-				t.Fatalf("handle.Primitives() err = %v, want nil", err)
+				t.Fatalf("handle.Primitives(internalapi.Token{}, ) err = %v, want nil", err)
 			}
 		})
 	}
@@ -1217,9 +1217,9 @@ func TestPrimitivesWithKeyManagerIsThreadSafe(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
 			t.Parallel()
-			_, err := handle.PrimitivesWithKeyManager(keysetManager)
+			_, err := handle.PrimitivesWithKeyManager(keysetManager, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("handle.PrimitivesWithKeyManager(keysetManager) err = %v, want nil", err)
+				t.Fatalf("handle.PrimitivesWithKeyManager() err = %v, want nil", err)
 			}
 		})
 	}
