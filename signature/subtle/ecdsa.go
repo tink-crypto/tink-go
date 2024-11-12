@@ -18,6 +18,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+
+	"github.com/tink-crypto/tink-go/v2/internal/signature/ecdsa"
 )
 
 var errUnsupportedEncoding = errors.New("ecdsa: unsupported encoding")
@@ -34,13 +36,14 @@ func NewECDSASignature(r, s *big.Int) *ECDSASignature {
 
 // EncodeECDSASignature converts the signature to the given encoding format.
 func (sig *ECDSASignature) EncodeECDSASignature(encoding, curveName string) ([]byte, error) {
+	s := &ecdsa.Signature{R: sig.R, S: sig.S}
 	var enc []byte
 	var err error
 	switch encoding {
 	case "IEEE_P1363":
-		enc, err = ieeeP1363Encode(sig, curveName)
+		enc, err = ecdsa.IEEEP1363Encode(s, curveName)
 	case "DER":
-		enc, err = asn1encode(sig)
+		enc, err = ecdsa.ASN1Encode(s)
 	default:
 		err = errUnsupportedEncoding
 	}
@@ -54,20 +57,20 @@ func (sig *ECDSASignature) EncodeECDSASignature(encoding, curveName string) ([]b
 // The function assumes that the byte slice is the concatenation of the BigEndian
 // representation of two big integer r and s.
 func DecodeECDSASignature(encodedBytes []byte, encoding string) (*ECDSASignature, error) {
-	var sig *ECDSASignature
+	var sig *ecdsa.Signature
 	var err error
 	switch encoding {
 	case "IEEE_P1363":
-		sig, err = ieeeP1363Decode(encodedBytes)
+		sig, err = ecdsa.IEEEP1363Decode(encodedBytes)
 	case "DER":
-		sig, err = asn1decode(encodedBytes)
+		sig, err = ecdsa.ASN1Decode(encodedBytes)
 	default:
 		err = errUnsupportedEncoding
 	}
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa: %s", err)
 	}
-	return sig, nil
+	return &ECDSASignature{R: sig.R, S: sig.S}, nil
 }
 
 // ValidateECDSAParams validates ECDSA parameters.
