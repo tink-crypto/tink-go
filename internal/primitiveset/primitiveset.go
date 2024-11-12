@@ -30,23 +30,13 @@ import (
 // Entry represents a single entry in the keyset. In addition to the actual
 // primitive, it holds the identifier and status of the primitive.
 type Entry struct {
-	KeyID      uint32
-	Primitive  any
-	Prefix     string
-	PrefixType tinkpb.OutputPrefixType
-	Status     tinkpb.KeyStatusType
-	TypeURL    string
-}
-
-func newEntry(keyID uint32, primitive any, prefix string, prefixType tinkpb.OutputPrefixType, status tinkpb.KeyStatusType, typeURL string) *Entry {
-	return &Entry{
-		KeyID:      keyID,
-		Primitive:  primitive,
-		Prefix:     prefix,
-		Status:     status,
-		PrefixType: prefixType,
-		TypeURL:    typeURL,
-	}
+	KeyID         uint32
+	Primitive     any
+	FullPrimitive any
+	Prefix        string
+	PrefixType    tinkpb.OutputPrefixType
+	Status        tinkpb.KeyStatusType
+	TypeURL       string
 }
 
 // PrimitiveSet is used for supporting key rotation: primitives in a set
@@ -98,8 +88,7 @@ func (ps *PrimitiveSet) EntriesForPrefix(prefix string) ([]*Entry, error) {
 	return result, nil
 }
 
-// Add creates a new entry in the primitive set and returns the added entry.
-func (ps *PrimitiveSet) Add(primitive any, key *tinkpb.Keyset_Key) (*Entry, error) {
+func (ps *PrimitiveSet) add(primitive any, key *tinkpb.Keyset_Key, isFullPrimitive bool) (*Entry, error) {
 	if key == nil || primitive == nil {
 		return nil, fmt.Errorf("primitive_set: key and primitive must not be nil")
 	}
@@ -113,15 +102,29 @@ func (ps *PrimitiveSet) Add(primitive any, key *tinkpb.Keyset_Key) (*Entry, erro
 	if err != nil {
 		return nil, fmt.Errorf("primitive_set: %s", err)
 	}
-	e := newEntry(
-		key.GetKeyId(),
-		primitive,
-		prefix,
-		key.GetOutputPrefixType(),
-		key.GetStatus(),
-		key.GetKeyData().GetTypeUrl(),
-	)
+	e := &Entry{
+		KeyID:      key.GetKeyId(),
+		Prefix:     prefix,
+		Status:     key.GetStatus(),
+		PrefixType: key.GetOutputPrefixType(),
+		TypeURL:    key.GetKeyData().GetTypeUrl(),
+	}
+	if isFullPrimitive {
+		e.FullPrimitive = primitive
+	} else {
+		e.Primitive = primitive
+	}
 	ps.Entries[prefix] = append(ps.Entries[prefix], e)
 	ps.EntriesInKeysetOrder = append(ps.EntriesInKeysetOrder, e)
 	return e, nil
+}
+
+// Add creates a new entry in the primitive set and returns the added entry.
+func (ps *PrimitiveSet) Add(primitive any, key *tinkpb.Keyset_Key) (*Entry, error) {
+	return ps.add(primitive, key, false)
+}
+
+// AddFullPrimitive adds a full primitive to the primitive set.
+func (ps *PrimitiveSet) AddFullPrimitive(primitive any, key *tinkpb.Keyset_Key) (*Entry, error) {
+	return ps.add(primitive, key, true)
 }

@@ -42,7 +42,9 @@ func TestPrimitivesetAddAndEntriesInKeysetOrder(t *testing.T) {
 		makeTestKey(1234543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.1"),
 		makeTestKey(7213743, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_LEGACY, "type.url.2"),
 		makeTestKey(5294722, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_RAW, "type.url.3"),
+		makeTestKey(9876543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.3"),
 	}
+	full := []bool{false, false, false, true}
 	macs := make([]testutil.DummyMAC, len(keys))
 	for i := 0; i < len(macs); i++ {
 		macs[i] = testutil.DummyMAC{Name: fmt.Sprintf("%d", i)}
@@ -50,9 +52,18 @@ func TestPrimitivesetAddAndEntriesInKeysetOrder(t *testing.T) {
 	ps := primitiveset.New()
 	got := []*primitiveset.Entry{}
 	for i := 0; i < len(macs); i++ {
-		e, err := ps.Add(&macs[i], keys[i])
-		if err != nil {
-			t.Fatalf("ps.Add(%q) err = %v, want nil", macs[i].Name, err)
+		var err error
+		var e *primitiveset.Entry
+		if full[i] {
+			e, err = ps.AddFullPrimitive(&macs[i], keys[i])
+			if err != nil {
+				t.Fatalf("ps.AddFullPrimitive(%q) err = %v, want nil", macs[i].Name, err)
+			}
+		} else {
+			e, err = ps.Add(&macs[i], keys[i])
+			if err != nil {
+				t.Fatalf("ps.Add(%q) err = %v, want nil", macs[i].Name, err)
+			}
 		}
 		got = append(got, e)
 	}
@@ -81,9 +92,17 @@ func TestPrimitivesetAddAndEntriesInKeysetOrder(t *testing.T) {
 			TypeURL:    "type.url.3",
 			Prefix:     "",
 		},
+		{
+			KeyID:         9876543,
+			Status:        tinkpb.KeyStatusType_ENABLED,
+			FullPrimitive: &testutil.DummyMAC{Name: "3"},
+			PrefixType:    tinkpb.OutputPrefixType_TINK,
+			TypeURL:       "type.url.3",
+			Prefix:        string([]byte{1, 0, 0x96, 0xb4, 0x3f}),
+		},
 	}
-	if !cmp.Equal(got, want) {
-		t.Errorf("got = %v, want = %v", got, want)
+	if diff := cmp.Diff(got, want); diff != "" {
+		t.Errorf("got diff (-want +got):\n%s", diff)
 	}
 	if !cmp.Equal(ps.EntriesInKeysetOrder, want) {
 		t.Errorf("EntriesInKeysetOrder = %v, want = %v", ps.EntriesInKeysetOrder, want)
@@ -97,14 +116,24 @@ func TestPrimitivesetRawEntries(t *testing.T) {
 		makeTestKey(9473277, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_RAW, "type.url.3"),
 		makeTestKey(5294722, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_RAW, "type.url.4"),
 	}
+	full := []bool{false, false, true, false}
 	macs := make([]testutil.DummyMAC, len(keys))
 	for i := 0; i < len(macs); i++ {
 		macs[i] = testutil.DummyMAC{Name: fmt.Sprintf("Mac#%d", i)}
 	}
 	ps := primitiveset.New()
 	for i := 0; i < len(macs); i++ {
-		if _, err := ps.Add(macs[i], keys[i]); err != nil {
-			t.Fatalf("ps.Add(%q) err = %v, want nil", macs[i].Name, err)
+		var err error
+		if full[i] {
+			_, err = ps.AddFullPrimitive(macs[i], keys[i])
+			if err != nil {
+				t.Fatalf("ps.AddFullPrimitive(%q) err = %v, want nil", macs[i].Name, err)
+			}
+		} else {
+			_, err = ps.Add(macs[i], keys[i])
+			if err != nil {
+				t.Fatalf("ps.Add(%q) err = %v, want nil", macs[i].Name, err)
+			}
 		}
 	}
 	got, err := ps.RawEntries()
@@ -113,11 +142,11 @@ func TestPrimitivesetRawEntries(t *testing.T) {
 	}
 	want := []*primitiveset.Entry{
 		{
-			KeyID:      keys[2].GetKeyId(),
-			Status:     keys[2].GetStatus(),
-			PrefixType: keys[2].GetOutputPrefixType(),
-			TypeURL:    keys[2].GetKeyData().GetTypeUrl(),
-			Primitive:  macs[2],
+			KeyID:         keys[2].GetKeyId(),
+			Status:        keys[2].GetStatus(),
+			PrefixType:    keys[2].GetOutputPrefixType(),
+			TypeURL:       keys[2].GetKeyData().GetTypeUrl(),
+			FullPrimitive: macs[2],
 		},
 		{
 			KeyID:      keys[3].GetKeyId(),
@@ -127,9 +156,14 @@ func TestPrimitivesetRawEntries(t *testing.T) {
 			Primitive:  macs[3],
 		},
 	}
-	if !cmp.Equal(got, want) {
-		t.Errorf("Raw primitives got = %v, want = %v", got, want)
+	if diff := cmp.Diff(got, want); diff != "" {
+		t.Errorf("ps.RawEntries() diff (-want +got):\n%s", diff)
 	}
+}
+
+type primitive struct {
+	primitive any
+	isFull    bool
 }
 
 func TestPrimitivesetPrefixedEntries(t *testing.T) {
@@ -137,7 +171,7 @@ func TestPrimitivesetPrefixedEntries(t *testing.T) {
 		tag        string
 		prefix     string
 		keys       []*tinkpb.Keyset_Key
-		primitives []any
+		primitives []primitive
 		want       []*primitiveset.Entry
 	}
 	for _, tc := range []testCase{
@@ -148,9 +182,9 @@ func TestPrimitivesetPrefixedEntries(t *testing.T) {
 				makeTestKey(1234543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_LEGACY, "type.url.1"),
 				makeTestKey(7213743, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.2"),
 			},
-			primitives: []any{
-				&testutil.DummyMAC{Name: "1"},
-				&testutil.DummyMAC{Name: "2"},
+			primitives: []primitive{
+				{&testutil.DummyMAC{Name: "1"}, false},
+				{&testutil.DummyMAC{Name: "2"}, false},
 			},
 			want: []*primitiveset.Entry{
 				{
@@ -169,10 +203,12 @@ func TestPrimitivesetPrefixedEntries(t *testing.T) {
 			keys: []*tinkpb.Keyset_Key{
 				makeTestKey(1234543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_RAW, "type.url.1"),
 				makeTestKey(7213743, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.2"),
+				makeTestKey(9876543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_RAW, "type.url.2"),
 			},
-			primitives: []any{
-				&testutil.DummyMAC{Name: "1"},
-				&testutil.DummyMAC{Name: "2"},
+			primitives: []primitive{
+				{&testutil.DummyMAC{Name: "1"}, false},
+				{&testutil.DummyMAC{Name: "2"}, false},
+				{&testutil.DummyMAC{Name: "3"}, true},
 			},
 			want: []*primitiveset.Entry{
 				{
@@ -183,10 +219,18 @@ func TestPrimitivesetPrefixedEntries(t *testing.T) {
 					TypeURL:    "type.url.1",
 					Prefix:     "",
 				},
+				{
+					KeyID:         9876543,
+					Status:        tinkpb.KeyStatusType_ENABLED,
+					FullPrimitive: &testutil.DummyMAC{Name: "3"},
+					PrefixType:    tinkpb.OutputPrefixType_RAW,
+					TypeURL:       "type.url.2",
+					Prefix:        "",
+				},
 			},
 		},
 		{
-			tag:    "tink prefix  multiple entries",
+			tag:    "tink prefix multiple entries",
 			prefix: string([]byte{1, 0, 18, 214, 111}), // TINK_PREFIX + 1234543
 			keys: []*tinkpb.Keyset_Key{
 				makeTestKey(1234543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.1"),
@@ -194,11 +238,11 @@ func TestPrimitivesetPrefixedEntries(t *testing.T) {
 				makeTestKey(1234543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_RAW, "type.url.3"),
 				makeTestKey(7213743, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.4"),
 			},
-			primitives: []any{
-				&testutil.DummyMAC{Name: "1"},
-				&testutil.DummyMAC{Name: "2"},
-				&testutil.DummyMAC{Name: "3"},
-				&testutil.DummyMAC{Name: "4"},
+			primitives: []primitive{
+				{&testutil.DummyMAC{Name: "1"}, false},
+				{&testutil.DummyMAC{Name: "2"}, true},
+				{&testutil.DummyMAC{Name: "3"}, false},
+				{&testutil.DummyMAC{Name: "4"}, false},
 			},
 			want: []*primitiveset.Entry{
 				{
@@ -210,28 +254,36 @@ func TestPrimitivesetPrefixedEntries(t *testing.T) {
 					Prefix:     string([]byte{1, 0, 18, 214, 111}),
 				},
 				{
-					KeyID:      1234543,
-					Status:     tinkpb.KeyStatusType_ENABLED,
-					Primitive:  &testutil.DummyMAC{Name: "2"},
-					PrefixType: tinkpb.OutputPrefixType_TINK,
-					TypeURL:    "type.url.2",
-					Prefix:     string([]byte{1, 0, 18, 214, 111}),
+					KeyID:         1234543,
+					Status:        tinkpb.KeyStatusType_ENABLED,
+					FullPrimitive: &testutil.DummyMAC{Name: "2"},
+					PrefixType:    tinkpb.OutputPrefixType_TINK,
+					TypeURL:       "type.url.2",
+					Prefix:        string([]byte{1, 0, 18, 214, 111}),
 				},
 			},
 		},
 	} {
 		ps := primitiveset.New()
 		for i := 0; i < len(tc.keys); i++ {
-			if _, err := ps.Add(tc.primitives[i], tc.keys[i]); err != nil {
-				t.Fatalf("ps.Add(%q) err = %v, want nil", tc.primitives[i], err)
+			if tc.primitives[i].isFull {
+				_, err := ps.AddFullPrimitive(tc.primitives[i].primitive, tc.keys[i])
+				if err != nil {
+					t.Fatalf("ps.AddFullPrimitive(%q) err = %v, want nil", tc.primitives[i].primitive, err)
+				}
+			} else {
+				_, err := ps.Add(tc.primitives[i].primitive, tc.keys[i])
+				if err != nil {
+					t.Fatalf("ps.Add(%q) err = %v, want nil", tc.primitives[i].primitive, err)
+				}
 			}
 		}
 		got, err := ps.EntriesForPrefix(tc.prefix)
 		if err != nil {
 			t.Errorf("EntriesForPrefix() err =  %v, want nil", err)
 		}
-		if !cmp.Equal(got, tc.want) {
-			t.Errorf("got = %v, want = %v", got, tc.want)
+		if diff := cmp.Diff(got, tc.want); diff != "" {
+			t.Errorf("EntriesForPrefix() diff (-want +got):\n%s", diff)
 		}
 	}
 }
