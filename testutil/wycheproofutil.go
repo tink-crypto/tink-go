@@ -117,14 +117,12 @@ const testdataDir = "testdata"
 func init() {
 	srcDir, ok := os.LookupEnv("TEST_SRCDIR")
 	if ok {
-		// Running with Bazel.
-		workspaceDir, ok := os.LookupEnv("TEST_WORKSPACE")
-		if !ok {
-			panic("TEST_WORKSPACE not found")
-		}
-		wycheproofDir = filepath.Join(srcDir, workspaceDir, testdataDir)
+		// If running with `bazel test` TEST_WORKSPACE is set.
+		// We don't panic if TEST_WORKSPACE is not set to allow running benchmarks
+		// internally at Google, which set TEST_SRCDIR but not TEST_WORKSPACE.
+		wycheproofDir = filepath.Join(srcDir, os.Getenv("TEST_WORKSPACE"), testdataDir)
 	} else {
-		// Not running with Bazel.
+		// Running tests with `go test`.
 		var err error
 		wycheproofDir, err = downloadWycheproofTestVectors()
 		if err != nil {
