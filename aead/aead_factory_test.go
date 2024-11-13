@@ -123,7 +123,7 @@ func (sc *stubConfig) PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalap
 }
 
 func (sc *stubConfig) PrimitiveFromKey(_ key.Key, _ internalapi.Token) (any, error) {
-	return new(stubAEAD), nil
+	return nil, fmt.Errorf("unsupported")
 }
 
 func TestNewWithConfig(t *testing.T) {

@@ -23,6 +23,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -869,30 +870,83 @@ func TestPrimitivesWithRegistry(t *testing.T) {
 
 type testConfig struct{}
 
-func (c *testConfig) PrimitiveFromKeyData(_ *tinkpb.KeyData, _ internalapi.Token) (any, error) {
-	return testPrimitive{}, nil
+type stubPrimitive struct {
+	isFull bool
 }
 
-func (c *testConfig) PrimitiveFromKey(_ key.Key, _ internalapi.Token) (any, error) {
-	return testPrimitive{}, nil
+func (c *testConfig) PrimitiveFromKeyData(_ *tinkpb.KeyData, _ internalapi.Token) (any, error) {
+	return &stubPrimitive{false}, nil
+}
+
+func (c *testConfig) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
+	if _, ok := k.(*aesgcm.Key); !ok {
+		return nil, fmt.Errorf("Unable to create primitive from key")
+	}
+	return &stubPrimitive{true}, nil
+}
+
+func TestPrimitives(t *testing.T) {
+	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", mac.HMACSHA256Tag128KeyTemplate(), err)
+	}
+	primitives, err := handle.Primitives(internalapi.Token{})
+	if err != nil {
+		t.Fatalf("handle.Primitives(internalapi.Token{}) err = %v, want nil", err)
+	}
+	if len(primitives.EntriesInKeysetOrder) != 1 {
+		t.Fatalf("len(handle.Primitives(internalapi.Token{})) = %d, want 1", len(primitives.EntriesInKeysetOrder))
+	}
+	if primitives.Primary.Primitive == nil {
+		t.Fatalf("handle.Primitives(internalapi.Token{}).Primary.Primitive = nil, want instance of `stubPrimitive`")
+	}
+	if _, ok := primitives.Primary.Primitive.(tink.MAC); !ok {
+		t.Fatalf("handle.Primitives(internalapi.Token{}).Primary.Primitive = %T, want instance of `tink.MAC`", primitives.Primary.FullPrimitive)
+	}
 }
 
 func TestPrimitivesWithConfig(t *testing.T) {
-	template := mac.HMACSHA256Tag128KeyTemplate()
-	template.OutputPrefixType = tinkpb.OutputPrefixType_RAW
-	handle, err := keyset.NewHandle(template)
-	if err != nil {
-		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", template, err)
-	}
-	primitives, err := handle.Primitives(internalapi.Token{}, keyset.WithConfig(&testConfig{}))
-	if err != nil {
-		t.Fatalf("handle.Primitives(internalapi.Token{}, keyset.WithConfig(&testConfig{})) err = %v, want nil", err)
-	}
-	if len(primitives.EntriesInKeysetOrder) != 1 {
-		t.Fatalf("len(handle.Primitives(internalapi.Token{}, )) = %d, want 1", len(primitives.EntriesInKeysetOrder))
-	}
-	if _, ok := (primitives.Primary.Primitive).(testPrimitive); !ok {
-		t.Errorf("handle.Primitives(internalapi.Token{}, ).Primary = %v, want instance of `testPrimitive`", primitives.Primary.Primitive)
+	for _, tc := range []struct {
+		name        string
+		keyTemplate *tinkpb.KeyTemplate
+		wantFull    bool
+	}{
+		{
+			name:        "legacy primitive",
+			keyTemplate: mac.HMACSHA256Tag128KeyTemplate(),
+			wantFull:    false,
+		},
+		{
+			name:        "full primitive",
+			keyTemplate: aead.AES256GCMKeyTemplate(),
+			wantFull:    true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handle, err := keyset.NewHandle(tc.keyTemplate)
+			if err != nil {
+				t.Fatalf("keyset.NewHandle(%v) = %v, want nil", tc.keyTemplate, err)
+			}
+			primitives, err := handle.Primitives(internalapi.Token{}, keyset.WithConfig(&testConfig{}))
+			if err != nil {
+				t.Fatalf("handle.Primitives(internalapi.Token{}, keyset.WithConfig(&testConfig{})) err = %v, want nil", err)
+			}
+			if len(primitives.EntriesInKeysetOrder) != 1 {
+				t.Fatalf("len(handle.Primitives(internalapi.Token{})) = %d, want 1", len(primitives.EntriesInKeysetOrder))
+			}
+			var p any
+			if tc.wantFull {
+				p = primitives.Primary.FullPrimitive
+			} else {
+				p = primitives.Primary.Primitive
+			}
+			if _, ok := p.(*stubPrimitive); !ok {
+				t.Fatalf("handle.Primitives(internalapi.Token{}).Primary.FullPrimitive = %v, want instance of `stubPrimitive`", p)
+			}
+			if p.(*stubPrimitive).isFull != tc.wantFull {
+				t.Errorf("handle.Primitives(internalapi.Token{}).Primary.FullPrimitive.isFull = %v, want %v", p.(*stubPrimitive).isFull, tc.wantFull)
+			}
+		})
 	}
 }
 

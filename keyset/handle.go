@@ -432,7 +432,7 @@ func (h *Handle) WriteWithNoSecrets(w Writer) error {
 // The config.Config concrete type is not used directly due to circular dependencies.
 type Config interface {
 	PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error)
-	// PrimitiveFromKey creates a primitive from a key.Key.
+	// PrimitiveFromKey creates a primitive from a [key.Key].
 	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
 }
 
@@ -499,6 +499,29 @@ func (h *Handle) PrimitivesWithKeyManager(km registry.KeyManager, _ internalapi.
 	return p, nil
 }
 
+func addToPrimitiveSet(primitiveSet *primitiveset.PrimitiveSet, entry *Entry, km registry.KeyManager, config Config) (*primitiveset.Entry, error) {
+	protoKey, err := entryToProtoKey(entry)
+	if err != nil {
+		return nil, err
+	}
+	if km != nil && km.DoesSupport(protoKey.GetKeyData().GetTypeUrl()) {
+		primitive, err := km.Primitive(protoKey.GetKeyData().GetValue())
+		if err != nil {
+			return nil, fmt.Errorf("cannot get primitive from key: %v", err)
+		}
+		return primitiveSet.Add(primitive, protoKey)
+	}
+	primitive, err := config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
+	if err == nil {
+		return primitiveSet.AddFullPrimitive(primitive, protoKey)
+	}
+	primitive, err = config.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})
+	if err != nil {
+		return nil, fmt.Errorf("cannot get primitive from key data: %v", err)
+	}
+	return primitiveSet.Add(primitive, protoKey)
+}
+
 func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
 	if h == nil {
 		return nil, fmt.Errorf("nil handle")
@@ -522,22 +545,7 @@ func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*
 		if entry.KeyStatus() != Enabled {
 			continue
 		}
-		protoKey, err := entryToProtoKey(entry)
-		if err != nil {
-			return nil, err
-		}
-		var primitive any
-		if km != nil && km.DoesSupport(protoKey.GetKeyData().GetTypeUrl()) {
-			primitive, err = km.Primitive(protoKey.GetKeyData().GetValue())
-		} else {
-			// TODO: b/369551049 - Use the new PrimitiveFromKey method once we have
-			// added tooling to distinguish between "full" and "partial" primitives.
-			primitive, err = config.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})
-		}
-		if err != nil {
-			return nil, fmt.Errorf("cannot get primitive from key: %v", err)
-		}
-		primitiveSetEntry, err := primitiveSet.Add(primitive, protoKey)
+		primitiveSetEntry, err := addToPrimitiveSet(primitiveSet, entry, km, config)
 		if err != nil {
 			return nil, fmt.Errorf("cannot add primitive: %v", err)
 		}
