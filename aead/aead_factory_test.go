@@ -18,12 +18,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
@@ -107,43 +109,182 @@ func TestFactoryMultipleKeys(t *testing.T) {
 	}
 }
 
-type stubAEAD struct{}
-
-func (a *stubAEAD) Encrypt(_, _ []byte) ([]byte, error) {
-	return []byte("stubAEAD Encrypt"), nil
-}
-func (a *stubAEAD) Decrypt(_, _ []byte) ([]byte, error) {
-	return []byte("stubAEAD Decrypt"), nil
+type stubAEAD struct {
+	prefix []byte
 }
 
-type stubConfig struct{}
+func (a *stubAEAD) Encrypt(p, _ []byte) ([]byte, error) {
+	return slices.Concat(a.prefix, p), nil
+}
+func (a *stubAEAD) Decrypt(c, _ []byte) ([]byte, error) {
+	if !bytes.HasPrefix(c, a.prefix) {
+		return nil, errors.New("ciphertext does not start with prefix")
+	}
+	return c[len(a.prefix):], nil
+}
 
-func (sc *stubConfig) PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error) {
+type stubConfig struct {
+	useFullPrimitive bool
+}
+
+func (sc *stubConfig) PrimitiveFromKeyData(_ *tinkpb.KeyData, _ internalapi.Token) (any, error) {
+	if sc.useFullPrimitive {
+		return nil, errors.New("using full primitives")
+	}
 	return new(stubAEAD), nil
 }
 
-func (sc *stubConfig) PrimitiveFromKey(_ key.Key, _ internalapi.Token) (any, error) {
-	return nil, fmt.Errorf("unsupported")
+func (sc *stubConfig) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
+	if !sc.useFullPrimitive {
+		return nil, errors.New("not using full primitives")
+	}
+	aesGCMKey, ok := k.(*aesgcm.Key)
+	if !ok {
+		return nil, errors.New("not an AES GCM key")
+	}
+	return &stubAEAD{prefix: aesGCMKey.OutputPrefix()}, nil
+}
+
+func annotateKeyset(t *testing.T, kh *keyset.Handle, annotations map[string]string) *keyset.Handle {
+	// Annotations are only supported through the `insecurecleartextkeyset` API.
+	buff := &bytes.Buffer{}
+	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
+		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
+	}
+	mh, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
+	if err != nil {
+		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
+	}
+	return mh
 }
 
 func TestNewWithConfig(t *testing.T) {
-	keysetHandle, err := keyset.NewHandle(aead.AES256GCMNoPrefixKeyTemplate())
-	if err != nil {
-		t.Fatalf("testkeyset.NewHandle(keyset) err = %v, want nil", err)
-	}
+	annotations := map[string]string{"foo": "bar"}
+	keysetHandleWithPrimaryWithPrefix := func() *keyset.Handle {
+		km := keyset.NewManager()
+		_, err := km.Add(aead.AES256GCMNoPrefixKeyTemplate())
+		if err != nil {
+			t.Fatalf("km.Add() err = %v, want nil", err)
+		}
+		keyID, err := km.Add(aead.AES256GCMKeyTemplate())
+		if err != nil {
+			t.Fatalf("km.Add() err = %v, want nil", err)
+		}
+		if err := km.SetPrimary(keyID); err != nil {
+			t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+		}
+		kh, err := km.Handle()
+		if err != nil {
+			t.Fatalf("km.Handle() err = %v, want nil", err)
+		}
+		return annotateKeyset(t, kh, annotations)
+	}()
+	keysetHandleWithPrimaryWithoutPrefix := func() *keyset.Handle {
+		km := keyset.NewManager()
+		keyID, err := km.Add(aead.AES256GCMNoPrefixKeyTemplate())
+		if err != nil {
+			t.Fatalf("km.Add() err = %v, want nil", err)
+		}
+		if err := km.SetPrimary(keyID); err != nil {
+			t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+		}
+		_, err = km.Add(aead.AES256GCMKeyTemplate())
+		if err != nil {
+			t.Fatalf("km.Add() err = %v, want nil", err)
+		}
+		kh, err := km.Handle()
+		if err != nil {
+			t.Fatalf("km.Handle() err = %v, want nil", err)
+		}
+		return annotateKeyset(t, kh, annotations)
+	}()
+	for _, tc := range []struct {
+		name       string
+		config     *stubConfig
+		kh         *keyset.Handle
+		wantPrefix bool
+	}{
+		{
+			name:       "full primitive primary with prefix",
+			config:     &stubConfig{useFullPrimitive: true},
+			kh:         keysetHandleWithPrimaryWithPrefix,
+			wantPrefix: true,
+		},
+		{
+			name:       "legacy primitive primary with prefix",
+			config:     &stubConfig{},
+			kh:         keysetHandleWithPrimaryWithPrefix,
+			wantPrefix: true,
+		},
+		{
+			name:   "full primitive primary without prefix",
+			config: &stubConfig{useFullPrimitive: true},
+			kh:     keysetHandleWithPrimaryWithoutPrefix,
+		},
+		{
+			name:   "legacy primitive primary without prefix",
+			config: &stubConfig{},
+			kh:     keysetHandleWithPrimaryWithoutPrefix,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			defer internalregistry.ClearMonitoringClient()
+			client := fakemonitoring.NewClient("fake-client")
+			if err := internalregistry.RegisterMonitoringClient(client); err != nil {
+				t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+			}
+			a, err := aead.NewWithConfig(tc.kh, tc.config)
+			if err != nil {
+				t.Fatalf("aead.NewWithConfig(tc.kh, config) err = %v, want nil", err)
+			}
 
-	config := &stubConfig{}
-	a, err := aead.NewWithConfig(keysetHandle, config)
-	if err != nil {
-		t.Fatalf("aead.NewWithConfig(keysetHandle, config) err = %v, want nil", err)
-	}
-	ct, err := a.Encrypt([]byte("plaintext"), []byte("aad"))
-	if err != nil {
-		t.Fatalf("aead.Encrypt() err = %v, want nil", err)
-	}
+			plaintext := []byte("message")
+			associatedData := []byte("aad")
+			ct, err := a.Encrypt(plaintext, associatedData)
+			if err != nil {
+				t.Fatalf("aead.Encrypt() err = %v, want nil", err)
+			}
+			primaryEntry, err := tc.kh.Primary()
+			if err != nil {
+				t.Fatalf("kh.Primary() err = %v, want nil", err)
+			}
+			prefix := primaryEntry.Key().(*aesgcm.Key).OutputPrefix()
+			if tc.wantPrefix && len(prefix) == 0 {
+				t.Fatalf("want prefix, got empty prefix")
+			}
+			if got, want := ct, slices.Concat(prefix, plaintext); !bytes.Equal(got, want) {
+				t.Errorf("aead.Encrypt() = %q, want %q", got, want)
+			}
 
-	if wantCT := "stubAEAD Encrypt"; !bytes.Equal(ct, []byte(wantCT)) {
-		t.Errorf("aead.Encrypt() = %q, want %q", ct, wantCT)
+			pt, err := a.Decrypt(ct, associatedData)
+			if err != nil {
+				t.Fatalf("aead.Decrypt() err = %v, want nil", err)
+			}
+			if !bytes.Equal(pt, plaintext) {
+				t.Errorf("aead.Decrypt() = %q, want %q", pt, plaintext)
+			}
+
+			// Make sure that the monitoring logs the correct number of bytes.
+			gotEvents := client.Events()
+			if len(gotEvents) != 2 {
+				t.Fatalf("len(client.Events()) = %d, want 1", len(gotEvents))
+			}
+			wantEvents := []*fakemonitoring.LogEvent{
+				{
+					KeyID:    primaryEntry.KeyID(),
+					NumBytes: len(plaintext),
+					Context:  monitoring.NewContext("aead", "encrypt", nil), // KeysetInfo is not relevant for this test.
+				},
+				{
+					KeyID:    primaryEntry.KeyID(),
+					NumBytes: len(plaintext),
+					Context:  monitoring.NewContext("aead", "decrypt", nil), // KeysetInfo is not relevant for this test.
+				},
+			}
+			if diff := cmp.Diff(gotEvents, wantEvents, cmpopts.IgnoreFields(fakemonitoring.LogEvent{}, "Context.KeysetInfo")); diff != "" {
+				t.Errorf("got != want, diff: %v", diff)
+			}
+		})
 	}
 }
 
@@ -241,7 +382,7 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsEncryptionDecryptionWithPr
 	if err != nil {
 		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
 	}
-	// Annotations are only supported throught the `insecurecleartextkeyset` API.
+	// Annotations are only supported through the `insecurecleartextkeyset` API.
 	buff := &bytes.Buffer{}
 	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
@@ -289,14 +430,15 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsEncryptionDecryptionWithPr
 		},
 		{
 			KeyID: mh.KeysetInfo().GetPrimaryKeyId(),
-			// ciphertext was encrypted with a key that has TINK ouput prefix. This adds a 5 bytes prefix
-			// to the ciphertext. This prefix is not included in `Log` call.
+			// ciphertext was encrypted with a key that has TINK output prefix. This
+			// adds a 5 bytes prefix to the ciphertext. This prefix is not included
+			// in `Log` call.
 			NumBytes: len(ct) - cryptofmt.NonRawPrefixSize,
 			Context:  monitoring.NewContext("aead", "decrypt", wantKeysetInfo),
 		},
 	}
-	if cmp.Diff(got, want) != "" {
-		t.Errorf("%v", cmp.Diff(got, want))
+	if diff := cmp.Diff(got, want); diff != "" {
+		t.Errorf("got != want, diff: %v", diff)
 	}
 }
 
@@ -310,7 +452,7 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsEncryptionDecryptionWithou
 	if err != nil {
 		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
 	}
-	// Annotations are only supported throught the `insecurecleartextkeyset` API.
+	// Annotations are only supported through the `insecurecleartextkeyset` API.
 	buff := &bytes.Buffer{}
 	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
@@ -397,7 +539,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotatiosMultipleKeysLogsEncryptionDecry
 	if err != nil {
 		t.Fatalf("manager.Handle() err = %v, want nil", err)
 	}
-	// Annotations are only supported throught the `insecurecleartextkeyset` API.
+	// Annotations are only supported through the `insecurecleartextkeyset` API.
 	buff := &bytes.Buffer{}
 	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
@@ -501,7 +643,7 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsEncryptionFailureIsLogged(t *t
 	if err != nil {
 		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
 	}
-	// Annotations are only supported throught the `insecurecleartextkeyset` API.
+	// Annotations are only supported through the `insecurecleartextkeyset` API.
 	buff := &bytes.Buffer{}
 	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
@@ -554,7 +696,7 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsDecryptionFailureIsLogged(t *t
 	if err != nil {
 		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
 	}
-	// Annotations are only supported throught the `insecurecleartextkeyset` API.
+	// Annotations are only supported through the `insecurecleartextkeyset` API.
 	buff := &bytes.Buffer{}
 	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
@@ -607,7 +749,7 @@ func TestFactoryWithMonitoringMultiplePrimitivesLogOperations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
 	}
-	// Annotations are only supported throught the `insecurecleartextkeyset` API.
+	// Annotations are only supported through the `insecurecleartextkeyset` API.
 	buff := &bytes.Buffer{}
 	if err := insecurecleartextkeyset.Write(kh1, keyset.NewBinaryWriter(buff)); err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)

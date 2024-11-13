@@ -16,6 +16,7 @@ package aead
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -54,15 +55,50 @@ type wrappedAead struct {
 	decLogger monitoring.Logger
 }
 
-func newWrappedAead(ps *primitiveset.PrimitiveSet) (*wrappedAead, error) {
-	if _, ok := (ps.Primary.Primitive).(tink.AEAD); !ok {
+// aeadPrimitiveAdapter is an adapter that turns a non-full [tink.AEAD]
+// primitive into a full [tink.AEAD] primitive.
+type fullAEADPrimitiveAdapter struct {
+	primitive tink.AEAD
+	prefix    []byte
+}
+
+func (a *fullAEADPrimitiveAdapter) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
+	ct, err := a.primitive.Encrypt(plaintext, associatedData)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Concat(a.prefix, ct), nil
+}
+
+func (a *fullAEADPrimitiveAdapter) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
+	return a.primitive.Decrypt(ciphertext[len(a.prefix):], associatedData)
+}
+
+// getFullPrimitive returns a full [tink.AEAD] from the given
+// [primitiveset.Entry].
+func getFullPrimitive(entry *primitiveset.Entry) (tink.AEAD, error) {
+	if entry.FullPrimitive != nil {
+		a, ok := (entry.FullPrimitive).(tink.AEAD)
+		if !ok {
+			return nil, fmt.Errorf("aead_factory: not an AEAD primitive")
+		}
+		return a, nil
+	}
+	a, ok := (entry.Primitive).(tink.AEAD)
+	if !ok {
 		return nil, fmt.Errorf("aead_factory: not an AEAD primitive")
 	}
+	return &fullAEADPrimitiveAdapter{primitive: a, prefix: []byte(entry.Prefix)}, nil
+}
 
-	for _, primitives := range ps.Entries {
-		for _, p := range primitives {
-			if _, ok := (p.Primitive).(tink.AEAD); !ok {
-				return nil, fmt.Errorf("aead_factory: not an AEAD primitive")
+func newWrappedAead(ps *primitiveset.PrimitiveSet) (*wrappedAead, error) {
+	if _, err := getFullPrimitive(ps.Primary); err != nil {
+		return nil, err
+	}
+	for _, entries := range ps.Entries {
+		for _, entry := range entries {
+			if _, err := getFullPrimitive(entry); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -109,9 +145,9 @@ func createLoggers(ps *primitiveset.PrimitiveSet) (monitoring.Logger, monitoring
 // It returns the concatenation of the primary's identifier and the ciphertext.
 func (a *wrappedAead) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
 	primary := a.ps.Primary
-	p, ok := (primary.Primitive).(tink.AEAD)
-	if !ok {
-		return nil, fmt.Errorf("aead_factory: not an AEAD primitive")
+	p, err := getFullPrimitive(primary)
+	if err != nil {
+		return nil, err
 	}
 	ct, err := p.Encrypt(plaintext, associatedData)
 	if err != nil {
@@ -119,13 +155,7 @@ func (a *wrappedAead) Encrypt(plaintext, associatedData []byte) ([]byte, error) 
 		return nil, err
 	}
 	a.encLogger.Log(primary.KeyID, len(plaintext))
-	if len(primary.Prefix) == 0 {
-		return ct, nil
-	}
-	output := make([]byte, 0, len(primary.Prefix)+len(ct))
-	output = append(output, primary.Prefix...)
-	output = append(output, ct...)
-	return output, nil
+	return ct, nil
 }
 
 // Decrypt decrypts the given ciphertext and authenticates it with the given
@@ -136,18 +166,17 @@ func (a *wrappedAead) Decrypt(ciphertext, associatedData []byte) ([]byte, error)
 	prefixSize := cryptofmt.NonRawPrefixSize
 	if len(ciphertext) > prefixSize {
 		prefix := ciphertext[:prefixSize]
-		ctNoPrefix := ciphertext[prefixSize:]
 		entries, err := a.ps.EntriesForPrefix(string(prefix))
 		if err == nil {
-			for i := 0; i < len(entries); i++ {
-				p, ok := (entries[i].Primitive).(tink.AEAD)
-				if !ok {
-					return nil, fmt.Errorf("aead_factory: not an AEAD primitive")
+			for _, entry := range entries {
+				p, err := getFullPrimitive(entry)
+				if err != nil {
+					return nil, err
 				}
-
-				pt, err := p.Decrypt(ctNoPrefix, associatedData)
+				pt, err := p.Decrypt(ciphertext, associatedData)
 				if err == nil {
-					a.decLogger.Log(entries[i].KeyID, len(ctNoPrefix))
+					numBytes := len(ciphertext[prefixSize:])
+					a.decLogger.Log(entry.KeyID, numBytes)
 					return pt, nil
 				}
 			}
@@ -156,15 +185,14 @@ func (a *wrappedAead) Decrypt(ciphertext, associatedData []byte) ([]byte, error)
 	// try raw keys
 	entries, err := a.ps.RawEntries()
 	if err == nil {
-		for i := 0; i < len(entries); i++ {
-			p, ok := (entries[i].Primitive).(tink.AEAD)
-			if !ok {
-				return nil, fmt.Errorf("aead_factory: not an AEAD primitive")
+		for _, entry := range entries {
+			p, err := getFullPrimitive(entry)
+			if err != nil {
+				return nil, err
 			}
-
 			pt, err := p.Decrypt(ciphertext, associatedData)
 			if err == nil {
-				a.decLogger.Log(entries[i].KeyID, len(ciphertext))
+				a.decLogger.Log(entry.KeyID, len(ciphertext))
 				return pt, nil
 			}
 		}
