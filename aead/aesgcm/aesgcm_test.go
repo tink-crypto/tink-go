@@ -16,11 +16,18 @@ package aesgcm_test
 
 import (
 	"bytes"
+	"encoding/hex"
+	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 func TestGetKeyFromHandle(t *testing.T) {
@@ -149,5 +156,157 @@ func TestCreateKeysetHandleFromParameters(t *testing.T) {
 	}
 	if !bytes.Equal(decrypted, plaintext) {
 		t.Errorf("decrypted = %v, want %v", decrypted, plaintext)
+	}
+}
+
+func hexDecode(t *testing.T, hexStr string) []byte {
+	t.Helper()
+	x, err := hex.DecodeString(hexStr)
+	if err != nil {
+		t.Fatalf("hex.DecodeString(%v) err = %v, want nil", hexStr, err)
+	}
+	return x
+}
+
+func newKey(t *testing.T, keyValue []byte, keyID uint32, opts aesgcm.ParametersOpts) *aesgcm.Key {
+	t.Helper()
+	params, err := aesgcm.NewParameters(opts)
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", opts, err)
+	}
+	keyBytes := secretdata.NewBytesFromData(keyValue, insecuresecretdataaccess.Token{})
+	key, err := aesgcm.NewKey(keyBytes, keyID, params)
+	if err != nil {
+		t.Fatalf("aesgcm.NewKey(%v, %v, %v) err = %v, want nil", keyBytes, keyID, params, err)
+	}
+	return key
+}
+
+func TestAESGCMAEADWorks(t *testing.T) {
+	// Test vectors from
+	// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/aes_gcm_test.json.
+	// 16 bytes key.
+	key1 := hexDecode(t, "5b9604fe14eadba931b0ccf34843dab9")
+	ciphertext1 := hexDecode(t, "028318abc1824029138141a226073cc1d851beff176384dc9896d5ff0a3ea7a5487cb5f7d70fb6c58d038554")
+	wantMessage1 := hexDecode(t, "001d0c231287c1182784554ca3a21908")
+	// 32 bytes key.
+	key2 := hexDecode(t, "51e4bf2bad92b7aff1a4bc05550ba81df4b96fabf41c12c7b00e60e48db7e152")
+	ciphertext2 := hexDecode(t, "4f07afedfdc3b6c2361823d3cf332a12fdee800b602e8d7c4799d62c140c9bb834876b09")
+	wantMessage2 := hexDecode(t, "be3308f72a2c6aed")
+
+	tinkPrefix := []byte{cryptofmt.TinkStartByte, 0x22, 0x34, 0x55, 0xab}
+	crunchyPrefix := []byte{cryptofmt.LegacyStartByte, 0x22, 0x34, 0x55, 0xab}
+
+	for _, tc := range []struct {
+		name          string
+		key           *aesgcm.Key
+		ciphertext    []byte
+		wantPlaintext []byte
+	}{
+		{
+			name: fmt.Sprintf("AES-%d-TINK", len(key1)*8),
+			key: newKey(t, key1, 0x223455ab, aesgcm.ParametersOpts{
+				KeySizeInBytes: len(key1),
+				IVSizeInBytes:  12,
+				TagSizeInBytes: 16,
+				Variant:        aesgcm.VariantTink,
+			}),
+			ciphertext:    slices.Concat(tinkPrefix, ciphertext1),
+			wantPlaintext: wantMessage1,
+		},
+		{
+			name: fmt.Sprintf("AES-%d-CRUNCHY", len(key1)*8),
+			key: newKey(t, key1, 0x223455ab, aesgcm.ParametersOpts{
+				KeySizeInBytes: len(key1),
+				IVSizeInBytes:  12,
+				TagSizeInBytes: 16,
+				Variant:        aesgcm.VariantCrunchy,
+			}),
+			ciphertext:    slices.Concat(crunchyPrefix, ciphertext1),
+			wantPlaintext: wantMessage1,
+		},
+		{
+			name: fmt.Sprintf("AES-%d-RAW", len(key1)*8),
+			key: newKey(t, key1, 0, aesgcm.ParametersOpts{
+				KeySizeInBytes: len(key1),
+				IVSizeInBytes:  12,
+				TagSizeInBytes: 16,
+				Variant:        aesgcm.VariantNoPrefix,
+			}),
+			ciphertext:    ciphertext1,
+			wantPlaintext: wantMessage1,
+		},
+		{
+			name: fmt.Sprintf("AES-%d-TINK", len(key2)*8),
+			key: newKey(t, key2, 0x223455ab, aesgcm.ParametersOpts{
+				KeySizeInBytes: len(key2),
+				IVSizeInBytes:  12,
+				TagSizeInBytes: 16,
+				Variant:        aesgcm.VariantTink,
+			}),
+			ciphertext:    slices.Concat(tinkPrefix, ciphertext2),
+			wantPlaintext: wantMessage2,
+		},
+		{
+			name: fmt.Sprintf("AES-%d-CRUNCHY", len(key2)*8),
+			key: newKey(t, key2, 0x223455ab, aesgcm.ParametersOpts{
+				KeySizeInBytes: len(key2),
+				IVSizeInBytes:  12,
+				TagSizeInBytes: 16,
+				Variant:        aesgcm.VariantCrunchy,
+			}),
+			ciphertext:    slices.Concat(crunchyPrefix, ciphertext2),
+			wantPlaintext: wantMessage2,
+		},
+		{
+			name: fmt.Sprintf("AES-%d-RAW", len(key2)*8),
+			key: newKey(t, key2, 0, aesgcm.ParametersOpts{
+				KeySizeInBytes: len(key2),
+				IVSizeInBytes:  12,
+				TagSizeInBytes: 16,
+				Variant:        aesgcm.VariantNoPrefix,
+			}),
+			ciphertext:    ciphertext2,
+			wantPlaintext: wantMessage2,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// From the key.
+			a1, err := aesgcm.NewAEAD(tc.key)
+			if err != nil {
+				t.Fatalf("aesgcm.NewAEAD(tc.key) err = %v, want nil", err)
+			}
+
+			// From the keyset handle.
+			a2 := func() tink.AEAD {
+				km := keyset.NewManager()
+				keyID, err := km.AddKey(tc.key)
+				if err != nil {
+					t.Fatalf("km.AddKey(tc.key) err = %v, want nil", err)
+				}
+				if err := km.SetPrimary(keyID); err != nil {
+					t.Fatalf("km.SetPrimary(keyID) err = %v, want nil", err)
+				}
+				kh, err := km.Handle()
+				if err != nil {
+					t.Fatalf("km.Handle() err = %v, want nil", err)
+				}
+				a, err := aead.New(kh)
+				if err != nil {
+					t.Fatalf("New(kh) err = %v, want nil", err)
+				}
+				return a
+			}()
+
+			for _, a := range []tink.AEAD{a1, a2} {
+				decrypted, err := a.Decrypt(tc.ciphertext, nil)
+				if err != nil {
+					t.Fatalf("a.Decrypt(tc.ciphertext, nil) err = %v, want nil", err)
+				}
+				if !bytes.Equal(decrypted, tc.wantPlaintext) {
+					t.Errorf("a.Decrypt(tc.ciphertext, nil) = %v, want %v", decrypted, tc.wantPlaintext)
+				}
+			}
+		})
 	}
 }

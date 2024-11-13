@@ -21,12 +21,14 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/aead"
 	testingaead "github.com/tink-crypto/tink-go/v2/internal/testing/aead"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 type testCase struct {
@@ -385,112 +387,98 @@ func TestPrimitiveCreator(t *testing.T) {
 	ciphertext2 := hexDecode(t, "4f07afedfdc3b6c2361823d3cf332a12fdee800b602e8d7c4799d62c140c9bb834876b09")
 	wantMessage2 := hexDecode(t, "be3308f72a2c6aed")
 
-	// Prefixes.
-	tinkPrefix, err := calculateOutputPrefix(VariantTink, 123)
-	if err != nil {
-		t.Fatalf("calculateOutputPrefix(VariantTink, 123) err = %v, want nil", err)
-	}
-	crunchyPrefix, err := calculateOutputPrefix(VariantCrunchy, 123)
-	if err != nil {
-		t.Fatalf("calculateOutputPrefix(VariantTink, 123) err = %v, want nil", err)
-	}
+	tinkPrefix := []byte{cryptofmt.TinkStartByte, 0x00, 0x00, 0x00, 0x7b}
+	crunchyPrefix := []byte{cryptofmt.LegacyStartByte, 0x00, 0x00, 0x00, 0x7b}
 
 	for _, testCase := range []struct {
 		name          string
-		opts          ParametersOpts
-		keyBytes      []byte
+		key           *Key
 		ciphertext    []byte
 		wantPlaintext []byte
 	}{
 		{
 			name: fmt.Sprintf("%d-bit key, Tink Variant", len(key1)*8),
-			opts: ParametersOpts{
+			key: newKey(t, key1, ParametersOpts{
 				KeySizeInBytes: len(key1),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
 				Variant:        VariantTink,
-			},
-			keyBytes:      key1,
+			}),
 			ciphertext:    slices.Concat(tinkPrefix, ciphertext1),
 			wantPlaintext: wantMessage1,
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, Crunchy Variant", len(key1)*8),
-			opts: ParametersOpts{
+			key: newKey(t, key1, ParametersOpts{
 				KeySizeInBytes: len(key1),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
 				Variant:        VariantCrunchy,
-			},
-			keyBytes:      key1,
+			}),
 			ciphertext:    slices.Concat(crunchyPrefix, ciphertext1),
 			wantPlaintext: wantMessage1,
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, No Prefix Variant", len(key1)*8),
-			opts: ParametersOpts{
+			key: newKey(t, key1, ParametersOpts{
 				KeySizeInBytes: len(key1),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
 				Variant:        VariantNoPrefix,
-			},
-			keyBytes:      key1,
+			}),
 			ciphertext:    ciphertext1,
 			wantPlaintext: wantMessage1,
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, Tink Variant", len(key2)*8),
-			opts: ParametersOpts{
+			key: newKey(t, key2, ParametersOpts{
 				KeySizeInBytes: len(key2),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
 				Variant:        VariantTink,
-			},
-			keyBytes:      key2,
+			}),
 			ciphertext:    slices.Concat(tinkPrefix, ciphertext2),
 			wantPlaintext: wantMessage2,
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, Crunchy Variant", len(key2)*8),
-			opts: ParametersOpts{
+			key: newKey(t, key2, ParametersOpts{
 				KeySizeInBytes: len(key2),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
 				Variant:        VariantCrunchy,
-			},
-			keyBytes:      key2,
+			}),
 			ciphertext:    slices.Concat(crunchyPrefix, ciphertext2),
 			wantPlaintext: wantMessage2,
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, No Prefix Variant", len(key2)*8),
-			opts: ParametersOpts{
+			key: newKey(t, key2, ParametersOpts{
 				KeySizeInBytes: len(key2),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
 				Variant:        VariantNoPrefix,
-			},
-			keyBytes:      key2,
+			}),
 			ciphertext:    ciphertext2,
 			wantPlaintext: wantMessage2,
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			key := newKey(t, testCase.keyBytes, testCase.opts)
-			primitive, err := primitiveConstructor(key)
+			// Using primitiveConstructor.
+			p, err := primitiveConstructor(testCase.key)
 			if err != nil {
-				t.Fatalf("primitiveConstructor(key) err = %v, want nil", err)
+				t.Fatalf("primitiveConstructor(testCase.key) err = %v, want nil", err)
 			}
-			aesgcmPrimitive := primitive.(*AEAD)
-			if aesgcmPrimitive == nil {
-				t.Errorf("primitiveConstructor(key) has type %T, wanted *aesgcm.AEAD", primitive)
+			a, ok := p.(tink.AEAD)
+			if !ok {
+				t.Errorf("primitiveConstructor(key) has type %T, wanted *aesgcm.AEAD", a)
 			}
-			decrypted, err := aesgcmPrimitive.Decrypt(testCase.ciphertext, []byte{})
+			decrypted, err := a.Decrypt(testCase.ciphertext, nil)
 			if err != nil {
-				t.Fatalf("aesgcmPrimitive.Decrypt(%x, []byte{}) err = %v, want nil", testCase.ciphertext, err)
+				t.Fatalf("a.Decrypt(testCase.ciphertext, nil) err = %v, want nil", err)
 			}
-			if got, want := decrypted, testCase.wantPlaintext; !bytes.Equal(got, want) {
-				t.Errorf("aesgcmPrimitive.Decrypt(%x, %x) = %x, want %x", testCase.ciphertext, testCase.wantPlaintext, got, want)
+			if !bytes.Equal(decrypted, testCase.wantPlaintext) {
+				t.Errorf("a.Decrypt(testCase.ciphertext, nil) = %v, want %v", decrypted, testCase.wantPlaintext)
 			}
 		})
 	}
