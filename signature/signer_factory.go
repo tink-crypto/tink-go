@@ -16,6 +16,7 @@ package signature
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
@@ -45,15 +46,57 @@ type wrappedSigner struct {
 // Asserts that wrappedSigner implements the Signer interface.
 var _ tink.Signer = (*wrappedSigner)(nil)
 
-func newWrappedSigner(ps *primitiveset.PrimitiveSet) (*wrappedSigner, error) {
-	if _, ok := (ps.Primary.Primitive).(tink.Signer); !ok {
+type fullSignerAdapter struct {
+	primitive  tink.Signer
+	prefix     []byte
+	prefixType tinkpb.OutputPrefixType
+}
+
+var _ tink.Signer = (*fullSignerAdapter)(nil)
+
+func (a *fullSignerAdapter) Sign(data []byte) ([]byte, error) {
+	toSign := data
+	if a.prefixType == tinkpb.OutputPrefixType_LEGACY {
+		toSign = slices.Concat(data, []byte{0})
+	}
+	s, err := a.primitive.Sign(toSign)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Concat(a.prefix, s), nil
+}
+
+// extractFullSigner returns a [tink.Signer] from the given entry as a "full"
+// primitive.
+//
+// It wraps legacy primitives in a full primitive adapter.
+func extractFullSigner(entry *primitiveset.Entry) (tink.Signer, error) {
+	if entry.FullPrimitive != nil {
+		p, ok := (entry.FullPrimitive).(tink.Signer)
+		if !ok {
+			return nil, fmt.Errorf("public_key_sign_factory: not a Signer full primitive")
+		}
+		return p, nil
+	}
+	p, ok := (entry.Primitive).(tink.Signer)
+	if !ok {
 		return nil, fmt.Errorf("public_key_sign_factory: not a Signer primitive")
 	}
+	return &fullSignerAdapter{
+		primitive:  p,
+		prefix:     []byte(entry.Prefix),
+		prefixType: entry.PrefixType,
+	}, nil
+}
 
-	for _, primitives := range ps.Entries {
-		for _, p := range primitives {
-			if _, ok := (p.Primitive).(tink.Signer); !ok {
-				return nil, fmt.Errorf("public_key_sign_factory: not an Signer primitive")
+func newWrappedSigner(ps *primitiveset.PrimitiveSet) (*wrappedSigner, error) {
+	if _, err := extractFullSigner(ps.Primary); err != nil {
+		return nil, err
+	}
+	for _, entries := range ps.Entries {
+		for _, entry := range entries {
+			if _, err := extractFullSigner(entry); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -68,7 +111,7 @@ func newWrappedSigner(ps *primitiveset.PrimitiveSet) (*wrappedSigner, error) {
 }
 
 func createSignerLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, error) {
-	// only keysets which contain annotations are monitored.
+	// Only keysets which contain annotations are monitored.
 	if len(ps.Annotations) == 0 {
 		return &monitoringutil.DoNothingLogger{}, nil
 	}
@@ -83,35 +126,17 @@ func createSignerLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, error
 	})
 }
 
-// Sign signs the given data and returns the signature concatenated with the identifier of the
-// primary primitive.
+// Sign signs the given data using the primary key.
 func (s *wrappedSigner) Sign(data []byte) ([]byte, error) {
-	primary := s.ps.Primary
-	signer, ok := (primary.Primitive).(tink.Signer)
-	if !ok {
-		return nil, fmt.Errorf("public_key_sign_factory: not a Signer primitive")
+	signer, err := extractFullSigner(s.ps.Primary)
+	if err != nil {
+		return nil, err
 	}
-
-	var signedData []byte
-	if primary.PrefixType == tinkpb.OutputPrefixType_LEGACY {
-		signedData = make([]byte, 0, len(data)+1)
-		signedData = append(signedData, data...)
-		signedData = append(signedData, byte(0))
-	} else {
-		signedData = data
-	}
-
-	signature, err := signer.Sign(signedData)
+	signature, err := signer.Sign(data)
 	if err != nil {
 		s.logger.LogFailure()
 		return nil, err
 	}
-	s.logger.Log(primary.KeyID, len(data))
-	if len(primary.Prefix) == 0 {
-		return signature, nil
-	}
-	output := make([]byte, 0, len(primary.Prefix)+len(signature))
-	output = append(output, primary.Prefix...)
-	output = append(output, signature...)
-	return output, nil
+	s.logger.Log(s.ps.Primary.KeyID, len(data))
+	return signature, nil
 }

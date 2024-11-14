@@ -17,14 +17,19 @@ package signature_test
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -478,5 +483,208 @@ func TestVerifyWithLegacyKeyDoesNotHaveSideEffectOnMessage(t *testing.T) {
 	wantData := []byte("data")
 	if !bytes.Equal(data, wantData) {
 		t.Errorf("data = %q, want: %q", data, wantData)
+	}
+}
+
+const stubKeyURL = "type.googleapis.com/google.crypto.tink.SomeKey"
+
+type stubFullSigner struct{}
+
+func (s *stubFullSigner) Sign(data []byte) ([]byte, error) {
+	return slices.Concat([]byte("full_signer_prefix"), data), nil
+}
+
+type stubParams struct{}
+
+var _ key.Parameters = (*stubParams)(nil)
+
+func (p *stubParams) Equals(_ key.Parameters) bool { return true }
+func (p *stubParams) HasIDRequirement() bool       { return true }
+
+type stubPublicKey struct{}
+
+var _ key.Key = (*stubPublicKey)(nil)
+
+func (p *stubPublicKey) Equals(_ key.Key) bool         { return true }
+func (p *stubPublicKey) Parameters() key.Parameters    { return &stubParams{} }
+func (p *stubPublicKey) IDRequirement() (uint32, bool) { return 0, false }
+func (p *stubPublicKey) HasIDRequirement() bool        { return true }
+
+type stubPrivateKey struct {
+	prefixType   tinkpb.OutputPrefixType
+	idRequrement uint32
+}
+
+var _ key.Key = (*stubPrivateKey)(nil)
+
+func (p *stubPrivateKey) Equals(_ key.Key) bool         { return true }
+func (p *stubPrivateKey) Parameters() key.Parameters    { return &stubParams{} }
+func (p *stubPrivateKey) IDRequirement() (uint32, bool) { return p.idRequrement, p.HasIDRequirement() }
+func (p *stubPrivateKey) HasIDRequirement() bool        { return p.prefixType != tinkpb.OutputPrefixType_RAW }
+func (p *stubPrivateKey) PublicKey() (key.Key, error)   { return &stubPublicKey{}, nil }
+
+type stubPrivateKeySerialization struct{}
+
+var _ protoserialization.KeySerializer = (*stubPrivateKeySerialization)(nil)
+
+func (s *stubPrivateKeySerialization) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	return protoserialization.NewKeySerialization(
+		&tinkpb.KeyData{
+			TypeUrl:         stubKeyURL,
+			Value:           []byte("serialized_key"),
+			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+		},
+		key.(*stubPrivateKey).prefixType,
+		key.(*stubPrivateKey).idRequrement,
+	)
+}
+
+type stubPrivateKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*stubPrivateKeyParser)(nil)
+
+func (s *stubPrivateKeyParser) ParseKey(serialization *protoserialization.KeySerialization) (key.Key, error) {
+	idRequirement, _ := serialization.IDRequirement()
+	return &stubPrivateKey{serialization.OutputPrefixType(), idRequirement}, nil
+}
+
+func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
+	defer registryconfig.ClearPrimitiveConstructors()
+	defer protoserialization.ClearKeyParsers()
+	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubKeyURL, &stubPrivateKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	// Register a primitive constructor to make sure that the factory uses the
+	// full primitive.
+	primitiveConstructor := func(key key.Key) (any, error) { return &stubFullSigner{}, nil }
+	if err := registryconfig.RegisterPrimitiveConstructor[*stubPrivateKey](primitiveConstructor); err != nil {
+		t.Fatalf("registryconfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubPrivateKey{
+		tinkpb.OutputPrefixType_TINK,
+		0x1234,
+	})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	signer, err := signature.NewSigner(handle)
+	if err != nil {
+		t.Fatalf("signature.NewSigner() err = %v, want nil", err)
+	}
+	data := []byte("data")
+	signature, err := signer.Sign(data)
+	if err != nil {
+		t.Fatalf("signer.Sign() err = %v, want nil", err)
+	}
+	if !bytes.Equal(signature, slices.Concat([]byte("full_signer_prefix"), data)) {
+		t.Errorf("signature = %q, want: %q", signature, data)
+	}
+}
+
+type stubLegacySigner struct{}
+
+func (s *stubLegacySigner) Sign(data []byte) ([]byte, error) {
+	return slices.Concat([]byte("legacy_signer_prefix"), data), nil
+}
+
+type stubKeyManager struct{}
+
+var _ registry.KeyManager = (*stubKeyManager)(nil)
+
+func (km *stubKeyManager) NewKey(_ []byte) (proto.Message, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubKeyManager) DoesSupport(keyURL string) bool  { return keyURL == stubKeyURL }
+func (km *stubKeyManager) TypeURL() string                 { return stubKeyURL }
+func (km *stubKeyManager) Primitive(_ []byte) (any, error) { return &stubLegacySigner{}, nil }
+
+func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
+	defer protoserialization.ClearKeyParsers()
+	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubKeyURL, &stubPrivateKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	if err := registry.RegisterKeyManager(&stubKeyManager{}); err != nil {
+		t.Fatalf("registry.RegisterKeyManager() err = %v, want nil", err)
+	}
+
+	data := []byte("data")
+	legacyPrefix := []byte("legacy_signer_prefix")
+	for _, tc := range []struct {
+		name         string
+		key          *stubPrivateKey
+		wantSigature []byte
+	}{
+		{
+			name:         "TINK",
+			key:          &stubPrivateKey{tinkpb.OutputPrefixType_TINK, 0x1234},
+			wantSigature: slices.Concat([]byte{cryptofmt.TinkStartByte, 0x00, 0x00, 0x12, 0x34}, legacyPrefix, data),
+		},
+		{
+			name:         "LEGACY",
+			key:          &stubPrivateKey{tinkpb.OutputPrefixType_LEGACY, 0x1234},
+			wantSigature: slices.Concat([]byte{cryptofmt.LegacyStartByte, 0x00, 0x00, 0x12, 0x34}, legacyPrefix, data, []byte{0}),
+		},
+		{
+			name:         "CRUNCHY",
+			key:          &stubPrivateKey{tinkpb.OutputPrefixType_CRUNCHY, 0x1234},
+			wantSigature: slices.Concat([]byte{cryptofmt.LegacyStartByte, 0x00, 0x00, 0x12, 0x34}, legacyPrefix, data),
+		},
+		{
+			name:         "RAW",
+			key:          &stubPrivateKey{tinkpb.OutputPrefixType_RAW, 0},
+			wantSigature: slices.Concat(legacyPrefix, data),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a keyset with a single key.
+			km := keyset.NewManager()
+			keyID, err := km.AddKey(tc.key)
+			if err != nil {
+				t.Fatalf("km.AddKey() err = %v, want nil", err)
+			}
+			if err := km.SetPrimary(keyID); err != nil {
+				t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+			}
+			handle, err := km.Handle()
+			if err != nil {
+				t.Fatalf("km.Handle() err = %v, want nil", err)
+			}
+
+			signer, err := signature.NewSigner(handle)
+			if err != nil {
+				t.Fatalf("signature.NewSigner() err = %v, want nil", err)
+			}
+			signature, err := signer.Sign(data)
+			if err != nil {
+				t.Fatalf("signer.Sign() err = %v, want nil", err)
+			}
+			if !bytes.Equal(signature, tc.wantSigature) {
+				t.Errorf("signature = %q, want: %q", signature, data)
+			}
+		})
 	}
 }
