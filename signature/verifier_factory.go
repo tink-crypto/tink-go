@@ -15,8 +15,9 @@
 package signature
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
+	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -48,15 +49,56 @@ type wrappedVerifier struct {
 // Asserts that verifierSet implements the Verifier interface.
 var _ tink.Verifier = (*wrappedVerifier)(nil)
 
-func newWrappedVerifier(ps *primitiveset.PrimitiveSet) (*wrappedVerifier, error) {
-	if _, ok := (ps.Primary.Primitive).(tink.Verifier); !ok {
+type fullVerifierAdapter struct {
+	primitive        tink.Verifier
+	prefix           []byte
+	outputPrefixType tinkpb.OutputPrefixType
+}
+
+var _ tink.Verifier = (*fullVerifierAdapter)(nil)
+
+func (a *fullVerifierAdapter) Verify(signatureBytes, data []byte) error {
+	if !bytes.HasPrefix(signatureBytes, a.prefix) {
+		return fmt.Errorf("verifier_factory: invalid signature prefix")
+	}
+	message := data
+	if a.outputPrefixType == tinkpb.OutputPrefixType_LEGACY {
+		message = slices.Concat(message, []byte{0})
+	}
+	return a.primitive.Verify(signatureBytes[len(a.prefix):], message)
+}
+
+// extractFullVerifier returns a [tink.Verifier] from the given entry as a
+// "full" primitive.
+//
+// It wraps legacy primitives in a full primitive adapter.
+func extractFullVerifier(entry *primitiveset.Entry) (tink.Verifier, error) {
+	if entry.FullPrimitive != nil {
+		p, ok := (entry.FullPrimitive).(tink.Verifier)
+		if !ok {
+			return nil, fmt.Errorf("verifier_factory: not a Verifier full primitive")
+		}
+		return p, nil
+	}
+	p, ok := (entry.Primitive).(tink.Verifier)
+	if !ok {
 		return nil, fmt.Errorf("verifier_factory: not a Verifier primitive")
 	}
+	return &fullVerifierAdapter{
+		primitive:        p,
+		prefix:           []byte(entry.Prefix),
+		outputPrefixType: entry.PrefixType,
+	}, nil
+}
 
-	for _, primitives := range ps.Entries {
-		for _, p := range primitives {
-			if _, ok := (p.Primitive).(tink.Verifier); !ok {
-				return nil, fmt.Errorf("verifier_factory: not an Verifier primitive")
+func newWrappedVerifier(ps *primitiveset.PrimitiveSet) (*wrappedVerifier, error) {
+	if _, err := extractFullVerifier(ps.Primary); err != nil {
+		return nil, err
+	}
+	for _, entries := range ps.Entries {
+		for _, entry := range entries {
+			if _, err := extractFullVerifier(entry); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -86,57 +128,36 @@ func createVerifierLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, err
 	})
 }
 
-var errInvalidSignature = errors.New("verifier_factory: invalid signature")
-
 // Verify checks whether the given signature is a valid signature of the given data.
 func (v *wrappedVerifier) Verify(signature, data []byte) error {
 	prefixSize := cryptofmt.NonRawPrefixSize
 	if len(signature) < prefixSize {
-		return errInvalidSignature
+		return fmt.Errorf("verifier_factory: invalid signature; expected at least %d bytes, got %d", prefixSize, len(signature))
 	}
-
-	// try non-raw keys
-	prefix := signature[:prefixSize]
-	signatureNoPrefix := signature[prefixSize:]
-	entries, err := v.ps.EntriesForPrefix(string(prefix))
-	if err == nil {
-		for i := 0; i < len(entries); i++ {
-			var signedData []byte
-			if entries[i].PrefixType == tinkpb.OutputPrefixType_LEGACY {
-				signedData = make([]byte, 0, len(data)+1)
-				signedData = append(signedData, data...)
-				signedData = append(signedData, byte(0))
-			} else {
-				signedData = data
-			}
-
-			verifier, ok := (entries[i].Primitive).(tink.Verifier)
-			if !ok {
-				return fmt.Errorf("verifier_factory: not an Verifier primitive")
-			}
-
-			if err = verifier.Verify(signatureNoPrefix, signedData); err == nil {
-				v.logger.Log(entries[i].KeyID, len(signedData))
-				return nil
-			}
+	// Try to verify with non-raw keys.
+	entries, _ := v.ps.EntriesForPrefix(string(signature[:prefixSize]))
+	for _, entry := range entries {
+		verifier, err := extractFullVerifier(entry)
+		if err != nil {
+			return err
+		}
+		if err = verifier.Verify(signature, data); err == nil {
+			v.logger.Log(entry.KeyID, len(data))
+			return nil
 		}
 	}
-
-	// try raw keys
-	entries, err = v.ps.RawEntries()
-	if err == nil {
-		for i := 0; i < len(entries); i++ {
-			verifier, ok := (entries[i].Primitive).(tink.Verifier)
-			if !ok {
-				return fmt.Errorf("verifier_factory: not an Verifier primitive")
-			}
-
-			if err = verifier.Verify(signature, data); err == nil {
-				v.logger.Log(entries[i].KeyID, len(data))
-				return nil
-			}
+	// Try to verify with raw keys.
+	entries, _ = v.ps.RawEntries()
+	for _, entry := range entries {
+		verifier, err := extractFullVerifier(entry)
+		if err != nil {
+			return err
+		}
+		if err = verifier.Verify(signature, data); err == nil {
+			v.logger.Log(entry.KeyID, len(data))
+			return nil
 		}
 	}
 	v.logger.LogFailure()
-	return errInvalidSignature
+	return fmt.Errorf("verifier_factory: invalid signature")
 }
