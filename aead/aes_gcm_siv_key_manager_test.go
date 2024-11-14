@@ -20,8 +20,10 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	gcmsivpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_siv_go_proto"
@@ -312,4 +314,32 @@ func validateAESGCMSIVPrimitive(p any, key *gcmsivpb.AesGcmSivKey) error {
 		return fmt.Errorf("subtle.AESGCMSIV.Decrypt(ct=%v, aad=%v): Decrypted bytes did not match original, got %v, want %v", ct, aad, decrypted, pt)
 	}
 	return nil
+}
+
+type stubAESGCMSIVConfig struct {
+	keyManagers map[string]registry.KeyManager
+}
+
+func (sc *stubAESGCMSIVConfig) RegisterKeyManager(keyTypeURL string, km registry.KeyManager, _ internalapi.Token) error {
+	sc.keyManagers[keyTypeURL] = km
+	return nil
+}
+
+func TestRegisterKeyManager(t *testing.T) {
+	sc := &stubAESGCMSIVConfig{make(map[string]registry.KeyManager)}
+	if len(sc.keyManagers) != 0 {
+		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.keyManagers))
+	}
+
+	err := aead.RegisterKeyManager(sc, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("RegisterKeyManager() err = %v, want nil", err)
+	}
+
+	if len(sc.keyManagers) != 1 {
+		t.Errorf("Number of registered key types = %d, want 1", len(sc.keyManagers))
+	}
+	if _, ok := sc.keyManagers[testutil.AESGCMSIVTypeURL]; !ok {
+		t.Errorf("RegisterKeyManager() registered wrong type URL, want %q", testutil.AESGCMSIVTypeURL)
+	}
 }
