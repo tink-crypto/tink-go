@@ -42,8 +42,17 @@ func NewVerifier(handle *keyset.Handle) (tink.Verifier, error) {
 // verifierSet is a Verifier implementation that uses the
 // underlying primitive set for verifying.
 type wrappedVerifier struct {
-	ps     *primitiveset.PrimitiveSet
-	logger monitoring.Logger
+	verifiers map[string][]verifierAndID
+	logger    monitoring.Logger
+}
+
+type verifierAndID struct {
+	verifier tink.Verifier
+	keyID    uint32
+}
+
+func (a *verifierAndID) Verify(signatureBytes, data []byte) error {
+	return a.verifier.Verify(signatureBytes, data)
 }
 
 // Asserts that verifierSet implements the Verifier interface.
@@ -95,11 +104,17 @@ func newWrappedVerifier(ps *primitiveset.PrimitiveSet) (*wrappedVerifier, error)
 	if _, err := extractFullVerifier(ps.Primary); err != nil {
 		return nil, err
 	}
+	verifiers := make(map[string][]verifierAndID)
 	for _, entries := range ps.Entries {
 		for _, entry := range entries {
-			if _, err := extractFullVerifier(entry); err != nil {
+			verifier, err := extractFullVerifier(entry)
+			if err != nil {
 				return nil, err
 			}
+			verifiers[entry.Prefix] = append(verifiers[entry.Prefix], verifierAndID{
+				verifier: verifier,
+				keyID:    entry.KeyID,
+			})
 		}
 	}
 	logger, err := createVerifierLogger(ps)
@@ -107,8 +122,8 @@ func newWrappedVerifier(ps *primitiveset.PrimitiveSet) (*wrappedVerifier, error)
 		return nil, err
 	}
 	return &wrappedVerifier{
-		ps:     ps,
-		logger: logger,
+		verifiers: verifiers,
+		logger:    logger,
 	}, nil
 }
 
@@ -135,26 +150,18 @@ func (v *wrappedVerifier) Verify(signature, data []byte) error {
 		return fmt.Errorf("verifier_factory: invalid signature; expected at least %d bytes, got %d", prefixSize, len(signature))
 	}
 	// Try to verify with non-raw keys.
-	entries, _ := v.ps.EntriesForPrefix(string(signature[:prefixSize]))
-	for _, entry := range entries {
-		verifier, err := extractFullVerifier(entry)
-		if err != nil {
-			return err
-		}
-		if err = verifier.Verify(signature, data); err == nil {
-			v.logger.Log(entry.KeyID, len(data))
+	verifiersByPrefix, _ := v.verifiers[string(signature[:prefixSize])]
+	for _, verifier := range verifiersByPrefix {
+		if err := verifier.Verify(signature, data); err == nil {
+			v.logger.Log(verifier.keyID, len(data))
 			return nil
 		}
 	}
 	// Try to verify with raw keys.
-	entries, _ = v.ps.RawEntries()
-	for _, entry := range entries {
-		verifier, err := extractFullVerifier(entry)
-		if err != nil {
-			return err
-		}
-		if err = verifier.Verify(signature, data); err == nil {
-			v.logger.Log(entry.KeyID, len(data))
+	rawVerifiers, _ := v.verifiers[cryptofmt.RawPrefix]
+	for _, verifier := range rawVerifiers {
+		if err := verifier.Verify(signature, data); err == nil {
+			v.logger.Log(verifier.keyID, len(data))
 			return nil
 		}
 	}
