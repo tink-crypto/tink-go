@@ -515,7 +515,7 @@ func (p *stubParams) Equals(_ key.Parameters) bool { return true }
 func (p *stubParams) HasIDRequirement() bool       { return true }
 
 type stubPublicKey struct {
-	prefixType   tinkpb.OutputPrefixType
+	prefixType    tinkpb.OutputPrefixType
 	idRequirement uint32
 }
 
@@ -549,13 +549,13 @@ var _ protoserialization.KeyParser = (*stubPublicKeyParser)(nil)
 func (s *stubPublicKeyParser) ParseKey(serialization *protoserialization.KeySerialization) (key.Key, error) {
 	idRequirement, _ := serialization.IDRequirement()
 	return &stubPublicKey{
-		prefixType:   serialization.OutputPrefixType(),
+		prefixType:    serialization.OutputPrefixType(),
 		idRequirement: idRequirement,
 	}, nil
 }
 
 type stubPrivateKey struct {
-	prefixType   tinkpb.OutputPrefixType
+	prefixType    tinkpb.OutputPrefixType
 	idRequirement uint32
 }
 
@@ -567,7 +567,7 @@ func (p *stubPrivateKey) IDRequirement() (uint32, bool) { return p.idRequirement
 func (p *stubPrivateKey) HasIDRequirement() bool        { return p.prefixType != tinkpb.OutputPrefixType_RAW }
 func (p *stubPrivateKey) PublicKey() (key.Key, error) {
 	return &stubPublicKey{
-		prefixType:   p.prefixType,
+		prefixType:    p.prefixType,
 		idRequirement: p.idRequirement,
 	}, nil
 }
@@ -595,14 +595,15 @@ var _ protoserialization.KeyParser = (*stubPrivateKeyParser)(nil)
 func (s *stubPrivateKeyParser) ParseKey(serialization *protoserialization.KeySerialization) (key.Key, error) {
 	idRequirement, _ := serialization.IDRequirement()
 	return &stubPrivateKey{
-		prefixType:   serialization.OutputPrefixType(),
+		prefixType:    serialization.OutputPrefixType(),
 		idRequirement: idRequirement,
 	}, nil
 }
 
 func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 	defer registryconfig.ClearPrimitiveConstructors()
-	defer protoserialization.ClearKeyParsers()
+	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
 	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
 
@@ -631,7 +632,7 @@ func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 
 	km := keyset.NewManager()
 	keyID, err := km.AddKey(&stubPrivateKey{
-		prefixType:   tinkpb.OutputPrefixType_RAW,
+		prefixType:    tinkpb.OutputPrefixType_RAW,
 		idRequirement: 0,
 	})
 	if err != nil {
@@ -721,7 +722,8 @@ func (km *stubPublicKeyManager) TypeURL() string                 { return stubPu
 func (km *stubPublicKeyManager) Primitive(_ []byte) (any, error) { return &stubLegacyVerifier{}, nil }
 
 func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
-	defer protoserialization.ClearKeyParsers()
+	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
 	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
 

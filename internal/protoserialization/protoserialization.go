@@ -311,13 +311,14 @@ func (s *fallbackProtoPrivateKeySerializer) SerializeKey(key key.Key) (*KeySeria
 	return fallbackKey.protoKeySerialization.clone(), nil
 }
 
-// ClearKeyParsers clears the global key parsers registry.
+// UnregisterKeyParser removes the key parser for the given type URL from the
+// global key parsers registry.
 //
 // This function is intended to be used in tests only.
-func ClearKeyParsers() {
+func UnregisterKeyParser(keyTypeURL string) {
 	keyParsersMu.Lock()
 	defer keyParsersMu.Unlock()
-	clear(keyParsers)
+	delete(keyParsers, keyTypeURL)
 }
 
 // UnregisterKeySerializer removes the serializer for the given key type from
