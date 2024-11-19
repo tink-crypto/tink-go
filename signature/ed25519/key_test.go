@@ -408,10 +408,9 @@ func TestPublicKeyKeyBytes(t *testing.T) {
 }
 
 const (
-	// Taken from
-	// https://github.com/google/boringssl/blob/f10c1dc37174843c504a80e94c252e35b7b1eb61/crypto/evp/evp_tests.txt#L178
-	privKeyHex = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
-	pubKeyHex  = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+	// Taken from https://datatracker.ietf.org/doc/html/rfc8032#appendix-A - TEST 3.
+	privKeyHex = "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7"
+	pubKeyHex  = "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025"
 )
 
 var testCases = []struct {
