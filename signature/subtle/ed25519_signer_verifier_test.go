@@ -20,135 +20,158 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	subtleSignature "github.com/tink-crypto/tink-go/v2/signature/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
-func TestED25519Deterministic(t *testing.T) {
-	data := random.GetRandomBytes(20)
-	public, priv, err := ed25519.GenerateKey(rand.Reader)
+func TestED25519SignVerifyCorrectness(t *testing.T) {
+	// Taken from https://datatracker.ietf.org/doc/html/rfc8032#section-7.1 - TEST 3.
+	message := []byte{0xaf, 0x82}
+	privKeyHex := "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7"
+	privKeySeed, err := hex.DecodeString(privKeyHex)
 	if err != nil {
-		t.Errorf("key generation error: %s", err)
+		t.Fatalf("hex.DecodeString(%q) err = %v, want nil", privKeyHex, err)
+	}
+	privateKey := ed25519.NewKeyFromSeed(privKeySeed)
+	pubKeyHex := "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025"
+	pubKeyBytes, err := hex.DecodeString(pubKeyHex)
+	if err != nil {
+		t.Fatalf("hex.DecodeString(%q) err = %v, want nil", pubKeyHex, err)
+	}
+	publicKey := ed25519.PublicKey(pubKeyBytes)
+	signatureHex := "6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a"
+	wantSignature, err := hex.DecodeString(signatureHex)
+	if err != nil {
+		t.Fatalf("hex.DecodeString(%q) err = %v, want nil", signatureHex, err)
 	}
 
-	// Use the private key and public key directly to create new instances
-	signer, verifier, err := newSignerVerifier(t, &priv, &public)
+	signer, err := subtleSignature.NewED25519SignerFromPrivateKey(&privateKey)
 	if err != nil {
-		t.Errorf("unexpected error when creating ED25519 Signer and Verifier: %s", err)
+		t.Fatalf("unexpected error when creating ED25519 Signer: %s", err)
 	}
-	sign1, err := signer.Sign(data)
+	verifier, err := subtleSignature.NewED25519VerifierFromPublicKey(&publicKey)
 	if err != nil {
-		t.Errorf("unexpected error when signing: %s", err)
-	}
-	if err := verifier.Verify(sign1, data); err != nil {
-		t.Errorf("unexpected error when verifying: %s", err)
+		t.Fatalf("unexpected error when creating ED25519 Verifier: %s", err)
 	}
 
-	sign2, err := signer.Sign(data)
+	gotSignature, err := signer.Sign(message)
 	if err != nil {
-		t.Errorf("unexpected error when signing: %s", err)
+		t.Fatalf("signer.Sign(%x) err = %v, want nil", message, err)
 	}
-	if err := verifier.Verify(sign2, data); err != nil {
-		t.Errorf("unexpected error when verifying: %s", err)
-	}
-	if !bytes.Equal(sign1, sign2) {
-		t.Error("deterministic signature check failure")
+	if diff := cmp.Diff(gotSignature, wantSignature); diff != "" {
+		t.Errorf("signer.Sign() returned unexpected diff (-want +got):\n%s", diff)
 	}
 
+	if err := verifier.Verify(wantSignature, message); err != nil {
+		t.Errorf("verifier.Verify(%x, %x) err = %v, want nil", wantSignature, message, err)
+	}
 }
 
-func TestEd25519VerifyModifiedSignature(t *testing.T) {
+func TestED25519VerifyFails(t *testing.T) {
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("key generation error: %s", err)
+	}
+	signer, err := subtleSignature.NewED25519SignerFromPrivateKey(&privateKey)
+	if err != nil {
+		t.Fatalf("unexpected error when creating ED25519 Signer: %s", err)
+	}
+	verifier, err := subtleSignature.NewED25519VerifierFromPublicKey(&publicKey)
+	if err != nil {
+		t.Fatalf("unexpected error when creating ED25519 Verifier: %s", err)
+	}
 	data := random.GetRandomBytes(20)
-	public, priv, err := ed25519.GenerateKey(rand.Reader)
+	signatureBytes, err := signer.Sign(data)
 	if err != nil {
-		t.Errorf("key generation error: %s", err)
-	}
-	// Use the private key and public key directly to create new instances
-	signer, verifier, err := newSignerVerifier(t, &priv, &public)
-	if err != nil {
-		t.Fatalf("failed to create new signer verifier: %v", err)
+		t.Fatalf("signer.Sign(%x) err = %v, want nil", data, err)
 	}
 
-	sign, err := signer.Sign(data)
-	if err != nil {
-		t.Errorf("unexpected error when signing: %s", err)
-	}
-
-	for i := 0; i < len(sign); i++ {
+	// Modify the signature.
+	for i := 0; i < len(signatureBytes); i++ {
+		modifiedRawSignature := slices.Clone(signatureBytes)
 		for j := 0; j < 8; j++ {
-			sign[i] = byte(sign[i] ^ (1 << uint32(j)))
-			if err := verifier.Verify(sign, data); err == nil {
-				t.Errorf("unexpected error when verifying: %s", err)
+			modifiedRawSignature[i] = byte(modifiedRawSignature[i] ^ (1 << uint32(j)))
+			if err := verifier.Verify(modifiedRawSignature, data); err == nil {
+				t.Errorf("verifier.Verify(%x, data) err = nil, want error", modifiedRawSignature)
 			}
 		}
 	}
-}
-func TestEd25519VerifyModifiedMessage(t *testing.T) {
-	data := random.GetRandomBytes(20)
-	public, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Errorf("key generation error: %s", err)
-	}
-
-	// Use the private key and public key directly to create new instances
-	signer, verifier, err := newSignerVerifier(t, &priv, &public)
-	if err != nil {
-		t.Fatalf("failed to create new signer verifier: %v", err)
-	}
-
-	sign, err := signer.Sign(data)
-	if err != nil {
-		t.Errorf("unexpected error when signing: %s", err)
-	}
-
+	// Modify the message.
 	for i := 0; i < len(data); i++ {
+		modifiedData := slices.Clone(data)
 		for j := 0; j < 8; j++ {
-			data[i] = byte(data[i] ^ (1 << uint32(j)))
-			if err := verifier.Verify(sign, data); err == nil {
-				t.Errorf("unexpected error when verifying: %s", err)
+			modifiedData[i] = byte(modifiedData[i] ^ (1 << uint32(j)))
+			if err := verifier.Verify(signatureBytes, modifiedData); err == nil {
+				t.Errorf("verifier.Verify(signature, %x) err = nil, want error", modifiedData)
 			}
 		}
 	}
 }
+
 func TestED25519SignVerify(t *testing.T) {
-	public, priv, err := ed25519.GenerateKey(rand.Reader)
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		t.Errorf("key generation error: %s", err)
+		t.Fatalf("key generation error: %s", err)
 	}
-
-	// Use the private key and public key directly to create new instances
-	signer, verifier, err := newSignerVerifier(t, &priv, &public)
-	if err != nil {
-		t.Errorf("unexpected error when creating ED25519 Signer and Verifier: %s", err)
+	for _, tc := range []struct {
+		name     string
+		signer   tink.Signer
+		verifier tink.Verifier
+	}{
+		{
+			name: "signer from private key",
+			signer: func() tink.Signer {
+				signer, err := subtleSignature.NewED25519SignerFromPrivateKey(&privateKey)
+				if err != nil {
+					t.Fatalf("unexpected error when creating ED25519 Signer: %s", err)
+				}
+				return signer
+			}(),
+			verifier: func() tink.Verifier {
+				verifier, err := subtleSignature.NewED25519VerifierFromPublicKey(&publicKey)
+				if err != nil {
+					t.Fatalf("unexpected error when creating ED25519 Verifier: %s", err)
+				}
+				return verifier
+			}(),
+		},
+		{
+			name: "signer from slice",
+			signer: func() tink.Signer {
+				signer, err := subtleSignature.NewED25519Signer(privateKey[:ed25519.SeedSize])
+				if err != nil {
+					t.Fatalf("unexpected error when creating ED25519 Signer: %s", err)
+				}
+				return signer
+			}(),
+			verifier: func() tink.Verifier {
+				verifier, err := subtleSignature.NewED25519VerifierFromPublicKey(&publicKey)
+				if err != nil {
+					t.Fatalf("unexpected error when creating ED25519 Verifier: %s", err)
+				}
+				return verifier
+			}(),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for i := 0; i < 100; i++ {
+				data := random.GetRandomBytes(20)
+				signatureBytes, err := tc.signer.Sign(data)
+				if err != nil {
+					t.Fatalf("signer.Sign(%x) err = %v, want nil", data, err)
+				}
+				if err := tc.verifier.Verify(signatureBytes, data); err != nil {
+					t.Errorf("tc.verifier.Verify(%x, %x) err = %v, want nil", signatureBytes, data, err)
+				}
+			}
+		})
 	}
-	for i := 0; i < 100; i++ {
-		data := random.GetRandomBytes(20)
-		signature, err := signer.Sign(data)
-		if err != nil {
-			t.Errorf("unexpected error when signing: %s", err)
-		}
-		if err := verifier.Verify(signature, data); err != nil {
-			t.Errorf("unexpected error when verifying: %s", err)
-		}
-
-		// Use byte slices to create new instances
-		signer, err = subtleSignature.NewED25519Signer(priv[:ed25519.SeedSize])
-		if err != nil {
-			t.Errorf("unexpected error when creating ED25519 Signer: %s", err)
-		}
-
-		signature, err = signer.Sign(data)
-		if err != nil {
-			t.Errorf("unexpected error when signing: %s", err)
-		}
-		if err = verifier.Verify(signature, data); err != nil {
-			t.Errorf("unexpected error when verifying: %s", err)
-		}
-	}
-
 }
 
 func TestED25519WycheproofCases(t *testing.T) {
@@ -209,17 +232,4 @@ func TestED25519WycheproofCases(t *testing.T) {
 			})
 		}
 	}
-}
-
-func newSignerVerifier(t *testing.T, pvtKey *ed25519.PrivateKey, pubKey *ed25519.PublicKey) (*subtleSignature.ED25519Signer, *subtleSignature.ED25519Verifier, error) {
-	t.Helper()
-	signer, err := subtleSignature.NewED25519SignerFromPrivateKey(pvtKey)
-	if err != nil {
-		return nil, nil, err
-	}
-	verifier, err := subtleSignature.NewED25519VerifierFromPublicKey(pubKey)
-	if err != nil {
-		return nil, nil, err
-	}
-	return signer, verifier, nil
 }
