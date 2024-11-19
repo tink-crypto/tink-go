@@ -16,6 +16,7 @@ package subtle
 
 import (
 	"crypto/ed25519"
+	"fmt"
 )
 
 // ED25519Signer is an implementation of Signer for ED25519.
@@ -25,6 +26,9 @@ type ED25519Signer struct {
 
 // NewED25519Signer creates a new instance of ED25519Signer.
 func NewED25519Signer(keyValue []byte) (*ED25519Signer, error) {
+	if len(keyValue) != ed25519.SeedSize {
+		return nil, fmt.Errorf("ed25519: invalid key length %d, want %d", len(keyValue), ed25519.SeedSize)
+	}
 	p := ed25519.NewKeyFromSeed(keyValue)
 	return NewED25519SignerFromPrivateKey(&p)
 }

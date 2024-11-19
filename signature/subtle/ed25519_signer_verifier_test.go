@@ -174,6 +174,42 @@ func TestED25519SignVerify(t *testing.T) {
 	}
 }
 
+func NewED25519SignerInvalidKeyLength(t *testing.T) {
+	seedHex := "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025"
+	seedBytes, err := hex.DecodeString(seedHex)
+	if err != nil {
+		t.Fatalf("hex.DecodeString(%q) err = %v, want nil", seedHex, err)
+	}
+	for _, tc := range []struct {
+		name     string
+		keyValue []byte
+	}{
+		{
+			name:     "nil key",
+			keyValue: nil,
+		},
+		{
+			name:     "empty key",
+			keyValue: []byte{},
+		},
+		{
+			name:     "too small",
+			keyValue: seedBytes[:len(seedBytes)-1],
+		},
+		{
+			name:     "too large",
+			keyValue: slices.Concat(seedBytes, []byte{0xFF}),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := subtleSignature.NewED25519Signer(tc.keyValue)
+			if err == nil {
+				t.Errorf("NewED25519Signer(0x%x) err = nil, want error", tc.keyValue)
+			}
+		})
+	}
+}
+
 func TestED25519WycheproofCases(t *testing.T) {
 	suite := new(ed25519Suite)
 	if err := testutil.PopulateSuite(suite, "eddsa_test.json"); err != nil {
