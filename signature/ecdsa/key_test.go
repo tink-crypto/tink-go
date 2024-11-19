@@ -264,29 +264,32 @@ func TestNewParameters(t *testing.T) {
 }
 
 const (
-	// From
-	// https://github.com/google/boringssl/blob/59c222fcf123ec2026da450a0a8676436751a351/crypto/fipsmodule/ecdsa/ecdsa_sign_tests.txt#L550
-	pubKeyXP256Hex = "29578c7ab6ce0d11493c95d5ea05d299d536801ca9cbd50e9924e43b733b83ab"
-	pubKeyYP256Hex = "08c8049879c6278b2273348474158515accaa38344106ef96803c5a05adc4800"
-	privateP256Hex = "708309a7449e156b0db70e5b52e606c7e094ed676ce8953bf6c14757c826f590"
-
-	// From
-	// https://github.com/google/boringssl/blob/59c222fcf123ec2026da450a0a8676436751a351/crypto/fipsmodule/ecdsa/ecdsa_sign_tests.txt#L1630
-	pubKeyXP5216Hex = "01a7596d38aac7868327ddc1ef5e8178cf052b7ebc512828e8a45955d85bef49494d15278198bbcc5454358c12a2af9a3874e7002e1a2f02fcb36ff3e3b4bc0c69e7"
-	pubKeyYP5216Hex = "0184902e515982bb225b8c84f245e61b327c08e94d41c07d0b4101a963e02fe52f6a9f33e8b1de2394e0cb74c40790b4e489b5500e6804cabed0fe8c192443d4027b"
-
-	// From
-	// https://github.com/google/boringssl/blob/59c222fcf123ec2026da450a0a8676436751a351/crypto/fipsmodule/ecdsa/ecdsa_sign_tests.txt#L10
-	pubKeyXP224Hex = "605495756e6e88f1d07ae5f98787af9b4da8a641d1a9492a12174eab"
-	pubKeyYP224Hex = "f5cc733b17decc806ef1df861a42505d0af9ef7c3df3959b8dfc6669"
-
+	// Taken from https://datatracker.ietf.org/doc/html/rfc6979.html#appendix-A.2.5
+	pubKeyXP256Hex      = "60FED4BA255A9D31C961EB74C6356D68C049B8923B61FA6CE669622E60F29FB6"
+	pubKeyYP256Hex      = "7903FE1008B8BC99A41AE9E95628BC64F2F1B20C2D7E9F5177A3C294D4462299"
+	privKeyValueP256Hex = "C9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721"
 	// Encoded as an uncompressed octet string as per [SEC 1 v2.0, Section 2.3.3]
 	//
 	// [SEC 1 v2.0, Section 2.3.3]: https://www.secg.org/sec1-v2.pdf#page=17.08
-	pubKeyUncompressedP256        = "04" + pubKeyXP256Hex + pubKeyYP256Hex
-	pubKeyUncompressedP256Invalid = "04" + pubKeyXP256Hex + "08c8049879c6278b227334847415851500000000000000000000000000000000"
-	pubKeyUncompressedP521        = "04" + pubKeyXP5216Hex + pubKeyYP5216Hex
-	pubKeyUncompressedP224        = "04" + pubKeyXP224Hex + pubKeyYP224Hex
+	pubKeyUncompressedP256Hex        = "04" + pubKeyXP256Hex + pubKeyYP256Hex
+	pubKeyUncompressedP256InvalidHex = "04" + pubKeyXP256Hex + "08c8049879c6278b227334847415851500000000000000000000000000000000"
+
+	// Taken from https://datatracker.ietf.org/doc/html/rfc6979.html#appendix-A.2.6
+	pubKeyXP384Hex            = "EC3A4E415B4E19A4568618029F427FA5DA9A8BC4AE92E02E06AAE5286B300C64DEF8F0EA9055866064A254515480BC13"
+	pubKeyYP384Hex            = "8015D9B72D7D57244EA8EF9AC0C621896708A59367F9DFB9F54CA84B3F1C9DB1288B231C3AE0D4FE7344FD2533264720"
+	privKeyValueP384Hex       = "6B9D3DAD2E1B8C1C05B19875B6659F4DE23C3B667BF297BA9AA47740787137D896D5724E4C70A825F872C9EA60D2EDF5"
+	pubKeyUncompressedP384Hex = "04" + pubKeyXP384Hex + pubKeyYP384Hex
+
+	// Taken from https://datatracker.ietf.org/doc/html/rfc6979.html#appendix-A.2.7
+	pubKeyXP521Hex            = "01894550D0785932E00EAA23B694F213F8C3121F86DC97A04E5A7167DB4E5BCD371123D46E45DB6B5D5370A7F20FB633155D38FFA16D2BD761DCAC474B9A2F5023A4"
+	pubKeyYP521Hex            = "00493101C962CD4D2FDDF782285E64584139C2F91B47F87FF82354D6630F746A28A0DB25741B5B34A828008B22ACC23F924FAAFBD4D33F81EA66956DFEAA2BFDFCF5"
+	privKeyValueP521Hex       = "00FAD06DAA62BA3B25D2FB40133DA757205DE67F5BB0018FEE8C86E1B68C7E75CAA896EB32F1F47C70855836A6D16FCC1466F6D8FBEC67DB89EC0C08B0E996B83538"
+	pubKeyUncompressedP521Hex = "04" + pubKeyXP521Hex + pubKeyYP521Hex
+
+	// From https://datatracker.ietf.org/doc/html/rfc6979.html#appendix-A.2.4
+	pubKeyXP224Hex            = "00CF08DA5AD719E42707FA431292DEA11244D64FC51610D94B130D6C"
+	pubKeyYP224Hex            = "EEAB6F3DEBE455E3DBF85416F7030CBD94F34F2D6F232C69F3C1385A"
+	pubKeyUncompressedP224Hex = "04" + pubKeyXP224Hex + pubKeyYP224Hex
 )
 
 func bytesFromHex(t *testing.T, hexStr string) []byte {
@@ -299,8 +302,8 @@ func bytesFromHex(t *testing.T, hexStr string) []byte {
 }
 
 func TestNewPublicKeyInvalidValues(t *testing.T) {
-	validPoint := bytesFromHex(t, pubKeyUncompressedP256)
-	invalidPoint := bytesFromHex(t, pubKeyUncompressedP256Invalid)
+	validPoint := bytesFromHex(t, pubKeyUncompressedP256Hex)
+	invalidPoint := bytesFromHex(t, pubKeyUncompressedP256InvalidHex)
 	validParams, err := ecdsa.NewParameters(ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)
 	if err != nil {
 		t.Fatalf("ecdsa.NewParameters(%v, %v, %v, %v) = %v, want nil", ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink, err)
@@ -309,9 +312,9 @@ func TestNewPublicKeyInvalidValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ecdsa.NewParameters(%v, %v, %v, %v) = %v, want nil", ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantNoPrefix, err)
 	}
-	validPointOnAnotherCurve := bytesFromHex(t, pubKeyUncompressedP521)
+	validPointOnAnotherCurve := bytesFromHex(t, pubKeyUncompressedP521Hex)
 
-	validPointOnP224 := bytesFromHex(t, pubKeyUncompressedP224)
+	validPointOnP224 := bytesFromHex(t, pubKeyUncompressedP224Hex)
 	for _, tc := range []struct {
 		name       string
 		point      []byte
@@ -570,7 +573,7 @@ func TestNewPublicKey(t *testing.T) {
 }
 
 func TestPublicKeyOutputPrefix(t *testing.T) {
-	publicPoint := bytesFromHex(t, pubKeyUncompressedP256)
+	publicPoint := bytesFromHex(t, pubKeyUncompressedP256Hex)
 	for _, tc := range []struct {
 		name    string
 		variant ecdsa.Variant
@@ -647,12 +650,12 @@ func TestNewPrivateKeyInvalidValues(t *testing.T) {
 		{
 			name:            "nil params key",
 			params:          nil,
-			privateKeyValue: secretdata.NewBytesFromData(bytesFromHex(t, privateP256Hex), token),
+			privateKeyValue: secretdata.NewBytesFromData(bytesFromHex(t, privKeyValueP256Hex), token),
 		},
 		{
 			name:            "empty params key",
 			params:          &ecdsa.Parameters{},
-			privateKeyValue: secretdata.NewBytesFromData(bytesFromHex(t, privateP256Hex), token),
+			privateKeyValue: secretdata.NewBytesFromData(bytesFromHex(t, privKeyValueP256Hex), token),
 		},
 		{
 			name:            "empty private key value",
@@ -732,7 +735,7 @@ func TestNewPrivateKey(t *testing.T) {
 }
 
 func TestNewPrivateKeyFromPublicKeyInvalidValues(t *testing.T) {
-	publicPoint := bytesFromHex(t, pubKeyUncompressedP256)
+	publicPoint := bytesFromHex(t, pubKeyUncompressedP256Hex)
 	publicKey := newPublicKey(t, publicPoint, 123, newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantCrunchy))
 	token := insecuresecretdataaccess.Token{}
 	for _, tc := range []struct {
@@ -743,12 +746,12 @@ func TestNewPrivateKeyFromPublicKeyInvalidValues(t *testing.T) {
 		{
 			name:            "nil public key",
 			publicKey:       nil,
-			privateKeyValue: secretdata.NewBytesFromData(bytesFromHex(t, privateP256Hex), token),
+			privateKeyValue: secretdata.NewBytesFromData(bytesFromHex(t, privKeyValueP256Hex), token),
 		},
 		{
 			name:            "empty public key",
 			publicKey:       &ecdsa.PublicKey{},
-			privateKeyValue: secretdata.NewBytesFromData(bytesFromHex(t, privateP256Hex), token),
+			privateKeyValue: secretdata.NewBytesFromData(bytesFromHex(t, privKeyValueP256Hex), token),
 		},
 		{
 			name:            "empty private key value",

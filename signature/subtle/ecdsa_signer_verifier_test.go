@@ -138,7 +138,7 @@ func TestECDSAWycheproofCases(t *testing.T) {
 							t.Fatalf("ECDSAVerifier.Verify() succeeded in an invalid test case")
 						}
 					case "acceptable":
-						// TODO(ckl): Inspect flags to appropriately handle acceptable test cases.
+						// TODO: b/379282500 - Use acceptable test vectors.
 					default:
 						t.Fatalf("unsupported test result: %q", test.Result)
 					}
