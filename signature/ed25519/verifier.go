@@ -21,6 +21,7 @@ import (
 	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -64,4 +65,12 @@ func (e *verifier) Verify(signature, data []byte) error {
 		return fmt.Errorf("ed25519: invalid signature")
 	}
 	return nil
+}
+
+func verifierConstructor(key key.Key) (any, error) {
+	that, ok := key.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("key is not a *ed25519.PublicKey")
+	}
+	return NewVerifier(that, internalapi.Token{})
 }

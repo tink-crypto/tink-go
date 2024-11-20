@@ -27,8 +27,10 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	tinked25519 "github.com/tink-crypto/tink-go/v2/signature/ed25519"
+	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
@@ -95,7 +97,7 @@ func TestSignVerifyCorrectness(t *testing.T) {
 				t.Fatalf("tinked25519.NewPrivateKey(%v, %v, %v) err = %v, want nil", privateKeyBytes, tc.idRequirement, params, err)
 			}
 
-			// Sign.
+			// Signer verifier from keys.
 			signer, err := tinked25519.NewSigner(privateKey, internalapi.Token{})
 			if err != nil {
 				t.Fatalf("tinked25519.NewSigner(%v, internalapi.Token{}) err = %v, want nil", privateKey, err)
@@ -108,13 +110,50 @@ func TestSignVerifyCorrectness(t *testing.T) {
 				t.Errorf("signer.Sign() returned unexpected diff (-want +got):\n%s", diff)
 			}
 
-			// Verify.
 			verifier, err := tinked25519.NewVerifier(publicKey, internalapi.Token{})
 			if err != nil {
 				t.Fatalf("tinked25519.NewVerifier(%v, internalapi.Token{}) err = %v, want nil", publicKey, err)
 			}
 			if err := verifier.Verify(tc.signature, message); err != nil {
 				t.Errorf("verifier.Verify(%x, %x) err = %v, want nil", tc.signature, message, err)
+			}
+
+			// Signer verifier from keyset handle.
+			km := keyset.NewManager()
+			keyID, err := km.AddKey(privateKey)
+			if err != nil {
+				t.Fatalf("km.AddKey(%v) err = %v, want nil", privateKey, err)
+			}
+			if err := km.SetPrimary(keyID); err != nil {
+				t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID, err)
+			}
+			keysetHandle, err := km.Handle()
+			if err != nil {
+				t.Fatalf("km.Handle() err = %v, want nil", err)
+			}
+			publicKeysetHandle, err := keysetHandle.Public()
+			if err != nil {
+				t.Fatalf("keysetHandle.Public() err = %v, want nil", err)
+			}
+
+			signerFromKeyset, err := signature.NewSigner(keysetHandle)
+			if err != nil {
+				t.Fatalf("signature.NewSigner(%v) err = %v, want nil", keysetHandle, err)
+			}
+			gotSignatureFromKeyset, err := signerFromKeyset.Sign(message)
+			if err != nil {
+				t.Fatalf("signerFromKeyset.Sign(%x) err = %v, want nil", message, err)
+			}
+			if diff := cmp.Diff(gotSignatureFromKeyset, tc.signature); diff != "" {
+				t.Errorf("signerFromKeyset.Sign() returned unexpected diff (-want +got):\n%s", diff)
+			}
+
+			verifierFromKeyset, err := signature.NewVerifier(publicKeysetHandle)
+			if err != nil {
+				t.Fatalf("tinked25519.NewVerifier() err = %v, want nil", err)
+			}
+			if err := verifierFromKeyset.Verify(tc.signature, message); err != nil {
+				t.Errorf("verifierFromKeyset.Verify(%x, %x) err = %v, want nil", tc.signature, message, err)
 			}
 		})
 	}
