@@ -23,6 +23,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	internalecdsa "github.com/tink-crypto/tink-go/v2/internal/signature/ecdsa"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/subtle"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -100,4 +101,12 @@ func (e *verifier) Verify(signatureBytes, data []byte) error {
 		return fmt.Errorf("ecdsa_verifier: invalid signature")
 	}
 	return nil
+}
+
+func verifierConstructor(key key.Key) (any, error) {
+	that, ok := key.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("key is not a *ecdsa.PublicKey")
+	}
+	return NewVerifier(that, internalapi.Token{})
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	internalecdsa "github.com/tink-crypto/tink-go/v2/internal/signature/ecdsa"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/subtle"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -115,4 +116,12 @@ func (e *signer) Sign(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("ecdsa: unsupported encoding: %s", e.encoding)
 	}
 	return slices.Concat(e.prefix, signatureBytes), nil
+}
+
+func signerConstructor(key key.Key) (any, error) {
+	that, ok := key.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("key is not a *ecdsa.PrivateKey")
+	}
+	return NewSigner(that, internalapi.Token{})
 }
