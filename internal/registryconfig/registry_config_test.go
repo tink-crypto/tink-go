@@ -188,7 +188,7 @@ func alwaysFailingStubPrimitiveConstructor(k key.Key) (any, error) {
 }
 
 func TestRegisterPrimitiveConstructor(t *testing.T) {
-	defer registryconfig.ClearPrimitiveConstructors()
+	defer registryconfig.UnregisterPrimitiveConstructor[*stubKey]()
 	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor); err != nil {
 		t.Errorf("registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor) err = %v, want nil", err)
 	}
@@ -211,7 +211,7 @@ func stubPrimitiveConstructorFromFallbackProtoKey(k key.Key) (any, error) {
 }
 
 func TestPrimitiveFromKeyFailsIfCreatorFails(t *testing.T) {
-	defer registryconfig.ClearPrimitiveConstructors()
+	defer registryconfig.UnregisterPrimitiveConstructor[*stubKey]()
 	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](alwaysFailingStubPrimitiveConstructor); err != nil {
 		t.Errorf("registryconfig.RegisterPrimitiveConstructor[*stubKey](alwaysFailingStubPrimitiveConstructor) err = %v, want nil", err)
 	}
@@ -222,7 +222,7 @@ func TestPrimitiveFromKeyFailsIfCreatorFails(t *testing.T) {
 }
 
 func TestRegisterPrimitiveConstructorSucceedsIfDoubleRegister(t *testing.T) {
-	defer registryconfig.ClearPrimitiveConstructors()
+	defer registryconfig.UnregisterPrimitiveConstructor[*stubKey]()
 	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor); err != nil {
 		t.Fatalf("registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor) err = %v, want nil", err)
 	}
@@ -232,7 +232,7 @@ func TestRegisterPrimitiveConstructorSucceedsIfDoubleRegister(t *testing.T) {
 }
 
 func TestRegisterPrimitiveConstructorFailsIfRegisterAnotherCreatorForSameKeyType(t *testing.T) {
-	defer registryconfig.ClearPrimitiveConstructors()
+	defer registryconfig.UnregisterPrimitiveConstructor[*stubKey]()
 	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor); err != nil {
 		t.Fatalf("registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor) err = %v, want nil", err)
 	}

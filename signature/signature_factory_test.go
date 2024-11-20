@@ -601,7 +601,8 @@ func (s *stubPrivateKeyParser) ParseKey(serialization *protoserialization.KeySer
 }
 
 func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
-	defer registryconfig.ClearPrimitiveConstructors()
+	defer registryconfig.UnregisterPrimitiveConstructor[*stubPrivateKey]()
+	defer registryconfig.UnregisterPrimitiveConstructor[*stubPublicKey]()
 	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
 	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()

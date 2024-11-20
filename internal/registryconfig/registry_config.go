@@ -75,11 +75,12 @@ func RegisterPrimitiveConstructor[K key.Key](constructor primitiveConstructor) e
 	return nil
 }
 
-// ClearPrimitiveConstructors clears the registry of primitive constructors.
+// UnregisterPrimitiveConstructor removes the primitive constructor for the
+// given key type.
 //
 // This function is intended to be used in tests only.
-func ClearPrimitiveConstructors() {
+func UnregisterPrimitiveConstructor[K key.Key]() {
 	primitiveConstructorsMu.Lock()
 	defer primitiveConstructorsMu.Unlock()
-	primitiveConstructors = make(map[reflect.Type]primitiveConstructor)
+	delete(primitiveConstructors, reflect.TypeFor[K]())
 }
