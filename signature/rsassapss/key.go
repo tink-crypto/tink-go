@@ -234,13 +234,9 @@ func NewPublicKey(modulus []byte, idRequirement uint32, parameters *Parameters) 
 	if parameters.SigHashType() == UnknownHashType {
 		return nil, fmt.Errorf("rsassapss.NewPublicKey: invalid parameters")
 	}
-	// We want modulus to fix exactly parameters.ModulusSizeBits() bits.
-	if len(modulus) != parameters.ModulusSizeBits()/8 {
-		return nil, fmt.Errorf("rsassapss.NewPublicKey: invalid modulus length: %v, want %v", len(modulus), parameters.ModulusSizeBits()/8)
-	}
-	bitLength := new(big.Int).SetBytes(modulus).BitLen()
-	if bitLength != parameters.ModulusSizeBits() {
-		return nil, fmt.Errorf("rsassapss.NewPublicKey: invalid modulus bit-length: %v, want %v", bitLength, parameters.ModulusSizeBits())
+	modulusBigInt := new(big.Int).SetBytes(modulus)
+	if modulusBigInt.BitLen() != parameters.ModulusSizeBits() {
+		return nil, fmt.Errorf("rsassapss.NewPublicKey: invalid modulus bit-length: %v, want %v", modulusBigInt.BitLen(), parameters.ModulusSizeBits())
 	}
 	if parameters.Variant() == VariantNoPrefix && idRequirement != 0 {
 		return nil, fmt.Errorf("rsassapss.NewPublicKey: key ID must be zero for VariantNoPrefix")
@@ -250,7 +246,7 @@ func NewPublicKey(modulus []byte, idRequirement uint32, parameters *Parameters) 
 		return nil, fmt.Errorf("rsassapss.NewPublicKey: %v", err)
 	}
 	return &PublicKey{
-		modulus:       modulus,
+		modulus:       modulusBigInt.Bytes(),
 		idRequirement: idRequirement,
 		outputPrefix:  outputPrefix,
 		parameters:    parameters,
