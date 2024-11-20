@@ -75,7 +75,7 @@ func extractFullSigner(entry *primitiveset.Entry) (tink.Signer, error) {
 	if entry.FullPrimitive != nil {
 		p, ok := (entry.FullPrimitive).(tink.Signer)
 		if !ok {
-			return nil, fmt.Errorf("public_key_sign_factory: not a Signer full primitive")
+			return nil, fmt.Errorf("public_key_sign_factory: not a Signer primitive")
 		}
 		return p, nil
 	}

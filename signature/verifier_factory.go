@@ -85,7 +85,7 @@ func extractFullVerifier(entry *primitiveset.Entry) (tink.Verifier, error) {
 	if entry.FullPrimitive != nil {
 		p, ok := (entry.FullPrimitive).(tink.Verifier)
 		if !ok {
-			return nil, fmt.Errorf("verifier_factory: not a Verifier full primitive")
+			return nil, fmt.Errorf("verifier_factory: not a Verifier primitive")
 		}
 		return p, nil
 	}
