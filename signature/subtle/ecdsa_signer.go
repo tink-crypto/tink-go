@@ -69,15 +69,25 @@ func (e *ECDSASigner) Sign(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	r, s, err := ecdsa.Sign(rand.Reader, e.privateKey, hashed)
-	if err != nil {
-		return nil, fmt.Errorf("ecdsa_signer: signing failed: %s", err)
+	var signatureBytes []byte
+	switch e.encoding {
+	case "IEEE_P1363":
+		r, s, err := ecdsa.Sign(rand.Reader, e.privateKey, hashed)
+		if err != nil {
+			return nil, err
+		}
+		sig := NewECDSASignature(r, s)
+		signatureBytes, err = sig.EncodeECDSASignature(e.encoding, e.privateKey.PublicKey.Curve.Params().Name)
+		if err != nil {
+			return nil, fmt.Errorf("ecdsa_signer: signing failed: %s", err)
+		}
+	case "DER":
+		signatureBytes, err = ecdsa.SignASN1(rand.Reader, e.privateKey, hashed)
+		if err != nil {
+			return nil, fmt.Errorf("ecdsa_signer: signing failed: %s", err)
+		}
+	default:
+		return nil, fmt.Errorf("ecdsa_signer: unsupported encoding: %s", e.encoding)
 	}
-	// format the signature
-	sig := NewECDSASignature(r, s)
-	ret, err := sig.EncodeECDSASignature(e.encoding, e.privateKey.PublicKey.Curve.Params().Name)
-	if err != nil {
-		return nil, fmt.Errorf("ecdsa_signer: signing failed: %s", err)
-	}
-	return ret, nil
+	return signatureBytes, nil
 }

@@ -21,10 +21,9 @@ import (
 	"hash"
 	"math/big"
 
+	internalecdsa "github.com/tink-crypto/tink-go/v2/internal/signature/ecdsa"
 	"github.com/tink-crypto/tink-go/v2/subtle"
 )
-
-var errInvalidECDSASignature = errors.New("ecdsa_verifier: invalid signature")
 
 // ECDSAVerifier is an implementation of Verifier for ECDSA.
 // At the moment, the implementation only accepts signatures with strict DER encoding.
@@ -67,17 +66,28 @@ func NewECDSAVerifierFromPublicKey(hashAlg string, encoding string, publicKey *e
 // Verify verifies whether the given signature is valid for the given data.
 // It returns an error if the signature is not valid; nil otherwise.
 func (e *ECDSAVerifier) Verify(signatureBytes, data []byte) error {
-	signature, err := DecodeECDSASignature(signatureBytes, e.encoding)
-	if err != nil {
-		return fmt.Errorf("ecdsa_verifier: %s", err)
-	}
 	hashed, err := subtle.ComputeHash(e.hashFunc, data)
 	if err != nil {
 		return err
 	}
-	valid := ecdsa.Verify(e.publicKey, hashed, signature.R, signature.S)
-	if !valid {
-		return errInvalidECDSASignature
+	var asn1Signature []byte
+	switch e.encoding {
+	case "DER":
+		asn1Signature = signatureBytes
+	case "IEEE_P1363":
+		decodedSig, err := internalecdsa.IEEEP1363Decode(signatureBytes)
+		if err != nil {
+			return err
+		}
+		asn1Signature, err = internalecdsa.ASN1Encode(decodedSig)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("ecdsa: unsupported encoding: %s", e.encoding)
+	}
+	if ok := ecdsa.VerifyASN1(e.publicKey, hashed, asn1Signature); !ok {
+		return fmt.Errorf("ecdsa_verifier: invalid signature")
 	}
 	return nil
 }
