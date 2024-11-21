@@ -16,6 +16,7 @@ package aead_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"testing"
 
@@ -29,6 +30,10 @@ func TestKMSEnvelopeWorksWithTinkKeyTemplatesAsDekTemplate(t *testing.T) {
 	kekAEAD, err := fakekms.NewAEAD(keyURI)
 	if err != nil {
 		t.Fatalf("fakekms.NewAEAD(keyURI) err = %q, want nil", err)
+	}
+	kekAEADWithContext, err := fakekms.NewAEADWithContext(keyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEADWithContext(keyURI) err = %q, want nil", err)
 	}
 	plaintext := []byte("plaintext")
 	associatedData := []byte("associatedData")
@@ -87,6 +92,42 @@ func TestKMSEnvelopeWorksWithTinkKeyTemplatesAsDekTemplate(t *testing.T) {
 			if _, err = a.Decrypt(ciphertext, invalidAssociatedData); err == nil {
 				t.Error("a.Decrypt(ciphertext, invalidAssociatedData) err = nil, want error")
 			}
+
+			ctx := context.Background()
+			r, err := aead.NewKMSEnvelopeAEADWithContext(tc.dekTemplate, kekAEADWithContext)
+			if err != nil {
+				t.Error("a.DecryptWithContext(ctx, ciphertext, invalidAssociatedData) err = nil, want error")
+			}
+			ciphertext2, err := r.EncryptWithContext(ctx, plaintext, associatedData)
+			if err != nil {
+				t.Fatalf("a.EncryptWithContext(ctx, plaintext, associatedData) err = %q, want nil", err)
+			}
+			gotPlaintext2, err := r.DecryptWithContext(ctx, ciphertext2, associatedData)
+			if err != nil {
+				t.Fatalf("a.DecryptWithContext(ctx, ciphertext2, associatedData) err = %q, want nil", err)
+			}
+			if !bytes.Equal(gotPlaintext2, plaintext) {
+				t.Fatalf("got plaintext %q, want %q", gotPlaintext, plaintext)
+			}
+			if _, err = r.DecryptWithContext(ctx, ciphertext2, invalidAssociatedData); err == nil {
+				t.Error("a.DecryptWithContext(ctx, ciphertext2, invalidAssociatedData) err = nil, want error")
+			}
+
+			// check that DecryptWithContext is compatible with Decrypt
+			gotPlaintext3, err := r.DecryptWithContext(ctx, ciphertext, associatedData)
+			if err != nil {
+				t.Fatalf("r.DecryptWithContext(ctx, ciphertext, associatedData) err = %q, want nil", err)
+			}
+			if !bytes.Equal(gotPlaintext3, plaintext) {
+				t.Fatalf("got plaintext %q, want %q", gotPlaintext3, plaintext)
+			}
+			gotPlaintext4, err := a.Decrypt(ciphertext2, associatedData)
+			if err != nil {
+				t.Fatalf("a.Decrypt(ciphertext2, associatedData) err = %q, want nil", err)
+			}
+			if !bytes.Equal(gotPlaintext4, plaintext) {
+				t.Fatalf("got plaintext %q, want %q", gotPlaintext4, plaintext)
+			}
 		})
 	}
 }
@@ -102,6 +143,7 @@ func TestKMSEnvelopeDecryptTestVector(t *testing.T) {
 		t.Fatalf("hex.DecodeString(ciphertextHex) err = %q, want nil", err)
 	}
 
+	// with NewKMSEnvelopeAEAD2.
 	kekAEAD, err := fakekms.NewAEAD(keyURI)
 	if err != nil {
 		t.Fatalf("fakekms.NewAEAD(keyURI) err = %q, want nil", err)
@@ -112,6 +154,24 @@ func TestKMSEnvelopeDecryptTestVector(t *testing.T) {
 		t.Fatalf("a.Decrypt(ciphertext, associatedData) err = %q, want nil", err)
 	}
 	if !bytes.Equal(gotPlaintext, plaintext) {
+		t.Fatalf("got plaintext %q, want %q", gotPlaintext, plaintext)
+	}
+
+	// with NewKMSEnvelopeAEADWithContext.
+	ctx := context.Background()
+	kekAEADWithContext, err := fakekms.NewAEADWithContext(keyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEADWithContext(keyURI) err = %q, want nil", err)
+	}
+	r, err := aead.NewKMSEnvelopeAEADWithContext(aead.AES256GCMKeyTemplate(), kekAEADWithContext)
+	if err != nil {
+		t.Fatalf("aead.NewKMSEnvelopeAEADWithContext() err = %q, want nil", err)
+	}
+	gotPlaintext2, err := r.DecryptWithContext(ctx, ciphertext, associatedData)
+	if err != nil {
+		t.Fatalf("r.DecryptWithContext(ciphertext, associatedData) err = %q, want nil", err)
+	}
+	if !bytes.Equal(gotPlaintext2, plaintext) {
 		t.Fatalf("got plaintext %q, want %q", gotPlaintext, plaintext)
 	}
 }
@@ -126,6 +186,7 @@ func TestKMSEnvelopeWithKmsEnvelopeKeyTemplatesAsDekTemplate_fails(t *testing.T)
 		t.Fatalf("aead.CreateKMSEnvelopAEADKeyTemplate() err = %q, want nil", err)
 	}
 
+	// NewKMSEnvelopeAEAD2 can't return an error. But it always fails when calling Encrypt.
 	kekAEAD, err := fakekms.NewAEAD(keyURI)
 	if err != nil {
 		t.Fatalf("fakekms.NewAEAD(keyURI) err = %q, want nil", err)
@@ -135,10 +196,22 @@ func TestKMSEnvelopeWithKmsEnvelopeKeyTemplatesAsDekTemplate_fails(t *testing.T)
 	if err == nil {
 		t.Error("a.Encrypt(plaintext, associatedData) err = nil, want error")
 	}
+
+	// NewKMSEnvelopeAEADWithContext returns an error.
+	kekAEADWithContext, err := fakekms.NewAEADWithContext(keyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEADWithContext(keyURI) err = %q, want nil", err)
+	}
+	_, err = aead.NewKMSEnvelopeAEADWithContext(envelopeDEKTemplate, kekAEADWithContext)
+	if err == nil {
+		t.Error("NewKMSEnvelopeAEADWithContext() err = nil, want error")
+	}
 }
 
 func TestKMSEnvelopeShortCiphertext(t *testing.T) {
 	keyURI := "fake-kms://CM2b3_MDElQKSAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EhIaEIK75t5L-adlUwVhWvRuWUwYARABGM2b3_MDIAE"
+
+	// with NewKMSEnvelopeAEAD2.
 	kekAEAD, err := fakekms.NewAEAD(keyURI)
 	if err != nil {
 		t.Fatalf("fakekms.NewAEAD(keyURI) err = %q, want nil", err)
@@ -147,23 +220,49 @@ func TestKMSEnvelopeShortCiphertext(t *testing.T) {
 	if _, err = a.Decrypt([]byte{1}, nil); err == nil {
 		t.Error("a.Decrypt([]byte{1}, nil) err = nil, want error")
 	}
+
+	// with NewKMSEnvelopeAEADWithContext.
+	kekAEADWithContext, err := fakekms.NewAEADWithContext(keyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEADWithContext(keyURI) err = %q, want nil", err)
+	}
+	r, err := aead.NewKMSEnvelopeAEADWithContext(aead.AES256GCMKeyTemplate(), kekAEADWithContext)
+	if err != nil {
+		t.Fatalf("fakekms.NewKMSEnvelopeAEADWithContext() err = %q, want nil", err)
+	}
+	if _, err = r.DecryptWithContext(context.Background(), []byte{1}, nil); err == nil {
+		t.Error("a.DecryptWithContext([]byte{1}, nil) err = nil, want error")
+	}
 }
 
 func TestKMSEnvelopeDecryptHugeEncryptedDek(t *testing.T) {
 	keyURI := "fake-kms://CM2b3_MDElQKSAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EhIaEIK75t5L-adlUwVhWvRuWUwYARABGM2b3_MDIAE"
+	// A ciphertext with a huge encrypted DEK length
+	ciphertext := []byte{0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88}
+
+	// with NewKMSEnvelopeAEAD2.
 	kekAEAD, err := fakekms.NewAEAD(keyURI)
 	if err != nil {
 		t.Fatalf("fakekms.NewAEAD(keyURI) err = %q, want nil", err)
 	}
 	a := aead.NewKMSEnvelopeAEAD2(aead.AES256GCMKeyTemplate(), kekAEAD)
 
-	ciphertext := []byte{0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88}
 	if _, err = a.Decrypt(ciphertext, nil); err == nil {
 		t.Error("a.Decrypt([]byte{1}, nil) err = nil, want error")
 	}
-	expectedError := "kms_envelope_aead: length of encrypted DEK too large"
-	if err.Error() != expectedError {
-		t.Errorf("a.Decrypt([]byte{1}, nil) err = %q, want %q", err, expectedError)
+
+	// with NewKMSEnvelopeAEADWithContext.
+	ctx := context.Background()
+	kekAEADWithContext, err := fakekms.NewAEADWithContext(keyURI)
+	if err != nil {
+		t.Fatalf("fakekms.NewAEADWithContext(keyURI) err = %q, want nil", err)
+	}
+	r, err := aead.NewKMSEnvelopeAEADWithContext(aead.AES256GCMKeyTemplate(), kekAEADWithContext)
+	if err != nil {
+		t.Fatalf("fakekms.NewKMSEnvelopeAEADWithContext() err = %q, want nil", err)
+	}
+	if _, err = r.DecryptWithContext(ctx, ciphertext, nil); err == nil {
+		t.Error("a.Decrypt([]byte{1}, nil) err = nil, want error")
 	}
 }
 

@@ -15,6 +15,7 @@
 package aead
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -29,7 +30,8 @@ const (
 	maxLengthEncryptedDEK = 4096
 )
 
-// KMSEnvelopeAEAD represents an instance of Envelope AEAD.
+// KMSEnvelopeAEAD represents an instance of KMS Envelope AEAD that implements
+// the [tink.AEAD] interface.
 type KMSEnvelopeAEAD struct {
 	dekTemplate *tinkpb.KeyTemplate
 	kekAEAD     tink.AEAD
@@ -51,7 +53,36 @@ func isSupporedKMSEnvelopeDEK(dekKeyTypeURL string) bool {
 	return found
 }
 
-// NewKMSEnvelopeAEAD2 creates an new instance of KMSEnvelopeAEAD.
+// KMSEnvelopeAEADWithContext represents an instance of KMS Envelope AEAD that implements
+// the [tink.AEADWithContext] interface.
+type KMSEnvelopeAEADWithContext struct {
+	dekTemplate *tinkpb.KeyTemplate
+	kekAEAD     tink.AEADWithContext
+}
+
+// NewKMSEnvelopeAEADWithContext creates an new instance of [KMSEnvelopeAEADWithContext].
+//
+// dekTemplate must be a KeyTemplate for any of these Tink AEAD key types (any
+// other key template will be rejected):
+//   - AesCtrHmacAeadKey
+//   - AesGcmKey
+//   - ChaCha20Poly1305Key
+//   - XChaCha20Poly1305
+//   - AesGcmSivKey
+//
+// keyEncryptionAEAD is used to encrypt the DEK, and is usually a remote AEAD
+// provided by a KMS.
+func NewKMSEnvelopeAEADWithContext(dekTemplate *tinkpb.KeyTemplate, keyEncryptionAEAD tink.AEADWithContext) (*KMSEnvelopeAEADWithContext, error) {
+	if !isSupporedKMSEnvelopeDEK(dekTemplate.GetTypeUrl()) {
+		return nil, errors.New("unsupported DEK key type")
+	}
+	return &KMSEnvelopeAEADWithContext{
+		dekTemplate: dekTemplate,
+		kekAEAD:     keyEncryptionAEAD,
+	}, nil
+}
+
+// NewKMSEnvelopeAEAD2 creates an new instance of [KMSEnvelopeAEAD].
 //
 // dekTemplate specifies the key template of the data encryption key (DEK).
 // It must be a KeyTemplate for any of these Tink AEAD key types (any
@@ -62,7 +93,8 @@ func isSupporedKMSEnvelopeDEK(dekKeyTypeURL string) bool {
 //   - XChaCha20Poly1305
 //   - AesGcmSivKey
 //
-// keyEncryptionAEAD is used to encrypt the DEK.
+// keyEncryptionAEAD is used to encrypt the DEK, and is usually a remote AEAD
+// provided by a KMS. It is preferable to use [NewKMSEnvelopeAEADWithContext] instead.
 func NewKMSEnvelopeAEAD2(dekTemplate *tinkpb.KeyTemplate, keyEncryptionAEAD tink.AEAD) *KMSEnvelopeAEAD {
 	if !isSupporedKMSEnvelopeDEK(dekTemplate.GetTypeUrl()) {
 		return &KMSEnvelopeAEAD{
@@ -176,6 +208,34 @@ func (a *KMSEnvelopeAEAD) Decrypt(ciphertext, associatedData []byte) ([]byte, er
 	}
 
 	dek, err := a.kekAEAD.Decrypt(encryptedDEK, []byte{})
+	if err != nil {
+		return nil, err
+	}
+
+	return decryptDataWithDEK(a.dekTemplate.GetTypeUrl(), dek, payload, associatedData)
+}
+
+// EncryptWithContext implements the [tink.AEADWithContext] interface for encryption.
+func (a *KMSEnvelopeAEADWithContext) EncryptWithContext(ctx context.Context, plaintext, associatedData []byte) ([]byte, error) {
+	dek, err := newDEK(a.dekTemplate)
+	if err != nil {
+		return nil, err
+	}
+	encryptedDEK, err := a.kekAEAD.EncryptWithContext(ctx, dek, []byte{})
+	if err != nil {
+		return nil, err
+	}
+	return encryptDataAndSerializeEnvelope(a.dekTemplate.GetTypeUrl(), dek, encryptedDEK, plaintext, associatedData)
+}
+
+// DecryptWithContext implements the [tink.AEADWithContext] interface for decryption.
+func (a *KMSEnvelopeAEADWithContext) DecryptWithContext(ctx context.Context, ciphertext, associatedData []byte) ([]byte, error) {
+	encryptedDEK, payload, err := parseEnvelope(ciphertext)
+	if err != nil {
+		return nil, err
+	}
+
+	dek, err := a.kekAEAD.DecryptWithContext(ctx, encryptedDEK, []byte{})
 	if err != nil {
 		return nil, err
 	}
