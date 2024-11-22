@@ -21,6 +21,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -64,4 +65,12 @@ func (ca *aead) Decrypt(ciphertext []byte, associatedData []byte) ([]byte, error
 		return nil, err
 	}
 	return plaintext, nil
+}
+
+func primitiveConstructor(key key.Key) (any, error) {
+	that, ok := key.(*Key)
+	if !ok {
+		return nil, fmt.Errorf("key is not a *chacha20poly1305.Key")
+	}
+	return newAEAD(that)
 }
