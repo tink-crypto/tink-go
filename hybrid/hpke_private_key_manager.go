@@ -56,6 +56,9 @@ func (p *hpkePrivateKeyManager) Primitive(serializedKey []byte) (any, error) {
 	if err := keyset.ValidateKeyVersion(key.GetVersion(), maxSupportedHPKEPrivateKeyVersion); err != nil {
 		return nil, err
 	}
+	if err := keyset.ValidateKeyVersion(key.GetPublicKey().GetVersion(), maxSupportedHPKEPublicKeyVersion); err != nil {
+		return nil, err
+	}
 	return hpke.NewDecrypt(key)
 }
 
@@ -112,6 +115,12 @@ func (p *hpkePrivateKeyManager) PublicKeyData(serializedPrivKey []byte) (*tinkpb
 	privKey := new(hpkepb.HpkePrivateKey)
 	if err := proto.Unmarshal(serializedPrivKey, privKey); err != nil {
 		return nil, errInvalidHPKEPrivateKey
+	}
+	if err := keyset.ValidateKeyVersion(privKey.GetVersion(), maxSupportedHPKEPrivateKeyVersion); err != nil {
+		return nil, err
+	}
+	if err := keyset.ValidateKeyVersion(privKey.GetPublicKey().GetVersion(), maxSupportedHPKEPublicKeyVersion); err != nil {
+		return nil, err
 	}
 	serializedPubKey, err := proto.Marshal(privKey.GetPublicKey())
 	if err != nil {

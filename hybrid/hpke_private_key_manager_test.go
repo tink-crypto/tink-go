@@ -28,7 +28,7 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func TestPrivateKeyManagerPrimitiveRejectsInvalidKeyVersion(t *testing.T) {
+func TestPrivateKeyManagerPrimitiveRejectsInvalidPrivateKeyVersion(t *testing.T) {
 	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
 	if err != nil {
 		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
@@ -39,7 +39,28 @@ func TestPrivateKeyManagerPrimitiveRejectsInvalidKeyVersion(t *testing.T) {
 		Aead: hpkepb.HpkeAead_AES_256_GCM,
 	}
 	_, privKey := pubPrivKeys(t, params)
-	privKey.Version = 1
+	privKey.Version = maxSupportedHPKEPrivateKeyVersion + 1
+	serializedPrivKey, err := proto.Marshal(privKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := km.Primitive(serializedPrivKey); err == nil {
+		t.Error("Primitive() err = nil, want error")
+	}
+}
+
+func TestPrivateKeyManagerPrimitiveRejectsInvalidPublicKeyVersion(t *testing.T) {
+	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	if err != nil {
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+	}
+	params := &hpkepb.HpkeParams{
+		Kem:  hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+		Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+		Aead: hpkepb.HpkeAead_AES_256_GCM,
+	}
+	_, privKey := pubPrivKeys(t, params)
+	privKey.GetPublicKey().Version = maxSupportedHPKEPublicKeyVersion + 1
 	serializedPrivKey, err := proto.Marshal(privKey)
 	if err != nil {
 		t.Fatal(err)
@@ -364,6 +385,56 @@ func TestPrivateKeyManagerNewKeyData(t *testing.T) {
 		if len(pubKey.GetPublicKey()) == 0 {
 			t.Error("public key is missing")
 		}
+	}
+}
+
+func TestPrivateKeyManagerPublicKeyDataRejectsInvalidPrivateKeyVersion(t *testing.T) {
+	k, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	if err != nil {
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+	}
+	km, ok := k.(registry.PrivateKeyManager)
+	if !ok {
+		t.Errorf("primitive is not PrivateKeyManager")
+	}
+	params := &hpkepb.HpkeParams{
+		Kem:  hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+		Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+		Aead: hpkepb.HpkeAead_AES_256_GCM,
+	}
+	_, privKey := pubPrivKeys(t, params)
+	privKey.Version = maxSupportedHPKEPrivateKeyVersion + 1
+	serializedPrivKey, err := proto.Marshal(privKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := km.PublicKeyData(serializedPrivKey); err == nil {
+		t.Error("PublicKeyData() err = nil, want error")
+	}
+}
+
+func TestPrivateKeyManagerPublicKeyDataRejectsInvalidPublicKeyVersion(t *testing.T) {
+	k, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	if err != nil {
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+	}
+	km, ok := k.(registry.PrivateKeyManager)
+	if !ok {
+		t.Errorf("primitive is not PrivateKeyManager")
+	}
+	params := &hpkepb.HpkeParams{
+		Kem:  hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+		Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+		Aead: hpkepb.HpkeAead_AES_256_GCM,
+	}
+	_, privKey := pubPrivKeys(t, params)
+	privKey.GetPublicKey().Version = maxSupportedHPKEPublicKeyVersion + 1
+	serializedPrivKey, err := proto.Marshal(privKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := km.PublicKeyData(serializedPrivKey); err == nil {
+		t.Error("PublicKeyData() err = nil, want error")
 	}
 }
 
