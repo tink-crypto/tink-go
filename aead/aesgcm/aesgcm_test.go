@@ -18,15 +18,20 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"reflect"
 	"slices"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -308,5 +313,89 @@ func TestAESGCMAEADWorks(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type stubConfig struct {
+	keyManagers           map[string]registry.KeyManager
+	primitiveConstructors map[reflect.Type]func(key key.Key) (any, error)
+}
+
+func newStubConfig() *stubConfig {
+	return &stubConfig{make(map[string]registry.KeyManager), make(map[reflect.Type]func(key key.Key) (any, error))}
+}
+
+func (sc *stubConfig) RegisterKeyManager(keyTypeURL string, km registry.KeyManager, _ internalapi.Token) error {
+	sc.keyManagers[keyTypeURL] = km
+	return nil
+}
+
+func (sc *stubConfig) RegisterPrimitiveConstructor(keyType reflect.Type, primitiveConstructor func(key key.Key) (any, error), _ internalapi.Token) error {
+	sc.primitiveConstructors[keyType] = primitiveConstructor
+	return nil
+}
+
+type alwaysFailingStubConfig struct{}
+
+func (sc *alwaysFailingStubConfig) RegisterKeyManager(keyTypeURL string, km registry.KeyManager, _ internalapi.Token) error {
+	return fmt.Errorf("oh no :(")
+}
+
+func (sc *alwaysFailingStubConfig) RegisterPrimitiveConstructor(keyType reflect.Type, primitiveConstructor func(key key.Key) (any, error), _ internalapi.Token) error {
+	return fmt.Errorf("oh no :(")
+}
+
+func TestRegisterKeyManager(t *testing.T) {
+	sc := newStubConfig()
+	if len(sc.keyManagers) != 0 {
+		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.keyManagers))
+	}
+
+	err := aesgcm.RegisterKeyManager(sc, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("RegisterKeyManager() err = %v, want nil", err)
+	}
+
+	if len(sc.keyManagers) != 1 {
+		t.Errorf("Number of registered key types = %d, want 1", len(sc.keyManagers))
+	}
+	if _, ok := sc.keyManagers[testutil.AESGCMTypeURL]; !ok {
+		t.Errorf("RegisterKeyManager() registered wrong type URL, want %q", testutil.AESGCMTypeURL)
+	}
+}
+
+func TestRegisterPrimitiveConstructor(t *testing.T) {
+	sc := newStubConfig()
+	if len(sc.keyManagers) != 0 {
+		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.keyManagers))
+	}
+
+	err := aesgcm.RegisterPrimitiveConstructor(sc, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+
+	if len(sc.keyManagers) != 0 {
+		t.Errorf("Number of registered key managers = %d, want 0", len(sc.keyManagers))
+	}
+	if len(sc.primitiveConstructors) != 1 {
+		t.Errorf("Number of registered primitive constructors = %d, want 1", len(sc.primitiveConstructors))
+	}
+	if _, ok := sc.primitiveConstructors[reflect.TypeFor[aesgcm.Key]()]; !ok {
+		t.Errorf("RegisterKeyManager() registered wrong type, want %q", reflect.TypeFor[aesgcm.Key]())
+	}
+}
+
+func TestRegisterKeyManagerFailsIfConfigFails(t *testing.T) {
+	sc := &alwaysFailingStubConfig{}
+	if err := aesgcm.RegisterKeyManager(sc, internalapi.Token{}); err == nil {
+		t.Errorf("RegisterKeyManager() err = nil, want error")
+	}
+}
+
+func TestRegisterPrimitiveConstructorFailsIfConfigFails(t *testing.T) {
+	sc := &alwaysFailingStubConfig{}
+	if err := aesgcm.RegisterPrimitiveConstructor(sc, internalapi.Token{}); err == nil {
+		t.Errorf("RegisterPrimitiveConstructor() err = nil, want error")
 	}
 }

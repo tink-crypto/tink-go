@@ -17,12 +17,36 @@ package aesgcm
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
+	"github.com/tink-crypto/tink-go/v2/key"
 )
+
+type config interface {
+	RegisterPrimitiveConstructor(keyType reflect.Type, primitiveConstructor func(key key.Key) (any, error), t internalapi.Token) error
+	RegisterKeyManager(keyTypeURL string, km registry.KeyManager, t internalapi.Token) error
+}
+
+// RegisterKeyManager accepts a config object and registers an
+// instance of an AES-GCM AEAD KeyManager to the provided config.
+//
+// It is *NOT* part of the public API.
+func RegisterKeyManager(c config, t internalapi.Token) error {
+	return c.RegisterKeyManager(typeURL, new(keyManager), t)
+}
+
+// RegisterPrimitiveConstructor accepts a config object and registers the
+// AES-GCM AEAD primitive constructor to the provided config.
+//
+// It is *NOT* part of the public API.
+func RegisterPrimitiveConstructor(c config, t internalapi.Token) error {
+	return c.RegisterPrimitiveConstructor(reflect.TypeFor[Key](), primitiveConstructor, t)
+}
 
 func init() {
 	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
