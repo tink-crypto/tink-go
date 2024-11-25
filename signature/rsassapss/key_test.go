@@ -569,7 +569,7 @@ func TestNewPublicKeyMinMaxValues(t *testing.T) {
 		{
 			name:   "min module 2048 bit",
 			module: minModulus2048.Bytes(),
-			params: newParameters(t, rsassapss.ParametersValues{
+			params: mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 2048,
 				SigHashType:     rsassapss.SHA256,
 				MGF1HashType:    rsassapss.SHA256,
@@ -580,7 +580,7 @@ func TestNewPublicKeyMinMaxValues(t *testing.T) {
 		{
 			name:   "max module 2048 bit",
 			module: maxModulus2048.Bytes(),
-			params: newParameters(t, rsassapss.ParametersValues{
+			params: mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 2048,
 				SigHashType:     rsassapss.SHA256,
 				MGF1HashType:    rsassapss.SHA256,
@@ -591,7 +591,7 @@ func TestNewPublicKeyMinMaxValues(t *testing.T) {
 		{
 			name:   "min module 3072 bit",
 			module: minModulus3072.Bytes(),
-			params: newParameters(t, rsassapss.ParametersValues{
+			params: mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 3072,
 				SigHashType:     rsassapss.SHA384,
 				MGF1HashType:    rsassapss.SHA384,
@@ -602,7 +602,7 @@ func TestNewPublicKeyMinMaxValues(t *testing.T) {
 		{
 			name:   "max module 3072 bit",
 			module: maxModulus3072.Bytes(),
-			params: newParameters(t, rsassapss.ParametersValues{
+			params: mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 3072,
 				SigHashType:     rsassapss.SHA384,
 				MGF1HashType:    rsassapss.SHA384,
@@ -613,7 +613,7 @@ func TestNewPublicKeyMinMaxValues(t *testing.T) {
 		{
 			name:   "min module 4096 bit",
 			module: minModulus4096.Bytes(),
-			params: newParameters(t, rsassapss.ParametersValues{
+			params: mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 4096,
 				SigHashType:     rsassapss.SHA512,
 				MGF1HashType:    rsassapss.SHA512,
@@ -624,7 +624,7 @@ func TestNewPublicKeyMinMaxValues(t *testing.T) {
 		{
 			name:   "max module 4096 bit",
 			module: maxModulus4096.Bytes(),
-			params: newParameters(t, rsassapss.ParametersValues{
+			params: mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 4096,
 				SigHashType:     rsassapss.SHA512,
 				MGF1HashType:    rsassapss.SHA512,
@@ -641,7 +641,7 @@ func TestNewPublicKeyMinMaxValues(t *testing.T) {
 	}
 }
 
-func newParameters(t *testing.T, parametersValues rsassapss.ParametersValues, variant rsassapss.Variant) *rsassapss.Parameters {
+func mustCreateParameters(t *testing.T, parametersValues rsassapss.ParametersValues, variant rsassapss.Variant) *rsassapss.Parameters {
 	t.Helper()
 	params, err := rsassapss.NewParameters(parametersValues, variant)
 	if err != nil {
@@ -650,7 +650,7 @@ func newParameters(t *testing.T, parametersValues rsassapss.ParametersValues, va
 	return params
 }
 
-func newPublicKey(t *testing.T, modulus []byte, idRequirement uint32, parameters *rsassapss.Parameters) *rsassapss.PublicKey {
+func mustCreatePublicKey(t *testing.T, modulus []byte, idRequirement uint32, parameters *rsassapss.Parameters) *rsassapss.PublicKey {
 	t.Helper()
 	key, err := rsassapss.NewPublicKey(modulus, idRequirement, parameters)
 	if err != nil {
@@ -672,14 +672,14 @@ func TestNewPublicKeyEqualsFailsIfDifferentKeys(t *testing.T) {
 	}{
 		{
 			name: "different modulus",
-			this: newPublicKey(t, validModulus2048, 123, newParameters(t, rsassapss.ParametersValues{
+			this: mustCreatePublicKey(t, validModulus2048, 123, mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 2048,
 				SigHashType:     rsassapss.SHA256,
 				MGF1HashType:    rsassapss.SHA256,
 				PublicExponent:  f4,
 				SaltLengthBytes: 1,
 			}, rsassapss.VariantTink)),
-			that: newPublicKey(t, otherValidModulus2048, 123, newParameters(t, rsassapss.ParametersValues{
+			that: mustCreatePublicKey(t, otherValidModulus2048, 123, mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 2048,
 				SigHashType:     rsassapss.SHA256,
 				MGF1HashType:    rsassapss.SHA256,
@@ -689,14 +689,14 @@ func TestNewPublicKeyEqualsFailsIfDifferentKeys(t *testing.T) {
 		},
 		{
 			name: "different parameters",
-			this: newPublicKey(t, validModulus2048, 123, newParameters(t, rsassapss.ParametersValues{
+			this: mustCreatePublicKey(t, validModulus2048, 123, mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 2048,
 				SigHashType:     rsassapss.SHA256,
 				MGF1HashType:    rsassapss.SHA256,
 				PublicExponent:  f4,
 				SaltLengthBytes: 1,
 			}, rsassapss.VariantTink)),
-			that: newPublicKey(t, validModulus2048, 123, newParameters(t, rsassapss.ParametersValues{
+			that: mustCreatePublicKey(t, validModulus2048, 123, mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 2048,
 				SigHashType:     rsassapss.SHA256,
 				MGF1HashType:    rsassapss.SHA256,
@@ -706,14 +706,14 @@ func TestNewPublicKeyEqualsFailsIfDifferentKeys(t *testing.T) {
 		},
 		{
 			name: "different ID requirement",
-			this: newPublicKey(t, validModulus2048, 123, newParameters(t, rsassapss.ParametersValues{
+			this: mustCreatePublicKey(t, validModulus2048, 123, mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 2048,
 				SigHashType:     rsassapss.SHA256,
 				MGF1HashType:    rsassapss.SHA256,
 				PublicExponent:  f4,
 				SaltLengthBytes: 1,
 			}, rsassapss.VariantTink)),
-			that: newPublicKey(t, validModulus2048, 234, newParameters(t, rsassapss.ParametersValues{
+			that: mustCreatePublicKey(t, validModulus2048, 234, mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 2048,
 				SigHashType:     rsassapss.SHA256,
 				MGF1HashType:    rsassapss.SHA256,
@@ -723,14 +723,14 @@ func TestNewPublicKeyEqualsFailsIfDifferentKeys(t *testing.T) {
 		},
 		{
 			name: "different modulus size",
-			this: newPublicKey(t, validModulus2048, 123, newParameters(t, rsassapss.ParametersValues{
+			this: mustCreatePublicKey(t, validModulus2048, 123, mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 2048,
 				SigHashType:     rsassapss.SHA256,
 				MGF1HashType:    rsassapss.SHA256,
 				PublicExponent:  f4,
 				SaltLengthBytes: 1,
 			}, rsassapss.VariantTink)),
-			that: newPublicKey(t, base64Decode(t, n3072Base64), 123, newParameters(t, rsassapss.ParametersValues{
+			that: mustCreatePublicKey(t, base64Decode(t, n3072Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 3072,
 				SigHashType:     rsassapss.SHA256,
 				MGF1HashType:    rsassapss.SHA256,
@@ -921,7 +921,7 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 			token := insecuresecretdataaccess.Token{}
 			testCases = append(testCases, privateKeyTestCase{
 				name: fmt.Sprintf("%v-%v-%v-%v", 2048, hashType, hashType, variant),
-				publicKey: newPublicKey(t, base64Decode(t, n2048Base64), idRequirement, newParameters(t, rsassapss.ParametersValues{
+				publicKey: mustCreatePublicKey(t, base64Decode(t, n2048Base64), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     hashType,
 					MGF1HashType:    hashType,
@@ -940,7 +940,7 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 
 			testCases = append(testCases, privateKeyTestCase{
 				name: fmt.Sprintf("%v-%v-%v-%v-android", 2048, hashType, hashType, variant),
-				publicKey: newPublicKey(t, setStringToBigInt(t, n2048BigInt16, 16).Bytes(), idRequirement, newParameters(t, rsassapss.ParametersValues{
+				publicKey: mustCreatePublicKey(t, setStringToBigInt(t, n2048BigInt16, 16).Bytes(), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     hashType,
 					MGF1HashType:    hashType,
@@ -960,7 +960,7 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 			// 3072 bits
 			testCases = append(testCases, privateKeyTestCase{
 				name: fmt.Sprintf("%v-%v-%v-%v", 3072, hashType, hashType, variant),
-				publicKey: newPublicKey(t, base64Decode(t, n3072Base64), idRequirement, newParameters(t, rsassapss.ParametersValues{
+				publicKey: mustCreatePublicKey(t, base64Decode(t, n3072Base64), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 3072,
 					SigHashType:     hashType,
 					MGF1HashType:    hashType,
@@ -980,7 +980,7 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 			// 4096 bits
 			testCases = append(testCases, privateKeyTestCase{
 				name: fmt.Sprintf("%v-%v-%v-%v", 4096, hashType, hashType, variant),
-				publicKey: newPublicKey(t, base64Decode(t, n4096Base64), idRequirement, newParameters(t, rsassapss.ParametersValues{
+				publicKey: mustCreatePublicKey(t, base64Decode(t, n4096Base64), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 4096,
 					SigHashType:     hashType,
 					MGF1HashType:    hashType,
@@ -1071,7 +1071,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 		{
 			name: "different RSA keys",
 			this: func() *rsassapss.PrivateKey {
-				publicKey := newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, rsassapss.ParametersValues{
+				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     rsassapss.SHA256,
 					MGF1HashType:    rsassapss.SHA256,
@@ -1090,7 +1090,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 				return privateKey
 			}(),
 			that: func() *rsassapss.PrivateKey {
-				publicKey := newPublicKey(t, base64Decode(t, differentN2048Base64), 123, newParameters(t, rsassapss.ParametersValues{
+				publicKey := mustCreatePublicKey(t, base64Decode(t, differentN2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     rsassapss.SHA256,
 					MGF1HashType:    rsassapss.SHA256,
@@ -1112,7 +1112,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 		{
 			name: "different parameters - ID requirement",
 			this: func() *rsassapss.PrivateKey {
-				publicKey := newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, rsassapss.ParametersValues{
+				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     rsassapss.SHA256,
 					MGF1HashType:    rsassapss.SHA256,
@@ -1131,7 +1131,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 				return privateKey
 			}(),
 			that: func() *rsassapss.PrivateKey {
-				publicKey := newPublicKey(t, base64Decode(t, n2048Base64), 456, newParameters(t, rsassapss.ParametersValues{
+				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 456, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     rsassapss.SHA256,
 					MGF1HashType:    rsassapss.SHA256,
@@ -1153,7 +1153,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 		{
 			name: "different parameters - variant",
 			this: func() *rsassapss.PrivateKey {
-				publicKey := newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, rsassapss.ParametersValues{
+				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     rsassapss.SHA256,
 					MGF1HashType:    rsassapss.SHA256,
@@ -1172,7 +1172,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 				return privateKey
 			}(),
 			that: func() *rsassapss.PrivateKey {
-				publicKey := newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, rsassapss.ParametersValues{
+				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     rsassapss.SHA256,
 					MGF1HashType:    rsassapss.SHA256,
