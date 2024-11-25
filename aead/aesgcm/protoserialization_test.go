@@ -139,7 +139,7 @@ func TestParseKeyFails(t *testing.T) {
 	}
 }
 
-func newKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
+func mustCreateKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
 	t.Helper()
 	ks, err := protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
 	if err != nil {
@@ -165,7 +165,7 @@ func TestParseKey(t *testing.T) {
 	}{
 		{
 			name: "key with TINK output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.AesGcmKey",
 				Value:           serializedKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
@@ -174,7 +174,7 @@ func TestParseKey(t *testing.T) {
 		},
 		{
 			name: "key with CRUNCHY output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.AesGcmKey",
 				Value:           serializedKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
@@ -183,7 +183,7 @@ func TestParseKey(t *testing.T) {
 		},
 		{
 			name: "key with RAW output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.AesGcmKey",
 				Value:           serializedKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
@@ -293,7 +293,7 @@ func TestSerializeKey(t *testing.T) {
 		{
 			name:    "key with TINK output prefix type",
 			variant: VariantTink,
-			wantKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			wantKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.AesGcmKey",
 				Value:           serializedProtoKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
@@ -302,7 +302,7 @@ func TestSerializeKey(t *testing.T) {
 		{
 			name:    "key with CRUNCHY output prefix type",
 			variant: VariantCrunchy,
-			wantKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			wantKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.AesGcmKey",
 				Value:           serializedProtoKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
@@ -312,7 +312,7 @@ func TestSerializeKey(t *testing.T) {
 			// No key ID is set for keys with no prefix.
 			name:    "key with RAW output prefix type",
 			variant: VariantNoPrefix,
-			wantKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			wantKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.AesGcmKey",
 				Value:           serializedProtoKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
@@ -378,7 +378,7 @@ func TestSerializeParametersFailsWithWrongParameters(t *testing.T) {
 	}
 }
 
-func newKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixType, keySizeInBytes uint32) *tinkpb.KeyTemplate {
+func mustCreateKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixType, keySizeInBytes uint32) *tinkpb.KeyTemplate {
 	t.Helper()
 	format := &aesgcmpb.AesGcmKeyFormat{
 		KeySize: keySizeInBytes,
@@ -408,7 +408,7 @@ func TestSerializeParameters(t *testing.T) {
 				tagSizeInBytes: 16,
 				variant:        VariantTink,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 16),
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 16),
 		},
 		{
 			name: "AES256-GCM TINK output prefix type",
@@ -418,7 +418,7 @@ func TestSerializeParameters(t *testing.T) {
 				tagSizeInBytes: 16,
 				variant:        VariantTink,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 32),
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 32),
 		},
 		{
 			name: "AES128-GCM RAW output prefix type",
@@ -428,7 +428,7 @@ func TestSerializeParameters(t *testing.T) {
 				tagSizeInBytes: 16,
 				variant:        VariantNoPrefix,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 16),
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 16),
 		},
 		{
 			name: "AES256-GCM RAW output prefix type",
@@ -438,7 +438,7 @@ func TestSerializeParameters(t *testing.T) {
 				tagSizeInBytes: 16,
 				variant:        VariantNoPrefix,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 32),
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 32),
 		},
 		{
 			name: "AES128-GCM CRUNCHY output prefix type",
@@ -448,7 +448,7 @@ func TestSerializeParameters(t *testing.T) {
 				tagSizeInBytes: 16,
 				variant:        VariantCrunchy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, 16),
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, 16),
 		},
 		{
 			name: "AES256-GCM CRUNCHY output prefix type",
@@ -458,7 +458,7 @@ func TestSerializeParameters(t *testing.T) {
 				tagSizeInBytes: 16,
 				variant:        VariantCrunchy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, 32),
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, 32),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

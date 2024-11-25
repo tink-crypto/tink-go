@@ -139,7 +139,7 @@ func TestParseKeyFails(t *testing.T) {
 	}
 }
 
-func newKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
+func mustCreateKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
 	t.Helper()
 	ks, err := protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
 	if err != nil {
@@ -165,7 +165,7 @@ func TestParseKey(t *testing.T) {
 	}{
 		{
 			name: "TINK output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key",
 				Value:           serializedKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
@@ -174,7 +174,7 @@ func TestParseKey(t *testing.T) {
 		},
 		{
 			name: "CRUNCHY output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key",
 				Value:           serializedKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
@@ -183,7 +183,7 @@ func TestParseKey(t *testing.T) {
 		},
 		{
 			name: "RAW output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key",
 				Value:           serializedKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
@@ -288,7 +288,7 @@ func TestSerializeKey(t *testing.T) {
 		{
 			name:    "key with TINK output prefix type",
 			variant: VariantTink,
-			wantKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			wantKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key",
 				Value:           serializedProtoKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
@@ -297,7 +297,7 @@ func TestSerializeKey(t *testing.T) {
 		{
 			name:    "key with CRUNCHY output prefix type",
 			variant: VariantCrunchy,
-			wantKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			wantKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key",
 				Value:           serializedProtoKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
@@ -307,7 +307,7 @@ func TestSerializeKey(t *testing.T) {
 			// No key ID is set for keys with no prefix.
 			name:    "key with RAW output prefix type",
 			variant: VariantNoPrefix,
-			wantKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			wantKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key",
 				Value:           serializedProtoKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
@@ -367,7 +367,7 @@ func TestSerializeParametersFailsWithWrongParameters(t *testing.T) {
 	}
 }
 
-func newKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixType) *tinkpb.KeyTemplate {
+func mustCreateKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixType) *tinkpb.KeyTemplate {
 	t.Helper()
 	format := &xcppb.XChaCha20Poly1305KeyFormat{}
 	serializedFormat, err := proto.Marshal(format)
@@ -392,21 +392,21 @@ func TestSerializeParameters(t *testing.T) {
 			parameters: &Parameters{
 				variant: VariantTink,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK),
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK),
 		},
 		{
 			name: "RAW output prefix type",
 			parameters: &Parameters{
 				variant: VariantNoPrefix,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW),
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW),
 		},
 		{
 			name: "CRUNCHY output prefix type",
 			parameters: &Parameters{
 				variant: VariantCrunchy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY),
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -36,7 +36,7 @@ type testCase struct {
 	opts ParametersOpts
 }
 
-func newKey(t *testing.T, keyData []byte, opts ParametersOpts) *Key {
+func mustCreateKey(t *testing.T, keyData []byte, opts ParametersOpts) *Key {
 	t.Helper()
 	params, err := NewParameters(opts)
 	if err != nil {
@@ -94,7 +94,7 @@ func TestNewAEADFailures(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			key := newKey(t, random.GetRandomBytes(uint32(tc.opts.KeySizeInBytes)), tc.opts)
+			key := mustCreateKey(t, random.GetRandomBytes(uint32(tc.opts.KeySizeInBytes)), tc.opts)
 			if _, err := NewAEAD(key); err == nil {
 				t.Errorf("NewAEAD(%v) err = nil, want error", key)
 			}
@@ -202,7 +202,7 @@ func TestAEAD(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			keyValue := random.GetRandomBytes(uint32(tc.opts.KeySizeInBytes))
-			key := newKey(t, keyValue, tc.opts)
+			key := mustCreateKey(t, keyValue, tc.opts)
 			aead, err := NewAEAD(key)
 			if err != nil {
 				t.Fatalf("NewAEAD(%v) err = %v, want nil", key, err)
@@ -246,7 +246,7 @@ func TestAEADDecryptFailsIfCiphertextIsCorruptedOrTruncated(t *testing.T) {
 	ad := random.GetRandomBytes(33)
 	key := random.GetRandomBytes(16)
 	pt := random.GetRandomBytes(32)
-	a, err := NewAEAD(newKey(t, key, ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink}))
+	a, err := NewAEAD(mustCreateKey(t, key, ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink}))
 	if err != nil {
 		t.Fatalf("NewAEAD() err = %q, want nil", err)
 	}
@@ -305,7 +305,7 @@ func TestAEADEncryptUsesRandomNonce(t *testing.T) {
 		TagSizeInBytes: 16,
 		Variant:        VariantTink,
 	}
-	key := newKey(t, keyValue, opts)
+	key := mustCreateKey(t, keyValue, opts)
 	a, err := NewAEAD(key)
 	if err != nil {
 		t.Fatalf("NewAEAD() err = %q, want nil", err)
@@ -346,7 +346,7 @@ func TestAEADWycheproofCases(t *testing.T) {
 				combinedCt = append(combinedCt, tc.Iv...)
 				combinedCt = append(combinedCt, tc.Ct...)
 				combinedCt = append(combinedCt, tc.Tag...)
-				key := newKey(t, tc.Key, ParametersOpts{
+				key := mustCreateKey(t, tc.Key, ParametersOpts{
 					KeySizeInBytes: len(tc.Key),
 					IVSizeInBytes:  len(tc.Iv),
 					TagSizeInBytes: len(tc.Tag),
@@ -398,7 +398,7 @@ func TestPrimitiveCreator(t *testing.T) {
 	}{
 		{
 			name: fmt.Sprintf("%d-bit key, Tink Variant", len(key1)*8),
-			key: newKey(t, key1, ParametersOpts{
+			key: mustCreateKey(t, key1, ParametersOpts{
 				KeySizeInBytes: len(key1),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -409,7 +409,7 @@ func TestPrimitiveCreator(t *testing.T) {
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, Crunchy Variant", len(key1)*8),
-			key: newKey(t, key1, ParametersOpts{
+			key: mustCreateKey(t, key1, ParametersOpts{
 				KeySizeInBytes: len(key1),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -420,7 +420,7 @@ func TestPrimitiveCreator(t *testing.T) {
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, No Prefix Variant", len(key1)*8),
-			key: newKey(t, key1, ParametersOpts{
+			key: mustCreateKey(t, key1, ParametersOpts{
 				KeySizeInBytes: len(key1),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -431,7 +431,7 @@ func TestPrimitiveCreator(t *testing.T) {
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, Tink Variant", len(key2)*8),
-			key: newKey(t, key2, ParametersOpts{
+			key: mustCreateKey(t, key2, ParametersOpts{
 				KeySizeInBytes: len(key2),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -442,7 +442,7 @@ func TestPrimitiveCreator(t *testing.T) {
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, Crunchy Variant", len(key2)*8),
-			key: newKey(t, key2, ParametersOpts{
+			key: mustCreateKey(t, key2, ParametersOpts{
 				KeySizeInBytes: len(key2),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -453,7 +453,7 @@ func TestPrimitiveCreator(t *testing.T) {
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, No Prefix Variant", len(key2)*8),
-			key: newKey(t, key2, ParametersOpts{
+			key: mustCreateKey(t, key2, ParametersOpts{
 				KeySizeInBytes: len(key2),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -500,7 +500,7 @@ func TestPrimitiveCreatorInvalidParameters(t *testing.T) {
 							Variant:        variant,
 						}
 						keyData := random.GetRandomBytes(keySize)
-						key := newKey(t, keyData, opts)
+						key := mustCreateKey(t, keyData, opts)
 						if _, err := primitiveConstructor(key); err == nil {
 							t.Errorf("primitiveConstructor(key) err = nil, want error")
 						}

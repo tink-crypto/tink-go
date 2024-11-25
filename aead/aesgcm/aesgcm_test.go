@@ -173,7 +173,7 @@ func hexDecode(t *testing.T, hexStr string) []byte {
 	return x
 }
 
-func newKey(t *testing.T, keyValue []byte, keyID uint32, opts aesgcm.ParametersOpts) *aesgcm.Key {
+func mustCreateKey(t *testing.T, keyValue []byte, keyID uint32, opts aesgcm.ParametersOpts) *aesgcm.Key {
 	t.Helper()
 	params, err := aesgcm.NewParameters(opts)
 	if err != nil {
@@ -210,7 +210,7 @@ func TestAESGCMAEADWorks(t *testing.T) {
 	}{
 		{
 			name: fmt.Sprintf("AES-%d-TINK", len(key1)*8),
-			key: newKey(t, key1, 0x223455ab, aesgcm.ParametersOpts{
+			key: mustCreateKey(t, key1, 0x223455ab, aesgcm.ParametersOpts{
 				KeySizeInBytes: len(key1),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -221,7 +221,7 @@ func TestAESGCMAEADWorks(t *testing.T) {
 		},
 		{
 			name: fmt.Sprintf("AES-%d-CRUNCHY", len(key1)*8),
-			key: newKey(t, key1, 0x223455ab, aesgcm.ParametersOpts{
+			key: mustCreateKey(t, key1, 0x223455ab, aesgcm.ParametersOpts{
 				KeySizeInBytes: len(key1),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -232,7 +232,7 @@ func TestAESGCMAEADWorks(t *testing.T) {
 		},
 		{
 			name: fmt.Sprintf("AES-%d-RAW", len(key1)*8),
-			key: newKey(t, key1, 0, aesgcm.ParametersOpts{
+			key: mustCreateKey(t, key1, 0, aesgcm.ParametersOpts{
 				KeySizeInBytes: len(key1),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -243,7 +243,7 @@ func TestAESGCMAEADWorks(t *testing.T) {
 		},
 		{
 			name: fmt.Sprintf("AES-%d-TINK", len(key2)*8),
-			key: newKey(t, key2, 0x223455ab, aesgcm.ParametersOpts{
+			key: mustCreateKey(t, key2, 0x223455ab, aesgcm.ParametersOpts{
 				KeySizeInBytes: len(key2),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -254,7 +254,7 @@ func TestAESGCMAEADWorks(t *testing.T) {
 		},
 		{
 			name: fmt.Sprintf("AES-%d-CRUNCHY", len(key2)*8),
-			key: newKey(t, key2, 0x223455ab, aesgcm.ParametersOpts{
+			key: mustCreateKey(t, key2, 0x223455ab, aesgcm.ParametersOpts{
 				KeySizeInBytes: len(key2),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
@@ -265,7 +265,7 @@ func TestAESGCMAEADWorks(t *testing.T) {
 		},
 		{
 			name: fmt.Sprintf("AES-%d-RAW", len(key2)*8),
-			key: newKey(t, key2, 0, aesgcm.ParametersOpts{
+			key: mustCreateKey(t, key2, 0, aesgcm.ParametersOpts{
 				KeySizeInBytes: len(key2),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
