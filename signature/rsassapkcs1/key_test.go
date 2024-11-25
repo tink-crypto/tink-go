@@ -440,32 +440,32 @@ func TestNewPublicKeyMinMaxValues(t *testing.T) {
 		{
 			name:   "min module 2048 bit",
 			module: minModulus2048.Bytes(),
-			params: newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink),
+			params: mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink),
 		},
 		{
 			name:   "max module 2048 bit",
 			module: maxModulus2048.Bytes(),
-			params: newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink),
+			params: mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink),
 		},
 		{
 			name:   "min module 3072 bit",
 			module: minModulus3072.Bytes(),
-			params: newParameters(t, 3072, rsassapkcs1.SHA384, f4, rsassapkcs1.VariantTink),
+			params: mustCreateParameters(t, 3072, rsassapkcs1.SHA384, f4, rsassapkcs1.VariantTink),
 		},
 		{
 			name:   "max module 3072 bit",
 			module: maxModulus3072.Bytes(),
-			params: newParameters(t, 3072, rsassapkcs1.SHA384, f4, rsassapkcs1.VariantTink),
+			params: mustCreateParameters(t, 3072, rsassapkcs1.SHA384, f4, rsassapkcs1.VariantTink),
 		},
 		{
 			name:   "min module 4096 bit",
 			module: minModulus4096.Bytes(),
-			params: newParameters(t, 4096, rsassapkcs1.SHA512, f4, rsassapkcs1.VariantTink),
+			params: mustCreateParameters(t, 4096, rsassapkcs1.SHA512, f4, rsassapkcs1.VariantTink),
 		},
 		{
 			name:   "max module 4096 bit",
 			module: maxModulus4096.Bytes(),
-			params: newParameters(t, 4096, rsassapkcs1.SHA512, f4, rsassapkcs1.VariantTink),
+			params: mustCreateParameters(t, 4096, rsassapkcs1.SHA512, f4, rsassapkcs1.VariantTink),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -476,7 +476,7 @@ func TestNewPublicKeyMinMaxValues(t *testing.T) {
 	}
 }
 
-func newParameters(t *testing.T, modulusSizeBits int, hashType rsassapkcs1.HashType, publicExponent int, variant rsassapkcs1.Variant) *rsassapkcs1.Parameters {
+func mustCreateParameters(t *testing.T, modulusSizeBits int, hashType rsassapkcs1.HashType, publicExponent int, variant rsassapkcs1.Variant) *rsassapkcs1.Parameters {
 	t.Helper()
 	params, err := rsassapkcs1.NewParameters(modulusSizeBits, hashType, publicExponent, variant)
 	if err != nil {
@@ -485,7 +485,7 @@ func newParameters(t *testing.T, modulusSizeBits int, hashType rsassapkcs1.HashT
 	return params
 }
 
-func newPublicKey(t *testing.T, modulus []byte, idRequirement uint32, parameters *rsassapkcs1.Parameters) *rsassapkcs1.PublicKey {
+func mustCreatePublicKey(t *testing.T, modulus []byte, idRequirement uint32, parameters *rsassapkcs1.Parameters) *rsassapkcs1.PublicKey {
 	t.Helper()
 	key, err := rsassapkcs1.NewPublicKey(modulus, idRequirement, parameters)
 	if err != nil {
@@ -508,23 +508,23 @@ func TestNewPublicKeyEqualsFailsIfDifferentKeys(t *testing.T) {
 	}{
 		{
 			name: "different modulus",
-			this: newPublicKey(t, validModulus2048, 123, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
-			that: newPublicKey(t, otherValidModulus2048, 123, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
+			this: mustCreatePublicKey(t, validModulus2048, 123, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
+			that: mustCreatePublicKey(t, otherValidModulus2048, 123, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
 		},
 		{
 			name: "different parameters",
-			this: newPublicKey(t, validModulus2048, 123, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
-			that: newPublicKey(t, validModulus2048, 123, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantCrunchy)),
+			this: mustCreatePublicKey(t, validModulus2048, 123, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
+			that: mustCreatePublicKey(t, validModulus2048, 123, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantCrunchy)),
 		},
 		{
 			name: "different ID requirement",
-			this: newPublicKey(t, validModulus2048, 123, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
-			that: newPublicKey(t, validModulus2048, 234, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
+			this: mustCreatePublicKey(t, validModulus2048, 123, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
+			that: mustCreatePublicKey(t, validModulus2048, 234, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
 		},
 		{
 			name: "different modulus size",
-			this: newPublicKey(t, validModulus2048, 123, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
-			that: newPublicKey(t, validModulus3072, 123, newParameters(t, 3072, rsassapkcs1.SHA384, f4, rsassapkcs1.VariantTink)),
+			this: mustCreatePublicKey(t, validModulus2048, 123, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
+			that: mustCreatePublicKey(t, validModulus3072, 123, mustCreateParameters(t, 3072, rsassapkcs1.SHA384, f4, rsassapkcs1.VariantTink)),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -696,7 +696,7 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 			token := insecuresecretdataaccess.Token{}
 			testCases = append(testCases, privateKeyTestCase{
 				name:      fmt.Sprintf("%v-%v-%v", 2048, hashType, variant),
-				publicKey: newPublicKey(t, base64Decode(t, n2048Base64), idRequirement, newParameters(t, 2048, hashType, f4, variant)),
+				publicKey: mustCreatePublicKey(t, base64Decode(t, n2048Base64), idRequirement, mustCreateParameters(t, 2048, hashType, f4, variant)),
 				privateKeyValues: rsassapkcs1.PrivateKeyValues{
 					P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
 					Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
@@ -709,7 +709,7 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 
 			testCases = append(testCases, privateKeyTestCase{
 				name:      fmt.Sprintf("%v-%v-%v-android", 2048, hashType, variant),
-				publicKey: newPublicKey(t, setStringToBigInt(t, n2048BigInt16, 16).Bytes(), idRequirement, newParameters(t, 2048, hashType, f4, variant)),
+				publicKey: mustCreatePublicKey(t, setStringToBigInt(t, n2048BigInt16, 16).Bytes(), idRequirement, mustCreateParameters(t, 2048, hashType, f4, variant)),
 				privateKeyValues: rsassapkcs1.PrivateKeyValues{
 					P: secretdata.NewBytesFromData(setStringToBigInt(t, p2048BigInt10, 10).Bytes(), token),
 					Q: secretdata.NewBytesFromData(setStringToBigInt(t, q2048BigInt10, 10).Bytes(), token),
@@ -838,7 +838,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 		{
 			name: "different RSA keys",
 			this: func() *rsassapkcs1.PrivateKey {
-				publicKey := newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink))
+				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 123, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink))
 				privateKeyValue := rsassapkcs1.PrivateKeyValues{
 					P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
 					Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
@@ -851,7 +851,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 				return privateKey
 			}(),
 			that: func() *rsassapkcs1.PrivateKey {
-				publicKey := newPublicKey(t, base64Decode(t, differentN2048Base64), 123, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink))
+				publicKey := mustCreatePublicKey(t, base64Decode(t, differentN2048Base64), 123, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink))
 				privateKeyValue := rsassapkcs1.PrivateKeyValues{
 					P: secretdata.NewBytesFromData(base64Decode(t, differentP2048Base64), token),
 					Q: secretdata.NewBytesFromData(base64Decode(t, differentQ2048Base64), token),
@@ -867,7 +867,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 		{
 			name: "different parameters - ID requirement",
 			this: func() *rsassapkcs1.PrivateKey {
-				publicKey := newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink))
+				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 123, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink))
 				privateKeyValue := rsassapkcs1.PrivateKeyValues{
 					P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
 					Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
@@ -880,7 +880,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 				return privateKey
 			}(),
 			that: func() *rsassapkcs1.PrivateKey {
-				publicKey := newPublicKey(t, base64Decode(t, n2048Base64), 456, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink))
+				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 456, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink))
 				privateKeyValue := rsassapkcs1.PrivateKeyValues{
 					P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
 					Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
@@ -896,7 +896,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 		{
 			name: "different parameters - variant",
 			this: func() *rsassapkcs1.PrivateKey {
-				publicKey := newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink))
+				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 123, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink))
 				privateKeyValue := rsassapkcs1.PrivateKeyValues{
 					P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
 					Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
@@ -909,7 +909,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 				return privateKey
 			}(),
 			that: func() *rsassapkcs1.PrivateKey {
-				publicKey := newPublicKey(t, base64Decode(t, n2048Base64), 123, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantCrunchy))
+				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 123, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantCrunchy))
 				privateKeyValue := rsassapkcs1.PrivateKeyValues{
 					P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
 					Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),

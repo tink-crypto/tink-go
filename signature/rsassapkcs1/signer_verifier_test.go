@@ -54,7 +54,7 @@ func TestVerifyWorks(t *testing.T) {
 	}{
 		{
 			name:      "2048-SHA256-RAW",
-			publicKey: newPublicKey(t, base64Decode(t, modulus2048Base64), 0, newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantNoPrefix)),
+			publicKey: mustCreatePublicKey(t, base64Decode(t, modulus2048Base64), 0, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantNoPrefix)),
 			signature: func() []byte {
 				signatureHex := "3d10ce911833c1fe3f3356580017d159e1557e019096499950f62c3768c716bca418828dc140e930ecceff" +
 					"ebc532db66c77b433e51cef6dfbac86cb3aff6f5fc2a488faf35199b2e12c9fe2de7be3eea63bdc9" +
@@ -73,7 +73,7 @@ func TestVerifyWorks(t *testing.T) {
 		},
 		{
 			name:      "2048-SHA512-RAW",
-			publicKey: newPublicKey(t, base64Decode(t, modulus2048Base64), 0, newParameters(t, 2048, rsassapkcs1.SHA512, f4, rsassapkcs1.VariantNoPrefix)),
+			publicKey: mustCreatePublicKey(t, base64Decode(t, modulus2048Base64), 0, mustCreateParameters(t, 2048, rsassapkcs1.SHA512, f4, rsassapkcs1.VariantNoPrefix)),
 			signature: func() []byte {
 				signatureHex := "67cbf2475fff2908ba2fbde91e5ac21901427cf3328b17a41a1ba41f955d64b6358c78417ca19d1bd83f36" +
 					"0fe28e48c7e4fd3946349e19812d9fa41b546c6751fd49b4ad986c9f38c3af9993a8466b91839415" +
@@ -92,7 +92,7 @@ func TestVerifyWorks(t *testing.T) {
 		},
 		{
 			name:      "2048-SHA256-TINK",
-			publicKey: newPublicKey(t, base64Decode(t, modulus2048Base64), uint32(0x99887766), newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
+			publicKey: mustCreatePublicKey(t, base64Decode(t, modulus2048Base64), uint32(0x99887766), mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantTink)),
 			signature: func() []byte {
 				signatureHex := "01998877663d10ce911833c1fe3f3356580017d159e1557e019096499950f62c3768c716bca418828dc140" +
 					"e930ecceffebc532db66c77b433e51cef6dfbac86cb3aff6f5fc2a488faf35199b2e12c9fe2de7be" +
@@ -111,7 +111,7 @@ func TestVerifyWorks(t *testing.T) {
 		},
 		{
 			name:      "2048-SHA256-CRUNCHY",
-			publicKey: newPublicKey(t, base64Decode(t, modulus2048Base64), uint32(0x99887766), newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantCrunchy)),
+			publicKey: mustCreatePublicKey(t, base64Decode(t, modulus2048Base64), uint32(0x99887766), mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantCrunchy)),
 			signature: func() []byte {
 				signatureHex := "00998877663d10ce911833c1fe3f3356580017d159e1557e019096499950f62c3768c716bca418828dc140" +
 					"e930ecceffebc532db66c77b433e51cef6dfbac86cb3aff6f5fc2a488faf35199b2e12c9fe2de7be" +
@@ -130,7 +130,7 @@ func TestVerifyWorks(t *testing.T) {
 		},
 		{
 			name:      "2048-SHA256-LEGACY",
-			publicKey: newPublicKey(t, base64Decode(t, modulus2048Base64), uint32(0x99887766), newParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantLegacy)),
+			publicKey: mustCreatePublicKey(t, base64Decode(t, modulus2048Base64), uint32(0x99887766), mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantLegacy)),
 			signature: func() []byte {
 				signatureHex := "00998877668aece22c45c0db3db64e00416ed906b45e9c8ffedc1715cb3ea6cd9855a16f1c25375dbdd902" +
 					"8c79ad5ee192f1fa60d54efbe3d753e1c604ee7104398e2bae28d1690d8984155b0de78ab52d90d3" +
@@ -149,7 +149,7 @@ func TestVerifyWorks(t *testing.T) {
 		},
 		{
 			name:      "4096-SHA256-RAW",
-			publicKey: newPublicKey(t, base64Decode(t, modulus4096Base64), 0, newParameters(t, 4096, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantNoPrefix)),
+			publicKey: mustCreatePublicKey(t, base64Decode(t, modulus4096Base64), 0, mustCreateParameters(t, 4096, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantNoPrefix)),
 			signature: func() []byte {
 				signatureHex := "122a08c6e8b9bf4cb437a00e55cf6ac96e216c4580af87e40be6227504e163c0c516b747d38a81f087f387" +
 					"8242008e4d0ef400d02f5bdc6629bb2f323241fcbbaa84aa173324359bdf7e35becd68b3977367ae" +
