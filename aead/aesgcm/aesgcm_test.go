@@ -164,7 +164,7 @@ func TestCreateKeysetHandleFromParameters(t *testing.T) {
 	}
 }
 
-func hexDecode(t *testing.T, hexStr string) []byte {
+func mustDecodeHex(t *testing.T, hexStr string) []byte {
 	t.Helper()
 	x, err := hex.DecodeString(hexStr)
 	if err != nil {
@@ -191,13 +191,13 @@ func TestAESGCMAEADWorks(t *testing.T) {
 	// Test vectors from
 	// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/aes_gcm_test.json.
 	// 16 bytes key.
-	key1 := hexDecode(t, "5b9604fe14eadba931b0ccf34843dab9")
-	ciphertext1 := hexDecode(t, "028318abc1824029138141a226073cc1d851beff176384dc9896d5ff0a3ea7a5487cb5f7d70fb6c58d038554")
-	wantMessage1 := hexDecode(t, "001d0c231287c1182784554ca3a21908")
+	key1 := mustDecodeHex(t, "5b9604fe14eadba931b0ccf34843dab9")
+	ciphertext1 := mustDecodeHex(t, "028318abc1824029138141a226073cc1d851beff176384dc9896d5ff0a3ea7a5487cb5f7d70fb6c58d038554")
+	wantMessage1 := mustDecodeHex(t, "001d0c231287c1182784554ca3a21908")
 	// 32 bytes key.
-	key2 := hexDecode(t, "51e4bf2bad92b7aff1a4bc05550ba81df4b96fabf41c12c7b00e60e48db7e152")
-	ciphertext2 := hexDecode(t, "4f07afedfdc3b6c2361823d3cf332a12fdee800b602e8d7c4799d62c140c9bb834876b09")
-	wantMessage2 := hexDecode(t, "be3308f72a2c6aed")
+	key2 := mustDecodeHex(t, "51e4bf2bad92b7aff1a4bc05550ba81df4b96fabf41c12c7b00e60e48db7e152")
+	ciphertext2 := mustDecodeHex(t, "4f07afedfdc3b6c2361823d3cf332a12fdee800b602e8d7c4799d62c140c9bb834876b09")
+	wantMessage2 := mustDecodeHex(t, "be3308f72a2c6aed")
 
 	tinkPrefix := []byte{cryptofmt.TinkStartByte, 0x22, 0x34, 0x55, 0xab}
 	crunchyPrefix := []byte{cryptofmt.LegacyStartByte, 0x22, 0x34, 0x55, 0xab}

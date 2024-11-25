@@ -61,7 +61,7 @@ const (
 	uncompressedP521Hex = "04" + pubKeyXP521Hex + pubKeyYP521Hex
 )
 
-func hexDecode(t *testing.T, hexStr string) []byte {
+func mustDecodeHex(t *testing.T, hexStr string) []byte {
 	t.Helper()
 	decoded, err := hex.DecodeString(hexStr)
 	if err != nil {
@@ -142,7 +142,7 @@ func TestSerializePublicKey(t *testing.T) {
 }
 
 func TestParsePublicKeyFails(t *testing.T) {
-	xP256, yP256 := hexDecode(t, pubKeyXP256Hex), hexDecode(t, pubKeyYP256Hex)
+	xP256, yP256 := mustDecodeHex(t, pubKeyXP256Hex), mustDecodeHex(t, pubKeyYP256Hex)
 	protoPublicKey := &ecdsapb.EcdsaPublicKey{
 		X: xP256,
 		Y: yP256,
@@ -154,7 +154,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		Version: verifierKeyVersion,
 	}
 	serializedProtoPublicKey := marshalKey(t, protoPublicKey)
-	xP521, yP521 := hexDecode(t, pubKeyXP521Hex), hexDecode(t, pubKeyYP521Hex)
+	xP521, yP521 := mustDecodeHex(t, pubKeyXP521Hex), mustDecodeHex(t, pubKeyYP521Hex)
 
 	for _, tc := range []struct {
 		name             string
@@ -406,8 +406,8 @@ func testCases(t *testing.T) []testCase {
 					switch curveType {
 					case commonpb.EllipticCurveType_NIST_P256:
 						{
-							x, y, privateKeyValue := hexDecode(t, pubKeyXP256Hex), hexDecode(t, pubKeyYP256Hex), hexDecode(t, privKeyValueP256Hex)
-							uncompressedPoint := hexDecode(t, uncompressedP256Hex)
+							x, y, privateKeyValue := mustDecodeHex(t, pubKeyXP256Hex), mustDecodeHex(t, pubKeyYP256Hex), mustDecodeHex(t, privKeyValueP256Hex)
+							uncompressedPoint := mustDecodeHex(t, uncompressedP256Hex)
 							publicKey := mustCreatePublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
 								curveType:         NistP256,
 								hashType:          SHA256,
@@ -456,8 +456,8 @@ func testCases(t *testing.T) []testCase {
 						}
 					case commonpb.EllipticCurveType_NIST_P384:
 						{
-							x, y, privateKeyValue := hexDecode(t, pubKeyXP384Hex), hexDecode(t, pubKeyYP384Hex), hexDecode(t, privKeyValueP384Hex)
-							uncompressedPoint := hexDecode(t, uncompressedP384Hex)
+							x, y, privateKeyValue := mustDecodeHex(t, pubKeyXP384Hex), mustDecodeHex(t, pubKeyYP384Hex), mustDecodeHex(t, privKeyValueP384Hex)
+							uncompressedPoint := mustDecodeHex(t, uncompressedP384Hex)
 							var privateKeyValueForProto []byte
 							if hasLeadingZeros {
 								x = append([]byte{0x00}, x...)
@@ -550,7 +550,7 @@ func testCases(t *testing.T) []testCase {
 						}
 					case commonpb.EllipticCurveType_NIST_P521:
 						{
-							x, y, privateKeyValue := hexDecode(t, pubKeyXP521Hex), hexDecode(t, pubKeyYP521Hex), hexDecode(t, privKeyValueP521Hex)
+							x, y, privateKeyValue := mustDecodeHex(t, pubKeyXP521Hex), mustDecodeHex(t, pubKeyYP521Hex), mustDecodeHex(t, privKeyValueP521Hex)
 							var privateKeyValueForProto []byte
 							if hasLeadingZeros {
 								x = append([]byte{0x00}, x...)
@@ -559,7 +559,7 @@ func testCases(t *testing.T) []testCase {
 							} else {
 								privateKeyValueForProto = privateKeyValue
 							}
-							uncompressedPoint := hexDecode(t, uncompressedP521Hex)
+							uncompressedPoint := mustDecodeHex(t, uncompressedP521Hex)
 							publicKey := mustCreatePublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
 								curveType:         NistP521,
 								hashType:          SHA512,
@@ -626,8 +626,8 @@ func TestParsePublicKey(t *testing.T) {
 	pubKeyXP521Hex65Bytes := "01f974fbc98b55c4d39797fe6ff8891eab2aa541e8767a1b9e9eaef1f94895cdf6373c90ccb3643d1b2ef3154b126de937e4343f2409b191c262e3ac1e2577606e58"
 	pubKeyYP521Hex65Bytes := "6ed880d925e876beba3102432752ce237b8682c65ceb59902fd6dc7b6f8c728e5078e8676912ae822fda39cb62023fa4fd85bab6d32f3857914aae2d0b7e04e958"
 	pubKeyP521Hex65BytesCompressed := "0401f974fbc98b55c4d39797fe6ff8891eab2aa541e8767a1b9e9eaef1f94895cdf6373c90ccb3643d1b2ef3154b126de937e4343f2409b191c262e3ac1e2577606e58006ed880d925e876beba3102432752ce237b8682c65ceb59902fd6dc7b6f8c728e5078e8676912ae822fda39cb62023fa4fd85bab6d32f3857914aae2d0b7e04e958"
-	x, y := hexDecode(t, pubKeyXP521Hex65Bytes), hexDecode(t, pubKeyYP521Hex65Bytes)
-	uncompressedPoint := hexDecode(t, pubKeyP521Hex65BytesCompressed)
+	x, y := mustDecodeHex(t, pubKeyXP521Hex65Bytes), mustDecodeHex(t, pubKeyYP521Hex65Bytes)
+	uncompressedPoint := mustDecodeHex(t, pubKeyP521Hex65BytesCompressed)
 	t.Run("curveType:NIST_P521_hashType:SHA512_encoding:DER_variant:TINK_id:123_YBytesLength:65", func(t *testing.T) {
 		publicKeySerialization := mustCreateKeySerialization(t, &tinkpb.KeyData{
 			TypeUrl: verifierTypeURL,
@@ -662,7 +662,7 @@ func TestParsePublicKey(t *testing.T) {
 }
 
 func TestParsePrivateKeyFails(t *testing.T) {
-	xP256, yP256, privKeyBytesP256 := hexDecode(t, pubKeyXP256Hex), hexDecode(t, pubKeyYP256Hex), hexDecode(t, privKeyValueP256Hex)
+	xP256, yP256, privKeyBytesP256 := mustDecodeHex(t, pubKeyXP256Hex), mustDecodeHex(t, pubKeyYP256Hex), mustDecodeHex(t, privKeyValueP256Hex)
 	protoPublicKey := &ecdsapb.EcdsaPublicKey{
 		X: xP256,
 		Y: yP256,
@@ -820,7 +820,7 @@ func TestParsePrivateKey(t *testing.T) {
 	// Make sure we can parse private keys where the private key value size is
 	// smaller than the coordinate size.
 	t.Run("curveType:NIST_P521_hashType:SHA512_encoding:DER_variant:TINK_id:12345_hasLeadingZeros:true_PrivateKeyBytesLength:65", func(t *testing.T) {
-		xP521, yP521, privKeyBytesP521 := hexDecode(t, pubKeyXP521Hex), hexDecode(t, pubKeyYP521Hex), hexDecode(t, privKeyValueP521Hex)
+		xP521, yP521, privKeyBytesP521 := mustDecodeHex(t, pubKeyXP521Hex), mustDecodeHex(t, pubKeyYP521Hex), mustDecodeHex(t, privKeyValueP521Hex)
 		privKeyBytesP521NoLeadingZeros := bytes.TrimLeft(privKeyBytesP521, "\x00")
 		if len(privKeyBytesP521NoLeadingZeros) != 65 {
 			t.Fatalf("privKeyBytesP521NoLeadingZeros has length %v, want 65", len(privKeyBytesP521NoLeadingZeros))

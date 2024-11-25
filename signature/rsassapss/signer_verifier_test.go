@@ -37,7 +37,7 @@ type primtiveTesCase struct {
 	message    []byte
 }
 
-func hexDecode(t *testing.T, value string) []byte {
+func mustDecodeHex(t *testing.T, value string) []byte {
 	t.Helper()
 	decoded, err := hex.DecodeString(value)
 	if err != nil {
@@ -124,27 +124,27 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 
 	var testCases []primtiveTesCase
 	publicKey2048 := &rsa.PublicKey{
-		N: new(big.Int).SetBytes(base64Decode(t, n2048Base64)),
+		N: new(big.Int).SetBytes(mustDecodeBase64(t, n2048Base64)),
 		E: 65537,
 	}
 	privateKey2048 := &rsa.PrivateKey{
 		PublicKey: *publicKey2048,
-		D:         new(big.Int).SetBytes(base64Decode(t, d2048Base64)),
+		D:         new(big.Int).SetBytes(mustDecodeBase64(t, d2048Base64)),
 		Primes: []*big.Int{
-			new(big.Int).SetBytes(base64Decode(t, p2048Base64)),
-			new(big.Int).SetBytes(base64Decode(t, q2048Base64)),
+			new(big.Int).SetBytes(mustDecodeBase64(t, p2048Base64)),
+			new(big.Int).SetBytes(mustDecodeBase64(t, q2048Base64)),
 		},
 	}
 	privateKey2048.Precompute()
 
 	privateValues2048 := rsassapss.PrivateKeyValues{
-		D: secretdata.NewBytesFromData(base64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
-		P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
-		Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+		D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), insecuresecretdataaccess.Token{}),
+		P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), insecuresecretdataaccess.Token{}),
+		Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), insecuresecretdataaccess.Token{}),
 	}
 
 	// Test vector 0.
-	testVec0PublicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec0PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -159,17 +159,17 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		name:       fmt.Sprintf("2048-SHA256-RAW-salt32"),
 		publicKey:  testVec0PublicKey,
 		privateKey: testVec0PrivateKey,
-		signature: hexDecode(t, "97db7e8f38015cb1d14530c0bf3a28dfdd61e7570f3fea2d2933ba0afbbe6358f7d0c39e9647fd27c9b441"+
+		signature: mustDecodeHex(t, "97db7e8f38015cb1d14530c0bf3a28dfdd61e7570f3fea2d2933ba0afbbe6358f7d0c39e9647fd27c9b441"+
 			"557dc3e1ce34f8664bfdf93a7b1af78650eae4ed61f16c8583058296019fe968e92bcf35f38cb85a"+
 			"32c2107a76790a95a715440da281d026172b8b6e043af417852988441dac5ea888c849668bdcbb58"+
 			"f5c34ebe9ab5d16f7fa6cff32e9ed6a65c58708d887af791a33f34f7fc2da8885a9c867d347c6f92"+
 			"996dcb24f99701d2b955bb66f38c057f4acd51ff02da59c3bc129593820552ca07825a7e9920c266"+
 			"8c8eb99f2a541d9ef34f34054fda0d8a792822cc00f3f274fa0fcbf3c6a32f9fb85cba8dc713941f"+
 			"92a7a4f082693a2f79ff8198d6"),
-		message: hexDecode(t, "aa"),
+		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 1.
-	testVec1PublicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec1PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA512,
 		MGF1HashType:    rsassapss.SHA512,
@@ -184,17 +184,17 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		name:       fmt.Sprintf("2048-SHA512-RAW-salt32"),
 		publicKey:  testVec1PublicKey,
 		privateKey: testVec1PrivateKey,
-		signature: hexDecode(t, "b21a035305dbe9119803932330dbfcc4ab11bf15f1b89b974e53e5e48d54433a230ec189da5f0c77e53fb0"+
+		signature: mustDecodeHex(t, "b21a035305dbe9119803932330dbfcc4ab11bf15f1b89b974e53e5e48d54433a230ec189da5f0c77e53fb0"+
 			"eb320fd36a9e7209ffc78759cc409c15d67b858782afa5f9c67d3880275d67cd98c40064adf08d9a"+
 			"58f0badb5c47b88a06ed81a23ffb131380c2f3bbc16a9290d13d31df54e2061b2f0acb3629a3693f"+
 			"03b3f2004b451de3e1ae2861654d145a5723f102f65533598aa5bc8e40b67190386a45fe99bf17c4"+
 			"610b2edf2538878989cacffd57b4c27c82ab72d95f380e50f0282423d759a6d06241cd88a817e3c9"+
 			"67ff0e2dd1cbbacc9402ffee0acf41bbec54ea2bbe01edadf0382c8ab2a897580c1cdf4e412032a0"+
 			"83d1e5d47a625a38aac8c552e1"),
-		message: hexDecode(t, "aa"),
+		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 2.
-	testVec2PublicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), uint32(0x99887766), mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec2PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), uint32(0x99887766), mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -209,7 +209,7 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		name:       fmt.Sprintf("2048-SHA256-TINK-salt32"),
 		publicKey:  testVec2PublicKey,
 		privateKey: testVec2PrivateKey,
-		signature: hexDecode(t, "0199887766"+
+		signature: mustDecodeHex(t, "0199887766"+
 			"97db7e8f38015cb1d14530c0bf3a28dfdd61e7570f3fea2d2933ba0afbbe6358f7d0c39e9647fd27"+
 			"c9b441557dc3e1ce34f8664bfdf93a7b1af78650eae4ed61f16c8583058296019fe968e92bcf35f3"+
 			"8cb85a32c2107a76790a95a715440da281d026172b8b6e043af417852988441dac5ea888c849668b"+
@@ -217,10 +217,10 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 			"7c6f92996dcb24f99701d2b955bb66f38c057f4acd51ff02da59c3bc129593820552ca07825a7e99"+
 			"20c2668c8eb99f2a541d9ef34f34054fda0d8a792822cc00f3f274fa0fcbf3c6a32f9fb85cba8dc7"+
 			"13941f92a7a4f082693a2f79ff8198d6"),
-		message: hexDecode(t, "aa"),
+		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 3.
-	testVec3PublicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), uint32(0x99887766), mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec3PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), uint32(0x99887766), mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -235,7 +235,7 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		name:       fmt.Sprintf("2048-SHA256-CRUNCHY-salt32"),
 		publicKey:  testVec3PublicKey,
 		privateKey: testVec3PrivateKey,
-		signature: hexDecode(t, "0099887766"+
+		signature: mustDecodeHex(t, "0099887766"+
 			"97db7e8f38015cb1d14530c0bf3a28dfdd61e7570f3fea2d2933ba0afbbe6358f7d0c39e9647fd27"+
 			"c9b441557dc3e1ce34f8664bfdf93a7b1af78650eae4ed61f16c8583058296019fe968e92bcf35f3"+
 			"8cb85a32c2107a76790a95a715440da281d026172b8b6e043af417852988441dac5ea888c849668b"+
@@ -243,10 +243,10 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 			"7c6f92996dcb24f99701d2b955bb66f38c057f4acd51ff02da59c3bc129593820552ca07825a7e99"+
 			"20c2668c8eb99f2a541d9ef34f34054fda0d8a792822cc00f3f274fa0fcbf3c6a32f9fb85cba8dc7"+
 			"13941f92a7a4f082693a2f79ff8198d6"),
-		message: hexDecode(t, "aa"),
+		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 4.
-	testVec4PublicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), uint32(0x99887766), mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec4PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), uint32(0x99887766), mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -261,7 +261,7 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		name:       fmt.Sprintf("2048-SHA256-LEGACY-salt32"),
 		publicKey:  testVec4PublicKey,
 		privateKey: testVec4PrivateKey,
-		signature: hexDecode(t, "0099887766"+
+		signature: mustDecodeHex(t, "0099887766"+
 			"433065815d23c7beff4780228b0e6212d7cedd6998c5528bd5b0a3ce90066a4a1f76c703745c23b4"+
 			"f7d92a5c84871dc9e6b2800d2bebd3d651afa86b1eb68924bacabc0699358417319f5f9f7b326e63"+
 			"6457c6098676f61c549b25c40975ee5cefa4c3c2b7d5d81efa0a78e4c777908762a0348022d425aa"+
@@ -269,10 +269,10 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 			"1a0d2588cb6640383b5b193f094754c21250485eb9430b056bab0d781ba261bd6cf80ad520402b83"+
 			"bc30a81d9ce38b7de9844d7d1310696de099dbf2b642cfca8edb6b098c71d50710668870f3e47b11"+
 			"5ecf4a0933573c92027d737647daa9f8"),
-		message: hexDecode(t, "aa"),
+		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 5.
-	testVec5PublicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec5PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -287,31 +287,31 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		name:       fmt.Sprintf("2048-SHA256-RAW-salt64"),
 		publicKey:  testVec5PublicKey,
 		privateKey: testVec5PrivateKey,
-		signature: hexDecode(t, "aa5310c40c83878e0116ccc09efda3be6a88c667c797e61b6831e109fd6b5fbed9df08cf05711d79cb3841"+
+		signature: mustDecodeHex(t, "aa5310c40c83878e0116ccc09efda3be6a88c667c797e61b6831e109fd6b5fbed9df08cf05711d79cb3841"+
 			"64fc5ddfb0de10a5110053c2b073449603bb11994fc0847d929806d5034e24db0662df5c0963fbac"+
 			"1d214842c4de1d7f4bfb741d8a2866e24819e8073042d17bccef92bbcdc6b34ca052486d60d12e9d"+
 			"992cebaaca5df2d7ea31c08af4d35338cdaa460a0ee568ff2bdaab1d72d6a8360713d98a0923ae92"+
 			"9cff9950fd48bf0fa05e4324f4f9561defbb8e2c4854122394dd55bda740d57064956255e36c6c1c"+
 			"c1970947d630121df570ba577957dd23116e9bf4c2c826ec4b52223735dd0c355165485ff6652656"+
 			"aa471a190c7f40e26c85440fc8"),
-		message: hexDecode(t, "aa"),
+		message: mustDecodeHex(t, "aa"),
 	})
 
 	publicKey4096 := &rsa.PublicKey{
-		N: new(big.Int).SetBytes(base64Decode(t, n4096Base64)),
+		N: new(big.Int).SetBytes(mustDecodeBase64(t, n4096Base64)),
 		E: 65537,
 	}
 	privateKey4096 := &rsa.PrivateKey{
 		PublicKey: *publicKey4096,
-		D:         new(big.Int).SetBytes(base64Decode(t, d4096Base64)),
+		D:         new(big.Int).SetBytes(mustDecodeBase64(t, d4096Base64)),
 		Primes: []*big.Int{
-			new(big.Int).SetBytes(base64Decode(t, p4096Base64)),
-			new(big.Int).SetBytes(base64Decode(t, q4096Base64)),
+			new(big.Int).SetBytes(mustDecodeBase64(t, p4096Base64)),
+			new(big.Int).SetBytes(mustDecodeBase64(t, q4096Base64)),
 		},
 	}
 	privateKey4096.Precompute()
 	// Test vector 6.
-	testVec6PublicKey := mustCreatePublicKey(t, base64Decode(t, n4096Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec6PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n4096Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 4096,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -319,9 +319,9 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		SaltLengthBytes: 32,
 	}, rsassapss.VariantNoPrefix))
 	privateValues4096 := rsassapss.PrivateKeyValues{
-		D: secretdata.NewBytesFromData(base64Decode(t, d4096Base64), insecuresecretdataaccess.Token{}),
-		P: secretdata.NewBytesFromData(base64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
-		Q: secretdata.NewBytesFromData(base64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
+		D: secretdata.NewBytesFromData(mustDecodeBase64(t, d4096Base64), insecuresecretdataaccess.Token{}),
+		P: secretdata.NewBytesFromData(mustDecodeBase64(t, p4096Base64), insecuresecretdataaccess.Token{}),
+		Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q4096Base64), insecuresecretdataaccess.Token{}),
 	}
 	testVec6PrivateKey, err := rsassapss.NewPrivateKey(testVec6PublicKey, privateValues4096)
 	if err != nil {
@@ -331,7 +331,7 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		name:       fmt.Sprintf("4096-SHA256-RAW-salt32"),
 		publicKey:  testVec6PublicKey,
 		privateKey: testVec6PrivateKey,
-		signature: hexDecode(t, "20c933ec5b1c7862d3695e4e98ce4494fb9225ffcca5cb6ff165790c856a7600092b8dc57c1e551fc8a85b"+
+		signature: mustDecodeHex(t, "20c933ec5b1c7862d3695e4e98ce4494fb9225ffcca5cb6ff165790c856a7600092b8dc57c1e551fc8a85b"+
 			"6e0731f4e6b148c9b2b1ab72f8ea528591fa2cfc35a1d893d00aabff2d66471bcfa84cafa033d33c"+
 			"a9964c13ee316ddfdde2d1766272d60440f5df0eba22f419f2b95c2decf3621f0c3cb311b7f72bf2"+
 			"ca740414b31f74d3dd042abd005a1adc9aa4e57b65ef813476d7294aa516f04f96211dcc74497fd7"+
@@ -344,10 +344,10 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 			"68f21d9e51c184bdc679c8aceda400bb4edc29c029b4b939b2ac43d712ef4b68a058f5f45ac70022"+
 			"abc5fec9389333a8b67a54b4a994f3ca7fdf14c73b5b130220fcc2607b27bdfa2b37e115bc8ccfe2"+
 			"489f51642f8556b0240ad86f7620d3e7664f76ac671da08e92b76f512b"),
-		message: hexDecode(t, "aa"),
+		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 7.
-	testVec7PublicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec7PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA384,
 		MGF1HashType:    rsassapss.SHA384,
@@ -362,17 +362,17 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		name:       fmt.Sprintf("2048-SHA384-RAW-salt32"),
 		publicKey:  testVec7PublicKey,
 		privateKey: testVec7PrivateKey,
-		signature: hexDecode(t, "8c87ec23317b97c5d5e3692da3aa7037c183d757d0aa79ed1a2ccc46cde8397e2a8b231057034b24358135"+
+		signature: mustDecodeHex(t, "8c87ec23317b97c5d5e3692da3aa7037c183d757d0aa79ed1a2ccc46cde8397e2a8b231057034b24358135"+
 			"87314335bf308f9c930682e7575ec54968fdf15d9a689230ee2822338a97f08af3ce85b81f1c4826"+
 			"17a2f3316b78b59ec3243541eb4e32bc3a33e20729f4019085dda89f7a6c4584ab9f4288755e6511"+
 			"7f3f1dca298ef9605804ee69a88bc7d7addb99b9dbee9f858d1f7df01f0b12fa9a9534bdeaf7f197"+
 			"c1cafcb0853f32bfed7cb9495f073fcaa2d73eab5f9398b07300dbc9b80dbff248106e6c8a52e564"+
 			"fd9de73e0122f576e5fa3c4bdb477663b616372568492b4f00b6261800b132a04a3dc735e44fc4ce"+
 			"9a72e3afaca5a0d50ea77388c9"),
-		message: hexDecode(t, "aa"),
+		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 8.
-	testVec8PublicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec8PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -387,14 +387,14 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		name:       fmt.Sprintf("2048-SHA256-RAW-salt0"),
 		publicKey:  testVec8PublicKey,
 		privateKey: testVec8PrivateKey,
-		signature: hexDecode(t, "5bfef53336a5148a2f880e28c92c71fa0523707390d075d7608a8eeab44cff5166946850f5818b00e48769"+
+		signature: mustDecodeHex(t, "5bfef53336a5148a2f880e28c92c71fa0523707390d075d7608a8eeab44cff5166946850f5818b00e48769"+
 			"22bf7cc0fedfdc1f8e265200c4c10e41686f62f8a621b8ca2771106deb28fa9b0ec2b2687f106b8f"+
 			"68695dddc0b80dc15bec32e7ad2de73edb2789a8222866521230f2795b6c74de777050f02a031577"+
 			"6855f4bb1e063c93ef8d1c4a91abe393017b0cfa09548f6f5bfd565d02bdce2116ffca232ede6f4e"+
 			"869aac226f703ae0ef739fe926f0f15f916a7fa17b407118d9a54353794835c224fa8c7b92137715"+
 			"26a7acb7575ddbd4ea3aaad6c827a5d1378773a4556763ed1442fddc76e29585c9d1992d42a8b730"+
 			"e744e44f3bfe5ddddc47b5d728"),
-		message: hexDecode(t, "aa"),
+		message: mustDecodeHex(t, "aa"),
 	})
 	return testCases
 }

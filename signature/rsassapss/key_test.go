@@ -383,7 +383,7 @@ const (
 	qInv4096Base64 = "IvuOX82bdnEE5xJE21MFjBgGHhsNH2O3Pi1ZqV4qEM2HQmoz2hPCh83vgTbl5H6T-5swrZJiintUP0jrARqGNWqzy0gPJ-ORsBjKGH2Xrz2C4xhh7K-mY9t4qonDvUaOaq3vs6Q_eLwAuAFMldtU6dIaAX6PIfZxVF7d6all6jLf_0XNo3_KGqUTL2yO7SIr0B_tWm59Y5WAxZVXd6hlRMLEyTm9uLTEht2lMHKGGgM0NZvbN1hHXknZDQU5lE54z8_Y__Vbsxoc68ZbKPUeeQcBsveRIYiYTwNObpbhxSUeM_44-yIbznqQqGhXxfVrbKdzB8RdUpCx8Iit4IKzSQ"
 )
 
-func base64Decode(t *testing.T, value string) []byte {
+func mustDecodeBase64(t *testing.T, value string) []byte {
 	t.Helper()
 	decoded, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(value)
 	if err != nil {
@@ -393,7 +393,7 @@ func base64Decode(t *testing.T, value string) []byte {
 }
 
 func TestNewPublicKeyInvalidValues(t *testing.T) {
-	modulus2048 := base64Decode(t, n2048Base64)
+	modulus2048 := mustDecodeBase64(t, n2048Base64)
 	tinkParamsValues := rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
@@ -488,11 +488,11 @@ func testCases(t *testing.T) []testCase {
 				var modulus []byte
 				switch modulusSizeBits {
 				case 2048:
-					modulus = base64Decode(t, n2048Base64)
+					modulus = mustDecodeBase64(t, n2048Base64)
 				case 3072:
-					modulus = base64Decode(t, n3072Base64)
+					modulus = mustDecodeBase64(t, n3072Base64)
 				case 4096:
-					modulus = base64Decode(t, n4096Base64)
+					modulus = mustDecodeBase64(t, n4096Base64)
 				default:
 					t.Fatalf("invalid modulus size: %v", modulusSizeBits)
 				}
@@ -660,11 +660,11 @@ func mustCreatePublicKey(t *testing.T, modulus []byte, idRequirement uint32, par
 }
 
 func TestNewPublicKeyEqualsFailsIfDifferentKeys(t *testing.T) {
-	validModulus2048 := base64Decode(t, n2048Base64)
+	validModulus2048 := mustDecodeBase64(t, n2048Base64)
 	// From:
 	// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/rsa_pkcs1_2048_test.json#L353
 	otherN2048Base64 := "3ZBFkDl4CMQxQyliPZATRThDJRsTuLPE_vVFmBEq8-sxxxEDxiWZUWdOU72Tp-NtGUcuR06-gChobZUpSE2Lr-pKBLoZVVZnYWyEeGcFlACcm8aj7-UidMumTHJHR9ftwZTk_t3jKjKJ2Uwxk25-ehXXVvVISS9bNFuSfoxhi91VCsshoXrhSDBDg9ubPHuqPkyL2OhEqITao-GNVpmMsy-brk1B1WoY3dQxPICJt16du5EoRwusmwh_thkoqw-MTIk2CwIImQCNCOi9MfkHqAfoBWrWgA3_357Z2WSpOefkgRS4SXhVGsuFyd-RlvPv9VKG1s1LOagiqKd2Ohggjw"
-	otherValidModulus2048 := base64Decode(t, otherN2048Base64)
+	otherValidModulus2048 := mustDecodeBase64(t, otherN2048Base64)
 	for _, tc := range []struct {
 		name string
 		this *rsassapss.PublicKey
@@ -730,7 +730,7 @@ func TestNewPublicKeyEqualsFailsIfDifferentKeys(t *testing.T) {
 				PublicExponent:  f4,
 				SaltLengthBytes: 1,
 			}, rsassapss.VariantTink)),
-			that: mustCreatePublicKey(t, base64Decode(t, n3072Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
+			that: mustCreatePublicKey(t, mustDecodeBase64(t, n3072Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
 				ModulusSizeBits: 3072,
 				SigHashType:     rsassapss.SHA256,
 				MGF1HashType:    rsassapss.SHA256,
@@ -751,7 +751,7 @@ func TestNewPublicKeyEqualsFailsIfDifferentKeys(t *testing.T) {
 }
 
 func TestPublicKeyOutputPrefix(t *testing.T) {
-	validModulus2048 := base64Decode(t, n2048Base64)
+	validModulus2048 := mustDecodeBase64(t, n2048Base64)
 	for _, tc := range []struct {
 		name          string
 		variant       rsassapss.Variant
@@ -806,10 +806,10 @@ func TestPublicKeyOutputPrefix(t *testing.T) {
 }
 
 func TestNewPrivateKeyInvalidValues(t *testing.T) {
-	n := base64Decode(t, n2048Base64)
-	d := base64Decode(t, d2048Base64)
-	p := base64Decode(t, p2048Base64)
-	q := base64Decode(t, q2048Base64)
+	n := mustDecodeBase64(t, n2048Base64)
+	d := mustDecodeBase64(t, d2048Base64)
+	p := mustDecodeBase64(t, p2048Base64)
+	q := mustDecodeBase64(t, q2048Base64)
 	privateKeyValues := rsassapss.PrivateKeyValues{
 		P: secretdata.NewBytesFromData(p, insecuresecretdataaccess.Token{}),
 		Q: secretdata.NewBytesFromData(q, insecuresecretdataaccess.Token{}),
@@ -830,11 +830,11 @@ func TestNewPrivateKeyInvalidValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("rsassapss.NewPublicKey(%v, %v, %v) = %v, want nil", n, 123, params, err)
 	}
-	invalidD := base64Decode(t, d2048Base64)
+	invalidD := mustDecodeBase64(t, d2048Base64)
 	invalidD[0]++
-	invalidP := base64Decode(t, p2048Base64)
+	invalidP := mustDecodeBase64(t, p2048Base64)
 	invalidP[0]++
-	invalidQ := base64Decode(t, q2048Base64)
+	invalidQ := mustDecodeBase64(t, q2048Base64)
 	invalidQ[0]++
 
 	token := insecuresecretdataaccess.Token{}
@@ -921,7 +921,7 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 			token := insecuresecretdataaccess.Token{}
 			testCases = append(testCases, privateKeyTestCase{
 				name: fmt.Sprintf("%v-%v-%v-%v", 2048, hashType, hashType, variant),
-				publicKey: mustCreatePublicKey(t, base64Decode(t, n2048Base64), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
+				publicKey: mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     hashType,
 					MGF1HashType:    hashType,
@@ -929,13 +929,13 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 					SaltLengthBytes: 1,
 				}, variant)),
 				privateKeyValues: rsassapss.PrivateKeyValues{
-					P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
-					Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
-					D: secretdata.NewBytesFromData(base64Decode(t, d2048Base64), token),
+					P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), token),
+					Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), token),
+					D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), token),
 				},
-				dp:   secretdata.NewBytesFromData(base64Decode(t, dp2048Base64), token),
-				dq:   secretdata.NewBytesFromData(base64Decode(t, dq2048Base64), token),
-				qInv: secretdata.NewBytesFromData(base64Decode(t, qInv2048Base64), token),
+				dp:   secretdata.NewBytesFromData(mustDecodeBase64(t, dp2048Base64), token),
+				dq:   secretdata.NewBytesFromData(mustDecodeBase64(t, dq2048Base64), token),
+				qInv: secretdata.NewBytesFromData(mustDecodeBase64(t, qInv2048Base64), token),
 			})
 
 			testCases = append(testCases, privateKeyTestCase{
@@ -960,7 +960,7 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 			// 3072 bits
 			testCases = append(testCases, privateKeyTestCase{
 				name: fmt.Sprintf("%v-%v-%v-%v", 3072, hashType, hashType, variant),
-				publicKey: mustCreatePublicKey(t, base64Decode(t, n3072Base64), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
+				publicKey: mustCreatePublicKey(t, mustDecodeBase64(t, n3072Base64), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 3072,
 					SigHashType:     hashType,
 					MGF1HashType:    hashType,
@@ -968,19 +968,19 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 					SaltLengthBytes: 1,
 				}, variant)),
 				privateKeyValues: rsassapss.PrivateKeyValues{
-					P: secretdata.NewBytesFromData(base64Decode(t, p3072Base64), token),
-					Q: secretdata.NewBytesFromData(base64Decode(t, q3072Base64), token),
-					D: secretdata.NewBytesFromData(base64Decode(t, d3072Base64), token),
+					P: secretdata.NewBytesFromData(mustDecodeBase64(t, p3072Base64), token),
+					Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q3072Base64), token),
+					D: secretdata.NewBytesFromData(mustDecodeBase64(t, d3072Base64), token),
 				},
-				dp:   secretdata.NewBytesFromData(base64Decode(t, dp3072Base64), token),
-				dq:   secretdata.NewBytesFromData(base64Decode(t, dq3072Base64), token),
-				qInv: secretdata.NewBytesFromData(base64Decode(t, qInv3072Base64), token),
+				dp:   secretdata.NewBytesFromData(mustDecodeBase64(t, dp3072Base64), token),
+				dq:   secretdata.NewBytesFromData(mustDecodeBase64(t, dq3072Base64), token),
+				qInv: secretdata.NewBytesFromData(mustDecodeBase64(t, qInv3072Base64), token),
 			})
 
 			// 4096 bits
 			testCases = append(testCases, privateKeyTestCase{
 				name: fmt.Sprintf("%v-%v-%v-%v", 4096, hashType, hashType, variant),
-				publicKey: mustCreatePublicKey(t, base64Decode(t, n4096Base64), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
+				publicKey: mustCreatePublicKey(t, mustDecodeBase64(t, n4096Base64), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 4096,
 					SigHashType:     hashType,
 					MGF1HashType:    hashType,
@@ -988,13 +988,13 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 					SaltLengthBytes: 1,
 				}, variant)),
 				privateKeyValues: rsassapss.PrivateKeyValues{
-					P: secretdata.NewBytesFromData(base64Decode(t, p4096Base64), token),
-					Q: secretdata.NewBytesFromData(base64Decode(t, q4096Base64), token),
-					D: secretdata.NewBytesFromData(base64Decode(t, d4096Base64), token),
+					P: secretdata.NewBytesFromData(mustDecodeBase64(t, p4096Base64), token),
+					Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q4096Base64), token),
+					D: secretdata.NewBytesFromData(mustDecodeBase64(t, d4096Base64), token),
 				},
-				dp:   secretdata.NewBytesFromData(base64Decode(t, dp4096Base64), token),
-				dq:   secretdata.NewBytesFromData(base64Decode(t, dq4096Base64), token),
-				qInv: secretdata.NewBytesFromData(base64Decode(t, qInv4096Base64), token),
+				dp:   secretdata.NewBytesFromData(mustDecodeBase64(t, dp4096Base64), token),
+				dq:   secretdata.NewBytesFromData(mustDecodeBase64(t, dq4096Base64), token),
+				qInv: secretdata.NewBytesFromData(mustDecodeBase64(t, qInv4096Base64), token),
 			})
 		}
 	}
@@ -1071,7 +1071,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 		{
 			name: "different RSA keys",
 			this: func() *rsassapss.PrivateKey {
-				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
+				publicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     rsassapss.SHA256,
 					MGF1HashType:    rsassapss.SHA256,
@@ -1079,9 +1079,9 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 					SaltLengthBytes: 1,
 				}, rsassapss.VariantTink))
 				privateKeyValue := rsassapss.PrivateKeyValues{
-					P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
-					Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
-					D: secretdata.NewBytesFromData(base64Decode(t, d2048Base64), token),
+					P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), token),
+					Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), token),
+					D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), token),
 				}
 				privateKey, err := rsassapss.NewPrivateKey(publicKey, privateKeyValue)
 				if err != nil {
@@ -1090,7 +1090,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 				return privateKey
 			}(),
 			that: func() *rsassapss.PrivateKey {
-				publicKey := mustCreatePublicKey(t, base64Decode(t, differentN2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
+				publicKey := mustCreatePublicKey(t, mustDecodeBase64(t, differentN2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     rsassapss.SHA256,
 					MGF1HashType:    rsassapss.SHA256,
@@ -1098,9 +1098,9 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 					SaltLengthBytes: 1,
 				}, rsassapss.VariantTink))
 				privateKeyValue := rsassapss.PrivateKeyValues{
-					P: secretdata.NewBytesFromData(base64Decode(t, differentP2048Base64), token),
-					Q: secretdata.NewBytesFromData(base64Decode(t, differentQ2048Base64), token),
-					D: secretdata.NewBytesFromData(base64Decode(t, differentD2048Base64), token),
+					P: secretdata.NewBytesFromData(mustDecodeBase64(t, differentP2048Base64), token),
+					Q: secretdata.NewBytesFromData(mustDecodeBase64(t, differentQ2048Base64), token),
+					D: secretdata.NewBytesFromData(mustDecodeBase64(t, differentD2048Base64), token),
 				}
 				privateKey, err := rsassapss.NewPrivateKey(publicKey, privateKeyValue)
 				if err != nil {
@@ -1112,7 +1112,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 		{
 			name: "different parameters - ID requirement",
 			this: func() *rsassapss.PrivateKey {
-				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
+				publicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     rsassapss.SHA256,
 					MGF1HashType:    rsassapss.SHA256,
@@ -1120,9 +1120,9 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 					SaltLengthBytes: 1,
 				}, rsassapss.VariantTink))
 				privateKeyValue := rsassapss.PrivateKeyValues{
-					P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
-					Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
-					D: secretdata.NewBytesFromData(base64Decode(t, d2048Base64), token),
+					P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), token),
+					Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), token),
+					D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), token),
 				}
 				privateKey, err := rsassapss.NewPrivateKey(publicKey, privateKeyValue)
 				if err != nil {
@@ -1131,7 +1131,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 				return privateKey
 			}(),
 			that: func() *rsassapss.PrivateKey {
-				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 456, mustCreateParameters(t, rsassapss.ParametersValues{
+				publicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 456, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     rsassapss.SHA256,
 					MGF1HashType:    rsassapss.SHA256,
@@ -1139,9 +1139,9 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 					SaltLengthBytes: 1,
 				}, rsassapss.VariantTink))
 				privateKeyValue := rsassapss.PrivateKeyValues{
-					P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
-					Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
-					D: secretdata.NewBytesFromData(base64Decode(t, d2048Base64), token),
+					P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), token),
+					Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), token),
+					D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), token),
 				}
 				privateKey, err := rsassapss.NewPrivateKey(publicKey, privateKeyValue)
 				if err != nil {
@@ -1153,7 +1153,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 		{
 			name: "different parameters - variant",
 			this: func() *rsassapss.PrivateKey {
-				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
+				publicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     rsassapss.SHA256,
 					MGF1HashType:    rsassapss.SHA256,
@@ -1161,9 +1161,9 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 					SaltLengthBytes: 1,
 				}, rsassapss.VariantTink))
 				privateKeyValue := rsassapss.PrivateKeyValues{
-					P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
-					Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
-					D: secretdata.NewBytesFromData(base64Decode(t, d2048Base64), token),
+					P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), token),
+					Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), token),
+					D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), token),
 				}
 				privateKey, err := rsassapss.NewPrivateKey(publicKey, privateKeyValue)
 				if err != nil {
@@ -1172,7 +1172,7 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 				return privateKey
 			}(),
 			that: func() *rsassapss.PrivateKey {
-				publicKey := mustCreatePublicKey(t, base64Decode(t, n2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
+				publicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 123, mustCreateParameters(t, rsassapss.ParametersValues{
 					ModulusSizeBits: 2048,
 					SigHashType:     rsassapss.SHA256,
 					MGF1HashType:    rsassapss.SHA256,
@@ -1180,9 +1180,9 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 					SaltLengthBytes: 1,
 				}, rsassapss.VariantCrunchy))
 				privateKeyValue := rsassapss.PrivateKeyValues{
-					P: secretdata.NewBytesFromData(base64Decode(t, p2048Base64), token),
-					Q: secretdata.NewBytesFromData(base64Decode(t, q2048Base64), token),
-					D: secretdata.NewBytesFromData(base64Decode(t, d2048Base64), token),
+					P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), token),
+					Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), token),
+					D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), token),
 				}
 				privateKey, err := rsassapss.NewPrivateKey(publicKey, privateKeyValue)
 				if err != nil {

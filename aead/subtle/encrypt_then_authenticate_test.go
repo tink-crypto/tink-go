@@ -127,7 +127,7 @@ var rfcTestVectors = []struct {
 	},
 }
 
-func hexDecode(t *testing.T, data string) []byte {
+func mustDecodeHex(t *testing.T, data string) []byte {
 	t.Helper()
 	decoded, err := hex.DecodeString(data)
 	if err != nil {
@@ -138,10 +138,10 @@ func hexDecode(t *testing.T, data string) []byte {
 
 func TestETARFCTestVectors(t *testing.T) {
 	for _, v := range rfcTestVectors {
-		macKey := hexDecode(t, v.macKey)
-		encryptionKey := hexDecode(t, v.encryptionKey)
-		ciphertext := hexDecode(t, v.ciphertext)
-		associatedData := hexDecode(t, v.associatedData)
+		macKey := mustDecodeHex(t, v.macKey)
+		encryptionKey := mustDecodeHex(t, v.encryptionKey)
+		ciphertext := mustDecodeHex(t, v.ciphertext)
+		associatedData := mustDecodeHex(t, v.associatedData)
 
 		cipher, err := createAEADWithKeys(encryptionKey, v.ivSize, v.hashAlgo, macKey, v.tagSize)
 		if err != nil {

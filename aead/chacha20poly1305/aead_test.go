@@ -136,7 +136,7 @@ func TestDecryptFailsWithWrongPrefix(t *testing.T) {
 	}
 }
 
-func hexDecode(t *testing.T, hexStr string) []byte {
+func mustDecodeHex(t *testing.T, hexStr string) []byte {
 	t.Helper()
 	x, err := hex.DecodeString(hexStr)
 	if err != nil {
@@ -148,7 +148,7 @@ func hexDecode(t *testing.T, hexStr string) []byte {
 func TestDecryptCorrectness(t *testing.T) {
 	// Test vectors from
 	// https://github.com/C2SP/wycheproof/blob/b063b4aedae951c69df014cd25fa6d69ae9e8cb9/testvectors/chacha20_poly1305_test.json#L57
-	key := secretdata.NewBytesFromData(hexDecode(t, "cc56b680552eb75008f5484b4cb803fa5063ebd6eab91f6ab6aef4916a766273"), insecuresecretdataaccess.Token{})
+	key := secretdata.NewBytesFromData(mustDecodeHex(t, "cc56b680552eb75008f5484b4cb803fa5063ebd6eab91f6ab6aef4916a766273"), insecuresecretdataaccess.Token{})
 	iv := "99e23ec48985bccdeeab60f1"
 	ct := "3a"
 	tag := "cac27dec0968801e9f6eded69d807522"
@@ -166,27 +166,27 @@ func TestDecryptCorrectness(t *testing.T) {
 			variant:        VariantTink,
 			idRequirement:  0x11223344,
 			key:            key,
-			plaintext:      hexDecode(t, "2a"),
-			associatedData: hexDecode(t, ""),
-			ciphertext:     hexDecode(t, "0111223344"+iv+ct+tag),
+			plaintext:      mustDecodeHex(t, "2a"),
+			associatedData: mustDecodeHex(t, ""),
+			ciphertext:     mustDecodeHex(t, "0111223344"+iv+ct+tag),
 		},
 		{
 			name:           "CRUNCHY",
 			variant:        VariantCrunchy,
 			idRequirement:  0x11223344,
 			key:            key,
-			plaintext:      hexDecode(t, "2a"),
-			associatedData: hexDecode(t, ""),
-			ciphertext:     hexDecode(t, "0011223344"+iv+ct+tag),
+			plaintext:      mustDecodeHex(t, "2a"),
+			associatedData: mustDecodeHex(t, ""),
+			ciphertext:     mustDecodeHex(t, "0011223344"+iv+ct+tag),
 		},
 		{
 			name:           "NO_PREFIX",
 			variant:        VariantNoPrefix,
 			idRequirement:  0,
 			key:            key,
-			plaintext:      hexDecode(t, "2a"),
-			associatedData: hexDecode(t, ""),
-			ciphertext:     hexDecode(t, iv+ct+tag),
+			plaintext:      mustDecodeHex(t, "2a"),
+			associatedData: mustDecodeHex(t, ""),
+			ciphertext:     mustDecodeHex(t, iv+ct+tag),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
