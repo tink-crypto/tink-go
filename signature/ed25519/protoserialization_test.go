@@ -29,7 +29,7 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func newKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
+func mustCreateKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
 	t.Helper()
 	ks, err := protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
 	if err != nil {
@@ -61,11 +61,11 @@ func TestParsePublicKeyFails(t *testing.T) {
 	}{
 		{
 			name:             "key data is nil",
-			keySerialization: newKeySerialization(t, nil, tinkpb.OutputPrefixType_TINK, 12345),
+			keySerialization: mustCreateKeySerialization(t, nil, tinkpb.OutputPrefixType_TINK, 12345),
 		},
 		{
 			name: "wrong type URL",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "invalid_type_url",
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -73,7 +73,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong key material type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -81,7 +81,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong key version",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKeyWithWrongVersion,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -114,7 +114,7 @@ func TestParsePublicKey(t *testing.T) {
 	}{
 		{
 			name: "key with TINK output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -123,7 +123,7 @@ func TestParsePublicKey(t *testing.T) {
 		},
 		{
 			name: "key with LEGACY output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -132,7 +132,7 @@ func TestParsePublicKey(t *testing.T) {
 		},
 		{
 			name: "key with CRUNCHY output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -141,7 +141,7 @@ func TestParsePublicKey(t *testing.T) {
 		},
 		{
 			name: "key with RAW output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -221,7 +221,7 @@ func TestSerializePublicKeyFails(t *testing.T) {
 	}
 }
 
-func newPublicKey(t *testing.T, keyBytes []byte, idRequirement uint32, variant Variant) *PublicKey {
+func mustCreatePublicKey(t *testing.T, keyBytes []byte, idRequirement uint32, variant Variant) *PublicKey {
 	t.Helper()
 	params, err := NewParameters(variant)
 	if err != nil {
@@ -250,8 +250,8 @@ func TestSerializePublicKey(t *testing.T) {
 	}{
 		{
 			name:      "Public key with TINK output prefix type",
-			publicKey: newPublicKey(t, []byte("12345678901234567890123456789012"), 12345, VariantTink),
-			want: newKeySerialization(t, &tinkpb.KeyData{
+			publicKey: mustCreatePublicKey(t, []byte("12345678901234567890123456789012"), 12345, VariantTink),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -259,8 +259,8 @@ func TestSerializePublicKey(t *testing.T) {
 		},
 		{
 			name:      "Public key with LEGACY output prefix type",
-			publicKey: newPublicKey(t, []byte("12345678901234567890123456789012"), 12345, VariantLegacy),
-			want: newKeySerialization(t, &tinkpb.KeyData{
+			publicKey: mustCreatePublicKey(t, []byte("12345678901234567890123456789012"), 12345, VariantLegacy),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -268,8 +268,8 @@ func TestSerializePublicKey(t *testing.T) {
 		},
 		{
 			name:      "Public key with CRUNCHY output prefix type",
-			publicKey: newPublicKey(t, []byte("12345678901234567890123456789012"), 12345, VariantCrunchy),
-			want: newKeySerialization(t, &tinkpb.KeyData{
+			publicKey: mustCreatePublicKey(t, []byte("12345678901234567890123456789012"), 12345, VariantCrunchy),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -277,8 +277,8 @@ func TestSerializePublicKey(t *testing.T) {
 		},
 		{
 			name:      "Public key with RAW output prefix type",
-			publicKey: newPublicKey(t, []byte("12345678901234567890123456789012"), 0, VariantNoPrefix),
-			want: newKeySerialization(t, &tinkpb.KeyData{
+			publicKey: mustCreatePublicKey(t, []byte("12345678901234567890123456789012"), 0, VariantNoPrefix),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -378,11 +378,11 @@ func TestParsePrivateKeyFails(t *testing.T) {
 	}{
 		{
 			name:             "key data is nil",
-			keySerialization: newKeySerialization(t, nil, tinkpb.OutputPrefixType_TINK, 12345),
+			keySerialization: mustCreateKeySerialization(t, nil, tinkpb.OutputPrefixType_TINK, 12345),
 		},
 		{
 			name: "wrong type URL",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "invalid_type_url",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -390,7 +390,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -398,7 +398,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong private key material type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -406,7 +406,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong private key version",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKeyWithWrongPrivateKeyVersion,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -414,7 +414,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong public key version",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKeyWithWrongPublicKeyVersion,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -422,7 +422,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong public key bytes",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKeyWithWrongPublicKeyBytes,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -461,7 +461,7 @@ func TestParsePrivateKey(t *testing.T) {
 	}{
 		{
 			name: "key with TINK output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -470,7 +470,7 @@ func TestParsePrivateKey(t *testing.T) {
 		},
 		{
 			name: "key with LEGACY output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -479,7 +479,7 @@ func TestParsePrivateKey(t *testing.T) {
 		},
 		{
 			name: "key with CRUNCHY output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -488,7 +488,7 @@ func TestParsePrivateKey(t *testing.T) {
 		},
 		{
 			name: "key with RAW output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -555,7 +555,7 @@ func TestSerializePrivateKeyFails(t *testing.T) {
 	}
 }
 
-func newPrivateKey(t *testing.T, keyBytes secretdata.Bytes, idRequirement uint32, variant Variant) *PrivateKey {
+func mustCreatePrivateKey(t *testing.T, keyBytes secretdata.Bytes, idRequirement uint32, variant Variant) *PrivateKey {
 	t.Helper()
 	params, err := NewParameters(variant)
 	if err != nil {
@@ -591,8 +591,8 @@ func TestSerializePrivateKey(t *testing.T) {
 	}{
 		{
 			name:       "Public key with TINK output prefix type",
-			privateKey: newPrivateKey(t, privateKeyBytes, 12345, VariantTink),
-			want: newKeySerialization(t, &tinkpb.KeyData{
+			privateKey: mustCreatePrivateKey(t, privateKeyBytes, 12345, VariantTink),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -600,8 +600,8 @@ func TestSerializePrivateKey(t *testing.T) {
 		},
 		{
 			name:       "Public key with LEGACY output prefix type",
-			privateKey: newPrivateKey(t, privateKeyBytes, 12345, VariantLegacy),
-			want: newKeySerialization(t, &tinkpb.KeyData{
+			privateKey: mustCreatePrivateKey(t, privateKeyBytes, 12345, VariantLegacy),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -609,8 +609,8 @@ func TestSerializePrivateKey(t *testing.T) {
 		},
 		{
 			name:       "Public key with CRUNCHY output prefix type",
-			privateKey: newPrivateKey(t, privateKeyBytes, 12345, VariantCrunchy),
-			want: newKeySerialization(t, &tinkpb.KeyData{
+			privateKey: mustCreatePrivateKey(t, privateKeyBytes, 12345, VariantCrunchy),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -618,8 +618,8 @@ func TestSerializePrivateKey(t *testing.T) {
 		},
 		{
 			name:       "Public key with RAW output prefix type",
-			privateKey: newPrivateKey(t, privateKeyBytes, 0, VariantNoPrefix),
-			want: newKeySerialization(t, &tinkpb.KeyData{
+			privateKey: mustCreatePrivateKey(t, privateKeyBytes, 0, VariantNoPrefix),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
