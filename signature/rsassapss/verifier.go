@@ -23,6 +23,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/signature"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -63,4 +64,12 @@ func (v *verifier) Verify(signatureBytes, data []byte) error {
 	}
 	signatureWithoutPrefix := signatureBytes[len(v.prefix):]
 	return v.rawVerifier.Verify(signatureWithoutPrefix, toVerify)
+}
+
+func verifierConstructor(key key.Key) (any, error) {
+	that, ok := key.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("key is not a *rsassapss.PublicKey")
+	}
+	return NewVerifier(that, internalapi.Token{})
 }

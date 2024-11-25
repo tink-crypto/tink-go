@@ -20,6 +20,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 )
 
 func init() {
@@ -42,6 +43,12 @@ func init() {
 		panic(fmt.Sprintf("rsassapss.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
+		panic(fmt.Sprintf("rsassapss.init() failed: %v", err))
+	}
+	if err := registryconfig.RegisterPrimitiveConstructor[*PublicKey](verifierConstructor); err != nil {
+		panic(fmt.Sprintf("rsassapss.init() failed: %v", err))
+	}
+	if err := registryconfig.RegisterPrimitiveConstructor[*PrivateKey](signerConstructor); err != nil {
 		panic(fmt.Sprintf("rsassapss.init() failed: %v", err))
 	}
 }

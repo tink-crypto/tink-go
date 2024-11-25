@@ -15,10 +15,12 @@
 package rsassapss
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/signature"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -57,4 +59,12 @@ func (s *signer) Sign(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	return slices.Concat(s.prefix, signature), nil
+}
+
+func signerConstructor(key key.Key) (any, error) {
+	that, ok := key.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("key is not a *rsassapss.PrivateKey")
+	}
+	return NewSigner(that, internalapi.Token{})
 }
