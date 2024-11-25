@@ -621,7 +621,7 @@ func TestPublicKeyOutputPrefix(t *testing.T) {
 	}
 }
 
-func newParameters(t *testing.T, curveType ecdsa.CurveType, hashType ecdsa.HashType, signatureEncoding ecdsa.SignatureEncoding, variant ecdsa.Variant) *ecdsa.Parameters {
+func mustCreateParameters(t *testing.T, curveType ecdsa.CurveType, hashType ecdsa.HashType, signatureEncoding ecdsa.SignatureEncoding, variant ecdsa.Variant) *ecdsa.Parameters {
 	t.Helper()
 	params, err := ecdsa.NewParameters(curveType, hashType, signatureEncoding, variant)
 	if err != nil {
@@ -630,7 +630,7 @@ func newParameters(t *testing.T, curveType ecdsa.CurveType, hashType ecdsa.HashT
 	return params
 }
 
-func newPublicKey(t *testing.T, point []byte, id uint32, params *ecdsa.Parameters) *ecdsa.PublicKey {
+func mustCreatePublicKey(t *testing.T, point []byte, id uint32, params *ecdsa.Parameters) *ecdsa.PublicKey {
 	t.Helper()
 	pubKey, err := ecdsa.NewPublicKey(point, id, params)
 	if err != nil {
@@ -640,7 +640,7 @@ func newPublicKey(t *testing.T, point []byte, id uint32, params *ecdsa.Parameter
 }
 
 func TestNewPrivateKeyInvalidValues(t *testing.T) {
-	params := newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)
+	params := mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)
 	token := insecuresecretdataaccess.Token{}
 	for _, tc := range []struct {
 		name            string
@@ -689,8 +689,8 @@ func TestNewPrivateKeyInvalidValues(t *testing.T) {
 func TestNewPrivateKey(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("curveType: %v, hashType: %v, encoding: %v, variant: %v, id: %d", tc.curveType, tc.hashType, tc.encoding, tc.variant, tc.id), func(t *testing.T) {
-			params := newParameters(t, tc.curveType, tc.hashType, tc.encoding, tc.variant)
-			publicKey := newPublicKey(t, bytesFromHex(t, tc.point), tc.id, params)
+			params := mustCreateParameters(t, tc.curveType, tc.hashType, tc.encoding, tc.variant)
+			publicKey := mustCreatePublicKey(t, bytesFromHex(t, tc.point), tc.id, params)
 			token := insecuresecretdataaccess.Token{}
 
 			privateKeyValueBytes := bytesFromHex(t, tc.d)
@@ -736,7 +736,7 @@ func TestNewPrivateKey(t *testing.T) {
 
 func TestNewPrivateKeyFromPublicKeyInvalidValues(t *testing.T) {
 	publicPoint := bytesFromHex(t, pubKeyUncompressedP256Hex)
-	publicKey := newPublicKey(t, publicPoint, 123, newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantCrunchy))
+	publicKey := mustCreatePublicKey(t, publicPoint, 123, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantCrunchy))
 	token := insecuresecretdataaccess.Token{}
 	for _, tc := range []struct {
 		name            string
@@ -790,8 +790,8 @@ func TestNewPrivateKeyFromPublicKeyInvalidValues(t *testing.T) {
 func TestNewPrivateKeyFromPublicKey(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("curveType: %v, hashType: %v, encoding: %v, variant: %v, id: %d", tc.curveType, tc.hashType, tc.encoding, tc.variant, tc.id), func(t *testing.T) {
-			params := newParameters(t, tc.curveType, tc.hashType, tc.encoding, tc.variant)
-			publicKey := newPublicKey(t, bytesFromHex(t, tc.point), tc.id, params)
+			params := mustCreateParameters(t, tc.curveType, tc.hashType, tc.encoding, tc.variant)
+			publicKey := mustCreatePublicKey(t, bytesFromHex(t, tc.point), tc.id, params)
 			token := insecuresecretdataaccess.Token{}
 
 			privateKeyValueBytes := bytesFromHex(t, tc.d)

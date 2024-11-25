@@ -32,7 +32,7 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func newKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
+func mustCreateKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
 	t.Helper()
 	ks, err := protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
 	if err != nil {
@@ -162,11 +162,11 @@ func TestParsePublicKeyFails(t *testing.T) {
 	}{
 		{
 			name:             "key data is nil",
-			keySerialization: newKeySerialization(t, nil, tinkpb.OutputPrefixType_TINK, 12345),
+			keySerialization: mustCreateKeySerialization(t, nil, tinkpb.OutputPrefixType_TINK, 12345),
 		},
 		{
 			name: "wrong type URL",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "invalid_type_url",
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -174,7 +174,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong key material type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -182,7 +182,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong key version",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: verifierTypeURL,
 				Value: marshalKey(t, &ecdsapb.EcdsaPublicKey{
 					X: xP256,
@@ -199,7 +199,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		},
 		{
 			name: "point not on curve",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: verifierTypeURL,
 				Value: marshalKey(t, &ecdsapb.EcdsaPublicKey{
 					X: xP256,
@@ -216,7 +216,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		},
 		{
 			name: "point coordinate after leading 0s removal too long",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: verifierTypeURL,
 				Value: marshalKey(t, &ecdsapb.EcdsaPublicKey{
 					X: append(xP256, 0x02),
@@ -233,7 +233,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		},
 		{
 			name: "invalid point",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: verifierTypeURL,
 				Value: marshalKey(t, &ecdsapb.EcdsaPublicKey{
 					X: []byte("0"),
@@ -250,7 +250,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		},
 		{
 			name: "point from another curve",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: verifierTypeURL,
 				Value: marshalKey(t, &ecdsapb.EcdsaPublicKey{
 					X: xP521,
@@ -267,7 +267,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		},
 		{
 			name: "unknown curve type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: verifierTypeURL,
 				Value: marshalKey(t, &ecdsapb.EcdsaPublicKey{
 					X: xP256,
@@ -284,7 +284,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		},
 		{
 			name: "unknown hash type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: verifierTypeURL,
 				Value: marshalKey(t, &ecdsapb.EcdsaPublicKey{
 					X: xP256,
@@ -301,7 +301,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		},
 		{
 			name: "unknown encoding",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: verifierTypeURL,
 				Value: marshalKey(t, &ecdsapb.EcdsaPublicKey{
 					X: xP256,
@@ -328,7 +328,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 	}
 }
 
-func newPublicKey(t *testing.T, uncompressedPoint []byte, idRequirement uint32, params *Parameters) *PublicKey {
+func mustCreatePublicKey(t *testing.T, uncompressedPoint []byte, idRequirement uint32, params *Parameters) *PublicKey {
 	t.Helper()
 	outputPrefix, err := calculateOutputPrefix(params.variant, idRequirement)
 	if err != nil {
@@ -342,7 +342,7 @@ func newPublicKey(t *testing.T, uncompressedPoint []byte, idRequirement uint32, 
 	}
 }
 
-func newPrivateKey(t *testing.T, privateKeyValue secretdata.Bytes, publicKey *PublicKey) *PrivateKey {
+func mustCreatePrivateKey(t *testing.T, privateKeyValue secretdata.Bytes, publicKey *PublicKey) *PrivateKey {
 	t.Helper()
 	privateKey, err := NewPrivateKeyFromPublicKey(publicKey, privateKeyValue)
 	if err != nil {
@@ -408,13 +408,13 @@ func testCases(t *testing.T) []testCase {
 						{
 							x, y, privateKeyValue := hexDecode(t, pubKeyXP256Hex), hexDecode(t, pubKeyYP256Hex), hexDecode(t, privKeyValueP256Hex)
 							uncompressedPoint := hexDecode(t, uncompressedP256Hex)
-							publicKey := newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
+							publicKey := mustCreatePublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
 								curveType:         NistP256,
 								hashType:          SHA256,
 								signatureEncoding: encoding.encoding,
 								variant:           variantAndID.variant,
 							})
-							privateKey := newPrivateKey(t, secretdata.NewBytesFromData(privateKeyValue, token), publicKey)
+							privateKey := mustCreatePrivateKey(t, secretdata.NewBytesFromData(privateKeyValue, token), publicKey)
 							var privateKeyValueForProto []byte
 							if hasLeadingZeros {
 								x = append([]byte{0x00}, x...)
@@ -439,13 +439,13 @@ func testCases(t *testing.T) []testCase {
 								PublicKey: protoPublicKey,
 							}
 							tc = append(tc, testCase{
-								publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+								publicKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 									TypeUrl:         verifierTypeURL,
 									Value:           marshalKey(t, protoPublicKey),
 									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 								}, variantAndID.protoPrefixType, variantAndID.id),
 								publicKey: publicKey,
-								privateKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+								privateKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 									TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey",
 									Value:           marshalKey(t, protoPrivateKey),
 									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -468,13 +468,13 @@ func testCases(t *testing.T) []testCase {
 							}
 
 							// hashType: SHA384.
-							publicKeySHA384 := newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
+							publicKeySHA384 := mustCreatePublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
 								curveType:         NistP384,
 								hashType:          SHA384,
 								signatureEncoding: encoding.encoding,
 								variant:           variantAndID.variant,
 							})
-							privateKeySHA384 := newPrivateKey(t, secretdata.NewBytesFromData(privateKeyValue, token), publicKeySHA384)
+							privateKeySHA384 := mustCreatePrivateKey(t, secretdata.NewBytesFromData(privateKeyValue, token), publicKeySHA384)
 
 							protoPublicKeySHA384 := &ecdsapb.EcdsaPublicKey{
 								X: x,
@@ -493,13 +493,13 @@ func testCases(t *testing.T) []testCase {
 							}
 
 							tc = append(tc, testCase{
-								publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+								publicKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 									TypeUrl:         verifierTypeURL,
 									Value:           marshalKey(t, protoPublicKeySHA384),
 									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 								}, variantAndID.protoPrefixType, variantAndID.id),
 								publicKey: publicKeySHA384,
-								privateKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+								privateKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 									TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey",
 									Value:           marshalKey(t, protoPrivateKeySHA384),
 									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -524,22 +524,22 @@ func testCases(t *testing.T) []testCase {
 								KeyValue:  privateKeyValueForProto,
 								PublicKey: protoPublicKeySHA512,
 							}
-							publicKeySHA512 := newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
+							publicKeySHA512 := mustCreatePublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
 								curveType:         NistP384,
 								hashType:          SHA512,
 								signatureEncoding: encoding.encoding,
 								variant:           variantAndID.variant,
 							})
-							privateKeySHA512 := newPrivateKey(t, secretdata.NewBytesFromData(privateKeyValue, token), publicKeySHA512)
+							privateKeySHA512 := mustCreatePrivateKey(t, secretdata.NewBytesFromData(privateKeyValue, token), publicKeySHA512)
 
 							tc = append(tc, testCase{
-								publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+								publicKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 									TypeUrl:         verifierTypeURL,
 									Value:           marshalKey(t, protoPublicKeySHA512),
 									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 								}, variantAndID.protoPrefixType, variantAndID.id),
 								publicKey: publicKeySHA512,
-								privateKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+								privateKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 									TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey",
 									Value:           marshalKey(t, protoPrivateKeySHA512),
 									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -560,7 +560,7 @@ func testCases(t *testing.T) []testCase {
 								privateKeyValueForProto = privateKeyValue
 							}
 							uncompressedPoint := hexDecode(t, uncompressedP521Hex)
-							publicKey := newPublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
+							publicKey := mustCreatePublicKey(t, uncompressedPoint, variantAndID.id, &Parameters{
 								curveType:         NistP521,
 								hashType:          SHA512,
 								signatureEncoding: encoding.encoding,
@@ -583,18 +583,18 @@ func testCases(t *testing.T) []testCase {
 							}
 
 							tc = append(tc, testCase{
-								publicKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+								publicKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 									TypeUrl:         verifierTypeURL,
 									Value:           marshalKey(t, protoPublicKey),
 									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 								}, variantAndID.protoPrefixType, variantAndID.id),
 								publicKey: publicKey,
-								privateKeySerialization: newKeySerialization(t, &tinkpb.KeyData{
+								privateKeySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 									TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey",
 									Value:           marshalKey(t, protoPrivateKey),
 									KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 								}, variantAndID.protoPrefixType, variantAndID.id),
-								privateKey:      newPrivateKey(t, secretdata.NewBytesFromData(privateKeyValue, token), publicKey),
+								privateKey:      mustCreatePrivateKey(t, secretdata.NewBytesFromData(privateKeyValue, token), publicKey),
 								hasLeadingZeros: hasLeadingZeros,
 							})
 						}
@@ -629,7 +629,7 @@ func TestParsePublicKey(t *testing.T) {
 	x, y := hexDecode(t, pubKeyXP521Hex65Bytes), hexDecode(t, pubKeyYP521Hex65Bytes)
 	uncompressedPoint := hexDecode(t, pubKeyP521Hex65BytesCompressed)
 	t.Run("curveType:NIST_P521_hashType:SHA512_encoding:DER_variant:TINK_id:123_YBytesLength:65", func(t *testing.T) {
-		publicKeySerialization := newKeySerialization(t, &tinkpb.KeyData{
+		publicKeySerialization := mustCreateKeySerialization(t, &tinkpb.KeyData{
 			TypeUrl: verifierTypeURL,
 			Value: marshalKey(t, &ecdsapb.EcdsaPublicKey{
 				X: x,
@@ -644,7 +644,7 @@ func TestParsePublicKey(t *testing.T) {
 			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 		}, tinkpb.OutputPrefixType_TINK, 123)
 		publicKey :=
-			newPublicKey(t, uncompressedPoint, 123, &Parameters{
+			mustCreatePublicKey(t, uncompressedPoint, 123, &Parameters{
 				curveType:         NistP521,
 				hashType:          SHA512,
 				signatureEncoding: DER,
@@ -727,11 +727,11 @@ func TestParsePrivateKeyFails(t *testing.T) {
 	}{
 		{
 			name:             "key data is nil",
-			keySerialization: newKeySerialization(t, nil, tinkpb.OutputPrefixType_TINK, 12345),
+			keySerialization: mustCreateKeySerialization(t, nil, tinkpb.OutputPrefixType_TINK, 12345),
 		},
 		{
 			name: "wrong type URL",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "invalid_type_url",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -739,7 +739,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong output prefix type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -747,7 +747,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong private key material type",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey",
 				Value:           serializedProtoPrivateKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
@@ -755,7 +755,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong private key version",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey",
 				Value:           serializedProtoPrivateKeyWithWrongPrivateKeyVersion,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -763,7 +763,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong private key prefix",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey",
 				Value:           serializedProtoPrivateKeyWithPrivateKeyWithInvalidPrefix,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -771,7 +771,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong public key version",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey",
 				Value:           serializedProtoPrivateKeyWithWrongPublicKeyVersion,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -779,7 +779,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong public key too small",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey",
 				Value:           serializedProtoPrivateKeyWithPublicKeyTooSmall,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -787,7 +787,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		{
 			name: "wrong public key",
-			keySerialization: newKeySerialization(t, &tinkpb.KeyData{
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey",
 				Value:           serializedProtoPrivateKeyWithWrongPublicKeyBytes,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -844,7 +844,7 @@ func TestParsePrivateKey(t *testing.T) {
 		if err != nil {
 			t.Fatalf("proto.Marshal(%v) err = %v, want nil", protoPrivateKey, err)
 		}
-		keySerialization := newKeySerialization(t, &tinkpb.KeyData{
+		keySerialization := mustCreateKeySerialization(t, &tinkpb.KeyData{
 			TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey",
 			Value:           serializedProtoPrivateKey,
 			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
@@ -946,7 +946,7 @@ func TestSerializeParametersFailsWithWrongParameters(t *testing.T) {
 	}
 }
 
-func newKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixType, protoParams *ecdsapb.EcdsaParams) *tinkpb.KeyTemplate {
+func mustCreateKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixType, protoParams *ecdsapb.EcdsaParams) *tinkpb.KeyTemplate {
 	t.Helper()
 	format := &ecdsapb.EcdsaKeyFormat{
 		Params: protoParams,
@@ -976,7 +976,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantTink,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P256,
 				HashType: commonpb.HashType_SHA256,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -990,7 +990,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantTink,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P256,
 				HashType: commonpb.HashType_SHA256,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1004,7 +1004,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantLegacy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P256,
 				HashType: commonpb.HashType_SHA256,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1018,7 +1018,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantLegacy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P256,
 				HashType: commonpb.HashType_SHA256,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1032,7 +1032,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantCrunchy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P256,
 				HashType: commonpb.HashType_SHA256,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1046,7 +1046,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantCrunchy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P256,
 				HashType: commonpb.HashType_SHA256,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1060,7 +1060,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantNoPrefix,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P256,
 				HashType: commonpb.HashType_SHA256,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1074,7 +1074,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantNoPrefix,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P256,
 				HashType: commonpb.HashType_SHA256,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1088,7 +1088,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantTink,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P384,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1102,7 +1102,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantTink,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P384,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1116,7 +1116,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantLegacy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P384,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1130,7 +1130,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantLegacy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P384,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1144,7 +1144,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantCrunchy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P384,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1158,7 +1158,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantCrunchy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P384,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1172,7 +1172,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantNoPrefix,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P384,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1186,7 +1186,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantNoPrefix,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P384,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1200,7 +1200,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantTink,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1214,7 +1214,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantTink,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1228,7 +1228,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantLegacy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1242,7 +1242,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantLegacy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1256,7 +1256,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantCrunchy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1270,7 +1270,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantCrunchy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1284,7 +1284,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantNoPrefix,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1298,7 +1298,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantNoPrefix,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA384,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1312,7 +1312,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantTink,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA512,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1326,7 +1326,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantTink,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA512,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1340,7 +1340,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantLegacy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA512,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1354,7 +1354,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantLegacy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA512,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1368,7 +1368,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantCrunchy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA512,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1382,7 +1382,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantCrunchy,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA512,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
@@ -1396,7 +1396,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: DER,
 				variant:           VariantNoPrefix,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA512,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
@@ -1410,7 +1410,7 @@ func TestSerializeParameters(t *testing.T) {
 				signatureEncoding: IEEEP1363,
 				variant:           VariantNoPrefix,
 			},
-			wantKeyTemplate: newKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
+			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
 				Curve:    commonpb.EllipticCurveType_NIST_P521,
 				HashType: commonpb.HashType_SHA512,
 				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,

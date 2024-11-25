@@ -42,7 +42,7 @@ type primitiveTestCase struct {
 	message    []byte
 }
 
-func newPrivateKey(t *testing.T, keyValue []byte, id uint32, params *ecdsa.Parameters) *ecdsa.PrivateKey {
+func mustCreatePrivateKey(t *testing.T, keyValue []byte, id uint32, params *ecdsa.Parameters) *ecdsa.PrivateKey {
 	t.Helper()
 	token := insecuresecretdataaccess.Token{}
 	privateKey, err := ecdsa.NewPrivateKey(secretdata.NewBytesFromData(keyValue, token), id, params)
@@ -58,77 +58,77 @@ func primitiveTestVectors(t *testing.T) []primitiveTestCase {
 	t.Helper()
 	testCases := []primitiveTestCase{}
 	// Test case 0.
-	params0 := newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantNoPrefix)
+	params0 := mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantNoPrefix)
 	testCases = append(testCases, primitiveTestCase{
 		name:       "P256-SHA256-IEEE_P1363-NO_PREFIX",
-		publicKey:  newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0, params0),
-		privateKey: newPrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0, params0),
+		publicKey:  mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0, params0),
+		privateKey: mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0, params0),
 		curve:      elliptic.P256(),
 		signature:  bytesFromHex(t, "70cbee11e536e9c83d2a2abc6be049117fdab0c420db8191e36f8ce2855262bb5d0b69eefc4dea7b086aa62186e9a7c8600e7b0f1252f704271d5189e7a5cf03"),
 		message:    bytesFromHex(t, ""),
 	})
 
 	// Test case 1.
-	params1 := newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantNoPrefix)
+	params1 := mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantNoPrefix)
 	testCases = append(testCases, primitiveTestCase{
 		name:       "P256-SHA256-DER-NO_PREFIX",
-		publicKey:  newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0, params1),
-		privateKey: newPrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0, params1),
+		publicKey:  mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0, params1),
+		privateKey: mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0, params1),
 		curve:      elliptic.P256(),
 		signature:  bytesFromHex(t, "3046022100baca7d618e43d44f2754a5368f60b4a41925e2c04d27a672b276ae1f4b3c63a2022100d404a3015cb229f7cb036c2b5f77cc546065eed4b75837cec2883d1e35d5eb9f"),
 		message:    bytesFromHex(t, ""),
 	})
 
 	// Test case 1 with TINK prefix.
-	params1 = newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)
+	params1 = mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)
 	testCases = append(testCases, primitiveTestCase{
 		name:       "P256-SHA256-DER-TINK",
-		publicKey:  newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0x99887766, params1),
-		privateKey: newPrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0x99887766, params1),
+		publicKey:  mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0x99887766, params1),
+		privateKey: mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0x99887766, params1),
 		curve:      elliptic.P256(),
 		signature:  bytesFromHex(t, strings.Join([]string{"0199887766", "3046022100baca7d618e43d44f2754a5368f60b4a41925e2c04d27a672b276ae1f4b3c63a2022100d404a3015cb229f7cb036c2b5f77cc546065eed4b75837cec2883d1e35d5eb9f"}, "")),
 		message:    bytesFromHex(t, ""),
 	})
 
 	// Test case 2.
-	params2 := newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantTink)
+	params2 := mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantTink)
 	testCases = append(testCases, primitiveTestCase{
 		name:       "P256-SHA256-IEEE_P1363-TINK",
-		publicKey:  newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0x99887766, params2),
-		privateKey: newPrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0x99887766, params2),
+		publicKey:  mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0x99887766, params2),
+		privateKey: mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0x99887766, params2),
 		curve:      elliptic.P256(),
 		signature:  bytesFromHex(t, strings.Join([]string{"0199887766", "9b04881165ae47c99c637d306c537bdc97a336ed6f358c7fac1124b3f7166f7d5da6a7b20c61090200276fa25ff25e6e39cf56fb5499973b66f25bc1921a1fda"}, "")),
 		message:    bytesFromHex(t, ""),
 	})
 
 	// Test case 3.
-	params3 := newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantCrunchy)
+	params3 := mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantCrunchy)
 	testCases = append(testCases, primitiveTestCase{
 		name:       "P256-SHA256-IEEE_P1363-CRUNCHY",
-		publicKey:  newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0x99887766, params3),
-		privateKey: newPrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0x99887766, params3),
+		publicKey:  mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0x99887766, params3),
+		privateKey: mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0x99887766, params3),
 		curve:      elliptic.P256(),
 		signature:  bytesFromHex(t, strings.Join([]string{"0099887766", "9b04881165ae47c99c637d306c537bdc97a336ed6f358c7fac1124b3f7166f7d5da6a7b20c61090200276fa25ff25e6e39cf56fb5499973b66f25bc1921a1fda"}, "")),
 		message:    bytesFromHex(t, ""),
 	})
 
 	// Test case 4.
-	params4 := newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantLegacy)
+	params4 := mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantLegacy)
 	testCases = append(testCases, primitiveTestCase{
 		name:       "P256-SHA256-IEEE_P1363-LEGACY",
-		publicKey:  newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0x99887766, params4),
-		privateKey: newPrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0x99887766, params4),
+		publicKey:  mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0x99887766, params4),
+		privateKey: mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0x99887766, params4),
 		curve:      elliptic.P256(),
 		signature:  bytesFromHex(t, strings.Join([]string{"0099887766", "515b67e48efb8ebc12e0ce691cf210b18c1e96409667aaedd8d744c64aff843a4e09ebfb9b6c40a6540dd0d835693ca08da8c1d8e434770511459088243b0bbb"}, "")),
 		message:    bytesFromHex(t, ""),
 	})
 
 	// Test case 5.
-	params5 := newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantNoPrefix)
+	params5 := mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantNoPrefix)
 	testCases = append(testCases, primitiveTestCase{
 		name:       "P256-SHA256-IEEE_P1363-RAW-Nonempty",
-		publicKey:  newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0, params5),
-		privateKey: newPrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0, params5),
+		publicKey:  mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 0, params5),
+		privateKey: mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0, params5),
 		curve:      elliptic.P256(),
 		signature:  bytesFromHex(t, "bfec68e554a26e161b657efb368a6cd0ec3499c92f2b6240e1b92fa724366a79ca37137274c9125e34c286439c848ce3594a3f9450f4108a2fc287a120dfab4f"),
 		message:    bytesFromHex(t, "001122"),
@@ -139,22 +139,22 @@ func primitiveTestVectors(t *testing.T) []primitiveTestCase {
 	xP384Hex := "9d92e0330dfc60ba8b2be32e10f7d2f8457678a112cafd4544b29b7e6addf0249968f54c732aa49bc4a38f467edb8424"
 	yP384Hex := "81a3a9c9e878b86755f018a8ec3c5e80921910af919b95f18976e35acc04efa2962e277a0b2c990ae92b62d6c75180ba"
 	// Test case 6.
-	params6 := newParameters(t, ecdsa.NistP384, ecdsa.SHA384, ecdsa.IEEEP1363, ecdsa.VariantNoPrefix)
+	params6 := mustCreateParameters(t, ecdsa.NistP384, ecdsa.SHA384, ecdsa.IEEEP1363, ecdsa.VariantNoPrefix)
 	testCases = append(testCases, primitiveTestCase{
 		name:       "P384-SHA384-IEEE_P1363-RAW",
-		publicKey:  newPublicKey(t, bytesFromHex(t, "04"+xP384Hex+yP384Hex), 0, params6),
-		privateKey: newPrivateKey(t, bytesFromHex(t, "670dc60402d8a4fe52f4e552d2b71f0f81bcf195d8a71a6c7d84efb4f0e4b4a5d0f60a27c94caac46bdeeb79897a3ed9"), 0, params6),
+		publicKey:  mustCreatePublicKey(t, bytesFromHex(t, "04"+xP384Hex+yP384Hex), 0, params6),
+		privateKey: mustCreatePrivateKey(t, bytesFromHex(t, "670dc60402d8a4fe52f4e552d2b71f0f81bcf195d8a71a6c7d84efb4f0e4b4a5d0f60a27c94caac46bdeeb79897a3ed9"), 0, params6),
 		curve:      elliptic.P384(),
 		signature:  bytesFromHex(t, "eb19dc251dcbb0aac7634c646b27ccc59a21d6231e08d2b6031ec729ecb0e9927b70bfa66d458b5e1b7186355644fa9150602bade9f0c358b9d28263cb427f58bf7d9b892ac75f43ab048360b34ee81653f85ec2f10e6e4f0f0e0cafbe91f883"),
 		message:    bytesFromHex(t, ""),
 	})
 
 	// Test case 7.
-	params7 := newParameters(t, ecdsa.NistP384, ecdsa.SHA512, ecdsa.IEEEP1363, ecdsa.VariantNoPrefix)
+	params7 := mustCreateParameters(t, ecdsa.NistP384, ecdsa.SHA512, ecdsa.IEEEP1363, ecdsa.VariantNoPrefix)
 	testCases = append(testCases, primitiveTestCase{
 		name:       "P384-SHA512-IEEE_P1363-RAW",
-		publicKey:  newPublicKey(t, bytesFromHex(t, "04"+xP384Hex+yP384Hex), 0, params7),
-		privateKey: newPrivateKey(t, bytesFromHex(t, "670dc60402d8a4fe52f4e552d2b71f0f81bcf195d8a71a6c7d84efb4f0e4b4a5d0f60a27c94caac46bdeeb79897a3ed9"), 0, params7),
+		publicKey:  mustCreatePublicKey(t, bytesFromHex(t, "04"+xP384Hex+yP384Hex), 0, params7),
+		privateKey: mustCreatePrivateKey(t, bytesFromHex(t, "670dc60402d8a4fe52f4e552d2b71f0f81bcf195d8a71a6c7d84efb4f0e4b4a5d0f60a27c94caac46bdeeb79897a3ed9"), 0, params7),
 		curve:      elliptic.P384(),
 		signature:  bytesFromHex(t, "3db99cec1a865909886f8863ccfa3147f21ccad262a41abc8d964fafa55141a9d89efa6bf0acb4e5ec357c6056542e7e016d4a653fde985aad594763900f3f9c4494f45f7a4450422640f57b0ad467950f78ddb56641676cb91d392410ed606d"),
 		message:    bytesFromHex(t, ""),
@@ -163,11 +163,11 @@ func primitiveTestVectors(t *testing.T) []primitiveTestCase {
 	// P-521.
 
 	// Test case 8.
-	params8 := newParameters(t, ecdsa.NistP521, ecdsa.SHA512, ecdsa.IEEEP1363, ecdsa.VariantNoPrefix)
+	params8 := mustCreateParameters(t, ecdsa.NistP521, ecdsa.SHA512, ecdsa.IEEEP1363, ecdsa.VariantNoPrefix)
 	testCases = append(testCases, primitiveTestCase{
 		name:       "P521-SHA512-IEEE_P1363-RAW",
-		publicKey:  newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP521Hex), 0, params8),
-		privateKey: newPrivateKey(t, bytesFromHex(t, privKeyValueP521Hex), 0, params8),
+		publicKey:  mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP521Hex), 0, params8),
+		privateKey: mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP521Hex), 0, params8),
 		curve:      elliptic.P521(),
 		signature:  bytesFromHex(t, "00eaf6672f0696a46046d3b1572814b697c7904fe265fece75e33b90833d08af6513adfb6cbf0a4971442633c981d11cd068fcf9431cbe49448b4240a067d860f7fb0168a8d7bf1602050b2255e844aea1df8d8ad770053d2c915cca2af6e175c2fb0944f6a9e3262fb9b99910e7fbd6ef4aca887b901ec78678d3ec48529c7f06e8c815"),
 		message:    bytesFromHex(t, ""),
@@ -249,9 +249,9 @@ func TestVerifyFails(t *testing.T) {
 	}{
 		{
 			name:      "different prefix type",
-			publicKey: newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 123, newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)),
+			publicKey: mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 123, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)),
 			signature: func() []byte {
-				privateKey := newPrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 123, newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantCrunchy))
+				privateKey := mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 123, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantCrunchy))
 				s, err := ecdsa.NewSigner(privateKey, internalapi.Token{})
 				if err != nil {
 					t.Fatalf("ecdsa.NewSigner(%v) err = %v, want nil", privateKey, err)
@@ -265,9 +265,9 @@ func TestVerifyFails(t *testing.T) {
 		},
 		{
 			name:      "missing prefix",
-			publicKey: newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 123, newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)),
+			publicKey: mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 123, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)),
 			signature: func() []byte {
-				privateKey := newPrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0, newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantNoPrefix))
+				privateKey := mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 0, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantNoPrefix))
 				s, err := ecdsa.NewSigner(privateKey, internalapi.Token{})
 				if err != nil {
 					t.Fatalf("ecdsa.NewSigner(%v) err = %v, want nil", privateKey, err)
@@ -281,9 +281,9 @@ func TestVerifyFails(t *testing.T) {
 		},
 		{
 			name:      "different key ID",
-			publicKey: newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 123, newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)),
+			publicKey: mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 123, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)),
 			signature: func() []byte {
-				privateKey := newPrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 456, newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink))
+				privateKey := mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 456, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink))
 				s, err := ecdsa.NewSigner(privateKey, internalapi.Token{})
 				if err != nil {
 					t.Fatalf("ecdsa.NewSigner(%v) err = %v, want nil", privateKey, err)
@@ -297,9 +297,9 @@ func TestVerifyFails(t *testing.T) {
 		},
 		{
 			name:      "different signature encoding",
-			publicKey: newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 123, newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)),
+			publicKey: mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 123, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)),
 			signature: func() []byte {
-				privateKey := newPrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 123, newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantTink))
+				privateKey := mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 123, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantTink))
 				s, err := ecdsa.NewSigner(privateKey, internalapi.Token{})
 				if err != nil {
 					t.Fatalf("ecdsa.NewSigner(%v) err = %v, want nil", privateKey, err)
@@ -313,9 +313,9 @@ func TestVerifyFails(t *testing.T) {
 		},
 		{
 			name:      "invalid signature",
-			publicKey: newPublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 123, newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)),
+			publicKey: mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 123, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)),
 			signature: func() []byte {
-				privateKey := newPrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 123, newParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink))
+				privateKey := mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 123, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink))
 				s, err := ecdsa.NewSigner(privateKey, internalapi.Token{})
 				if err != nil {
 					t.Fatalf("ecdsa.NewSigner(%v) err = %v, want nil", privateKey, err)
