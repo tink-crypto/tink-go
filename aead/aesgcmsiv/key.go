@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package aesgcmsiv provides an implementation of AES-GCM-SIV.
-//
-// See https://www.rfc-editor.org/rfc/rfc8452.html for more information.
 package aesgcmsiv
 
 import (
