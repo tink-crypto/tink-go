@@ -245,28 +245,9 @@ func (a *AESGCMSIV) aesCTR(key, tag, in []byte) ([]byte, error) {
 		block.Encrypt(keystreamBlock, counter)
 		counterInc++
 		binary.LittleEndian.PutUint32(counter[0:4], counterInc)
-
-		n := xorBytes(output[outputIdx:], in, keystreamBlock)
+		n := subtle.XORBytes(output[outputIdx:], in, keystreamBlock)
 		outputIdx += n
 		in = in[n:]
 	}
-
 	return output, nil
-}
-
-// It would have been better to call xorBytes function defined in
-// "crypto/cipher/xor_*.go" to make use of the architechture optimisations.
-func xorBytes(dst, a, b []byte) int {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
-	}
-	if n == 0 {
-		return 0
-	}
-	for i := 0; i < n; i++ {
-		dst[i] = a[i] ^ b[i]
-	}
-
-	return n
 }
