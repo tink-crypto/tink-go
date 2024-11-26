@@ -30,11 +30,9 @@ import (
 //
 // This is an internal API.
 type Config struct {
-	primitiveConstructors map[reflect.Type]primitiveConstructor
+	primitiveConstructors map[reflect.Type]func(key key.Key) (any, error)
 	keysetManagers        map[string]registry.KeyManager
 }
-
-type primitiveConstructor func(key key.Key) (any, error)
 
 // PrimitiveFromKeyData creates a primitive from the given [tinkpb.KeyData].
 // Returns an error if there is no key manager registered for the given key
@@ -71,7 +69,7 @@ func (c *Config) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
 // unless they are nil).
 //
 // This is an internal API.
-func (c *Config) RegisterPrimitiveConstructor(keyType reflect.Type, constructor primitiveConstructor, _ internalapi.Token) error {
+func (c *Config) RegisterPrimitiveConstructor(keyType reflect.Type, constructor func(key key.Key) (any, error), _ internalapi.Token) error {
 	if _, ok := c.primitiveConstructors[keyType]; ok {
 		return fmt.Errorf("RegisterPrimitiveConstructor: attempt to register a different primitive constructor for the same key type %v", keyType)
 	}
@@ -95,7 +93,7 @@ func (c *Config) RegisterKeyManager(keyTypeURL string, km registry.KeyManager, _
 // New creates an empty Config.
 func New() (*Config, error) {
 	return &Config{
-		primitiveConstructors: map[reflect.Type]primitiveConstructor{},
+		primitiveConstructors: map[reflect.Type]func(key key.Key) (any, error){},
 		keysetManagers:        map[string]registry.KeyManager{},
 	}, nil
 }
