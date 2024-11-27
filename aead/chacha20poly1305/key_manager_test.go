@@ -23,6 +23,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/stubconfig"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 
@@ -208,19 +209,10 @@ func validateChaCha20Poly1305Key(key *cppb.ChaCha20Poly1305Key) error {
 	return validateChaCha20Poly1305Primitive(p, key)
 }
 
-type stubConfig struct {
-	keyManagers map[string]registry.KeyManager
-}
-
-func (sc *stubConfig) RegisterKeyManager(keyTypeURL string, km registry.KeyManager, _ internalapi.Token) error {
-	sc.keyManagers[keyTypeURL] = km
-	return nil
-}
-
 func TestRegisterKeyManager(t *testing.T) {
-	sc := &stubConfig{make(map[string]registry.KeyManager)}
-	if len(sc.keyManagers) != 0 {
-		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.keyManagers))
+	sc := stubconfig.NewStubConfig()
+	if len(sc.KeyManagers) != 0 {
+		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.KeyManagers))
 	}
 
 	err := tinkchacha20poly1305.RegisterKeyManager(sc, internalapi.Token{})
@@ -228,10 +220,10 @@ func TestRegisterKeyManager(t *testing.T) {
 		t.Fatalf("RegisterKeyManager() err = %v, want nil", err)
 	}
 
-	if len(sc.keyManagers) != 1 {
-		t.Errorf("Number of registered key types = %d, want 1", len(sc.keyManagers))
+	if len(sc.KeyManagers) != 1 {
+		t.Errorf("Number of registered key types = %d, want 1", len(sc.KeyManagers))
 	}
-	if _, ok := sc.keyManagers[testutil.ChaCha20Poly1305TypeURL]; !ok {
+	if _, ok := sc.KeyManagers[testutil.ChaCha20Poly1305TypeURL]; !ok {
 		t.Errorf("RegisterKeyManager() registered wrong type URL, want %q", testutil.ChaCha20Poly1305TypeURL)
 	}
 }

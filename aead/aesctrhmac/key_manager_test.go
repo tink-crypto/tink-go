@@ -22,6 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/stubconfig"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	ctrpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_go_proto"
 	achpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
@@ -245,19 +246,10 @@ func TestKeyManagerPrimitiveWithInvalidKey(t *testing.T) {
 	}
 }
 
-type stubConfig struct {
-	keyManagers map[string]registry.KeyManager
-}
-
-func (sc *stubConfig) RegisterKeyManager(keyTypeURL string, km registry.KeyManager, _ internalapi.Token) error {
-	sc.keyManagers[keyTypeURL] = km
-	return nil
-}
-
 func TestRegisterKeyManager(t *testing.T) {
-	sc := &stubConfig{make(map[string]registry.KeyManager)}
-	if len(sc.keyManagers) != 0 {
-		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.keyManagers))
+	sc := stubconfig.NewStubConfig()
+	if len(sc.KeyManagers) != 0 {
+		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.KeyManagers))
 	}
 
 	err := aesctrhmac.RegisterKeyManager(sc, internalapi.Token{})
@@ -265,10 +257,10 @@ func TestRegisterKeyManager(t *testing.T) {
 		t.Fatalf("RegisterKeyManager() err = %v, want nil", err)
 	}
 
-	if len(sc.keyManagers) != 1 {
-		t.Errorf("Number of registered key types = %d, want 1", len(sc.keyManagers))
+	if len(sc.KeyManagers) != 1 {
+		t.Errorf("Number of registered key types = %d, want 1", len(sc.KeyManagers))
 	}
-	if _, ok := sc.keyManagers[testutil.AESCTRHMACAEADTypeURL]; !ok {
+	if _, ok := sc.KeyManagers[testutil.AESCTRHMACAEADTypeURL]; !ok {
 		t.Errorf("RegisterKeyManager() registered wrong type URL, want \"%v\"", testutil.AESCTRHMACAEADTypeURL)
 	}
 }
