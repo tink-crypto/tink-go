@@ -28,6 +28,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/stubconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -346,9 +347,12 @@ func (sc *alwaysFailingStubConfig) RegisterPrimitiveConstructor(keyType reflect.
 }
 
 func TestRegisterKeyManager(t *testing.T) {
-	sc := newStubConfig()
-	if len(sc.keyManagers) != 0 {
-		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.keyManagers))
+	sc := stubconfig.NewStubConfig()
+	if len(sc.KeyManagers) != 0 {
+		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.KeyManagers))
+	}
+	if len(sc.PrimitiveConstructors) != 0 {
+		t.Errorf("Initial number of registered primitive constructors = %d, want 0", len(sc.PrimitiveConstructors))
 	}
 
 	err := aesgcm.RegisterKeyManager(sc, internalapi.Token{})
@@ -356,18 +360,24 @@ func TestRegisterKeyManager(t *testing.T) {
 		t.Fatalf("RegisterKeyManager() err = %v, want nil", err)
 	}
 
-	if len(sc.keyManagers) != 1 {
-		t.Errorf("Number of registered key types = %d, want 1", len(sc.keyManagers))
+	if len(sc.KeyManagers) != 1 {
+		t.Errorf("Number of registered key types = %d, want 1", len(sc.KeyManagers))
 	}
-	if _, ok := sc.keyManagers[testutil.AESGCMTypeURL]; !ok {
+	if len(sc.PrimitiveConstructors) != 0 {
+		t.Errorf("Number of registered primitive constructors = %d, want 0", len(sc.PrimitiveConstructors))
+	}
+	if _, ok := sc.KeyManagers[testutil.AESGCMTypeURL]; !ok {
 		t.Errorf("RegisterKeyManager() registered wrong type URL, want %q", testutil.AESGCMTypeURL)
 	}
 }
 
 func TestRegisterPrimitiveConstructor(t *testing.T) {
-	sc := newStubConfig()
-	if len(sc.keyManagers) != 0 {
-		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.keyManagers))
+	sc := stubconfig.NewStubConfig()
+	if len(sc.KeyManagers) != 0 {
+		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.KeyManagers))
+	}
+	if len(sc.PrimitiveConstructors) != 0 {
+		t.Errorf("Initial number of registered primitive constructors = %d, want 0", len(sc.PrimitiveConstructors))
 	}
 
 	err := aesgcm.RegisterPrimitiveConstructor(sc, internalapi.Token{})
@@ -375,13 +385,13 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
-	if len(sc.keyManagers) != 0 {
-		t.Errorf("Number of registered key managers = %d, want 0", len(sc.keyManagers))
+	if len(sc.KeyManagers) != 0 {
+		t.Errorf("Number of registered key managers = %d, want 0", len(sc.KeyManagers))
 	}
-	if len(sc.primitiveConstructors) != 1 {
-		t.Errorf("Number of registered primitive constructors = %d, want 1", len(sc.primitiveConstructors))
+	if len(sc.PrimitiveConstructors) != 1 {
+		t.Errorf("Number of registered primitive constructors = %d, want 1", len(sc.PrimitiveConstructors))
 	}
-	if _, ok := sc.primitiveConstructors[reflect.TypeFor[aesgcm.Key]()]; !ok {
+	if _, ok := sc.PrimitiveConstructors[reflect.TypeFor[aesgcm.Key]()]; !ok {
 		t.Errorf("RegisterKeyManager() registered wrong type, want %q", reflect.TypeFor[aesgcm.Key]())
 	}
 }

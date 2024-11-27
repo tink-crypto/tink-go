@@ -16,16 +16,20 @@
 package stubconfig
 
 import (
+	"reflect"
+
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/key"
 )
 
-// StubConfig simulates the KeyManager registration behaviour of the real Config
-// in order to test that the corresponding registration functions in the
-// KeyManagers (which cannot directly depend on the Config to avoid circular
-// dependency).
+// StubConfig simulates the behaviour of the real Config for the purposes of
+// testing the key managers registration functions and primitive constructors
+// registration functions in the primitive packages (since the primitive packages
+// cannot directly depend on the Config to avoid circular dependency).
 type StubConfig struct {
-	KeyManagers map[string]registry.KeyManager
+	KeyManagers           map[string]registry.KeyManager
+	PrimitiveConstructors map[reflect.Type]func(key key.Key) (any, error)
 }
 
 // RegisterKeyManager is the method responsible for the KeyManager registration
@@ -35,7 +39,14 @@ func (sc *StubConfig) RegisterKeyManager(keyTypeURL string, km registry.KeyManag
 	return nil
 }
 
+// RegisterPrimitiveConstructor is the method responsible for the
+// primitive constructor registration in the Config interface.
+func (sc *StubConfig) RegisterPrimitiveConstructor(keyType reflect.Type, primitiveConstructor func(key key.Key) (any, error), _ internalapi.Token) error {
+	sc.PrimitiveConstructors[keyType] = primitiveConstructor
+	return nil
+}
+
 // NewStubConfig returns an empty instance of a StubConfig.
 func NewStubConfig() *StubConfig {
-	return &StubConfig{make(map[string]registry.KeyManager)}
+	return &StubConfig{make(map[string]registry.KeyManager), make(map[reflect.Type]func(key key.Key) (any, error))}
 }

@@ -15,9 +15,12 @@
 package stubconfig_test
 
 import (
+	"reflect"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/key"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubconfig"
@@ -32,24 +35,33 @@ func (s stubKeyManager) DoesSupport(_ string) bool                    { panic("n
 func (s stubKeyManager) TypeURL() string                              { panic("not needed in test") }
 func (s stubKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) { panic("not needed in test") }
 
+func primitiveConstructor(k key.Key) (any, error) { return nil, nil }
+
 func TestStubConfig(t *testing.T) {
 	c := stubconfig.NewStubConfig()
 	if c == nil {
 		t.Fatalf("stubconfig.NewStubConfig() = nil, want not nil")
 	}
 
-	l := len(c.KeyManagers)
-	if l != 0 {
+	if l := len(c.KeyManagers); l != 0 {
 		t.Fatalf("Initial number of registered key types = %d, want 0", l)
 	}
 
-	err := c.RegisterKeyManager("", stubKeyManager{}, internalapi.Token{})
-	if err != nil {
-		t.Fatalf("StubConfig.RegisterKeyManager(): err = %v, want nil", err)
+	if l := len(c.PrimitiveConstructors); l != 0 {
+		t.Fatalf("Initial number of registered primitive constructors = %d, want 0", l)
 	}
 
-	l = len(c.KeyManagers)
-	if l != 1 {
+	if err := c.RegisterKeyManager("", stubKeyManager{}, internalapi.Token{}); err != nil {
+		t.Fatalf("StubConfig.RegisterKeyManager(): err = %v, want nil", err)
+	}
+	if l := len(c.KeyManagers); l != 1 {
 		t.Fatalf("Number of registered key types = %d, want 1", l)
+	}
+
+	if err := c.RegisterPrimitiveConstructor(reflect.TypeFor[aesgcm.Key](), primitiveConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("StubConfig.RegisterPrimitiveConstructor(): err = %v, want nil", err)
+	}
+	if l := len(c.PrimitiveConstructors); l != 1 {
+		t.Fatalf("Number of registered primitive constructors = %d, want 1", l)
 	}
 }
