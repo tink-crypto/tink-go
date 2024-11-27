@@ -17,28 +17,28 @@ package chacha20poly1305
 import (
 	"bytes"
 	"fmt"
-	"slices"
 
-	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/aead"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
-type aead struct {
-	rawAEAD *subtle.ChaCha20Poly1305
+type fullAEAD struct {
+	rawAEAD *aead.ChaCha20Poly1305InsecureNonce
 	prefix  []byte
 	variant Variant
 }
 
-var _ tink.AEAD = (*aead)(nil)
+var _ tink.AEAD = (*fullAEAD)(nil)
 
 func newAEAD(key *Key) (tink.AEAD, error) {
-	rawAEAD, err := subtle.NewChaCha20Poly1305(key.KeyBytes().Data(insecuresecretdataaccess.Token{}))
+	rawAEAD, err := aead.NewChaCha20Poly1305InsecureNonce(key.KeyBytes().Data(insecuresecretdataaccess.Token{}))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("chacha20_poly1305: %w", err)
 	}
-	return &aead{
+	return &fullAEAD{
 		rawAEAD: rawAEAD,
 		prefix:  key.OutputPrefix(),
 		variant: key.parameters.Variant(),
@@ -46,21 +46,31 @@ func newAEAD(key *Key) (tink.AEAD, error) {
 }
 
 // Encrypt encrypts plaintext with associatedData.
-func (ca *aead) Encrypt(plaintext []byte, associatedData []byte) ([]byte, error) {
-	ciphertext, err := ca.rawAEAD.Encrypt(plaintext, associatedData)
+func (ca *fullAEAD) Encrypt(plaintext []byte, associatedData []byte) ([]byte, error) {
+	nonce := random.GetRandomBytes(aead.ChaCha20Poly1305InsecureNonceSize)
+	ciphertext := make([]byte, 0, len(ca.prefix)+len(nonce)+len(plaintext)+aead.ChaCha20Poly1305InsecureTagSize)
+	ciphertext = append(ciphertext, ca.prefix...)
+	ciphertext = append(ciphertext, nonce...)
+	ciphertext, err := ca.rawAEAD.Encrypt(ciphertext, nonce, plaintext, associatedData)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("chacha20_poly1305: encryption failed: %w", err)
 	}
-	return slices.Concat(ca.prefix, ciphertext), nil
+	return ciphertext, nil
 }
 
 // Decrypt decrypts ciphertext with associatedData.
-func (ca *aead) Decrypt(ciphertext []byte, associatedData []byte) ([]byte, error) {
+func (ca *fullAEAD) Decrypt(ciphertext []byte, associatedData []byte) ([]byte, error) {
 	if !bytes.HasPrefix(ciphertext, ca.prefix) {
-		return nil, fmt.Errorf("ciphertext has invalid prefix")
+		return nil, fmt.Errorf("chacha20_poly1305: ciphertext has invalid prefix")
 	}
-	toDecrypt := ciphertext[len(ca.prefix):]
-	plaintext, err := ca.rawAEAD.Decrypt(toDecrypt, associatedData)
+	ciphertextNoPrefix := ciphertext[len(ca.prefix):]
+	minCiphertextLength := aead.ChaCha20Poly1305InsecureNonceSize + aead.ChaCha20Poly1305InsecureTagSize
+	if len(ciphertextNoPrefix) < minCiphertextLength {
+		return nil, fmt.Errorf("chacha20_poly1305: ciphertext is too short: got %d, want at least %d", len(ciphertextNoPrefix), minCiphertextLength)
+	}
+	nonce := ciphertextNoPrefix[:aead.ChaCha20Poly1305InsecureNonceSize]
+	ciphertextAndTag := ciphertextNoPrefix[aead.ChaCha20Poly1305InsecureNonceSize:]
+	plaintext, err := ca.rawAEAD.Decrypt(nonce, ciphertextAndTag, associatedData)
 	if err != nil {
 		return nil, err
 	}

@@ -54,13 +54,23 @@ func TestChaCha20Poly1305EncryptDecrypt(t *testing.T) {
 
 		ca, err := aead.NewChaCha20Poly1305InsecureNonce(key)
 		if err != nil {
-			t.Errorf("#%d, cannot create new instance of ChaCha20Poly1305: %s", i, err)
+			t.Errorf("#%d, aead.NewChaCha20Poly1305InsecureNonce(key) err = %q", i, err)
 			continue
 		}
 
-		_, err = ca.Encrypt(nonce, pt, aad)
+		ciphertextFromNil, err := ca.Encrypt(nil, nonce, pt, aad)
 		if err != nil {
-			t.Errorf("#%d, unexpected encryption error: %s", i, err)
+			t.Errorf("#%d, ca.Encrypt(nil, nonce, pt, aad) err = %q", i, err)
+			continue
+		}
+		var dst []byte
+		ciphertextFromDst, err := ca.Encrypt(dst, nonce, pt, aad)
+		if err != nil {
+			t.Errorf("#%d, ca.Encrypt(dst, nonce, pt, aad) err = %q", i, err)
+			continue
+		}
+		if !bytes.Equal(ciphertextFromNil, ciphertextFromDst) {
+			t.Errorf("#%d, ciphertextFromNil = %x, ciphertextFromDst = %x", i, ciphertextFromNil, ciphertextFromDst)
 			continue
 		}
 
@@ -87,7 +97,7 @@ func TestChaCha20Poly1305EmptyAssociatedData(t *testing.T) {
 		emptyAADs := [][]byte{[]byte{}, nil}
 		for _, encAAD := range emptyAADs {
 			nonce := random.GetRandomBytes(chacha20poly1305.NonceSize)
-			ct, err := ca.Encrypt(nonce, pt, encAAD)
+			ct, err := ca.Encrypt(nil, nonce, pt, encAAD)
 			if err != nil {
 				t.Errorf("Encrypt() err = %v, want nil", err)
 				continue
@@ -125,7 +135,7 @@ func TestChaCha20Poly1305LongMessages(t *testing.T) {
 		}
 
 		nonce := random.GetRandomBytes(chacha20poly1305.NonceSize)
-		ct, err := ca.Encrypt(nonce, pt, aad)
+		ct, err := ca.Encrypt(nil, nonce, pt, aad)
 		if err != nil {
 			t.Errorf("Encrypt(%x, %x) failed", pt, aad)
 			continue
@@ -160,7 +170,7 @@ func TestChaCha20Poly1305ModifyCiphertext(t *testing.T) {
 		}
 
 		nonce := random.GetRandomBytes(chacha20poly1305.NonceSize)
-		ct, err := ca.Encrypt(nonce, pt, aad)
+		ct, err := ca.Encrypt(nil, nonce, pt, aad)
 		if err != nil {
 			t.Errorf("#%d: Encrypt failed", i)
 			continue
@@ -199,7 +209,7 @@ func TestChaCha20Poly1305RandomNonce(t *testing.T) {
 	pt, aad := []byte{}, []byte{}
 	for i := 0; i < 1<<10; i++ {
 		nonce := random.GetRandomBytes(chacha20poly1305.NonceSize)
-		ct, err := ca.Encrypt(nonce, pt, aad)
+		ct, err := ca.Encrypt(nil, nonce, pt, aad)
 		ctHex := hex.EncodeToString(ct)
 		if err != nil || cts[ctHex] {
 			t.Errorf("TestRandomNonce failed: %v", err)
@@ -236,7 +246,7 @@ func runChaCha20Poly1305WycheproofCase(t *testing.T, tc *AEADCase) {
 	}
 
 	nonce := random.GetRandomBytes(chacha20poly1305.NonceSize)
-	_, err = ca.Encrypt(nonce, tc.Message, tc.AD)
+	_, err = ca.Encrypt(nil, nonce, tc.Message, tc.AD)
 	if err != nil {
 		t.Fatalf("unexpected encryption error: %s", err)
 	}

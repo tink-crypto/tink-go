@@ -21,7 +21,14 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
-const poly1305TagSize = 16
+const (
+	// ChaCha20Poly1305InsecureNonceSize is the size of the nonce.
+	ChaCha20Poly1305InsecureNonceSize = chacha20poly1305.NonceSize
+	// ChaCha20Poly1305InsecureTagSize is the size of the tag.
+	ChaCha20Poly1305InsecureTagSize = chacha20poly1305.Overhead
+
+	maxPlaintextSize = maxInt - ChaCha20Poly1305InsecureNonceSize - ChaCha20Poly1305InsecureTagSize
+)
 
 // ChaCha20Poly1305InsecureNonce is an insecure implementation of the AEAD
 // interface that permits the user to set the nonce.
@@ -35,28 +42,27 @@ func NewChaCha20Poly1305InsecureNonce(key []byte) (*ChaCha20Poly1305InsecureNonc
 	if len(key) != chacha20poly1305.KeySize {
 		return nil, errors.New("bad key length")
 	}
-
 	return &ChaCha20Poly1305InsecureNonce{Key: key}, nil
 }
 
 // Encrypt encrypts plaintext with nonce and associatedData.
-func (ca *ChaCha20Poly1305InsecureNonce) Encrypt(nonce, plaintext, associatedData []byte) ([]byte, error) {
-	if len(plaintext) > maxInt-chacha20poly1305.NonceSize-poly1305TagSize {
+func (ca *ChaCha20Poly1305InsecureNonce) Encrypt(dst, nonce, plaintext, associatedData []byte) ([]byte, error) {
+	if len(plaintext) > maxPlaintextSize {
 		return nil, fmt.Errorf("plaintext too long")
 	}
 	c, err := chacha20poly1305.New(ca.Key)
 	if err != nil {
 		return nil, err
 	}
-	return c.Seal(nil, nonce, plaintext, associatedData), nil
+	return c.Seal(dst, nonce, plaintext, associatedData), nil
 }
 
 // Decrypt decrypts ciphertext with nonce and associatedData.
 func (ca *ChaCha20Poly1305InsecureNonce) Decrypt(nonce, ciphertext, associatedData []byte) ([]byte, error) {
-	if len(nonce) != chacha20poly1305.NonceSize {
-		return nil, fmt.Errorf("bad nonce length")
+	if len(nonce) != ChaCha20Poly1305InsecureNonceSize {
+		return nil, fmt.Errorf("invalid nonce length: got %d, want %d", len(nonce), ChaCha20Poly1305InsecureNonceSize)
 	}
-	if len(ciphertext) < poly1305TagSize {
+	if len(ciphertext) < ChaCha20Poly1305InsecureTagSize {
 		return nil, fmt.Errorf("ciphertext too short")
 	}
 	c, err := chacha20poly1305.New(ca.Key)

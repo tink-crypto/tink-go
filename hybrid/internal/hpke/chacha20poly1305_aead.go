@@ -35,7 +35,7 @@ func (c *chaCha20Poly1305AEAD) seal(key, nonce, plaintext, associatedData []byte
 	if err != nil {
 		return nil, fmt.Errorf("NewChaCha20Poly1305InsecureNonce: %v", err)
 	}
-	return cc.Encrypt(nonce, plaintext, associatedData)
+	return cc.Encrypt(nil, nonce, plaintext, associatedData)
 }
 
 func (c *chaCha20Poly1305AEAD) open(key, nonce, ciphertext, associatedData []byte) ([]byte, error) {

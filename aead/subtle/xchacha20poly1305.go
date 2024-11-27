@@ -47,7 +47,7 @@ func NewXChaCha20Poly1305(key []byte) (*XChaCha20Poly1305, error) {
 //  1. the nonce used for encryption
 //  2. the actual ciphertext
 func (x *XChaCha20Poly1305) Encrypt(plaintext []byte, associatedData []byte) ([]byte, error) {
-	if len(plaintext) > maxInt-chacha20poly1305.NonceSizeX-poly1305TagSize {
+	if len(plaintext) > maxInt-chacha20poly1305.NonceSizeX-chacha20poly1305.Overhead {
 		return nil, fmt.Errorf("xchacha20poly1305: plaintext too long")
 	}
 	c, err := chacha20poly1305.NewX(x.key)
@@ -69,7 +69,7 @@ func (x *XChaCha20Poly1305) Encrypt(plaintext []byte, associatedData []byte) ([]
 //  1. the nonce used for encryption
 //  2. the actual ciphertext
 func (x *XChaCha20Poly1305) Decrypt(ciphertext []byte, associatedData []byte) ([]byte, error) {
-	if len(ciphertext) < chacha20poly1305.NonceSizeX+poly1305TagSize {
+	if len(ciphertext) < chacha20poly1305.NonceSizeX+chacha20poly1305.Overhead {
 		return nil, fmt.Errorf("xchacha20poly1305: ciphertext too short")
 	}
 

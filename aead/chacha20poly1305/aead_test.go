@@ -82,6 +82,60 @@ func TestEncryptDecrypt(t *testing.T) {
 	}
 }
 
+func TestDecryptFailsCiphertextTooShort(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		variant       Variant
+		idRequirement uint32
+		wantPrefix    []byte
+	}{
+		{
+			name:          "TINK",
+			variant:       VariantTink,
+			idRequirement: 0x11223344,
+			wantPrefix:    []byte{cryptofmt.TinkStartByte, 0x11, 0x22, 0x33, 0x44},
+		},
+		{
+			name:          "CRUNCHY",
+			variant:       VariantCrunchy,
+			idRequirement: 0x11223344,
+			wantPrefix:    []byte{cryptofmt.LegacyStartByte, 0x11, 0x22, 0x33, 0x44},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			params, err := NewParameters(tc.variant)
+			if err != nil {
+				t.Fatalf("NewParameters(%v) err = %v, want nil", tc.variant, err)
+			}
+			keyBytes, err := secretdata.NewBytesFromRand(32)
+			if err != nil {
+				t.Fatalf("secretdata.NewBytesFromRand(32) err = %v, want nil", err)
+			}
+			key, err := NewKey(keyBytes, tc.idRequirement, params)
+			if err != nil {
+				t.Fatalf("NewKey() err = %v, want nil", err)
+			}
+			aead, err := newAEAD(key)
+			if err != nil {
+				t.Fatalf("newAEAD() err = %v, want nil", err)
+			}
+			plaintext := []byte{}
+			associatedData := []byte("associatedData")
+
+			ciphertext, err := aead.Encrypt(plaintext, associatedData)
+			if err != nil {
+				t.Fatalf("aead.Encrypt(%v, %v) err = %v, want nil", plaintext, associatedData, err)
+			}
+
+			for l := 0; l < len(ciphertext)-1; l++ {
+				if _, err := aead.Decrypt(ciphertext[:l], associatedData); err == nil {
+					t.Errorf("aead.Decrypt(%x, %x) err = nil, want error", ciphertext, associatedData)
+				}
+			}
+		})
+	}
+}
+
 func TestDecryptFailsWithWrongPrefix(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
