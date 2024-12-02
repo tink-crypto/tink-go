@@ -21,13 +21,15 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 )
 
-func TestNewParametersInvalidKeySize(t *testing.T) {
+func TestNewParametersInvalidAESKeySize(t *testing.T) {
 	for _, keySize := range []int{1, 15, 17, 31, 33} {
 		opts := aesctrhmac.ParametersOpts{
-			KeySizeInBytes: keySize,
-			IVSizeInBytes:  12,
-			TagSizeInBytes: 16,
-			Variant:        aesctrhmac.VariantTink,
+			AESKeySizeInBytes:  keySize,
+			HMACKeySizeInBytes: 16,
+			IVSizeInBytes:      12,
+			TagSizeInBytes:     16,
+			HashType:           aesctrhmac.SHA256,
+			Variant:            aesctrhmac.VariantTink,
 		}
 		if _, err := aesctrhmac.NewParameters(opts); err == nil {
 			t.Errorf("aesctrhmac.NewParameters(%v) err = nil, want error", opts)
@@ -38,7 +40,7 @@ func TestNewParametersInvalidKeySize(t *testing.T) {
 func TestNewParametersInvalidIVSize(t *testing.T) {
 	for _, ivSize := range []int{11, 17} {
 		opts := aesctrhmac.ParametersOpts{
-			KeySizeInBytes:     16,
+			AESKeySizeInBytes:  16,
 			HMACKeySizeInBytes: 16,
 			IVSizeInBytes:      ivSize,
 			TagSizeInBytes:     16,
@@ -54,7 +56,7 @@ func TestNewParametersInvalidIVSize(t *testing.T) {
 func TestNewParametersInvalidHMACKeySize(t *testing.T) {
 	for _, hmacKeySize := range []int{1, 15} {
 		opts := aesctrhmac.ParametersOpts{
-			KeySizeInBytes:     16,
+			AESKeySizeInBytes:  16,
 			HMACKeySizeInBytes: hmacKeySize,
 			IVSizeInBytes:      12,
 			TagSizeInBytes:     16,
@@ -101,7 +103,7 @@ func TestNewParametersInvalidTagSize(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			opts := aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     16,
+				AESKeySizeInBytes:  16,
 				HMACKeySizeInBytes: 16,
 				IVSizeInBytes:      12,
 				TagSizeInBytes:     tc.tagSize,
@@ -117,7 +119,7 @@ func TestNewParametersInvalidTagSize(t *testing.T) {
 
 func TestNewParametersInvalidVariant(t *testing.T) {
 	opts := aesctrhmac.ParametersOpts{
-		KeySizeInBytes:     16,
+		AESKeySizeInBytes:  16,
 		HMACKeySizeInBytes: 16,
 		IVSizeInBytes:      12,
 		TagSizeInBytes:     16,
@@ -143,7 +145,7 @@ func paramsTestVectors() []paramsTestVector {
 					testVectors = append(testVectors, paramsTestVector{
 						name: fmt.Sprintf("AES%d-CTR-HMAC-%d-iv%d-tag%d-%s-%s", keySize, hmacKeySize, ivSize, 20, aesctrhmac.SHA1, variant),
 						paramsOpts: aesctrhmac.ParametersOpts{
-							KeySizeInBytes:     keySize,
+							AESKeySizeInBytes:  keySize,
 							HMACKeySizeInBytes: hmacKeySize,
 							IVSizeInBytes:      ivSize,
 							TagSizeInBytes:     20,
@@ -154,7 +156,7 @@ func paramsTestVectors() []paramsTestVector {
 					testVectors = append(testVectors, paramsTestVector{
 						name: fmt.Sprintf("AES%d-CTR-HMAC-%d-iv%d-tag%d-%s-%s", keySize, hmacKeySize, ivSize, 28, aesctrhmac.SHA224, variant),
 						paramsOpts: aesctrhmac.ParametersOpts{
-							KeySizeInBytes:     keySize,
+							AESKeySizeInBytes:  keySize,
 							HMACKeySizeInBytes: hmacKeySize,
 							IVSizeInBytes:      ivSize,
 							TagSizeInBytes:     28,
@@ -165,7 +167,7 @@ func paramsTestVectors() []paramsTestVector {
 					testVectors = append(testVectors, paramsTestVector{
 						name: fmt.Sprintf("AES%d-CTR-HMAC-%d-iv%d-tag%d-%s-%s", keySize, hmacKeySize, ivSize, 32, aesctrhmac.SHA256, variant),
 						paramsOpts: aesctrhmac.ParametersOpts{
-							KeySizeInBytes:     keySize,
+							AESKeySizeInBytes:  keySize,
 							HMACKeySizeInBytes: hmacKeySize,
 							IVSizeInBytes:      ivSize,
 							TagSizeInBytes:     32,
@@ -176,7 +178,7 @@ func paramsTestVectors() []paramsTestVector {
 					testVectors = append(testVectors, paramsTestVector{
 						name: fmt.Sprintf("AES%d-CTR-HMAC-%d-iv%d-tag%d-%s-%s", keySize, hmacKeySize, ivSize, 48, aesctrhmac.SHA384, variant),
 						paramsOpts: aesctrhmac.ParametersOpts{
-							KeySizeInBytes:     keySize,
+							AESKeySizeInBytes:  keySize,
 							HMACKeySizeInBytes: hmacKeySize,
 							IVSizeInBytes:      ivSize,
 							TagSizeInBytes:     48,
@@ -187,7 +189,7 @@ func paramsTestVectors() []paramsTestVector {
 					testVectors = append(testVectors, paramsTestVector{
 						name: fmt.Sprintf("AES%d-CTR-HMAC-%d-iv%d-tag%d-%s-%s", keySize, hmacKeySize, ivSize, 64, aesctrhmac.SHA512, variant),
 						paramsOpts: aesctrhmac.ParametersOpts{
-							KeySizeInBytes:     keySize,
+							AESKeySizeInBytes:  keySize,
 							HMACKeySizeInBytes: hmacKeySize,
 							IVSizeInBytes:      ivSize,
 							TagSizeInBytes:     64,
@@ -212,8 +214,11 @@ func TestNewParametersWorks(t *testing.T) {
 			if params.HasIDRequirement() != (tc.paramsOpts.Variant != aesctrhmac.VariantNoPrefix) {
 				t.Errorf("params.HasIDRequirement() = %v, want %v", params.HasIDRequirement(), (tc.paramsOpts.Variant != aesctrhmac.VariantNoPrefix))
 			}
-			if params.KeySizeInBytes() != tc.paramsOpts.KeySizeInBytes {
-				t.Errorf("params.KeySizeInBytes()() = %v, want %v", params.KeySizeInBytes(), tc.paramsOpts.KeySizeInBytes)
+			if params.AESKeySizeInBytes() != tc.paramsOpts.AESKeySizeInBytes {
+				t.Errorf("params.AESKeySizeInBytes() = %v, want %v", params.AESKeySizeInBytes(), tc.paramsOpts.AESKeySizeInBytes)
+			}
+			if params.HMACKeySizeInBytes() != tc.paramsOpts.HMACKeySizeInBytes {
+				t.Errorf("params.HMACKeySizeInBytes() = %v, want %v", params.HMACKeySizeInBytes(), tc.paramsOpts.HMACKeySizeInBytes)
 			}
 			if params.TagSizeInBytes() != tc.paramsOpts.TagSizeInBytes {
 				t.Errorf("params.TagSizeInBytes() = %v, want %d", params.TagSizeInBytes(), tc.paramsOpts.TagSizeInBytes)
@@ -244,7 +249,7 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 		{
 			name: "different AES key size",
 			opts1: aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     16,
+				AESKeySizeInBytes:  16,
 				HMACKeySizeInBytes: 16,
 				IVSizeInBytes:      12,
 				TagSizeInBytes:     16,
@@ -252,7 +257,7 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 				Variant:            aesctrhmac.VariantTink,
 			},
 			opts2: aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     32,
+				AESKeySizeInBytes:  32,
 				HMACKeySizeInBytes: 16,
 				IVSizeInBytes:      12,
 				TagSizeInBytes:     16,
@@ -263,7 +268,7 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 		{
 			name: "different HMAC key size",
 			opts1: aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     16,
+				AESKeySizeInBytes:  16,
 				HMACKeySizeInBytes: 16,
 				IVSizeInBytes:      12,
 				TagSizeInBytes:     16,
@@ -271,7 +276,7 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 				Variant:            aesctrhmac.VariantTink,
 			},
 			opts2: aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     16,
+				AESKeySizeInBytes:  16,
 				HMACKeySizeInBytes: 32,
 				IVSizeInBytes:      12,
 				TagSizeInBytes:     16,
@@ -282,7 +287,7 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 		{
 			name: "different IV size",
 			opts1: aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     16,
+				AESKeySizeInBytes:  16,
 				HMACKeySizeInBytes: 16,
 				IVSizeInBytes:      12,
 				TagSizeInBytes:     16,
@@ -290,7 +295,7 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 				Variant:            aesctrhmac.VariantTink,
 			},
 			opts2: aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     16,
+				AESKeySizeInBytes:  16,
 				HMACKeySizeInBytes: 16,
 				IVSizeInBytes:      16,
 				TagSizeInBytes:     16,
@@ -301,7 +306,7 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 		{
 			name: "different tag size",
 			opts1: aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     16,
+				AESKeySizeInBytes:  16,
 				HMACKeySizeInBytes: 16,
 				IVSizeInBytes:      12,
 				TagSizeInBytes:     16,
@@ -309,7 +314,7 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 				Variant:            aesctrhmac.VariantTink,
 			},
 			opts2: aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     16,
+				AESKeySizeInBytes:  16,
 				HMACKeySizeInBytes: 16,
 				IVSizeInBytes:      12,
 				TagSizeInBytes:     20,
@@ -320,7 +325,7 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 		{
 			name: "different hash",
 			opts1: aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     16,
+				AESKeySizeInBytes:  16,
 				HMACKeySizeInBytes: 16,
 				IVSizeInBytes:      12,
 				TagSizeInBytes:     16,
@@ -328,7 +333,7 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 				Variant:            aesctrhmac.VariantTink,
 			},
 			opts2: aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     16,
+				AESKeySizeInBytes:  16,
 				HMACKeySizeInBytes: 16,
 				IVSizeInBytes:      12,
 				TagSizeInBytes:     16,
@@ -339,7 +344,7 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 		{
 			name: "different vairant",
 			opts1: aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     16,
+				AESKeySizeInBytes:  16,
 				HMACKeySizeInBytes: 16,
 				IVSizeInBytes:      12,
 				TagSizeInBytes:     16,
@@ -347,7 +352,7 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 				Variant:            aesctrhmac.VariantTink,
 			},
 			opts2: aesctrhmac.ParametersOpts{
-				KeySizeInBytes:     16,
+				AESKeySizeInBytes:  16,
 				HMACKeySizeInBytes: 16,
 				IVSizeInBytes:      12,
 				TagSizeInBytes:     16,

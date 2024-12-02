@@ -106,7 +106,7 @@ func calculateOutputPrefix(variant Variant, keyID uint32) ([]byte, error) {
 
 // Parameters specifies a AES-CTR-HMAC key.
 type Parameters struct {
-	keySizeInBytes     int
+	aesKeySizeInBytes  int
 	hmacKeySizeInBytes int
 	ivSizeInBytes      int
 	tagSizeInBytes     int
@@ -116,11 +116,11 @@ type Parameters struct {
 
 var _ key.Parameters = (*Parameters)(nil)
 
-// KeySizeInBytes returns the size of the key in bytes.
-func (p *Parameters) KeySizeInBytes() int { return p.keySizeInBytes }
+// AESKeySizeInBytes returns the size of the key in bytes.
+func (p *Parameters) AESKeySizeInBytes() int { return p.aesKeySizeInBytes }
 
 // HMACKeySizeInBytes returns the size of the HMAC key in bytes.
-func (p *Parameters) HMACKeySizeInBytes() int { return p.keySizeInBytes }
+func (p *Parameters) HMACKeySizeInBytes() int { return p.hmacKeySizeInBytes }
 
 // IVSizeInBytes returns the size of the IV in bytes.
 func (p *Parameters) IVSizeInBytes() int { return p.ivSizeInBytes }
@@ -136,7 +136,7 @@ func (p *Parameters) Variant() Variant { return p.variant }
 
 // ParametersOpts specifies options for creating AES-CTR-HMAC parameters.
 type ParametersOpts struct {
-	KeySizeInBytes     int
+	AESKeySizeInBytes  int
 	HMACKeySizeInBytes int
 	IVSizeInBytes      int
 	TagSizeInBytes     int
@@ -164,8 +164,8 @@ func maxTagSize(ht HashType) (int, error) {
 const minTagSize = 10
 
 func validateOpts(opts *ParametersOpts) error {
-	if opts.KeySizeInBytes != 16 && opts.KeySizeInBytes != 24 && opts.KeySizeInBytes != 32 {
-		return fmt.Errorf("unsupported key size: got: %v, want 16, 24, or 32", opts.KeySizeInBytes)
+	if opts.AESKeySizeInBytes != 16 && opts.AESKeySizeInBytes != 24 && opts.AESKeySizeInBytes != 32 {
+		return fmt.Errorf("unsupported key size: got: %v, want 16, 24, or 32", opts.AESKeySizeInBytes)
 	}
 	if opts.IVSizeInBytes < 12 || opts.IVSizeInBytes > 16 {
 		return fmt.Errorf("unsupported IV size: got: %v, want between 12 and 16", opts.IVSizeInBytes)
@@ -192,7 +192,7 @@ func NewParameters(opts ParametersOpts) (*Parameters, error) {
 		return nil, fmt.Errorf("aesctrhmac.NewParameters: %v", err)
 	}
 	return &Parameters{
-		keySizeInBytes:     opts.KeySizeInBytes,
+		aesKeySizeInBytes:  opts.AESKeySizeInBytes,
 		hmacKeySizeInBytes: opts.HMACKeySizeInBytes,
 		ivSizeInBytes:      opts.IVSizeInBytes,
 		tagSizeInBytes:     opts.TagSizeInBytes,
@@ -208,7 +208,7 @@ func (p *Parameters) HasIDRequirement() bool { return p.variant != VariantNoPref
 func (p *Parameters) Equals(other key.Parameters) bool {
 	actualParams, ok := other.(*Parameters)
 	return ok && p.HasIDRequirement() == actualParams.HasIDRequirement() &&
-		p.keySizeInBytes == actualParams.keySizeInBytes &&
+		p.aesKeySizeInBytes == actualParams.aesKeySizeInBytes &&
 		p.hmacKeySizeInBytes == actualParams.hmacKeySizeInBytes &&
 		p.ivSizeInBytes == actualParams.ivSizeInBytes &&
 		p.tagSizeInBytes == actualParams.tagSizeInBytes &&
