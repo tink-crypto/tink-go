@@ -247,8 +247,8 @@ func NewParameters(curveType CurveType, hashType HashType, encoding SignatureEnc
 // HasIDRequirement tells whether the key has an ID requirement.
 func (p *Parameters) HasIDRequirement() bool { return p.variant != VariantNoPrefix }
 
-// Equals tells whether this parameters value is equal to other.
-func (p *Parameters) Equals(other key.Parameters) bool {
+// Equal tells whether this parameters value is equal to other.
+func (p *Parameters) Equal(other key.Parameters) bool {
 	actualParams, ok := other.(*Parameters)
 	return ok && p.HasIDRequirement() == actualParams.HasIDRequirement() &&
 		p.curveType == actualParams.curveType &&
@@ -345,10 +345,10 @@ func (k *PublicKey) IDRequirement() (uint32, bool) {
 // OutputPrefix returns the output prefix of this key.
 func (k *PublicKey) OutputPrefix() []byte { return bytes.Clone(k.outputPrefix) }
 
-// Equals tells whether this key value is equal to other.
-func (k *PublicKey) Equals(other key.Key) bool {
+// Equal tells whether this key value is equal to other.
+func (k *PublicKey) Equal(other key.Key) bool {
 	actualKey, ok := other.(*PublicKey)
-	return ok && k.Parameters().Equals(actualKey.Parameters()) &&
+	return ok && k.Parameters().Equal(actualKey.Parameters()) &&
 		k.idRequirement == actualKey.idRequirement &&
 		bytes.Equal(k.publicPoint, actualKey.publicPoint) &&
 		bytes.Equal(k.outputPrefix, actualKey.outputPrefix)
@@ -468,9 +468,9 @@ func (k *PrivateKey) IDRequirement() (uint32, bool) { return k.publicKey.IDRequi
 // OutputPrefix returns the output prefix of this key.
 func (k *PrivateKey) OutputPrefix() []byte { return k.publicKey.OutputPrefix() }
 
-// Equals tells whether this key object is equal to other.
-func (k *PrivateKey) Equals(other key.Key) bool {
+// Equal tells whether this key object is equal to other.
+func (k *PrivateKey) Equal(other key.Key) bool {
 	actualKey, ok := other.(*PrivateKey)
-	return ok && k.publicKey.Equals(actualKey.publicKey) &&
-		k.privateKeyValue.Equals(actualKey.privateKeyValue)
+	return ok && k.publicKey.Equal(actualKey.publicKey) &&
+		k.privateKeyValue.Equal(actualKey.privateKeyValue)
 }

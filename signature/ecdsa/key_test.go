@@ -256,8 +256,8 @@ func TestNewParameters(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ecdsa.NewParameters(%v, %v, %v, %v) = %v, want nil", tc.curveType, tc.hashType, tc.encoding, ecdsa.VariantTink, err)
 			}
-			if !params.Equals(other) {
-				t.Errorf("params.Equals(other) = false, want true")
+			if !params.Equal(other) {
+				t.Errorf("params.Equal(other) = false, want true")
 			}
 		})
 	}
@@ -553,7 +553,7 @@ func TestNewPublicKey(t *testing.T) {
 			if got, want := pubKey.PublicPoint(), point; !bytes.Equal(got, want) {
 				t.Errorf("pubKey.PublicKey() = %v, want %v", got, want)
 			}
-			if got, want := pubKey.Parameters(), params; !got.Equals(want) {
+			if got, want := pubKey.Parameters(), params; !got.Equal(want) {
 				t.Errorf("pubKey.Parameters() = %v, want %v", got, want)
 			}
 			gotIDRequirement, gotRequired := pubKey.IDRequirement()
@@ -565,8 +565,8 @@ func TestNewPublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ecdsa.NewPublicKey(%v, %v, %v) err = %v, want nil", point, tc.id, params, err)
 			}
-			if !pubKey.Equals(otherKey) {
-				t.Errorf("pubKey.Equals(otherKey) = false, want true")
+			if !pubKey.Equal(otherKey) {
+				t.Errorf("pubKey.Equal(otherKey) = false, want true")
 			}
 		})
 	}
@@ -701,7 +701,7 @@ func TestNewPrivateKey(t *testing.T) {
 			}
 
 			// Check accessor methods.
-			if got, want := prvKey.PrivateKeyValue(), privateKeyValue; !got.Equals(want) {
+			if got, want := prvKey.PrivateKeyValue(), privateKeyValue; !got.Equal(want) {
 				t.Errorf("prvKey.PrivateKeyValue() = %x, want %x", got.Data(token), want.Data(token))
 			}
 			gotIDRequirement, gotRequired := prvKey.IDRequirement()
@@ -712,14 +712,14 @@ func TestNewPrivateKey(t *testing.T) {
 			if got, want := prvKey.OutputPrefix(), publicKey.OutputPrefix(); !bytes.Equal(got, want) {
 				t.Errorf("prvKey.OutputPrefix() = %v, want %v", got, want)
 			}
-			if got, want := prvKey.Parameters(), params; !got.Equals(want) {
+			if got, want := prvKey.Parameters(), params; !got.Equal(want) {
 				t.Errorf("prvKey.Parameters() = %v, want %v", got, want)
 			}
 			want, err := prvKey.PublicKey()
 			if err != nil {
 				t.Fatalf("prvKey.PublicKey() err = %v, want nil", err)
 			}
-			if got := publicKey; !got.Equals(want) {
+			if got := publicKey; !got.Equal(want) {
 				t.Errorf("prvKey.PublicKey() = %v, want %v", got, want)
 			}
 
@@ -727,8 +727,8 @@ func TestNewPrivateKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ecdsa.NewPrivateKey(privateKeyValue, %v, %v) err = %v, want nil", tc.id, params, err)
 			}
-			if !otherPrvKey.Equals(prvKey) {
-				t.Errorf("otherPrvKey.Equals(prvKey) = false, want true")
+			if !otherPrvKey.Equal(prvKey) {
+				t.Errorf("otherPrvKey.Equal(prvKey) = false, want true")
 			}
 		})
 	}
@@ -802,7 +802,7 @@ func TestNewPrivateKeyFromPublicKey(t *testing.T) {
 			}
 
 			// Check accessor methods.
-			if got, want := prvKey.PrivateKeyValue(), privateKeyValue; !got.Equals(want) {
+			if got, want := prvKey.PrivateKeyValue(), privateKeyValue; !got.Equal(want) {
 				t.Errorf("prvKey.PrivateKeyValue() = %x, want %x", got.Data(token), want.Data(token))
 			}
 			gotIDRequirement, gotRequired := prvKey.IDRequirement()
@@ -813,14 +813,14 @@ func TestNewPrivateKeyFromPublicKey(t *testing.T) {
 			if got, want := prvKey.OutputPrefix(), publicKey.OutputPrefix(); !bytes.Equal(got, want) {
 				t.Errorf("prvKey.OutputPrefix() = %v, want %v", got, want)
 			}
-			if got, want := prvKey.Parameters(), params; !got.Equals(want) {
+			if got, want := prvKey.Parameters(), params; !got.Equal(want) {
 				t.Errorf("prvKey.Parameters() = %v, want %v", got, want)
 			}
 			want, err := prvKey.PublicKey()
 			if err != nil {
 				t.Fatalf("prvKey.PublicKey() err = %v, want nil", err)
 			}
-			if got := publicKey; !got.Equals(want) {
+			if got := publicKey; !got.Equal(want) {
 				t.Errorf("prvKey.PublicKey() = %v, want %v", got, want)
 			}
 
@@ -828,8 +828,8 @@ func TestNewPrivateKeyFromPublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ecdsa.NewPrivateKeyFromPublicKey(%v, privateKeyValue) err = %v, want nil", publicKey, err)
 			}
-			if !otherPrvKey.Equals(prvKey) {
-				t.Errorf("otherPrvKey.Equals(prvKey) = false, want true")
+			if !otherPrvKey.Equal(prvKey) {
+				t.Errorf("otherPrvKey.Equal(prvKey) = false, want true")
 			}
 		})
 	}

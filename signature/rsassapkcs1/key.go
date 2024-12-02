@@ -163,8 +163,8 @@ func NewParameters(modulusSizeBits int, hashType HashType, publicExponent int, v
 // HasIDRequirement tells whether the key has an ID requirement.
 func (p *Parameters) HasIDRequirement() bool { return p.variant != VariantNoPrefix }
 
-// Equals tells whether this parameters object is equal to other.
-func (p *Parameters) Equals(other key.Parameters) bool {
+// Equal tells whether this parameters object is equal to other.
+func (p *Parameters) Equal(other key.Parameters) bool {
 	that, ok := other.(*Parameters)
 	return ok && p.HasIDRequirement() == that.HasIDRequirement() &&
 		p.modulusSizeBits == that.modulusSizeBits &&
@@ -240,12 +240,12 @@ func (k *PublicKey) IDRequirement() (uint32, bool) {
 // OutputPrefix returns the output prefix of this key.
 func (k *PublicKey) OutputPrefix() []byte { return bytes.Clone(k.outputPrefix) }
 
-// Equals tells whether this key object is equal to other.
-func (k *PublicKey) Equals(other key.Key) bool {
+// Equal tells whether this key object is equal to other.
+func (k *PublicKey) Equal(other key.Key) bool {
 	actualKey, ok := other.(*PublicKey)
 	return ok && bytes.Equal(k.modulus, actualKey.modulus) &&
 		k.idRequirement == actualKey.idRequirement &&
-		k.parameters.Equals(actualKey.parameters)
+		k.parameters.Equal(actualKey.parameters)
 }
 
 // PrivateKey represents a function that can produce RSA-SSA-PKCS1 v1.5
@@ -334,8 +334,8 @@ func (k *PrivateKey) IDRequirement() (uint32, bool) { return k.publicKey.IDRequi
 // OutputPrefix returns the output prefix of this key.
 func (k *PrivateKey) OutputPrefix() []byte { return k.publicKey.OutputPrefix() }
 
-// Equals tells whether this key object is equal to other.
-func (k *PrivateKey) Equals(other key.Key) bool {
+// Equal tells whether this key object is equal to other.
+func (k *PrivateKey) Equal(other key.Key) bool {
 	that, ok := other.(*PrivateKey)
-	return ok && k.publicKey.Equals(that.publicKey) && k.privateKey.Equal(that.privateKey)
+	return ok && k.publicKey.Equal(that.publicKey) && k.privateKey.Equal(that.privateKey)
 }

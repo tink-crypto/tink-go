@@ -120,8 +120,8 @@ func TestNewParameters(t *testing.T) {
 						if err != nil {
 							t.Fatalf("rsassapkcs1.NewParameters(%v, %v, %v, %v) = %v, want nil", modulusSizeBits, hashType, publicExponent, variant, err)
 						}
-						if !params.Equals(other) {
-							t.Errorf("params.Equals(other) = false, want true")
+						if !params.Equal(other) {
+							t.Errorf("params.Equal(other) = false, want true")
 						}
 					})
 				}
@@ -213,8 +213,8 @@ func TestNewParametersDifferentParameters(t *testing.T) {
 			if err != nil {
 				t.Fatalf("rsassapkcs1.NewParameters(%v, %v, %v, %v) = %v, want nil", tc.that.modulusSizeBits, tc.that.hashType, tc.that.publicExponent, tc.that.variant, err)
 			}
-			if this.Equals(that) {
-				t.Errorf("this.Equals(that) = true, want false")
+			if this.Equal(that) {
+				t.Errorf("this.Equal(that) = true, want false")
 			}
 		})
 	}
@@ -397,7 +397,7 @@ func TestNewPublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("rsassapkcs1.NewPublicKey(%v, %d, %v) = %v, want nil", tc.modulus, tc.idRequirement, params, err)
 			}
-			if got, want := key.Parameters(), params; !got.Equals(want) {
+			if got, want := key.Parameters(), params; !got.Equal(want) {
 				t.Errorf("key.Parameters() = %v, want %v", got, want)
 			}
 			idRequirement, required := key.IDRequirement()
@@ -417,8 +417,8 @@ func TestNewPublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("rsassapkcs1.NewPublicKey(%v, %d, %v) = %v, want nil", tc.modulus, tc.idRequirement, params, err)
 			}
-			if !key.Equals(otherKey) {
-				t.Errorf("key.Equals(otherKey) = false, want true")
+			if !key.Equal(otherKey) {
+				t.Errorf("key.Equal(otherKey) = false, want true")
 			}
 		})
 	}
@@ -494,7 +494,7 @@ func mustCreatePublicKey(t *testing.T, modulus []byte, idRequirement uint32, par
 	return key
 }
 
-func TestNewPublicKeyEqualsFailsIfDifferentKeys(t *testing.T) {
+func TestNewPublicKeyEqualFailsIfDifferentKeys(t *testing.T) {
 	validModulus2048 := mustDecodeBase64(t, n2048Base64)
 	// From:
 	// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/rsa_pkcs1_2048_test.json#L353
@@ -528,11 +528,11 @@ func TestNewPublicKeyEqualsFailsIfDifferentKeys(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.this.Equals(tc.that) {
-				t.Errorf("tc.this.Equals(tc.that) = true, want false")
+			if tc.this.Equal(tc.that) {
+				t.Errorf("tc.this.Equal(tc.that) = true, want false")
 			}
-			if tc.that.Equals(tc.this) {
-				t.Errorf("tc.that.Equals(tc.this) = true, want false")
+			if tc.that.Equal(tc.this) {
+				t.Errorf("tc.that.Equal(tc.this) = true, want false")
 			}
 		})
 	}
@@ -775,22 +775,22 @@ func TestNewPrivateKey(t *testing.T) {
 			if err != nil {
 				t.Errorf("rsassapkcs1.NewPrivateKey(tc.publicKey, %v) err = %v, want nil", tc.privateKeyValues, err)
 			}
-			if !privateKey.D().Equals(tc.privateKeyValues.D) {
+			if !privateKey.D().Equal(tc.privateKeyValues.D) {
 				t.Errorf("privateKey.D() = %v, want %v", privateKey.D(), tc.privateKeyValues.D)
 			}
-			if !privateKey.P().Equals(tc.privateKeyValues.P) {
+			if !privateKey.P().Equal(tc.privateKeyValues.P) {
 				t.Errorf("privateKey.P() = %v, want %v", privateKey.P(), tc.privateKeyValues.P)
 			}
-			if !privateKey.Q().Equals(tc.privateKeyValues.Q) {
+			if !privateKey.Q().Equal(tc.privateKeyValues.Q) {
 				t.Errorf("privateKey.Q() = %v, want %v", privateKey.Q(), tc.privateKeyValues.Q)
 			}
-			if !privateKey.DP().Equals(tc.dp) {
+			if !privateKey.DP().Equal(tc.dp) {
 				t.Errorf("privateKey.DP() = %v, want %v", privateKey.DP(), tc.dp)
 			}
-			if !privateKey.DQ().Equals(tc.dq) {
+			if !privateKey.DQ().Equal(tc.dq) {
 				t.Errorf("privateKey.DQ() = %v, want %v", privateKey.DQ(), tc.dq)
 			}
-			if !privateKey.QInv().Equals(tc.qInv) {
+			if !privateKey.QInv().Equal(tc.qInv) {
 				t.Errorf("privateKey.QInv() = %v, want %v", privateKey.QInv(), tc.qInv)
 			}
 			gotIDRequirement, gotRequired := privateKey.IDRequirement()
@@ -801,28 +801,28 @@ func TestNewPrivateKey(t *testing.T) {
 			if got, want := privateKey.OutputPrefix(), tc.publicKey.OutputPrefix(); !bytes.Equal(got, want) {
 				t.Errorf("privateKey.OutputPrefix() = %v, want %v", got, want)
 			}
-			if got, want := privateKey.Parameters(), tc.publicKey.Parameters(); !got.Equals(want) {
+			if got, want := privateKey.Parameters(), tc.publicKey.Parameters(); !got.Equal(want) {
 				t.Errorf("privateKey.Parameters() = %v, want %v", got, want)
 			}
 			want, err := privateKey.PublicKey()
 			if err != nil {
 				t.Fatalf("privateKey.PublicKey() err = %v, want nil", err)
 			}
-			if got := tc.publicKey; !got.Equals(want) {
+			if got := tc.publicKey; !got.Equal(want) {
 				t.Errorf("privateKey.PublicKey() = %v, want %v", got, want)
 			}
 			otherPrivateKey, err := rsassapkcs1.NewPrivateKey(tc.publicKey, tc.privateKeyValues)
 			if err != nil {
 				t.Errorf("rsassapkcs1.NewPrivateKey(tc.publicKey, %v) err = %v, want nil", tc.privateKeyValues, err)
 			}
-			if !privateKey.Equals(otherPrivateKey) {
-				t.Errorf("privateKey.Equals(otherPrivateKey) = false, want true")
+			if !privateKey.Equal(otherPrivateKey) {
+				t.Errorf("privateKey.Equal(otherPrivateKey) = false, want true")
 			}
 		})
 	}
 }
 
-func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
+func TestNewPrivateKeyEqualFailsIfKeysAreDifferent(t *testing.T) {
 	// From:
 	// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/rsa_pkcs1_2048_test.json#L353
 	differentN2048Base64 := "3ZBFkDl4CMQxQyliPZATRThDJRsTuLPE_vVFmBEq8-sxxxEDxiWZUWdOU72Tp-NtGUcuR06-gChobZUpSE2Lr-pKBLoZVVZnYWyEeGcFlACcm8aj7-UidMumTHJHR9ftwZTk_t3jKjKJ2Uwxk25-ehXXVvVISS9bNFuSfoxhi91VCsshoXrhSDBDg9ubPHuqPkyL2OhEqITao-GNVpmMsy-brk1B1WoY3dQxPICJt16du5EoRwusmwh_thkoqw-MTIk2CwIImQCNCOi9MfkHqAfoBWrWgA3_357Z2WSpOefkgRS4SXhVGsuFyd-RlvPv9VKG1s1LOagiqKd2Ohggjw"
@@ -924,11 +924,11 @@ func TestNewPrivateKeyEqualsFailsIfKeysAreDifferent(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.this.Equals(tc.that) {
-				t.Errorf("tc.this.Equals(tc.that) = true, want false")
+			if tc.this.Equal(tc.that) {
+				t.Errorf("tc.this.Equal(tc.that) = true, want false")
 			}
-			if tc.that.Equals(tc.this) {
-				t.Errorf("tc.that.Equals(tc.this) = true, want false")
+			if tc.that.Equal(tc.this) {
+				t.Errorf("tc.that.Equal(tc.this) = true, want false")
 			}
 		})
 	}

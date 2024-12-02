@@ -103,7 +103,7 @@ func TestParametersHasIDRequirement(t *testing.T) {
 	}
 }
 
-func TestParametersEquals(t *testing.T) {
+func TestParametersEqual(t *testing.T) {
 	tinkVariant, err := ed25519.NewParameters(ed25519.VariantTink)
 	if err != nil {
 		t.Fatalf("ed25519.NewParameters(%v) err = %v, want nil", ed25519.VariantTink, err)
@@ -122,8 +122,8 @@ func TestParametersEquals(t *testing.T) {
 	}
 
 	for _, params := range []ed25519.Parameters{tinkVariant, legacyVariant, crunchyVariant, noPrefixVariant} {
-		if !params.Equals(&params) {
-			t.Errorf("params.Equals(params) = false, want true")
+		if !params.Equal(&params) {
+			t.Errorf("params.Equal(params) = false, want true")
 		}
 	}
 
@@ -165,8 +165,8 @@ func TestParametersEquals(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.firstParams.Equals(&tc.secondParams) {
-				t.Errorf("tc.firstParams.Equals(&tc.secondParams) = true, want false")
+			if tc.firstParams.Equal(&tc.secondParams) {
+				t.Errorf("tc.firstParams.Equal(&tc.secondParams) = true, want false")
 			}
 		})
 	}
@@ -283,8 +283,8 @@ func TestPublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ed25519.NewPublicKey(%v, %v, %v) err = %v, want nil", tc.keyBytes, tc.idRequirement, params, err)
 			}
-			if !otherPubKey.Equals(pubKey) {
-				t.Errorf("otherPubKey.Equals(pubKey) = false, want true")
+			if !otherPubKey.Equal(pubKey) {
+				t.Errorf("otherPubKey.Equal(pubKey) = false, want true")
 			}
 		})
 	}
@@ -296,7 +296,7 @@ type TestPublicKeyParams struct {
 	variant       ed25519.Variant
 }
 
-func TestPublicKeyEqualsSelf(t *testing.T) {
+func TestPublicKeyEqualSelf(t *testing.T) {
 	params, err := ed25519.NewParameters(ed25519.VariantTink)
 	if err != nil {
 		t.Fatalf("ed25519.NewParameters(%v) err = %v, want nil", ed25519.VariantTink, err)
@@ -306,12 +306,12 @@ func TestPublicKeyEqualsSelf(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ed25519.NewPublicKey(%v, %v, %v) err = %v, want nil", keyBytes, 123, params, err)
 	}
-	if !pubKey.Equals(pubKey) {
-		t.Errorf("pubKey.Equals(pubKey) = false, want true")
+	if !pubKey.Equal(pubKey) {
+		t.Errorf("pubKey.Equal(pubKey) = false, want true")
 	}
 }
 
-func TestPublicKeyEqualsFalse(t *testing.T) {
+func TestPublicKeyEqualFalse(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		firstKey  *TestPublicKeyParams
@@ -374,8 +374,8 @@ func TestPublicKeyEqualsFalse(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ed25519.NewPublicKey(%v, %v, %v) err = %v, want nil", tc.secondKey.keyBytes, tc.secondKey.idRequirement, secondParams, err)
 			}
-			if firstPubKey.Equals(secondPubKey) {
-				t.Errorf("firstPubKey.Equals(secondPubKey) = true, want false")
+			if firstPubKey.Equal(secondPubKey) {
+				t.Errorf("firstPubKey.Equal(secondPubKey) = true, want false")
 			}
 		})
 	}
@@ -487,7 +487,7 @@ func TestPrivateKeyNewPrivateKeyWithPublicKey(t *testing.T) {
 				t.Errorf("params.OutputPrefix() = %v, want %v", got, tc.wantOutputPrefix)
 			}
 
-			// Test Equals.
+			// Test Equal.
 			otherPubKey, err := ed25519.NewPublicKey(pubKeyBytes, tc.idRequirement, params)
 			if err != nil {
 				t.Fatalf("ed25519.NewPublicKey(%v, %v, %v) err = %v, want nil", pubKeyBytes, tc.idRequirement, params, err)
@@ -496,8 +496,8 @@ func TestPrivateKeyNewPrivateKeyWithPublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ed25519.NewPrivateKeyWithPublicKey(%v, %v) err = %v, want nil", secretSeed, pubKey, err)
 			}
-			if !otherPrivKey.Equals(privKey) {
-				t.Errorf("otherPrivKey.Equals(privKey) = false, want true")
+			if !otherPrivKey.Equal(privKey) {
+				t.Errorf("otherPrivKey.Equal(privKey) = false, want true")
 			}
 
 			// Test PublicKey.
@@ -505,13 +505,13 @@ func TestPrivateKeyNewPrivateKeyWithPublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("privKey.PublicKey() err = %v, want nil", err)
 			}
-			if !got.Equals(pubKey) {
-				t.Errorf("privKey.PublicKey().Equals(pubKey) = false, want true")
+			if !got.Equal(pubKey) {
+				t.Errorf("privKey.PublicKey().Equal(pubKey) = false, want true")
 			}
 
 			// Test Parameters.
-			if got := privKey.Parameters(); !got.Equals(&params) {
-				t.Errorf("privKey.Parameters().Equals(&params) = false, want true")
+			if got := privKey.Parameters(); !got.Equal(&params) {
+				t.Errorf("privKey.Parameters().Equal(&params) = false, want true")
 			}
 		})
 	}
@@ -545,13 +545,13 @@ func TestPrivateKeyNewPrivateKey(t *testing.T) {
 				t.Errorf("params.OutputPrefix() = %v, want %v", got, tc.wantOutputPrefix)
 			}
 
-			// Test Equals.
+			// Test Equal.
 			otherPrivKey, err := ed25519.NewPrivateKey(secretSeed, tc.idRequirement, params)
 			if err != nil {
 				t.Fatalf("ed25519.NewPrivateKey(%v, %v, %v) err = %v, want nil", secretSeed, tc.idRequirement, params, err)
 			}
-			if !otherPrivKey.Equals(privKey) {
-				t.Errorf("otherPrivKey.Equals(privKey) = false, want true")
+			if !otherPrivKey.Equal(privKey) {
+				t.Errorf("otherPrivKey.Equal(privKey) = false, want true")
 			}
 
 			// Test PublicKey.
@@ -563,13 +563,13 @@ func TestPrivateKeyNewPrivateKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("privKey.PublicKey() err = %v, want nil", err)
 			}
-			if !got.Equals(want) {
-				t.Errorf("privKey.PublicKey().Equals(want) = false, want true")
+			if !got.Equal(want) {
+				t.Errorf("privKey.PublicKey().Equal(want) = false, want true")
 			}
 
 			// Test Parameters.
-			if got := privKey.Parameters(); !got.Equals(&params) {
-				t.Errorf("privKey.Parameters().Equals(&params) = false, want true")
+			if got := privKey.Parameters(); !got.Equal(&params) {
+				t.Errorf("privKey.Parameters().Equal(&params) = false, want true")
 			}
 		})
 	}
@@ -685,7 +685,7 @@ func TestNewPrivateKeyWithPublicKeyFails(t *testing.T) {
 	}
 }
 
-func TestPrivateKeyEqualsSelf(t *testing.T) {
+func TestPrivateKeyEqualSelf(t *testing.T) {
 	params, err := ed25519.NewParameters(ed25519.VariantTink)
 	if err != nil {
 		t.Fatalf("ed25519.NewParameters(%v) err = %v, want nil", ed25519.VariantTink, err)
@@ -700,12 +700,12 @@ func TestPrivateKeyEqualsSelf(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ed25519.NewPrivateKeyWithPublicKey(%v, %v) err = %v", secretSeed, pubKey, err)
 	}
-	if !privKey.Equals(privKey) {
-		t.Errorf("privKey.Equals(privKey) = false, want true")
+	if !privKey.Equal(privKey) {
+		t.Errorf("privKey.Equal(privKey) = false, want true")
 	}
 }
 
-func TestPrivateKeyEqualsFalse(t *testing.T) {
+func TestPrivateKeyEqualFalse(t *testing.T) {
 	paramsTink, err := ed25519.NewParameters(ed25519.VariantTink)
 	if err != nil {
 		t.Fatalf("ed25519.NewParameters(%v) err = %v, want nil", ed25519.VariantTink, err)
@@ -760,8 +760,8 @@ func TestPrivateKeyEqualsFalse(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ed25519.NewPrivateKey(%v, %v, %v) err = %v", tc.privKeyBytes2, tc.idRequirement2, tc.params2, err)
 			}
-			if firstPrivKey.Equals(secondPrivKey) {
-				t.Errorf("firstPrivKey.Equals(secondPrivKey) = true, want false")
+			if firstPrivKey.Equal(secondPrivKey) {
+				t.Errorf("firstPrivKey.Equal(secondPrivKey) = true, want false")
 			}
 		})
 	}

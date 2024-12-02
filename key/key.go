@@ -25,8 +25,8 @@ type Parameters interface {
 	// key id to the ciphertext). In this case, such a key should require a unique
 	// id in key.IDRequirement() and return true.
 	HasIDRequirement() bool
-	// Equals compares this parameters object with other.
-	Equals(other Parameters) bool
+	// Equal compares this parameters object with other.
+	Equal(other Parameters) bool
 }
 
 // Key represents a Tink key.
@@ -48,6 +48,6 @@ type Key interface {
 	// Parameters.HasIDRequirement(). If not required, the returned ID
 	// is zero and unusable.
 	IDRequirement() (idRequirement uint32, required bool)
-	// Equals compares this key object with other.
-	Equals(other Key) bool
+	// Equal compares this key object with other.
+	Equal(other Key) bool
 }

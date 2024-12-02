@@ -233,14 +233,14 @@ func TestNewParametersWorks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aesctrhmac.NewParameters(%v) err = %v, want nil", tc.paramsOpts, err)
 			}
-			if !params.Equals(otherParams) {
-				t.Errorf("params.Equals(otherParams) = %v, want true", params.Equals(otherParams))
+			if !params.Equal(otherParams) {
+				t.Errorf("params.Equal(otherParams) = %v, want true", params.Equal(otherParams))
 			}
 		})
 	}
 }
 
-func TestParametersEqualsFalseIfDifferent(t *testing.T) {
+func TestParametersEqualFalseIfDifferent(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		opts1 aesctrhmac.ParametersOpts
@@ -370,8 +370,8 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 			if err != nil {
 				t.Errorf("aesctrhmac.NewParameters(%v) err = %v, want nil", tc.opts2, err)
 			}
-			if params1.Equals(params2) {
-				t.Errorf("params.Equals(params2) = %v, want false", params1.Equals(params2))
+			if params1.Equal(params2) {
+				t.Errorf("params.Equal(params2) = %v, want false", params1.Equal(params2))
 			}
 		})
 	}

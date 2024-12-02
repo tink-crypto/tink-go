@@ -124,7 +124,7 @@ func TestNewKeySerialization(t *testing.T) {
 	}
 }
 
-func TestKeySerializationEquals(t *testing.T) {
+func TestKeySerializationEqual(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		ks1  *protoserialization.KeySerialization
@@ -217,14 +217,14 @@ func TestKeySerializationEquals(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.ks1.Equals(tc.ks2); got != tc.want {
-				t.Errorf("ks1.Equals(ks2) = %v, want %v", got, tc.want)
+			if got := tc.ks1.Equal(tc.ks2); got != tc.want {
+				t.Errorf("ks1.Equal(ks2) = %v, want %v", got, tc.want)
 			}
 		})
 	}
 }
 
-func TestFallbackKeyEquals(t *testing.T) {
+func TestFallbackKeyEqual(t *testing.T) {
 	keyData1 := &tinkpb.KeyData{
 		TypeUrl:         testKeyURL,
 		Value:           []byte("123"),
@@ -268,14 +268,14 @@ func TestFallbackKeyEquals(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.key1.Equals(tc.key2); got != tc.want {
-				t.Errorf("key1.Equals(key2) = %v, want %v", got, tc.want)
+			if got := tc.key1.Equal(tc.key2); got != tc.want {
+				t.Errorf("key1.Equal(key2) = %v, want %v", got, tc.want)
 			}
 		})
 	}
 }
 
-func TestFallbackKeyParametersEquals(t *testing.T) {
+func TestFallbackKeyParametersEqual(t *testing.T) {
 	keyData := &tinkpb.KeyData{
 		TypeUrl:         testKeyURL,
 		Value:           []byte("123"),
@@ -305,14 +305,14 @@ func TestFallbackKeyParametersEquals(t *testing.T) {
 			if otherParameters == nil {
 				t.Errorf("protoserialization.NewFallbackProtoKey(protoKey).Parameters() = nil, want not nil")
 			}
-			if !params.Equals(otherParameters) {
-				t.Errorf("parameters.Equals(otherParameters) = false, want true")
+			if !params.Equal(otherParameters) {
+				t.Errorf("parameters.Equal(otherParameters) = false, want true")
 			}
 		})
 	}
 }
 
-func TestFallbackKeyParametersNotEquals(t *testing.T) {
+func TestFallbackKeyParametersNotEqual(t *testing.T) {
 	keyData := &tinkpb.KeyData{
 		TypeUrl:         testKeyURL,
 		Value:           []byte("123"),
@@ -320,8 +320,8 @@ func TestFallbackKeyParametersNotEquals(t *testing.T) {
 	}
 	key1 := protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData, tinkpb.OutputPrefixType_RAW, 0))
 	key2 := protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData, tinkpb.OutputPrefixType_TINK, 123))
-	if key1.Parameters().Equals(key2.Parameters()) {
-		t.Errorf("parameters.Equals(otherParameters) = true, want false")
+	if key1.Parameters().Equal(key2.Parameters()) {
+		t.Errorf("parameters.Equal(otherParameters) = true, want false")
 	}
 }
 
@@ -366,7 +366,7 @@ type testParams struct {
 
 func (p *testParams) HasIDRequirement() bool { return p.hasIDRequirement }
 
-func (p *testParams) Equals(params key.Parameters) bool {
+func (p *testParams) Equal(params key.Parameters) bool {
 	_, ok := params.(*testParams)
 	return ok && p.hasIDRequirement == params.HasIDRequirement()
 }
@@ -379,12 +379,12 @@ type testKey struct {
 
 func (k *testKey) Parameters() key.Parameters { return &k.params }
 
-func (k *testKey) Equals(other key.Key) bool {
+func (k *testKey) Equal(other key.Key) bool {
 	fallbackProtoKey, ok := other.(*testKey)
 	if !ok {
 		return false
 	}
-	return k.params.Equals(fallbackProtoKey.Parameters())
+	return k.params.Equal(fallbackProtoKey.Parameters())
 }
 
 func (k *testKey) IDRequirement() (uint32, bool) { return k.id, k.params.HasIDRequirement() }
@@ -601,12 +601,12 @@ func TestSerializeKeyWithFallbackKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("protoserialization.SerializeKey(key) err = %v, want nil", err)
 	}
-	if !gotKeySerialization.Equals(keySerialization) {
-		t.Errorf("gotKeySerialization.Equals(keySerialization) = false, want true")
+	if !gotKeySerialization.Equal(keySerialization) {
+		t.Errorf("gotKeySerialization.Equal(keySerialization) = false, want true")
 	}
 	gotKeySerialization.KeyData().Value = []byte("456")
-	if gotKeySerialization.Equals(keySerialization) {
-		t.Errorf("gotKeySerialization.Equals(keySerialization) = true, want false")
+	if gotKeySerialization.Equal(keySerialization) {
+		t.Errorf("gotKeySerialization.Equal(keySerialization) = true, want false")
 	}
 }
 
@@ -625,8 +625,8 @@ func TestSerializeKeyWithFallbackPrivateKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("protoserialization.SerializeKey(key) err = %v, want nil", err)
 	}
-	if !gotProtoSerialization.Equals(keySerialization) {
-		t.Errorf("gotProtoSerialization.Equals(keySerialization) = false, want true")
+	if !gotProtoSerialization.Equal(keySerialization) {
+		t.Errorf("gotProtoSerialization.Equal(keySerialization) = false, want true")
 	}
 }
 

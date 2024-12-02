@@ -220,14 +220,14 @@ func TestNewParametersWorks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aesgcmsiv.NewParameters(%v, %v) err = %v, want nil", test.keySize, test.variant, err)
 			}
-			if !params.Equals(otherParams) {
-				t.Errorf("params.Equals(otherParams) = %v, want true", params.Equals(otherParams))
+			if !params.Equal(otherParams) {
+				t.Errorf("params.Equal(otherParams) = %v, want true", params.Equal(otherParams))
 			}
 		})
 	}
 }
 
-func TestParametersEqualsFalseIfDifferent(t *testing.T) {
+func TestParametersEqualFalseIfDifferent(t *testing.T) {
 	for _, test := range []struct {
 		name        string
 		key1Size    int
@@ -259,8 +259,8 @@ func TestParametersEqualsFalseIfDifferent(t *testing.T) {
 			if err != nil {
 				t.Errorf("aesgcmsiv.NewParameters(%v, %v) err = %v, want nil", test.key2Size, test.key2Variant, err)
 			}
-			if params1.Equals(params2) {
-				t.Errorf("params.Equals(params2) = %v, want false", params1.Equals(params2))
+			if params1.Equal(params2) {
+				t.Errorf("params.Equal(params2) = %v, want false", params1.Equal(params2))
 			}
 		})
 	}
@@ -331,12 +331,12 @@ func TestNewKeyWorks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aesgcmsiv.NewKey(keyBytes, %v, %v) err = %v, want nil", test.id, params, err)
 			}
-			if !key1.Parameters().Equals(params) {
+			if !key1.Parameters().Equal(params) {
 				t.Errorf("key1.Parameters() = %v, want %v", key1.Parameters(), params)
 			}
 			key1Bytes := key1.KeyBytes()
-			if !keyBytes.Equals(key1Bytes) {
-				t.Errorf("keyBytes.Equals(key1Bytes) = false, want true")
+			if !keyBytes.Equal(key1Bytes) {
+				t.Errorf("keyBytes.Equal(key1Bytes) = false, want true")
 			}
 			keyID1, required := key1.IDRequirement()
 			if wantRequired := test.variant != aesgcmsiv.VariantNoPrefix; required != wantRequired {
@@ -353,15 +353,15 @@ func TestNewKeyWorks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aesgcmsiv.NewKey(keyBytes, %v, %v) err = %v, want nil", keyID1, params, err)
 			}
-			// Test Equals.
-			if !key1.Equals(key2) {
-				t.Errorf("key1.Equals(key2) = %v, want true", key1.Equals(key2))
+			// Test Equal.
+			if !key1.Equal(key2) {
+				t.Errorf("key1.Equal(key2) = %v, want true", key1.Equal(key2))
 			}
 		})
 	}
 }
 
-func TestKeyEqualsReturnsFalseIfDifferent(t *testing.T) {
+func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 	for _, test := range []struct {
 		name   string
 		first  TestKey
@@ -451,8 +451,8 @@ func TestKeyEqualsReturnsFalseIfDifferent(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aesgcmsiv.NewKey(secondKeyBytes, %v, %v) err = %v, want nil", test.second.id, secondParams, err)
 			}
-			if firstKey.Equals(secondKey) {
-				t.Errorf("firstKey.Equals(secondKey) = true, want false")
+			if firstKey.Equal(secondKey) {
+				t.Errorf("firstKey.Equal(secondKey) = true, want false")
 			}
 		})
 	}

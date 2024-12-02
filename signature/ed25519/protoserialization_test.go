@@ -164,8 +164,8 @@ func TestParsePublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewPublicKey(%v, %v, %v) err = %v, want nil", protoPublicKey.GetKeyValue(), idRequirement, wantParams, err)
 			}
-			if !gotKey.Equals(wantKey) {
-				t.Errorf("%v.Equals(%v) = false, want true", gotKey, wantKey)
+			if !gotKey.Equal(wantKey) {
+				t.Errorf("%v.Equal(%v) = false, want true", gotKey, wantKey)
 			}
 			// Test serialization returns back tc.keySerialization.
 			s := publicKeySerializer{}
@@ -173,7 +173,7 @@ func TestParsePublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("s.SerializeKey(gotKey) err = %v, want nil", err)
 			}
-			if got, want := keySerialization, tc.keySerialization; !got.Equals(want) {
+			if got, want := keySerialization, tc.keySerialization; !got.Equal(want) {
 				t.Errorf("s.SerializeKey(gotKey) = %v, want %v", got, want)
 			}
 		})
@@ -184,13 +184,13 @@ type testParams struct{}
 
 func (p *testParams) HasIDRequirement() bool { return true }
 
-func (p *testParams) Equals(params key.Parameters) bool { return true }
+func (p *testParams) Equal(params key.Parameters) bool { return true }
 
 type testKey struct{}
 
 func (k *testKey) Parameters() key.Parameters { return &testParams{} }
 
-func (k *testKey) Equals(other key.Key) bool { return true }
+func (k *testKey) Equal(other key.Key) bool { return true }
 
 func (k *testKey) IDRequirement() (uint32, bool) { return 123, true }
 
@@ -291,7 +291,7 @@ func TestSerializePublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("s.SerializeKey(%v) err = nil, want non-nil", tc.publicKey)
 			}
-			if !got.Equals(tc.want) {
+			if !got.Equal(tc.want) {
 				t.Errorf("s.SerializeKey(%v) = %v, want %v", tc.publicKey, got, tc.want)
 			}
 		})
@@ -512,8 +512,8 @@ func TestParsePrivateKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewPrivateKey(%v, %v, %v) err = %v, want nil", privateKeyBytes, idRequirement, wantParams, err)
 			}
-			if !gotKey.Equals(wantKey) {
-				t.Errorf("%v.Equals(%v) = false, want true", gotKey, wantKey)
+			if !gotKey.Equal(wantKey) {
+				t.Errorf("%v.Equal(%v) = false, want true", gotKey, wantKey)
 			}
 			// Test serialization returns back tc.keySerialization.
 			s := privateKeySerializer{}
@@ -521,7 +521,7 @@ func TestParsePrivateKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("s.SerializeKey(gotKey) err = %v, want nil", err)
 			}
-			if got, want := keySerialization, tc.keySerialization; !got.Equals(want) {
+			if got, want := keySerialization, tc.keySerialization; !got.Equal(want) {
 				t.Errorf("s.SerializeKey(gotKey) = %v, want %v", got, want)
 			}
 		})
@@ -632,7 +632,7 @@ func TestSerializePrivateKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("s.SerializeKey(%v) err = nil, want non-nil", tc.privateKey)
 			}
-			if !got.Equals(tc.want) {
+			if !got.Equal(tc.want) {
 				t.Errorf("s.SerializeKey(%v) = %v, want %v", tc.privateKey, got, tc.want)
 			}
 		})

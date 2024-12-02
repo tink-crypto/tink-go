@@ -133,8 +133,8 @@ func NewParameters(opts ParametersOpts) (*Parameters, error) {
 // HasIDRequirement returns whether the key has an ID requirement.
 func (p *Parameters) HasIDRequirement() bool { return p.variant != VariantNoPrefix }
 
-// Equals returns whether this Parameters object is equal to other.
-func (p *Parameters) Equals(other key.Parameters) bool {
+// Equal returns whether this Parameters object is equal to other.
+func (p *Parameters) Equal(other key.Parameters) bool {
 	actualParams, ok := other.(*Parameters)
 	return ok && p.HasIDRequirement() == actualParams.HasIDRequirement() &&
 		p.keySizeInBytes == actualParams.keySizeInBytes &&
@@ -211,14 +211,14 @@ func (k *Key) IDRequirement() (uint32, bool) {
 // OutputPrefix returns the output prefix.
 func (k *Key) OutputPrefix() []byte { return bytes.Clone(k.outputPrefix) }
 
-// Equals returns whether this key object is equal to other.
-func (k *Key) Equals(other key.Key) bool {
+// Equal returns whether this key object is equal to other.
+func (k *Key) Equal(other key.Key) bool {
 	that, ok := other.(*Key)
 	thisIDRequirement, thisIDRequired := k.IDRequirement()
 	thatIDRequirement, thatIDRequired := that.IDRequirement()
-	return ok && k.Parameters().Equals(that.Parameters()) &&
+	return ok && k.Parameters().Equal(that.Parameters()) &&
 		thisIDRequired == thatIDRequired &&
 		thisIDRequirement == thatIDRequirement &&
-		k.keyBytes.Equals(that.keyBytes) &&
+		k.keyBytes.Equal(that.keyBytes) &&
 		bytes.Equal(k.outputPrefix, that.outputPrefix)
 }

@@ -89,8 +89,8 @@ func TestCreateKeysetHandleFromParameters(t *testing.T) {
 	if entry.KeyID() == anotherEntry.KeyID() {
 		t.Fatalf("entry.KeyID() = %v, want different from anotherEntry.KeyID() = %v", entry.KeyID(), anotherEntry.KeyID())
 	}
-	if entry.Key().Equals(anotherEntry.Key()) {
-		t.Fatalf("entry.Key().Equals(anotherEntry.Key()) = true, want false")
+	if entry.Key().Equal(anotherEntry.Key()) {
+		t.Fatalf("entry.Key().Equal(anotherEntry.Key()) = true, want false")
 	}
 	publicEntry, err := publicHandle.Primary()
 	if err != nil {
@@ -103,8 +103,8 @@ func TestCreateKeysetHandleFromParameters(t *testing.T) {
 	if publicEntry.KeyID() == anotherPublicEntry.KeyID() {
 		t.Fatalf("publicEntry.KeyID() = %v, want different from anotherPublicEntry.KeyID() = %v", publicEntry.KeyID(), anotherPublicEntry.KeyID())
 	}
-	if publicEntry.Key().Equals(anotherPublicEntry.Key()) {
-		t.Fatalf("publicEntry.Key().Equals(anotherPublicEntry.Key()) = true, want false")
+	if publicEntry.Key().Equal(anotherPublicEntry.Key()) {
+		t.Fatalf("publicEntry.Key().Equal(anotherPublicEntry.Key()) = true, want false")
 	}
 
 	// Make sure that a different generated key cannot verify the signature.

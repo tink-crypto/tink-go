@@ -667,7 +667,7 @@ type testParameters struct {
 }
 
 func (p *testParameters) HasIDRequirement() bool { return p.hasIDRequirement }
-func (p *testParameters) Equals(params key.Parameters) bool {
+func (p *testParameters) Equal(params key.Parameters) bool {
 	_, ok := params.(*testParameters)
 	return ok && p.hasIDRequirement == params.HasIDRequirement()
 }
@@ -683,12 +683,12 @@ func (k *testKey) IDRequirement() (id uint32, required bool) {
 	return k.id, k.Parameters().HasIDRequirement()
 }
 func (k *testKey) Parameters() key.Parameters { return &k.params }
-func (k *testKey) Equals(other key.Key) bool {
+func (k *testKey) Equal(other key.Key) bool {
 	thisKeyID, Required := k.IDRequirement()
 	otherkeyID, otherKeyRequired := other.IDRequirement()
 	return thisKeyID == otherkeyID &&
 		Required == otherKeyRequired &&
-		k.Parameters().Equals(other.Parameters())
+		k.Parameters().Equal(other.Parameters())
 }
 
 var _ key.Key = (*testKey)(nil)
@@ -872,7 +872,7 @@ type testParams struct {
 }
 
 func (p *testParams) HasIDRequirement() bool { return p.hasIDRequirement }
-func (p *testParams) Equals(params key.Parameters) bool {
+func (p *testParams) Equal(params key.Parameters) bool {
 	_, ok := params.(*testParams)
 	return ok && p.hasIDRequirement == params.HasIDRequirement()
 }

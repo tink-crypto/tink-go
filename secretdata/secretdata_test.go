@@ -69,20 +69,20 @@ func TestBytesData(t *testing.T) {
 	}
 }
 
-func TestBytesEquals(t *testing.T) {
+func TestBytesEqual(t *testing.T) {
 	data := []byte("secret key material")
 	keyMaterial := secretdata.NewBytesFromData(data, insecuresecretdataaccess.Token{})
 	otherBytes := secretdata.NewBytesFromData(data, insecuresecretdataaccess.Token{})
-	if !keyMaterial.Equals(otherBytes) {
-		t.Errorf("keyMaterial.Equals(otherBytes) = false, want true")
+	if !keyMaterial.Equal(otherBytes) {
+		t.Errorf("keyMaterial.Equal(otherBytes) = false, want true")
 	}
 	differentBytes := secretdata.NewBytesFromData([]byte("different secret key material"), insecuresecretdataaccess.Token{})
-	if differentBytes.Equals(keyMaterial) {
-		t.Errorf("differentBytes.Equals(keyMaterial) = true, want false")
+	if differentBytes.Equal(keyMaterial) {
+		t.Errorf("differentBytes.Equal(keyMaterial) = true, want false")
 	}
 }
 
-func TestBytesEqualsEmpty(t *testing.T) {
+func TestBytesEqualEmpty(t *testing.T) {
 	nilBytes := secretdata.NewBytesFromData(nil, insecuresecretdataaccess.Token{})
 	emptyBytes := secretdata.NewBytesFromData([]byte(""), insecuresecretdataaccess.Token{})
 	randomEmptyBytes, err := secretdata.NewBytesFromRand(0)
@@ -148,8 +148,8 @@ func TestBytesEqualsEmpty(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if !testCase.firstBytes.Equals(testCase.secondBytes) {
-				t.Errorf("firstBytes.Equals(secondBytes) = false, want true")
+			if !testCase.firstBytes.Equal(testCase.secondBytes) {
+				t.Errorf("firstBytes.Equal(secondBytes) = false, want true")
 			}
 		})
 	}

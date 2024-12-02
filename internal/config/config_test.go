@@ -28,7 +28,7 @@ import (
 type testParameters0 struct{}
 
 func (tp testParameters0) HasIDRequirement() bool { return false }
-func (tp testParameters0) Equals(other key.Parameters) bool {
+func (tp testParameters0) Equal(other key.Parameters) bool {
 	return false
 }
 
@@ -36,14 +36,14 @@ type testKey0 struct{}
 
 func (tk testKey0) Parameters() key.Parameters                { return new(testParameters0) }
 func (tk testKey0) IDRequirement() (id uint32, required bool) { return 0, false }
-func (tk testKey0) Equals(other key.Key) bool                 { return false }
+func (tk testKey0) Equal(other key.Key) bool                  { return false }
 
 type testPrimitive0 struct{}
 
 type testParameters1 struct{}
 
 func (tp testParameters1) HasIDRequirement() bool { return false }
-func (tp testParameters1) Equals(other key.Parameters) bool {
+func (tp testParameters1) Equal(other key.Parameters) bool {
 	return false
 }
 
@@ -51,7 +51,7 @@ type testKey1 struct{}
 
 func (tk testKey1) Parameters() key.Parameters                { return new(testParameters1) }
 func (tk testKey1) IDRequirement() (id uint32, required bool) { return 0, false }
-func (tk testKey1) Equals(other key.Key) bool                 { return false }
+func (tk testKey1) Equal(other key.Key) bool                  { return false }
 
 type testPrimitive1 struct{}
 
@@ -59,7 +59,7 @@ type testKeyUnregistered struct{}
 
 func (tk testKeyUnregistered) Parameters() key.Parameters                { return new(testParameters1) }
 func (tk testKeyUnregistered) IDRequirement() (id uint32, required bool) { return 0, false }
-func (tk testKeyUnregistered) Equals(other key.Key) bool                 { return false }
+func (tk testKeyUnregistered) Equal(other key.Key) bool                  { return false }
 
 func TestConfigPrimitiveFromKeyWorks(t *testing.T) {
 	testConfig, err := config.New()

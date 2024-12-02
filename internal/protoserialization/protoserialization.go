@@ -44,7 +44,7 @@ type fallbackProtoKeyParams struct {
 
 func (p *fallbackProtoKeyParams) HasIDRequirement() bool { return p.hasIDRequirement }
 
-func (p *fallbackProtoKeyParams) Equals(parameters key.Parameters) bool {
+func (p *fallbackProtoKeyParams) Equal(parameters key.Parameters) bool {
 	_, ok := parameters.(*fallbackProtoKeyParams)
 	return ok && p.hasIDRequirement == parameters.HasIDRequirement()
 }
@@ -88,8 +88,8 @@ func (k *KeySerialization) IDRequirement() (uint32, bool) {
 	return k.idRequirement, k.HasIDRequirement()
 }
 
-// Equals reports whether k is equal to other.
-func (k *KeySerialization) Equals(other *KeySerialization) bool {
+// Equal reports whether k is equal to other.
+func (k *KeySerialization) Equal(other *KeySerialization) bool {
 	return proto.Equal(k.keyData, other.keyData) &&
 		k.outputPrefixType == other.outputPrefixType &&
 		k.idRequirement == other.idRequirement
@@ -118,14 +118,14 @@ type FallbackProtoKey struct {
 // Parameters returns the parameters of this key.
 func (k *FallbackProtoKey) Parameters() key.Parameters { return k.parameters }
 
-// Equals reports whether k is equal to other.
-func (k *FallbackProtoKey) Equals(other key.Key) bool {
+// Equal reports whether k is equal to other.
+func (k *FallbackProtoKey) Equal(other key.Key) bool {
 	otherFallbackProtoKey, ok := other.(*FallbackProtoKey)
 	if !ok {
 		return false
 	}
-	return k.parameters.Equals(other.Parameters()) &&
-		k.protoKeySerialization.Equals(otherFallbackProtoKey.protoKeySerialization)
+	return k.parameters.Equal(other.Parameters()) &&
+		k.protoKeySerialization.Equal(otherFallbackProtoKey.protoKeySerialization)
 }
 
 // IDRequirement returns the key ID and whether it is required.

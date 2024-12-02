@@ -210,8 +210,8 @@ func TestParseKey(t *testing.T) {
 			if err != nil {
 				t.Errorf("protoserialization.ParseKey(%v) err = %v, want nil", tc.keySerialization, err)
 			}
-			if !gotKey.Equals(wantKey) {
-				t.Errorf("key.Equals(wantKey) = false, want true")
+			if !gotKey.Equal(wantKey) {
+				t.Errorf("key.Equal(wantKey) = false, want true")
 			}
 		})
 	}
@@ -223,7 +223,7 @@ type testParams struct {
 
 func (p *testParams) HasIDRequirement() bool { return p.hasIDRequirement }
 
-func (p *testParams) Equals(params key.Parameters) bool {
+func (p *testParams) Equal(params key.Parameters) bool {
 	_, ok := params.(*testParams)
 	return ok && p.hasIDRequirement == params.HasIDRequirement()
 }
@@ -236,12 +236,12 @@ type testKey struct {
 
 func (k *testKey) Parameters() key.Parameters { return &k.params }
 
-func (k *testKey) Equals(other key.Key) bool {
+func (k *testKey) Equal(other key.Key) bool {
 	fallbackProtoKey, ok := other.(*testKey)
 	if !ok {
 		return false
 	}
-	return k.params.Equals(fallbackProtoKey.Parameters())
+	return k.params.Equal(fallbackProtoKey.Parameters())
 }
 
 func (k *testKey) IDRequirement() (uint32, bool) { return k.id, k.params.HasIDRequirement() }
@@ -333,8 +333,8 @@ func TestSerializeKey(t *testing.T) {
 			if err != nil {
 				t.Errorf("protoserialization.SerializeKey(&testKey{}) err = %v, want nil", err)
 			}
-			if !got.Equals(tc.wantKeySerialization) {
-				t.Errorf("got.Equals(tc.wantKeySerialization) = false, want true")
+			if !got.Equal(tc.wantKeySerialization) {
+				t.Errorf("got.Equal(tc.wantKeySerialization) = false, want true")
 			}
 		})
 	}

@@ -204,8 +204,8 @@ func NewParameters(opts ParametersOpts) (*Parameters, error) {
 // HasIDRequirement returns whether the key has an ID requirement.
 func (p *Parameters) HasIDRequirement() bool { return p.variant != VariantNoPrefix }
 
-// Equals returns whether this Parameters object is equal to other.
-func (p *Parameters) Equals(other key.Parameters) bool {
+// Equal returns whether this Parameters object is equal to other.
+func (p *Parameters) Equal(other key.Parameters) bool {
 	actualParams, ok := other.(*Parameters)
 	return ok && p.HasIDRequirement() == actualParams.HasIDRequirement() &&
 		p.aesKeySizeInBytes == actualParams.aesKeySizeInBytes &&

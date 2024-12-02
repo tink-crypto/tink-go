@@ -166,7 +166,7 @@ func TestRegisterKeyManager(t *testing.T) {
 type stubKey struct{}
 
 func (k *stubKey) Parameters() key.Parameters    { return nil }
-func (k *stubKey) Equals(other key.Key) bool     { return true }
+func (k *stubKey) Equal(other key.Key) bool      { return true }
 func (k *stubKey) IDRequirement() (uint32, bool) { return 123, true }
 
 // stubPrimitiveConstructor	creates a stubPrimitive from a stubKey.

@@ -41,8 +41,8 @@ func TestGetKeyFromHandle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcmsiv.NewParameters(%v, %v) err = %v, want nil", keySize, aesgcmsiv.VariantTink, err)
 	}
-	if !key.Parameters().Equals(expectedParameters) {
-		t.Errorf("key.Parameters().Equals(expectedParameters) = false, want true")
+	if !key.Parameters().Equal(expectedParameters) {
+		t.Errorf("key.Parameters().Equal(expectedParameters) = false, want true")
 	}
 	if _, hasIDRequirement := key.IDRequirement(); !hasIDRequirement {
 		t.Errorf("expected ID requirement, got none")

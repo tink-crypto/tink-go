@@ -86,8 +86,8 @@ func (p *Parameters) Variant() Variant { return p.variant }
 // HasIDRequirement returns true if the key has an ID requirement.
 func (p *Parameters) HasIDRequirement() bool { return p.variant != VariantNoPrefix }
 
-// Equals returns true if this parameters object is equal to other.
-func (p *Parameters) Equals(other key.Parameters) bool {
+// Equal returns true if this parameters object is equal to other.
+func (p *Parameters) Equal(other key.Parameters) bool {
 	if p == other {
 		return true
 	}
@@ -156,13 +156,13 @@ func (k *PublicKey) IDRequirement() (uint32, bool) {
 	return k.idRequirement, k.params.HasIDRequirement()
 }
 
-// Equals returns true if this key is equal to other.
-func (k *PublicKey) Equals(other key.Key) bool {
+// Equal returns true if this key is equal to other.
+func (k *PublicKey) Equal(other key.Key) bool {
 	if k == other {
 		return true
 	}
 	that, ok := other.(*PublicKey)
-	return ok && k.params.Equals(that.Parameters()) &&
+	return ok && k.params.Equal(that.Parameters()) &&
 		bytes.Equal(k.keyBytes, that.keyBytes) &&
 		k.idRequirement == that.idRequirement
 }
@@ -231,11 +231,11 @@ func (k *PrivateKey) IDRequirement() (uint32, bool) { return k.publicKey.IDRequi
 // OutputPrefix returns the output prefix of this key.
 func (k *PrivateKey) OutputPrefix() []byte { return bytes.Clone(k.publicKey.outputPrefix) }
 
-// Equals returns true if this key is equal to other.
-func (k *PrivateKey) Equals(other key.Key) bool {
+// Equal returns true if this key is equal to other.
+func (k *PrivateKey) Equal(other key.Key) bool {
 	if k == other {
 		return true
 	}
 	that, ok := other.(*PrivateKey)
-	return ok && k.publicKey.Equals(that.publicKey) && k.keyBytes.Equals(that.keyBytes)
+	return ok && k.publicKey.Equal(that.publicKey) && k.keyBytes.Equal(that.keyBytes)
 }

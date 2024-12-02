@@ -511,8 +511,8 @@ type stubParams struct{}
 
 var _ key.Parameters = (*stubParams)(nil)
 
-func (p *stubParams) Equals(_ key.Parameters) bool { return true }
-func (p *stubParams) HasIDRequirement() bool       { return true }
+func (p *stubParams) Equal(_ key.Parameters) bool { return true }
+func (p *stubParams) HasIDRequirement() bool      { return true }
 
 type stubPublicKey struct {
 	prefixType    tinkpb.OutputPrefixType
@@ -521,7 +521,7 @@ type stubPublicKey struct {
 
 var _ key.Key = (*stubPublicKey)(nil)
 
-func (p *stubPublicKey) Equals(_ key.Key) bool         { return true }
+func (p *stubPublicKey) Equal(_ key.Key) bool          { return true }
 func (p *stubPublicKey) Parameters() key.Parameters    { return &stubParams{} }
 func (p *stubPublicKey) IDRequirement() (uint32, bool) { return p.idRequirement, p.HasIDRequirement() }
 func (p *stubPublicKey) HasIDRequirement() bool        { return p.prefixType == tinkpb.OutputPrefixType_RAW }
@@ -561,7 +561,7 @@ type stubPrivateKey struct {
 
 var _ key.Key = (*stubPrivateKey)(nil)
 
-func (p *stubPrivateKey) Equals(_ key.Key) bool         { return true }
+func (p *stubPrivateKey) Equal(_ key.Key) bool          { return true }
 func (p *stubPrivateKey) Parameters() key.Parameters    { return &stubParams{} }
 func (p *stubPrivateKey) IDRequirement() (uint32, bool) { return p.idRequirement, p.HasIDRequirement() }
 func (p *stubPrivateKey) HasIDRequirement() bool        { return p.prefixType != tinkpb.OutputPrefixType_RAW }

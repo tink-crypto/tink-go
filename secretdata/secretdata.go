@@ -66,11 +66,11 @@ func (b Bytes) Data(token insecuresecretdataaccess.Token) []byte { return bytes.
 // Len returns the size of the wrapped bytes.
 func (b Bytes) Len() int { return len(b.data) }
 
-// Equals returns true if the two Bytes objects are equal.
+// Equal returns true if the two Bytes objects are equal.
 //
 // The comparison is done in constant time. The time taken is a function of the
 // length of the wrapped bytes and is independent of the contents. If the two
 // wrapped slices are of different lengths, the function returns immediately.
-func (b Bytes) Equals(other Bytes) bool {
+func (b Bytes) Equal(other Bytes) bool {
 	return subtle.ConstantTimeCompare(b.data, other.data) == 1
 }

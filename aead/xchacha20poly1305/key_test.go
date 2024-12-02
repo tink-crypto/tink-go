@@ -39,7 +39,6 @@ func TestNewParametersInvalidVariant(t *testing.T) {
 	}
 }
 
-
 func TestOutputPrefix(t *testing.T) {
 	for _, test := range []struct {
 		name    string
@@ -120,14 +119,14 @@ func TestNewParametersWorks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("xchacha20poly1305.NewParameters(%v) err = %v, want nil", test.variant, err)
 			}
-			if !params.Equals(otherParams) {
-				t.Errorf("params.Equals(otherParams) = %v, want true", params.Equals(otherParams))
+			if !params.Equal(otherParams) {
+				t.Errorf("params.Equal(otherParams) = %v, want true", params.Equal(otherParams))
 			}
 		})
 	}
 }
 
-func TestParametersEqualsFalseIfDifferentVariant(t *testing.T) {
+func TestParametersEqualFalseIfDifferentVariant(t *testing.T) {
 	for _, test := range []struct {
 		name        string
 		key1Variant xchacha20poly1305.Variant
@@ -158,8 +157,8 @@ func TestParametersEqualsFalseIfDifferentVariant(t *testing.T) {
 			if err != nil {
 				t.Fatalf("xchacha20poly1305.NewParameters(%v) err = %v, want nil", test.key2Variant, err)
 			}
-			if params1.Equals(params2) {
-				t.Errorf("params.Equals(params2) = %v, want false", params1.Equals(params2))
+			if params1.Equal(params2) {
+				t.Errorf("params.Equal(params2) = %v, want false", params1.Equal(params2))
 			}
 		})
 	}
@@ -203,12 +202,12 @@ func TestNewKeyWorks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("xchacha20poly1305.NewKey(keyBytes, %v, %v) err = %v, want nil", tc.id, params, err)
 			}
-			if !firstKey.Parameters().Equals(params) {
+			if !firstKey.Parameters().Equal(params) {
 				t.Errorf("firstKey.Parameters() = %v, want %v", firstKey.Parameters(), params)
 			}
 			firstKeyBytes := firstKey.KeyBytes()
-			if !keyBytes.Equals(firstKeyBytes) {
-				t.Errorf("keyBytes.Equals(firstKeyBytes) = false, want true")
+			if !keyBytes.Equal(firstKeyBytes) {
+				t.Errorf("keyBytes.Equal(firstKeyBytes) = false, want true")
 			}
 			id, required := firstKey.IDRequirement()
 			if required != (tc.variant != xchacha20poly1305.VariantNoPrefix) {
@@ -217,13 +216,13 @@ func TestNewKeyWorks(t *testing.T) {
 			if id != tc.id {
 				t.Errorf("id = %v, want %v", id, tc.id)
 			}
-			// Test Equals.
+			// Test Equal.
 			secondKey, err := xchacha20poly1305.NewKey(keyBytes, tc.id, params)
 			if err != nil {
 				t.Fatalf("xchacha20poly1305.NewKey(keyBytes, %v, %v) err = %v, want nil", tc.id, params, err)
 			}
-			if !firstKey.Equals(secondKey) {
-				t.Errorf("firstKey.Equals(secondKey) = %v, want true", firstKey.Equals(secondKey))
+			if !firstKey.Equal(secondKey) {
+				t.Errorf("firstKey.Equal(secondKey) = %v, want true", firstKey.Equal(secondKey))
 			}
 		})
 	}
@@ -240,7 +239,7 @@ func TestNewKeyFailsIfNoPrefixAndIDIsNotZero(t *testing.T) {
 	}
 }
 
-func TestKeyEqualsReturnsFalseIfDifferent(t *testing.T) {
+func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		first  TestKey
@@ -310,8 +309,8 @@ func TestKeyEqualsReturnsFalseIfDifferent(t *testing.T) {
 			if err != nil {
 				t.Fatalf("xchacha20poly1305.NewKey(secondKeyBytes, %v, %v) err = %v, want nil", tc.second.id, secondParams, err)
 			}
-			if firstKey.Equals(secondKey) {
-				t.Errorf("firstKey.Equals(secondKey) = true, want false")
+			if firstKey.Equal(secondKey) {
+				t.Errorf("firstKey.Equal(secondKey) = true, want false")
 			}
 		})
 	}
