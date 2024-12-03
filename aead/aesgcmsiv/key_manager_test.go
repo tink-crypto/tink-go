@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package aead_test
+package aesgcmsiv_test
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -33,7 +33,7 @@ import (
 
 var aesGCMSIVKeySizes = []uint32{16, 32}
 
-func TestAESGCMSIVGetPrimitiveBasic(t *testing.T) {
+func TestKeyManagerGetPrimitiveBasic(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(typeURL=%s): Cannot obtain AES-GCM-SIV key manager; err=%v", testutil.AESGCMSIVTypeURL, err)
@@ -57,7 +57,7 @@ func TestAESGCMSIVGetPrimitiveBasic(t *testing.T) {
 	}
 }
 
-func TestAESGCMSIVGetPrimitiveWithInvalidInput(t *testing.T) {
+func TestKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(typeURL=%s): Cannot obtain AES-GCM-SIV key manager; err=%v", testutil.AESGCMSIVTypeURL, err)
@@ -83,7 +83,7 @@ func TestAESGCMSIVGetPrimitiveWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestAESGCMSIVNewKeyMultipleTimes(t *testing.T) {
+func TestKeyManagerNewKeyMultipleTimes(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(typeURL=%s): Cannot obtain AES-GCM-SIV key manager; err=%v", testutil.AESGCMSIVTypeURL, err)
@@ -114,11 +114,11 @@ func TestAESGCMSIVNewKeyMultipleTimes(t *testing.T) {
 		keys[string(serializedKey)] = true
 	}
 	if len(keys) != nTest*2 {
-		t.Errorf("TestAESGCMSIVNewKeyMultipleTimes(): Got %d unique keys, want %d.", len(keys), nTest*2)
+		t.Errorf("TestKeyManagerNewKeyMultipleTimes(): Got %d unique keys, want %d.", len(keys), nTest*2)
 	}
 }
 
-func TestAESGCMSIVNewKeyBasic(t *testing.T) {
+func TestKeyManagerNewKeyBasic(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(typeURL=%s): Cannot obtain AES-GCM-SIV key manager; err=%v", testutil.AESGCMSIVTypeURL, err)
@@ -142,7 +142,7 @@ func TestAESGCMSIVNewKeyBasic(t *testing.T) {
 	}
 }
 
-func TestAESGCMSIVNewKeyWithInvalidInput(t *testing.T) {
+func TestKeyManagerNewKeyWithInvalidInput(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(typeURL=%s): Cannot obtain AES-GCM-SIV key manager; err=%v", testutil.AESGCMSIVTypeURL, err)
@@ -168,7 +168,7 @@ func TestAESGCMSIVNewKeyWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestAESGCMSIVNewKeyDataBasic(t *testing.T) {
+func TestKeyManagerNewKeyDataBasic(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(typeURL=%s): Cannot obtain AES-GCM-SIV key manager; err=%v", testutil.AESGCMSIVTypeURL, err)
@@ -210,7 +210,7 @@ func TestAESGCMSIVNewKeyDataBasic(t *testing.T) {
 	}
 }
 
-func TestAESGCMSIVNewKeyDataWithInvalidInput(t *testing.T) {
+func TestKeyManagerNewKeyDataWithInvalidInput(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(typeURL=%s): Cannot obtain AES-GCM-SIV key manager; err=%v", testutil.AESGCMSIVTypeURL, err)
@@ -236,7 +236,7 @@ func TestAESGCMSIVNewKeyDataWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestAESGCMSIVDoesSupport(t *testing.T) {
+func TestKeyManagerDoesSupport(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(typeURL=%s): Cannot obtain AES-GCM-SIV key manager; err=%v", testutil.AESGCMSIVTypeURL, err)
@@ -249,7 +249,7 @@ func TestAESGCMSIVDoesSupport(t *testing.T) {
 	}
 }
 
-func TestAESGCMSIVTypeURL(t *testing.T) {
+func TestKeyManagerTypeURL(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(typeURL=%s): Cannot obtain AES-GCM-SIV key manager; err=%v", testutil.AESGCMSIVTypeURL, err)
@@ -323,7 +323,7 @@ func TestRegisterKeyManager(t *testing.T) {
 		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.KeyManagers))
 	}
 
-	err := aead.RegisterKeyManager(sc, internalapi.Token{})
+	err := aesgcmsiv.RegisterKeyManager(sc, internalapi.Token{})
 	if err != nil {
 		t.Fatalf("RegisterKeyManager() err = %v, want nil", err)
 	}

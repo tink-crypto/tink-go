@@ -17,9 +17,9 @@ package config
 import (
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
 	"github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -50,7 +50,7 @@ func mustCreateConfigV0() Config {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register XCHACHA20-POLY1305: %v", err))
 	}
 
-	if err = aead.RegisterKeyManager(config, internalapi.Token{}); err != nil {
+	if err = aesgcmsiv.RegisterKeyManager(config, internalapi.Token{}); err != nil {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register AES-SIV: %v", err))
 	}
 

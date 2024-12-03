@@ -20,11 +20,15 @@ package aesgcmsiv
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 )
 
 func init() {
+	if err := registry.RegisterKeyManager(new(aesGCMSIVKeyManager)); err != nil {
+		panic(fmt.Sprintf("aesgcmsiv.init() failed: %v", err))
+	}
 	if err := protoserialization.RegisterKeySerializer[*Key](&keySerializer{}); err != nil {
 		panic(fmt.Sprintf("aesgcmsiv.init() failed: %v", err))
 	}

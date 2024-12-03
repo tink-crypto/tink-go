@@ -34,6 +34,7 @@ const (
 	chaCha20Poly1305TypeURL  = "type.googleapis.com/google.crypto.tink.ChaCha20Poly1305Key"
 	xChaCha20Poly1305TypeURL = "type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key"
 	aesCTRHMACAEADTypeURL    = "type.googleapis.com/google.crypto.tink.AesCtrHmacAeadKey"
+	aesGCMSIVTypeURL         = "type.googleapis.com/google.crypto.tink.AesGcmSivKey"
 )
 
 // This file contains pre-generated KeyTemplates for AEAD keys. One can use these templates
