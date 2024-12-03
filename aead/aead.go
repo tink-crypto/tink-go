@@ -20,10 +20,10 @@ package aead
 import (
 	"fmt"
 
-	_ "github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"               // To register the AES-CTR-HMAC key manager.
-	_ "github.com/tink-crypto/tink-go/v2/aead/aesgcm"                       // To register the AES-GCM key manager, parser and serializer.
-	_ "github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"                 // To register the AES-GCM-SIV key parser and serializer.
-	_ "github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"   // To register the ChaCha20Poly1305 key manager, parser and serializer.
+	_ "github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"               // To register the AES-CTR-HMAC key manager, parsers and serializers.
+	_ "github.com/tink-crypto/tink-go/v2/aead/aesgcm"                       // To register the AES-GCM key manager, parsers and serializers.
+	_ "github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"                 // To register the AES-GCM-SIV key parsers and serializers.
+	_ "github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"   // To register the ChaCha20Poly1305 key manager, parsers and serializers.
 	_ "github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305" // To register the XChaCha20Poly1305 key manager.
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 )
