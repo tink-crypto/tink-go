@@ -16,20 +16,28 @@ package xchacha20poly1305
 
 import (
 	"bytes"
+	"crypto/cipher"
 	"fmt"
-	"slices"
 
-	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"golang.org/x/crypto/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
+)
+
+const (
+	intSize           = 32 << (^uint(0) >> 63) // 32 or 64
+	maxInt            = 1<<(intSize-1) - 1
+	maxPlaintextSize  = maxInt - chacha20poly1305.NonceSizeX - chacha20poly1305.Overhead
+	maxCiphertextSize = maxInt
 )
 
 // aead is a [tink.AEAD] implementation for XChaCha20Poly1305.
 //
 // See https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha-03.
 type aead struct {
-	rawAEAD *subtle.XChaCha20Poly1305
+	aead    cipher.AEAD
 	prefix  []byte
 	variant Variant
 }
@@ -37,37 +45,50 @@ type aead struct {
 var _ tink.AEAD = (*aead)(nil)
 
 func newAEAD(key *Key) (tink.AEAD, error) {
-	rawAEAD, err := subtle.NewXChaCha20Poly1305(key.KeyBytes().Data(insecuresecretdataaccess.Token{}))
+	c, err := chacha20poly1305.NewX(key.keyBytes.Data(insecuresecretdataaccess.Token{}))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("xchacha20_poly1305: %s", err)
 	}
 	return &aead{
-		rawAEAD: rawAEAD,
+		aead:    c,
 		prefix:  key.OutputPrefix(),
 		variant: key.parameters.Variant(),
 	}, nil
 }
 
 // Encrypt encrypts plaintext with associatedData.
-func (ca *aead) Encrypt(plaintext []byte, associatedData []byte) ([]byte, error) {
-	ciphertext, err := ca.rawAEAD.Encrypt(plaintext, associatedData)
-	if err != nil {
-		return nil, err
+func (a *aead) Encrypt(plaintext []byte, associatedData []byte) ([]byte, error) {
+	if len(plaintext) > maxPlaintextSize {
+		return nil, fmt.Errorf("xchacha20_poly1305: plaintext too long: got %d, want <= %d", len(plaintext), maxPlaintextSize)
 	}
-	return slices.Concat(ca.prefix, ciphertext), nil
+	nonce := random.GetRandomBytes(chacha20poly1305.NonceSizeX)
+	ciphertextSize := len(a.prefix) + len(nonce) + len(plaintext) + chacha20poly1305.Overhead
+	dst := make([]byte, 0, ciphertextSize)
+	dst = append(dst, a.prefix...)
+	dst = append(dst, nonce...)
+	return a.aead.Seal(dst, nonce, plaintext, associatedData), nil
 }
 
 // Decrypt decrypts ciphertext with associatedData.
-func (ca *aead) Decrypt(ciphertext []byte, associatedData []byte) ([]byte, error) {
-	if !bytes.HasPrefix(ciphertext, ca.prefix) {
-		return nil, fmt.Errorf("ciphertext has invalid prefix")
+func (a *aead) Decrypt(ciphertext []byte, associatedData []byte) ([]byte, error) {
+	minCiphertextSize := len(a.prefix) + chacha20poly1305.NonceSizeX + chacha20poly1305.Overhead
+	if len(ciphertext) < minCiphertextSize {
+		return nil, fmt.Errorf("xchacha20_poly1305: ciphertext too short: got %d, want >= %d", len(ciphertext), minCiphertextSize)
 	}
-	toDecrypt := ciphertext[len(ca.prefix):]
-	plaintext, err := ca.rawAEAD.Decrypt(toDecrypt, associatedData)
+	if len(ciphertext) > maxCiphertextSize {
+		return nil, fmt.Errorf("xchacha20_poly1305: ciphertext too long: got %d, want <= %d", len(ciphertext), maxCiphertextSize)
+	}
+	if !bytes.HasPrefix(ciphertext, a.prefix) {
+		return nil, fmt.Errorf("xchacha20_poly1305: ciphertext has invalid prefix")
+	}
+	ciphertextNoPrefix := ciphertext[len(a.prefix):]
+	nonce := ciphertextNoPrefix[:chacha20poly1305.NonceSizeX]
+	rawCiphertextAndTag := ciphertextNoPrefix[chacha20poly1305.NonceSizeX:]
+	decrypted, err := a.aead.Open(nil, nonce, rawCiphertextAndTag, associatedData)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("xchacha20_poly1305: %s", err)
 	}
-	return plaintext, nil
+	return decrypted, nil
 }
 
 func primitiveConstructor(key key.Key) (any, error) {
