@@ -15,6 +15,9 @@
 package hpke
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"errors"
 	"fmt"
 
 	internalaead "github.com/tink-crypto/tink-go/v2/internal/aead"
@@ -42,6 +45,21 @@ func newAESGCMAEAD(keyLength int) (*aesGCMAEAD, error) {
 	}
 }
 
+// newAESGCMCipher creates a [cipher.AEAD] using the given key.
+//
+// The key must be 16 or 32 bytes long.
+func newAESGCMCipher(keyBytes []byte) (cipher.AEAD, error) {
+	aesCipher, err := aes.NewCipher(keyBytes)
+	if err != nil {
+		return nil, errors.New("failed to initialize cipher")
+	}
+	gcmCipher, err := cipher.NewGCM(aesCipher)
+	if err != nil {
+		return nil, errors.New("failed to create cipher.AEAD")
+	}
+	return gcmCipher, nil
+}
+
 func (a *aesGCMAEAD) seal(key, nonce, plaintext, associatedData []byte) ([]byte, error) {
 	if len(key) != a.keyLen {
 		return nil, fmt.Errorf("unexpected key length: got %d, want %d", len(key), a.keyLen)
@@ -52,7 +70,7 @@ func (a *aesGCMAEAD) seal(key, nonce, plaintext, associatedData []byte) ([]byte,
 	if err := internalaead.CheckPlaintextSize(uint64(len(plaintext))); err != nil {
 		return nil, err
 	}
-	c, err := internalaead.NewAESGCMCipher(key)
+	c, err := newAESGCMCipher(key)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +84,7 @@ func (a *aesGCMAEAD) open(key, nonce, ciphertext, associatedData []byte) ([]byte
 	if len(nonce) != a.nonceLength() {
 		return nil, fmt.Errorf("unexpected nonce length: got %d, want %d", len(nonce), a.nonceLength())
 	}
-	c, err := internalaead.NewAESGCMCipher(key)
+	c, err := newAESGCMCipher(key)
 	if err != nil {
 		return nil, err
 	}

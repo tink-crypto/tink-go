@@ -15,9 +15,6 @@
 package aead
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
-	"errors"
 	"fmt"
 )
 
@@ -29,22 +26,6 @@ const (
 	maxInt              = 1<<(intSize-1) - 1
 	maxIntPlaintextSize = maxInt - AESGCMIVSize - AESGCMTagSize
 )
-
-// NewAESGCMCipher creates a new AES-GCM cipher with the given key.
-func NewAESGCMCipher(key []byte) (cipher.AEAD, error) {
-	if err := ValidateAESKeySize(uint32(len(key))); err != nil {
-		return nil, fmt.Errorf("invalid AES key size: %s", err)
-	}
-	aesCipher, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, errors.New("failed to initialize cipher")
-	}
-	gcmCipher, err := cipher.NewGCM(aesCipher)
-	if err != nil {
-		return nil, errors.New("failed to create cipher.AEAD")
-	}
-	return gcmCipher, nil
-}
 
 // CheckPlaintextSize checks if the given plaintext size is valid for AES-GCM.
 func CheckPlaintextSize(size uint64) error {
