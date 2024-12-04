@@ -391,8 +391,8 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	if len(sc.PrimitiveConstructors) != 1 {
 		t.Errorf("Number of registered primitive constructors = %d, want 1", len(sc.PrimitiveConstructors))
 	}
-	if _, ok := sc.PrimitiveConstructors[reflect.TypeFor[aesgcm.Key]()]; !ok {
-		t.Errorf("RegisterKeyManager() registered wrong type, want %q", reflect.TypeFor[aesgcm.Key]())
+	if _, ok := sc.PrimitiveConstructors[reflect.TypeFor[*aesgcm.Key]()]; !ok {
+		t.Errorf("RegisterKeyManager() registered wrong type, want %q", reflect.TypeFor[*aesgcm.Key]())
 	}
 }
 

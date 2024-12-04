@@ -45,7 +45,7 @@ func RegisterKeyManager(c config, t internalapi.Token) error {
 //
 // It is *NOT* part of the public API.
 func RegisterPrimitiveConstructor(c config, t internalapi.Token) error {
-	return c.RegisterPrimitiveConstructor(reflect.TypeFor[Key](), primitiveConstructor, t)
+	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
 }
 
 func init() {
