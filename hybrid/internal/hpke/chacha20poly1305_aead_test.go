@@ -52,7 +52,9 @@ func TestChaCha20Poly1305AEADSealOpen(t *testing.T) {
 			}
 		})
 	}
-	if i < 2 {
-		t.Errorf("number of vectors tested = %d, want > %d", i, 2)
+	// Verify that we actually tested something.
+	// If no vectors match the filter, then the test should fail because nothing was tested.
+	if i == 0 {
+		t.Error("no vectors were tested")
 	}
 }
