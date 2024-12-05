@@ -90,10 +90,10 @@ func (c *Config) RegisterKeyManager(keyTypeURL string, km registry.KeyManager, _
 	return nil
 }
 
-// New creates an empty Config.
-func New() (*Config, error) {
+// New creates an empty [Config].
+func New() *Config {
 	return &Config{
 		primitiveConstructors: map[reflect.Type]func(key key.Key) (any, error){},
 		keysetManagers:        map[string]registry.KeyManager{},
-	}, nil
+	}
 }

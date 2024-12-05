@@ -399,10 +399,7 @@ func TestPrimitiveCreator(t *testing.T) {
 	ciphertext2 := mustDecodeHex(t, "4f07afedfdc3b6c2361823d3cf332a12fdee800b602e8d7c4799d62c140c9bb834876b09")
 	wantMessage2 := mustDecodeHex(t, "be3308f72a2c6aed")
 
-	config, err := config.New()
-	if err != nil {
-		t.Fatalf("config.New() err = %v, want nil", err)
-	}
+	config := config.New()
 	if err := aesgcm.RegisterPrimitiveConstructor(config, internalapi.Token{}); err != nil {
 		t.Fatalf("aesgcm.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
@@ -501,10 +498,7 @@ func TestPrimitiveCreator(t *testing.T) {
 }
 
 func TestPrimitiveCreatorInvalidParameters(t *testing.T) {
-	config, err := config.New()
-	if err != nil {
-		t.Fatalf("config.New() err = %v, want nil", err)
-	}
+	config := config.New()
 	if err := aesgcm.RegisterPrimitiveConstructor(config, internalapi.Token{}); err != nil {
 		t.Fatalf("aesgcm.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}

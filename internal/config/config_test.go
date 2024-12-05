@@ -47,6 +47,8 @@ func (tp testParameters1) Equal(other key.Parameters) bool {
 	return false
 }
 
+func primitive0Constructor(k key.Key) (any, error) { return testPrimitive0{}, nil }
+
 type testKey1 struct{}
 
 func (tk testKey1) Parameters() key.Parameters                { return new(testParameters1) }
@@ -61,15 +63,13 @@ func (tk testKeyUnregistered) Parameters() key.Parameters                { retur
 func (tk testKeyUnregistered) IDRequirement() (id uint32, required bool) { return 0, false }
 func (tk testKeyUnregistered) Equal(other key.Key) bool                  { return false }
 
+func primitive1Constructor(k key.Key) (any, error) { return testPrimitive1{}, nil }
+
 func TestConfigPrimitiveFromKeyWorks(t *testing.T) {
-	testConfig, err := config.New()
-	if err != nil {
-		t.Fatalf("Config.New() err = %v, want nil", err)
-	}
+	testConfig := config.New()
 	token := internalapi.Token{}
 
-	err = testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), func(k key.Key) (any, error) { return testPrimitive0{}, nil }, token)
-	if err != nil {
+	if err := testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), primitive0Constructor, token); err != nil {
 		t.Fatalf("testConfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
@@ -106,14 +106,10 @@ func (km *stubKeyManager1) TypeURL() string                                     
 func (km *stubKeyManager1) NewKey(serializedKeyFormat []byte) (proto.Message, error) { return nil, nil }
 
 func TestConfigPrimitiveFromKeDataWorks(t *testing.T) {
-	testConfig, err := config.New()
-	if err != nil {
-		t.Fatalf("Config.New() err = %v, want nil", err)
-	}
+	testConfig := config.New()
 	token := internalapi.Token{}
 
-	err = testConfig.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token)
-	if err != nil {
+	if err := testConfig.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token); err != nil {
 		t.Fatalf("testConfig.RegisterKeyManager() err = %v, want nil", err)
 	}
 
@@ -131,18 +127,13 @@ func TestConfigPrimitiveFromKeDataWorks(t *testing.T) {
 }
 
 func TestMultiplePrimitiveConstructors(t *testing.T) {
-	testConfig, err := config.New()
-	if err != nil {
-		t.Fatalf("config.New() err = %v, want nil", err)
-	}
+	testConfig := config.New()
 	token := internalapi.Token{}
 
-	err = testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), func(k key.Key) (any, error) { return testPrimitive0{}, nil }, token)
-	if err != nil {
+	if err := testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), primitive0Constructor, token); err != nil {
 		t.Fatalf("testConfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
-	err = testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), func(k key.Key) (any, error) { return testPrimitive1{}, nil }, token)
-	if err != nil {
+	if err := testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), primitive1Constructor, token); err != nil {
 		t.Fatalf("testConfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
@@ -163,18 +154,13 @@ func TestMultiplePrimitiveConstructors(t *testing.T) {
 }
 
 func TestMultipleKeyManagers(t *testing.T) {
-	testConfig, err := config.New()
-	if err != nil {
-		t.Fatalf("config.New() err = %v, want nil", err)
-	}
+	testConfig := config.New()
 	token := internalapi.Token{}
 
-	err = testConfig.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token)
-	if err != nil {
+	if err := testConfig.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token); err != nil {
 		t.Fatalf("testConfig.RegisterKeyManager() err = %v, want nil", err)
 	}
-	err = testConfig.RegisterKeyManager(typeURL1, &stubKeyManager1{}, token)
-	if err != nil {
+	if err := testConfig.RegisterKeyManager(typeURL1, &stubKeyManager1{}, token); err != nil {
 		t.Fatalf("testConfig.RegisterKeyManager() err = %v, want nil", err)
 	}
 
@@ -195,71 +181,55 @@ func TestMultipleKeyManagers(t *testing.T) {
 }
 
 func TestRegisterDifferentPrimitiveConstructor(t *testing.T) {
-	testConfig, err := config.New()
-	if err != nil {
-		t.Fatalf("config.New() err = %v, want nil", err)
-	}
+	testConfig := config.New()
 	token := internalapi.Token{}
 
-	err = testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), func(k key.Key) (any, error) { return testPrimitive1{}, nil }, token)
-	if err != nil {
+	if err := testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), primitive1Constructor, token); err != nil {
 		t.Fatalf("testConfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	// Register another primitiveCreator for the same key type fails.
-	err = testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), func(k key.Key) (any, error) { return testPrimitive0{}, nil }, token)
-	if err == nil {
+	if err := testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), primitive0Constructor, token); err == nil {
 		t.Errorf("testConfig.RegisterPrimitiveConstructor() err = nil, want error")
 	}
 }
 
 func TestRegisterDifferentKeyManagers(t *testing.T) {
-	testConfig, err := config.New()
-	if err != nil {
-		t.Fatalf("config.New() err = %v, want nil", err)
-	}
+	testConfig := config.New()
 	token := internalapi.Token{}
 
-	err = testConfig.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token)
-	if err != nil {
+	if err := testConfig.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token); err != nil {
 		t.Fatalf("testConfig.RegisterKeyManager() err = %v, want nil", err)
 	}
 
 	// Register another primitiveCreator for the same key type fails.
-	if err = testConfig.RegisterKeyManager(typeURL0, &stubKeyManager1{}, token); err == nil {
+	if err := testConfig.RegisterKeyManager(typeURL0, &stubKeyManager1{}, token); err == nil {
 		t.Errorf("testConfig.RegisterKeyManager() err = nil, want error")
 	}
 }
 
 func TestUnregisteredPrimitive(t *testing.T) {
-	testConfig, err := config.New()
-	if err != nil {
-		t.Fatalf("config.New() err = %v, want nil", err)
-	}
+	testConfig := config.New()
 	token := internalapi.Token{}
 
-	err = testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), func(k key.Key) (any, error) { return testPrimitive0{}, nil }, token)
-	if err != nil {
+	if err := testConfig.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), primitive0Constructor, token); err != nil {
 		t.Fatalf("testConfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	res, err := testConfig.PrimitiveFromKey(testKeyUnregistered{}, token)
-	if res != nil {
-		t.Errorf("testConfig.PrimitiveFromKey() return value = %v, want nil", res)
-	}
 	if err == nil {
 		t.Errorf("testConfig.PrimitiveFromKey() err = nil, want error")
+	}
+	if res != nil {
+		t.Errorf("testConfig.PrimitiveFromKey() return value = %v, want nil", res)
 	}
 }
 
 func TestUnregisteredKeyManager(t *testing.T) {
-	testConfig, err := config.New()
-	if err != nil {
-		t.Fatalf("config.New() err = %v, want nil", err)
-	}
+	testConfig := config.New()
 	token := internalapi.Token{}
 
-	if err = testConfig.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token); err != nil {
+	if err := testConfig.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token); err != nil {
 		t.Fatalf("testConfig.RegisterKeyManager() err = %v, want nil", err)
 	}
 
