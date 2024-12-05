@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package aesgcm
+package aesgcm_test
 
 import (
 	"bytes"
@@ -21,11 +21,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/internal/aead"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	testingaead "github.com/tink-crypto/tink-go/v2/internal/testing/aead"
-	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -33,70 +33,43 @@ import (
 
 type testCase struct {
 	name string
-	opts ParametersOpts
+	opts aesgcm.ParametersOpts
 }
 
-func mustCreateKey(t *testing.T, keyData []byte, opts ParametersOpts) *Key {
-	t.Helper()
-	params, err := NewParameters(opts)
-	if err != nil {
-		t.Fatalf("NewParameters(%v) err = %v, want nil", opts, err)
-	}
-	keyBytes := secretdata.NewBytesFromData(keyData, insecuresecretdataaccess.Token{})
-	if err != nil {
-		t.Fatalf("secretdata.NewBytesFromRand(%v) err = %v, want nil", opts.KeySizeInBytes, err)
-	}
-	idRequirement := uint32(123)
-	if opts.Variant == VariantNoPrefix {
-		idRequirement = 0
-	}
-	key, err := NewKey(keyBytes, idRequirement, params)
-	if err != nil {
-		t.Fatalf("NewKey(keyBytes, %v, %v) err = %v, want nil", params, idRequirement, err)
-	}
-	return key
-}
-
-func mustDecodeHex(t *testing.T, hexStr string) []byte {
-	t.Helper()
-	x, err := hex.DecodeString(hexStr)
-	if err != nil {
-		t.Fatalf("hex.DecodeString(%v) err = %v, want nil", hexStr, err)
-	}
-	return x
-}
+const ivSize = 12
+const tagSize = 16
 
 // Key allows sizes of IV, tag and key that are not supported by the primitive.
 func TestNewAEADFailures(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts ParametersOpts
+		opts aesgcm.ParametersOpts
 	}{
 		{
 			name: "AES128-TINK-IV:11",
-			opts: ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 11, TagSizeInBytes: 16, Variant: VariantTink},
+			opts: aesgcm.ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 11, TagSizeInBytes: 16, Variant: aesgcm.VariantTink},
 		},
 		{
 			name: "AES256-TINK-IV:11",
-			opts: ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 11, TagSizeInBytes: 16, Variant: VariantTink},
+			opts: aesgcm.ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 11, TagSizeInBytes: 16, Variant: aesgcm.VariantTink},
 		},
 		{
 			name: "AES128-TINK-Tag:12",
-			opts: ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 12, Variant: VariantTink},
+			opts: aesgcm.ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 12, Variant: aesgcm.VariantTink},
 		},
 		{
 			name: "AES256-TINK-Tag:12",
-			opts: ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 12, Variant: VariantTink},
+			opts: aesgcm.ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 12, Variant: aesgcm.VariantTink},
 		},
 		{
 			name: "AES192-TINK",
-			opts: ParametersOpts{KeySizeInBytes: 24, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
+			opts: aesgcm.ParametersOpts{KeySizeInBytes: 24, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantTink},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			key := mustCreateKey(t, random.GetRandomBytes(uint32(tc.opts.KeySizeInBytes)), tc.opts)
-			if _, err := NewAEAD(key); err == nil {
-				t.Errorf("NewAEAD(%v) err = nil, want error", key)
+			key := mustCreateKey(t, random.GetRandomBytes(uint32(tc.opts.KeySizeInBytes)), 0x11223344, tc.opts)
+			if _, err := aesgcm.NewAEAD(key); err == nil {
+				t.Errorf("aesgcm.NewAEAD(%v) err = nil, want error", key)
 			}
 		})
 	}
@@ -105,107 +78,145 @@ func TestNewAEADFailures(t *testing.T) {
 func TestAEAD(t *testing.T) {
 	largePlaintext := random.GetRandomBytes(1 << 24)
 	for _, tc := range []struct {
-		name      string
-		opts      ParametersOpts
-		plaintext []byte
+		name             string
+		opts             aesgcm.ParametersOpts
+		idRequirement    uint32
+		wantOutputPrefix []byte
+		plaintext        []byte
 	}{
 		{
-			name:      "AES128-TINK-Empty",
-			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
-			plaintext: []byte{},
+			name:             "AES128-TINK-Empty",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantTink},
+			idRequirement:    0x11223344,
+			wantOutputPrefix: []byte{0x01, 0x11, 0x22, 0x33, 0x44},
+			plaintext:        []byte{},
 		},
 		{
-			name:      "AES128-CRUNCHY-Empty",
-			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantCrunchy},
-			plaintext: []byte{},
+			name:             "AES128-CRUNCHY-Empty",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantCrunchy},
+			idRequirement:    0x22334455,
+			wantOutputPrefix: []byte{0x00, 0x22, 0x33, 0x44, 0x55},
+			plaintext:        []byte{},
 		},
 		{
-			name:      "AES128-NO_PREFIX-Empty",
-			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantNoPrefix},
-			plaintext: []byte{},
+			name:             "AES128-NO_PREFIX-Empty",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantNoPrefix},
+			idRequirement:    0,
+			wantOutputPrefix: []byte{},
+			plaintext:        []byte{},
 		},
 		{
-			name:      "AES256-TINK-Empty",
-			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
-			plaintext: []byte{},
+			name:             "AES256-TINK-Empty",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantTink},
+			idRequirement:    0x11223344,
+			wantOutputPrefix: []byte{0x01, 0x11, 0x22, 0x33, 0x44},
+			plaintext:        []byte{},
 		},
 		{
-			name:      "AES256-CRUNCHY-Empty",
-			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantCrunchy},
-			plaintext: []byte{},
+			name:             "AES256-CRUNCHY-Empty",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantCrunchy},
+			idRequirement:    0x22334455,
+			wantOutputPrefix: []byte{0x00, 0x22, 0x33, 0x44, 0x55},
+			plaintext:        []byte{},
 		},
 		{
-			name:      "AES256-NO_PREFIX-Empty",
-			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantNoPrefix},
-			plaintext: []byte{},
+			name:             "AES256-NO_PREFIX-Empty",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantNoPrefix},
+			idRequirement:    0,
+			wantOutputPrefix: []byte{},
+			plaintext:        []byte{},
 		},
 		{
-			name:      "AES128-TINK-Small",
-			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
-			plaintext: []byte("Some small plaintext"),
+			name:             "AES128-TINK-Small",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantTink},
+			idRequirement:    0x11223344,
+			wantOutputPrefix: []byte{0x01, 0x11, 0x22, 0x33, 0x44},
+			plaintext:        []byte("Some small plaintext"),
 		},
 		{
-			name:      "AES128-CRUNCHY-Small",
-			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantCrunchy},
-			plaintext: []byte("Some small plaintext"),
+			name:             "AES128-CRUNCHY-Small",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantCrunchy},
+			idRequirement:    0x22334455,
+			wantOutputPrefix: []byte{0x00, 0x22, 0x33, 0x44, 0x55},
+			plaintext:        []byte("Some small plaintext"),
 		},
 		{
-			name:      "AES128-NO_PREFIX-Small",
-			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantNoPrefix},
-			plaintext: []byte("Some small plaintext"),
+			name:             "AES128-NO_PREFIX-Small",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantNoPrefix},
+			idRequirement:    0,
+			wantOutputPrefix: []byte{},
+			plaintext:        []byte("Some small plaintext"),
 		},
 		{
-			name:      "AES256-TINK-Small",
-			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
-			plaintext: []byte("Some small plaintext"),
+			name:             "AES256-TINK-Small",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantTink},
+			idRequirement:    0x11223344,
+			wantOutputPrefix: []byte{0x01, 0x11, 0x22, 0x33, 0x44},
+			plaintext:        []byte("Some small plaintext"),
 		},
 		{
-			name:      "AES256-CRUNCHY-Small",
-			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantCrunchy},
-			plaintext: []byte("Some small plaintext"),
+			name:             "AES256-CRUNCHY-Small",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantCrunchy},
+			idRequirement:    0x22334455,
+			wantOutputPrefix: []byte{0x00, 0x22, 0x33, 0x44, 0x55},
+			plaintext:        []byte("Some small plaintext"),
 		},
 		{
-			name:      "AES256-NO_PREFIX-Small",
-			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantNoPrefix},
-			plaintext: []byte("Some small plaintext"),
+			name:             "AES256-NO_PREFIX-Small",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantNoPrefix},
+			idRequirement:    0,
+			wantOutputPrefix: []byte{},
+			plaintext:        []byte("Some small plaintext"),
 		},
 		{
-			name:      "AES128-TINK-Large",
-			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
-			plaintext: largePlaintext,
+			name:             "AES128-TINK-Large",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantTink},
+			idRequirement:    0x11223344,
+			wantOutputPrefix: []byte{0x01, 0x11, 0x22, 0x33, 0x44},
+			plaintext:        largePlaintext,
 		},
 		{
-			name:      "AES128-CRUNCHY-Large",
-			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantCrunchy},
-			plaintext: largePlaintext,
+			name:             "AES128-CRUNCHY-Large",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantCrunchy},
+			idRequirement:    0x22334455,
+			wantOutputPrefix: []byte{0x00, 0x22, 0x33, 0x44, 0x55},
+			plaintext:        largePlaintext,
 		},
 		{
-			name:      "AES128-NO_PREFIX-Large",
-			opts:      ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantNoPrefix},
-			plaintext: largePlaintext,
+			name:             "AES128-NO_PREFIX-Large",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantNoPrefix},
+			idRequirement:    0,
+			wantOutputPrefix: []byte{},
+			plaintext:        largePlaintext,
 		},
 		{
-			name:      "AES256-TINK-Large",
-			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink},
-			plaintext: largePlaintext,
+			name:             "AES256-TINK-Large",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantTink},
+			idRequirement:    0x11223344,
+			wantOutputPrefix: []byte{0x01, 0x11, 0x22, 0x33, 0x44},
+			plaintext:        largePlaintext,
 		},
 		{
-			name:      "AES256-CRUNCHY-Large",
-			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantCrunchy},
-			plaintext: largePlaintext,
+			name:             "AES256-CRUNCHY-Large",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantCrunchy},
+			idRequirement:    0x22334455,
+			wantOutputPrefix: []byte{0x00, 0x22, 0x33, 0x44, 0x55},
+			plaintext:        largePlaintext,
 		},
 		{
-			name:      "AES256-NO_PREFIX-Large",
-			opts:      ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantNoPrefix},
-			plaintext: largePlaintext,
+			name:             "AES256-NO_PREFIX-Large",
+			opts:             aesgcm.ParametersOpts{KeySizeInBytes: 32, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: aesgcm.VariantNoPrefix},
+			idRequirement:    0,
+			wantOutputPrefix: []byte{},
+			plaintext:        largePlaintext,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			keyValue := random.GetRandomBytes(uint32(tc.opts.KeySizeInBytes))
-			key := mustCreateKey(t, keyValue, tc.opts)
-			aead, err := NewAEAD(key)
+			key := mustCreateKey(t, keyValue, tc.idRequirement, tc.opts)
+			aead, err := aesgcm.NewAEAD(key)
 			if err != nil {
-				t.Fatalf("NewAEAD(%v) err = %v, want nil", key, err)
+				t.Fatalf("aesgcm.NewAEAD(%v) err = %v, want nil", key, err)
 			}
 			associatedData := []byte("associatedData")
 			ciphertext, err := aead.Encrypt(tc.plaintext, associatedData)
@@ -218,12 +229,8 @@ func TestAEAD(t *testing.T) {
 			}
 
 			// Check the prefix is correct.
-			wantPrefix, err := calculateOutputPrefix(tc.opts.Variant, key.idRequirement)
-			if err != nil {
-				t.Fatalf("calculateOutputPrefix(%v, %v) err = %v, want nil", tc.opts.Variant, key.idRequirement, err)
-			}
-			if !bytes.Equal(ciphertext[:len(wantPrefix)], wantPrefix) {
-				t.Errorf("ciphertext has wrong prefix: got %x, want %x", ciphertext[:len(wantPrefix)], wantPrefix)
+			if !bytes.Equal(ciphertext[:len(tc.wantOutputPrefix)], tc.wantOutputPrefix) {
+				t.Errorf("ciphertext has wrong prefix: got %x, want %x", ciphertext[:len(tc.wantOutputPrefix)], tc.wantOutputPrefix)
 			}
 
 			// Check the tag length is 16 bytes.
@@ -246,9 +253,14 @@ func TestAEADDecryptFailsIfCiphertextIsCorruptedOrTruncated(t *testing.T) {
 	ad := random.GetRandomBytes(33)
 	key := random.GetRandomBytes(16)
 	pt := random.GetRandomBytes(32)
-	a, err := NewAEAD(mustCreateKey(t, key, ParametersOpts{KeySizeInBytes: 16, IVSizeInBytes: 12, TagSizeInBytes: 16, Variant: VariantTink}))
+	a, err := aesgcm.NewAEAD(mustCreateKey(t, key, 0x11223344, aesgcm.ParametersOpts{
+		KeySizeInBytes: 16,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantTink,
+	}))
 	if err != nil {
-		t.Fatalf("NewAEAD() err = %q, want nil", err)
+		t.Fatalf("aesgcm.NewAEAD() err = %q, want nil", err)
 	}
 	ct, err := a.Encrypt(pt, ad)
 	if err != nil {
@@ -299,16 +311,16 @@ func TestAEADEncryptUsesRandomNonce(t *testing.T) {
 	keyValue := random.GetRandomBytes(16)
 	pt := []byte{}
 	ad := []byte{}
-	opts := ParametersOpts{
+	opts := aesgcm.ParametersOpts{
 		KeySizeInBytes: 16,
 		IVSizeInBytes:  12,
 		TagSizeInBytes: 16,
-		Variant:        VariantTink,
+		Variant:        aesgcm.VariantTink,
 	}
-	key := mustCreateKey(t, keyValue, opts)
-	a, err := NewAEAD(key)
+	key := mustCreateKey(t, keyValue, 0x11223344, opts)
+	a, err := aesgcm.NewAEAD(key)
 	if err != nil {
-		t.Fatalf("NewAEAD() err = %q, want nil", err)
+		t.Fatalf("aesgcm.NewAEAD() err = %q, want nil", err)
 	}
 	ctSet := make(map[string]bool)
 	for i := 0; i < nSample; i++ {
@@ -346,15 +358,15 @@ func TestAEADWycheproofCases(t *testing.T) {
 				combinedCt = append(combinedCt, tc.Iv...)
 				combinedCt = append(combinedCt, tc.Ct...)
 				combinedCt = append(combinedCt, tc.Tag...)
-				key := mustCreateKey(t, tc.Key, ParametersOpts{
+				key := mustCreateKey(t, tc.Key, 0, aesgcm.ParametersOpts{
 					KeySizeInBytes: len(tc.Key),
 					IVSizeInBytes:  len(tc.Iv),
 					TagSizeInBytes: len(tc.Tag),
-					Variant:        VariantNoPrefix,
+					Variant:        aesgcm.VariantNoPrefix,
 				})
-				a, err := NewAEAD(key)
+				a, err := aesgcm.NewAEAD(key)
 				if err != nil {
-					t.Fatalf("NewAEAD(key) err = %v, want nil", err)
+					t.Fatalf("aesgcm.NewAEAD(key) err = %v, want nil", err)
 				}
 				decrypted, err := a.Decrypt(combinedCt, tc.Aad)
 				if err != nil {
@@ -387,87 +399,91 @@ func TestPrimitiveCreator(t *testing.T) {
 	ciphertext2 := mustDecodeHex(t, "4f07afedfdc3b6c2361823d3cf332a12fdee800b602e8d7c4799d62c140c9bb834876b09")
 	wantMessage2 := mustDecodeHex(t, "be3308f72a2c6aed")
 
-	tinkPrefix := []byte{cryptofmt.TinkStartByte, 0x00, 0x00, 0x00, 0x7b}
-	crunchyPrefix := []byte{cryptofmt.LegacyStartByte, 0x00, 0x00, 0x00, 0x7b}
+	config, err := config.New()
+	if err != nil {
+		t.Fatalf("config.New() err = %v, want nil", err)
+	}
+	if err := aesgcm.RegisterPrimitiveConstructor(config, internalapi.Token{}); err != nil {
+		t.Fatalf("aesgcm.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
 
 	for _, testCase := range []struct {
 		name          string
-		key           *Key
+		key           *aesgcm.Key
 		ciphertext    []byte
 		wantPlaintext []byte
 	}{
 		{
 			name: fmt.Sprintf("%d-bit key, Tink Variant", len(key1)*8),
-			key: mustCreateKey(t, key1, ParametersOpts{
+			key: mustCreateKey(t, key1, 0x11223344, aesgcm.ParametersOpts{
 				KeySizeInBytes: len(key1),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
-				Variant:        VariantTink,
+				Variant:        aesgcm.VariantTink,
 			}),
-			ciphertext:    slices.Concat(tinkPrefix, ciphertext1),
+			ciphertext:    slices.Concat([]byte{0x01, 0x11, 0x22, 0x33, 0x44}, ciphertext1),
 			wantPlaintext: wantMessage1,
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, Crunchy Variant", len(key1)*8),
-			key: mustCreateKey(t, key1, ParametersOpts{
+			key: mustCreateKey(t, key1, 0x22334455, aesgcm.ParametersOpts{
 				KeySizeInBytes: len(key1),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
-				Variant:        VariantCrunchy,
+				Variant:        aesgcm.VariantCrunchy,
 			}),
-			ciphertext:    slices.Concat(crunchyPrefix, ciphertext1),
+			ciphertext:    slices.Concat([]byte{0x00, 0x22, 0x33, 0x44, 0x55}, ciphertext1),
 			wantPlaintext: wantMessage1,
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, No Prefix Variant", len(key1)*8),
-			key: mustCreateKey(t, key1, ParametersOpts{
+			key: mustCreateKey(t, key1, 0, aesgcm.ParametersOpts{
 				KeySizeInBytes: len(key1),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
-				Variant:        VariantNoPrefix,
+				Variant:        aesgcm.VariantNoPrefix,
 			}),
 			ciphertext:    ciphertext1,
 			wantPlaintext: wantMessage1,
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, Tink Variant", len(key2)*8),
-			key: mustCreateKey(t, key2, ParametersOpts{
+			key: mustCreateKey(t, key2, 0x11223344, aesgcm.ParametersOpts{
 				KeySizeInBytes: len(key2),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
-				Variant:        VariantTink,
+				Variant:        aesgcm.VariantTink,
 			}),
-			ciphertext:    slices.Concat(tinkPrefix, ciphertext2),
+			ciphertext:    slices.Concat([]byte{0x01, 0x11, 0x22, 0x33, 0x44}, ciphertext2),
 			wantPlaintext: wantMessage2,
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, Crunchy Variant", len(key2)*8),
-			key: mustCreateKey(t, key2, ParametersOpts{
+			key: mustCreateKey(t, key2, 0x22334455, aesgcm.ParametersOpts{
 				KeySizeInBytes: len(key2),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
-				Variant:        VariantCrunchy,
+				Variant:        aesgcm.VariantCrunchy,
 			}),
-			ciphertext:    slices.Concat(crunchyPrefix, ciphertext2),
+			ciphertext:    slices.Concat([]byte{0x00, 0x22, 0x33, 0x44, 0x55}, ciphertext2),
 			wantPlaintext: wantMessage2,
 		},
 		{
 			name: fmt.Sprintf("%d-bit key, No Prefix Variant", len(key2)*8),
-			key: mustCreateKey(t, key2, ParametersOpts{
+			key: mustCreateKey(t, key2, 0, aesgcm.ParametersOpts{
 				KeySizeInBytes: len(key2),
 				IVSizeInBytes:  12,
 				TagSizeInBytes: 16,
-				Variant:        VariantNoPrefix,
+				Variant:        aesgcm.VariantNoPrefix,
 			}),
 			ciphertext:    ciphertext2,
 			wantPlaintext: wantMessage2,
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			// Using primitiveConstructor.
-			p, err := primitiveConstructor(testCase.key)
+			p, err := config.PrimitiveFromKey(testCase.key, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("primitiveConstructor(testCase.key) err = %v, want nil", err)
+				t.Fatalf("config.PrimitiveFromKey() err = %v, want nil", err)
 			}
 			a, ok := p.(tink.AEAD)
 			if !ok {
@@ -485,7 +501,14 @@ func TestPrimitiveCreator(t *testing.T) {
 }
 
 func TestPrimitiveCreatorInvalidParameters(t *testing.T) {
-	for _, variant := range []Variant{VariantTink, VariantCrunchy, VariantNoPrefix} {
+	config, err := config.New()
+	if err != nil {
+		t.Fatalf("config.New() err = %v, want nil", err)
+	}
+	if err := aesgcm.RegisterPrimitiveConstructor(config, internalapi.Token{}); err != nil {
+		t.Fatalf("aesgcm.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	for _, variant := range []aesgcm.Variant{aesgcm.VariantTink, aesgcm.VariantCrunchy, aesgcm.VariantNoPrefix} {
 		// Key allows keySize in {16, 24, 32}, but the primitive wants {16, 32}.
 		for _, keySize := range []uint32{24} {
 			// Key allows ivSize > 0, but the primitive wants 12.
@@ -493,16 +516,20 @@ func TestPrimitiveCreatorInvalidParameters(t *testing.T) {
 				// Key allows 12 <= tagSize <= 16, but the primitive wants 16.
 				for _, tagSize := range []int{12, 15} {
 					t.Run(fmt.Sprintf("variant: %v, keySize: %v, ivSize: %v, tagSize: %v", variant, keySize, ivSize, tagSize), func(t *testing.T) {
-						opts := ParametersOpts{
+						opts := aesgcm.ParametersOpts{
 							KeySizeInBytes: int(keySize),
 							IVSizeInBytes:  ivSize,
 							TagSizeInBytes: tagSize,
 							Variant:        variant,
 						}
 						keyData := random.GetRandomBytes(keySize)
-						key := mustCreateKey(t, keyData, opts)
-						if _, err := primitiveConstructor(key); err == nil {
-							t.Errorf("primitiveConstructor(key) err = nil, want error")
+						idRequirement := uint32(0)
+						if variant != aesgcm.VariantNoPrefix {
+							idRequirement = 0x11223344
+						}
+						key := mustCreateKey(t, keyData, idRequirement, opts)
+						if _, err := config.PrimitiveFromKey(key, internalapi.Token{}); err == nil {
+							t.Errorf("config.PrimitiveFromKey(testCase.key, internalapi.Token{}) err = nil, want error")
 						}
 					})
 				}
