@@ -121,10 +121,7 @@ func (k *FallbackProtoKey) Parameters() key.Parameters { return k.parameters }
 // Equal reports whether k is equal to other.
 func (k *FallbackProtoKey) Equal(other key.Key) bool {
 	otherFallbackProtoKey, ok := other.(*FallbackProtoKey)
-	if !ok {
-		return false
-	}
-	return k.parameters.Equal(other.Parameters()) &&
+	return ok && k.parameters.Equal(other.Parameters()) &&
 		k.protoKeySerialization.Equal(otherFallbackProtoKey.protoKeySerialization)
 }
 
@@ -147,6 +144,14 @@ func NewFallbackProtoKey(protoKeySerialization *KeySerialization) *FallbackProto
 // keyset key.
 type FallbackProtoPrivateKey struct {
 	FallbackProtoKey
+}
+
+var _ key.Key = (*FallbackProtoPrivateKey)(nil)
+
+// Equal returns whether k is equal to other.
+func (k *FallbackProtoPrivateKey) Equal(other key.Key) bool {
+	that, ok := other.(*FallbackProtoPrivateKey)
+	return ok && k.FallbackProtoKey.Equal(&that.FallbackProtoKey)
 }
 
 // NewFallbackProtoPrivateKey creates a new FallbackProtoPrivateKey.

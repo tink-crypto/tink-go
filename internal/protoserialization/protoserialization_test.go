@@ -275,6 +275,84 @@ func TestFallbackKeyEqual(t *testing.T) {
 	}
 }
 
+func TestFallbackProtoPrivateKeyEqual(t *testing.T) {
+	keyData1 := &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}
+	keyData2 := &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("456"),
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}
+
+	privateKey1, err := protoserialization.NewFallbackProtoPrivateKey(newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1))
+	if err != nil {
+		t.Fatalf("protoserialization.NewFallbackProtoPrivateKey(%v) err = %v, want nil", keyData1, err)
+	}
+	privateKey1DifferentID, err := protoserialization.NewFallbackProtoPrivateKey(newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 2))
+	if err != nil {
+		t.Fatalf("protoserialization.NewFallbackProtoPrivateKey(%v) err = %v, want nil", keyData1, err)
+	}
+	privateKey1Crunchy, err := protoserialization.NewFallbackProtoPrivateKey(newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_CRUNCHY, 1))
+	if err != nil {
+		t.Fatalf("protoserialization.NewFallbackProtoPrivateKey(%v) err = %v, want nil", keyData1, err)
+	}
+	privateKey2, err := protoserialization.NewFallbackProtoPrivateKey(newKeySerialization(t, keyData2, tinkpb.OutputPrefixType_TINK, 1))
+	if err != nil {
+		t.Fatalf("protoserialization.NewFallbackProtoPrivateKey(%v) err = %v, want nil", keyData1, err)
+	}
+
+	tests := []struct {
+		name string
+		key1 key.Key
+		key2 key.Key
+		want bool
+	}{
+		{
+			name: "equal keys",
+			key1: privateKey1,
+			key2: privateKey1,
+			want: true,
+		},
+		{
+			name: "keys with different key IDs",
+			key1: privateKey1DifferentID,
+			key2: privateKey1,
+			want: false,
+		},
+		{
+			name: "different key data",
+			key1: privateKey1,
+			key2: privateKey2,
+			want: false,
+		},
+		{
+			name: "different output prefix",
+			key1: privateKey1Crunchy,
+			key2: privateKey1,
+			want: false,
+		},
+		{
+			name: "not a private key",
+			key1: privateKey1,
+			key2: protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
+			want: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.key1.Equal(tc.key2); got != tc.want {
+				t.Errorf("key1.Equal(key2) = %v, want %v", got, tc.want)
+			}
+			if got := tc.key2.Equal(tc.key1); got != tc.want {
+				t.Errorf("key2.Equal(key1) = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestFallbackKeyParametersEqual(t *testing.T) {
 	keyData := &tinkpb.KeyData{
 		TypeUrl:         testKeyURL,
@@ -610,7 +688,7 @@ func TestSerializeKeyWithFallbackKey(t *testing.T) {
 	}
 }
 
-func TestSerializeKeyWithFallbackPrivateKey(t *testing.T) {
+func TestSerializeKeyWithFallbackProtoPrivateKey(t *testing.T) {
 	keyData := &tinkpb.KeyData{
 		TypeUrl:         testKeyURL,
 		Value:           []byte("123"),
