@@ -20,8 +20,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
-	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	subtleMac "github.com/tink-crypto/tink-go/v2/mac/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
@@ -185,16 +183,4 @@ func (km *keyManager) validateKeyFormat(format *aeadpb.AesCtrHmacAeadKeyFormat) 
 	}
 
 	return nil
-}
-
-type config interface {
-	RegisterKeyManager(keyTypeURL string, km registry.KeyManager, t internalapi.Token) error
-}
-
-// RegisterKeyManager registers an instance of an AES-CTR-HMAC AEAD KeyManager
-// to the config object provided as the first argument.
-//
-// It is *NOT* part of the public API.
-func RegisterKeyManager(c config, t internalapi.Token) error {
-	return c.RegisterKeyManager(typeURL, new(keyManager), t)
 }

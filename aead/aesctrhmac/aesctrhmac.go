@@ -17,11 +17,35 @@ package aesctrhmac
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
+	"github.com/tink-crypto/tink-go/v2/key"
 )
+
+type config interface {
+	RegisterPrimitiveConstructor(keyType reflect.Type, primitiveConstructor func(key key.Key) (any, error), t internalapi.Token) error
+	RegisterKeyManager(keyTypeURL string, km registry.KeyManager, t internalapi.Token) error
+}
+
+// RegisterKeyManager registers an instance of an AES-CTR-HMAC AEAD KeyManager
+// to the config object provided as the first argument.
+//
+// It is *NOT* part of the public API.
+func RegisterKeyManager(c config, t internalapi.Token) error {
+	return c.RegisterKeyManager(typeURL, new(keyManager), t)
+}
+
+// RegisterPrimitiveConstructor accepts a config object and registers the
+// AES-CTR-HMAC AEAD primitive constructor to the provided config.
+//
+// It is *NOT* part of the public API.
+func RegisterPrimitiveConstructor(c config, t internalapi.Token) error {
+	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
+}
 
 func init() {
 	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
