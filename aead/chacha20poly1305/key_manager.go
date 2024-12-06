@@ -20,8 +20,6 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
-	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 
@@ -110,16 +108,4 @@ func (km *keyManager) validateKey(key *cppb.ChaCha20Poly1305Key) error {
 		return fmt.Errorf("chacha20poly1305_key_manager: keySize != %d", chacha20poly1305.KeySize)
 	}
 	return nil
-}
-
-type config interface {
-	RegisterKeyManager(keyTypeURL string, km registry.KeyManager, t internalapi.Token) error
-}
-
-// RegisterKeyManager accepts a config object and registers an
-// instance of an CHACHA20-POLY1305 AEAD KeyManager to the provided config.
-//
-// It is *NOT* part of the public API.
-func RegisterKeyManager(c config, t internalapi.Token) error {
-	return c.RegisterKeyManager(typeURL, new(keyManager), t)
 }

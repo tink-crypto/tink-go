@@ -16,11 +16,15 @@ package xchacha20poly1305_test
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/stubconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 func TestGetKeyFromHandle(t *testing.T) {
@@ -136,5 +140,50 @@ func TestCreateKeysetHandleFromParameters(t *testing.T) {
 	}
 	if !bytes.Equal(decrypted, plaintext) {
 		t.Errorf("decrypted = %v, want %v", decrypted, plaintext)
+	}
+}
+
+func TestRegisterKeyManager(t *testing.T) {
+	sc := stubconfig.NewStubConfig()
+	if len(sc.KeyManagers) != 0 {
+		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.KeyManagers))
+	}
+
+	err := xchacha20poly1305.RegisterKeyManager(sc, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("xchacha20poly1305.RegisterKeyManager() err = %v, want nil", err)
+	}
+
+	if len(sc.PrimitiveConstructors) != 0 {
+		t.Errorf("Number of registered primitive constructors = %d, want 0", len(sc.PrimitiveConstructors))
+	}
+	if len(sc.KeyManagers) != 1 {
+		t.Errorf("Number of registered key types = %d, want 1", len(sc.KeyManagers))
+	}
+	if _, ok := sc.KeyManagers[testutil.XChaCha20Poly1305TypeURL]; !ok {
+		t.Errorf("xchacha20poly1305.RegisterKeyManager() registered wrong type URL, want \"%v\"", testutil.XChaCha20Poly1305TypeURL)
+	}
+}
+
+func TestRegisterPrimitiveConstructor(t *testing.T) {
+	sc := stubconfig.NewStubConfig()
+	if len(sc.KeyManagers) != 0 {
+		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.KeyManagers))
+	}
+
+	err := xchacha20poly1305.RegisterPrimitiveConstructor(sc, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("xchacha20poly1305.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+
+	if len(sc.PrimitiveConstructors) != 1 {
+		t.Errorf("Number of registered primitive constructors = %d, want 0", len(sc.PrimitiveConstructors))
+	}
+	if len(sc.KeyManagers) != 0 {
+		t.Errorf("Number of registered key types = %d, want 1", len(sc.KeyManagers))
+	}
+	kt := reflect.TypeFor[*xchacha20poly1305.Key]()
+	if _, ok := sc.PrimitiveConstructors[kt]; !ok {
+		t.Errorf("xchacha20poly1305.RegisterPrimitiveConstructor() registered wrong key type, want \"%v\"", kt)
 	}
 }
