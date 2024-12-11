@@ -30,24 +30,23 @@ var configV0 = mustCreateConfigV0()
 func mustCreateConfigV0() Config {
 	config := New()
 
-	if err := aesctrhmac.RegisterKeyManager(config, internalapi.Token{}); err != nil {
+	if err := aesctrhmac.RegisterPrimitiveConstructor(config, internalapi.Token{}); err != nil {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register AES-CTR-HMAC: %v", err))
 	}
 
-	// TODO(b/286235179): Add RegisterPrimitiveConstructor for AES GCM.
-	if err := aesgcm.RegisterKeyManager(config, internalapi.Token{}); err != nil {
+	if err := aesgcm.RegisterPrimitiveConstructor(config, internalapi.Token{}); err != nil {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register AES-GCM: %v", err))
 	}
 
-	if err := chacha20poly1305.RegisterKeyManager(config, internalapi.Token{}); err != nil {
+	if err := chacha20poly1305.RegisterPrimitiveConstructor(config, internalapi.Token{}); err != nil {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register CHACHA20-POLY1305: %v", err))
 	}
 
-	if err := xchacha20poly1305.RegisterKeyManager(config, internalapi.Token{}); err != nil {
+	if err := xchacha20poly1305.RegisterPrimitiveConstructor(config, internalapi.Token{}); err != nil {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register XCHACHA20-POLY1305: %v", err))
 	}
 
-	if err := aesgcmsiv.RegisterKeyManager(config, internalapi.Token{}); err != nil {
+	if err := aesgcmsiv.RegisterPrimitiveConstructor(config, internalapi.Token{}); err != nil {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register AES-SIV: %v", err))
 	}
 
