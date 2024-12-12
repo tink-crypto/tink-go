@@ -21,6 +21,7 @@ import (
 	"math/big"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -263,6 +264,27 @@ type PrivateKeyValues struct {
 	// See https://pkg.go.dev/crypto/rsa#PrivateKey.
 }
 
+// privateKeySelfCheck signs a test message with a private key and verifies a
+// the signature with the corresponding public key.
+//
+// This is a security check to ensure that the private key is valid.
+func privateKeySelfCheck(privateKey *PrivateKey) error {
+	signer, err := NewSigner(privateKey, internalapi.Token{})
+	if err != nil {
+		return err
+	}
+	verifier, err := NewVerifier(privateKey.publicKey, internalapi.Token{})
+	if err != nil {
+		return err
+	}
+	testMessage := []byte("Tink and Wycheproof.")
+	signature, err := signer.Sign(testMessage)
+	if err != nil {
+		return err
+	}
+	return verifier.Verify(signature, testMessage)
+}
+
 // NewPrivateKey creates a new RSA-SSA-PKCS1 PrivateKey value from a public key
 // and private key values.
 //
@@ -286,10 +308,14 @@ func NewPrivateKey(publicKey *PublicKey, opts PrivateKeyValues) (*PrivateKey, er
 		return nil, fmt.Errorf("rsassapkcs1.NewPrivateKey: %v", err)
 	}
 	privateKey.Precompute()
-	return &PrivateKey{
+	pk := &PrivateKey{
 		publicKey:  publicKey,
 		privateKey: &privateKey,
-	}, nil
+	}
+	if err := privateKeySelfCheck(pk); err != nil {
+		return nil, fmt.Errorf("rsassapkcs1.NewPrivateKey: %v", err)
+	}
+	return pk, nil
 }
 
 // P returns the prime P.
