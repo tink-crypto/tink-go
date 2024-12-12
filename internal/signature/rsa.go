@@ -79,22 +79,6 @@ const (
 	signVerifyErrMsg = "signing with private key followed by verifying with public key failed, the key may be corrupted"
 )
 
-// Validate_RSA_SSA_PKCS1 validates that the corresponding private key is valid by signing and verifying a message.
-func Validate_RSA_SSA_PKCS1(hashAlg string, privKey *rsa.PrivateKey) error {
-	signer, err := New_RSA_SSA_PKCS1_Signer(hashAlg, privKey)
-	if err != nil {
-		return err
-	}
-	verifier, err := New_RSA_SSA_PKCS1_Verifier(hashAlg, &privKey.PublicKey)
-	if err != nil {
-		return err
-	}
-	if err := validateSignerVerifier(signer, verifier); err != nil {
-		return fmt.Errorf("RSA-SSA-PKCS1: %q", signVerifyErrMsg)
-	}
-	return nil
-}
-
 // Validate_RSA_SSA_PSS validates that the corresponding private key is valid by signing and verifying a message.
 func Validate_RSA_SSA_PSS(hashAlg string, saltLen int, privKey *rsa.PrivateKey) error {
 	signer, err := New_RSA_SSA_PSS_Signer(hashAlg, saltLen, privKey)
