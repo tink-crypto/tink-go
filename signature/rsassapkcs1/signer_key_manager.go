@@ -23,6 +23,8 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/signature"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
@@ -47,43 +49,23 @@ var _ registry.PrivateKeyManager = (*signerKeyManager)(nil)
 func hashName(h commonpb.HashType) string { return commonpb.HashType_name[int32(h)] }
 
 func (km *signerKeyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, errInvalidSignKey
-	}
-	key := &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{}
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         signerTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
 		return nil, err
 	}
-	if err := validatePrivateKey(key); err != nil {
+	key, err := protoserialization.ParseKey(keySerialization)
+	if err != nil {
 		return nil, err
 	}
-
-	privKey := &rsa.PrivateKey{
-		D: new(big.Int).SetBytes(key.GetD()),
-		PublicKey: rsa.PublicKey{
-			N: new(big.Int).SetBytes(key.GetPublicKey().GetN()),
-			E: int(new(big.Int).SetBytes(key.GetPublicKey().GetE()).Int64()),
-		},
-		Primes: []*big.Int{
-			new(big.Int).SetBytes(key.GetP()),
-			new(big.Int).SetBytes(key.GetQ()),
-		},
+	signerKey, ok := key.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type: got %T, want *rsassapkcs1.PrivateKey", key)
 	}
-	if err := privKey.Validate(); err != nil {
-		return nil, err
-	}
-
-	// Instead of extracting Dp, Dq, and Qinv values from the key proto,
-	// the values must be computed by the Go library.
-	//
-	// See https://pkg.go.dev/crypto/rsa#PrivateKey.
-	privKey.Precompute()
-
-	h := hashName(key.GetPublicKey().GetParams().GetHashType())
-	if err := signature.Validate_RSA_SSA_PKCS1(h, privKey); err != nil {
-		return nil, err
-	}
-	return signature.New_RSA_SSA_PKCS1_Signer(h, privKey)
+	return NewSigner(signerKey, internalapi.Token{})
 }
 
 func validatePrivateKey(privKey *rsassapkcs1pb.RsaSsaPkcs1PrivateKey) error {

@@ -23,8 +23,11 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1"
 	jrsppb "github.com/tink-crypto/tink-go/v2/proto/jwt_rsa_ssa_pkcs1_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -49,6 +52,19 @@ func bytesToBigInt(v []byte) *big.Int {
 	return new(big.Int).SetBytes(v)
 }
 
+func protoAlgToHashType(algo jrsppb.JwtRsaSsaPkcs1Algorithm) (rsassapkcs1.HashType, error) {
+	switch algo {
+	case jrsppb.JwtRsaSsaPkcs1Algorithm_RS256:
+		return rsassapkcs1.SHA256, nil
+	case jrsppb.JwtRsaSsaPkcs1Algorithm_RS384:
+		return rsassapkcs1.SHA384, nil
+	case jrsppb.JwtRsaSsaPkcs1Algorithm_RS512:
+		return rsassapkcs1.SHA512, nil
+	default:
+		return 0, fmt.Errorf("invalid algorithm: %v", algo)
+	}
+}
+
 func (km *jwtRSSignerKeyManager) Primitive(serializedKey []byte) (any, error) {
 	if serializedKey == nil {
 		return nil, fmt.Errorf("invalid JwtRsaSsaPkcs1PrivateKey")
@@ -61,35 +77,34 @@ func (km *jwtRSSignerKeyManager) Primitive(serializedKey []byte) (any, error) {
 		return nil, err
 	}
 
-	rsaPrivKey := &rsa.PrivateKey{
-		PublicKey: rsa.PublicKey{
-			N: bytesToBigInt(privKey.GetPublicKey().GetN()),
-			E: int(bytesToBigInt(privKey.GetPublicKey().GetE()).Int64()),
-		},
-		D: bytesToBigInt(privKey.GetD()),
-		Primes: []*big.Int{
-			bytesToBigInt(privKey.GetP()),
-			bytesToBigInt(privKey.GetQ()),
-		},
-	}
-	if err := rsaPrivKey.Validate(); err != nil {
-		return nil, err
-	}
-
-	// Instead of extracting Dp, Dq, and Qinv values from the key proto,
-	// the values must be computed by the Go library.
-	//
-	// See https://pkg.go.dev/crypto/rsa#PrivateKey.
-	rsaPrivKey.Precompute()
-
-	alg := privKey.GetPublicKey().GetAlgorithm()
-	if err := internal.Validate_RSA_SSA_PKCS1(validRSAlgToHash[alg], rsaPrivKey); err != nil {
-		return nil, err
-	}
-	signer, err := internal.New_RSA_SSA_PKCS1_Signer(validRSAlgToHash[alg], rsaPrivKey)
+	n := bytesToBigInt(privKey.GetPublicKey().GetN())
+	e := int(bytesToBigInt(privKey.GetPublicKey().GetE()).Int64())
+	hashType, err := protoAlgToHashType(privKey.GetPublicKey().GetAlgorithm())
 	if err != nil {
 		return nil, err
 	}
+	params, err := rsassapkcs1.NewParameters(n.BitLen(), hashType, e, rsassapkcs1.VariantNoPrefix)
+	if err != nil {
+		return nil, err
+	}
+	idRequirement := uint32(0)
+	publicKey, err := rsassapkcs1.NewPublicKey(n.Bytes(), idRequirement, params)
+	if err != nil {
+		return nil, err
+	}
+	privateKey, err := rsassapkcs1.NewPrivateKey(publicKey, rsassapkcs1.PrivateKeyValues{
+		P: secretdata.NewBytesFromData(privKey.GetP(), insecuresecretdataaccess.Token{}),
+		Q: secretdata.NewBytesFromData(privKey.GetQ(), insecuresecretdataaccess.Token{}),
+		D: secretdata.NewBytesFromData(privKey.GetD(), insecuresecretdataaccess.Token{}),
+	})
+	if err != nil {
+		return nil, err
+	}
+	signer, err := rsassapkcs1.NewSigner(privateKey, internalapi.Token{})
+	if err != nil {
+		return nil, err
+	}
+	alg := privKey.GetPublicKey().GetAlgorithm()
 	return newSignerWithKID(signer, alg.String(), rsCustomKID(privKey.GetPublicKey()))
 }
 

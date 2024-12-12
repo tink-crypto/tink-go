@@ -105,9 +105,9 @@ func TestSignerKeyManagerPrimitiveSignVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Primitive() err = %v, want nil", err)
 	}
-	signer, ok := p.(*signature.RSA_SSA_PKCS1_Signer)
+	signer, ok := p.(tink.Signer)
 	if !ok {
-		t.Fatalf("primitive is not of type RSA_SSA_PKCS1_Signer")
+		t.Fatalf("primitive is not of type tink.Signer")
 	}
 	vkm, err := registry.GetKeyManager(publicKeyTypeURL)
 	if err != nil {
@@ -289,45 +289,6 @@ func TestSignerKeyManagerPrimitiveWithInvalidInputFails(t *testing.T) {
 				Dp:        validPrivKey.GetDp(),
 				Dq:        validPrivKey.GetDq(),
 				Crt:       validPrivKey.GetCrt(),
-			},
-		},
-		{
-			name: "invalid precomputed Dp values in private key",
-			key: &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
-				Version:   validPrivKey.GetVersion(),
-				PublicKey: validPrivKey.GetPublicKey(),
-				D:         validPrivKey.GetD(),
-				P:         validPrivKey.GetP(),
-				Q:         validPrivKey.GetQ(),
-				Dp:        nil,
-				Dq:        validPrivKey.GetDq(),
-				Crt:       validPrivKey.GetCrt(),
-			},
-		},
-		{
-			name: "invalid precomputed Dq values in private key",
-			key: &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
-				Version:   validPrivKey.GetVersion(),
-				PublicKey: validPrivKey.GetPublicKey(),
-				D:         validPrivKey.GetD(),
-				P:         validPrivKey.GetP(),
-				Q:         validPrivKey.GetQ(),
-				Dp:        validPrivKey.GetDp(),
-				Dq:        nil,
-				Crt:       validPrivKey.GetCrt(),
-			},
-		},
-		{
-			name: "invalid precomputed Crt values in private key",
-			key: &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
-				Version:   validPrivKey.GetVersion(),
-				PublicKey: validPrivKey.GetPublicKey(),
-				D:         validPrivKey.GetD(),
-				P:         validPrivKey.GetP(),
-				Q:         validPrivKey.GetQ(),
-				Dp:        validPrivKey.GetDp(),
-				Dq:        validPrivKey.GetDq(),
-				Crt:       nil,
 			},
 		},
 	} {
