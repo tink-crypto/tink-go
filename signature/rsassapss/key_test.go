@@ -826,9 +826,9 @@ func TestNewPrivateKeyInvalidValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("rsassapss.NewParameters(%v, %v) = %v, want nil", paramsValues, rsassapss.VariantTink, err)
 	}
-	publicKey, err := rsassapss.NewPublicKey(n, 123, params)
+	publicKey, err := rsassapss.NewPublicKey(n, 0x11223344, params)
 	if err != nil {
-		t.Fatalf("rsassapss.NewPublicKey(%v, %v, %v) = %v, want nil", n, 123, params, err)
+		t.Fatalf("rsassapss.NewPublicKey(%v, %v, %v) = %v, want nil", n, 0x11223344, params, err)
 	}
 	invalidD := mustDecodeBase64(t, d2048Base64)
 	invalidD[0]++
@@ -836,6 +836,11 @@ func TestNewPrivateKeyInvalidValues(t *testing.T) {
 	invalidP[0]++
 	invalidQ := mustDecodeBase64(t, q2048Base64)
 	invalidQ[0]++
+
+	// From:
+	// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/rsa_pkcs1_2048_test.json#L353
+	differentN2048Base64 := "3ZBFkDl4CMQxQyliPZATRThDJRsTuLPE_vVFmBEq8-sxxxEDxiWZUWdOU72Tp-NtGUcuR06-gChobZUpSE2Lr-pKBLoZVVZnYWyEeGcFlACcm8aj7-UidMumTHJHR9ftwZTk_t3jKjKJ2Uwxk25-ehXXVvVISS9bNFuSfoxhi91VCsshoXrhSDBDg9ubPHuqPkyL2OhEqITao-GNVpmMsy-brk1B1WoY3dQxPICJt16du5EoRwusmwh_thkoqw-MTIk2CwIImQCNCOi9MfkHqAfoBWrWgA3_357Z2WSpOefkgRS4SXhVGsuFyd-RlvPv9VKG1s1LOagiqKd2Ohggjw"
+	differentPublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, differentN2048Base64), 0x11223344, params)
 
 	token := insecuresecretdataaccess.Token{}
 	for _, tc := range []struct {
@@ -878,6 +883,15 @@ func TestNewPrivateKeyInvalidValues(t *testing.T) {
 				P: secretdata.NewBytesFromData(p, token),
 				Q: secretdata.NewBytesFromData(q, token),
 				D: secretdata.NewBytesFromData(invalidD, token),
+			},
+		},
+		{
+			name:      "wrong public key",
+			publicKey: differentPublicKey,
+			privateKeyValues: rsassapss.PrivateKeyValues{
+				P: secretdata.NewBytesFromData(p, token),
+				Q: secretdata.NewBytesFromData(q, token),
+				D: secretdata.NewBytesFromData(d, token),
 			},
 		},
 	} {
