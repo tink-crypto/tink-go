@@ -22,12 +22,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -49,8 +51,15 @@ func TestAESGCMGetPrimitiveBasic(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %s", err)
 		}
-		if err := validateAESGCMPrimitive(p, key); err != nil {
-			t.Errorf("%s", err)
+		subtleAESGCM, err := subtle.NewAESGCM(key.GetKeyValue())
+		if err != nil {
+			t.Errorf("subtle.NewAESGCM(key.GetKeyValue()) err = %v, want nil", err)
+		}
+		if err := validateAESGCMPrimitive(p, subtleAESGCM); err != nil {
+			t.Errorf("validateAESGCMPrimitive(p, subtleAESGCM) err = %v, want nil", err)
+		}
+		if err := validateAESGCMPrimitive(subtleAESGCM, p); err != nil {
+			t.Errorf("validateAESGCMPrimitive(subtleAESGCM, p) err = %v, want nil", err)
 		}
 	}
 }
@@ -454,19 +463,20 @@ func validateAESGCMKey(key *gcmpb.AesGcmKey, format *gcmpb.AesGcmKeyFormat) erro
 	if err != nil {
 		return fmt.Errorf("aesgcm.NewAEAD() err = %v, want nil", err)
 	}
-	return validateAESGCMPrimitive(p, key)
+	return validateAESGCMPrimitive(p, p)
 }
 
-func validateAESGCMPrimitive(p any, key *gcmpb.AesGcmKey) error {
-	cipher := p.(*aesgcm.AEAD)
+func validateAESGCMPrimitive(encryptor any, decryptor any) error {
+	aesGCMEncryptor := encryptor.(tink.AEAD)
+	aesGCMDecryptor := encryptor.(tink.AEAD)
 	// try to encrypt and decrypt
 	pt := random.GetRandomBytes(32)
 	aad := random.GetRandomBytes(32)
-	ct, err := cipher.Encrypt(pt, aad)
+	ct, err := aesGCMEncryptor.Encrypt(pt, aad)
 	if err != nil {
 		return fmt.Errorf("encryption failed")
 	}
-	decrypted, err := cipher.Decrypt(ct, aad)
+	decrypted, err := aesGCMDecryptor.Decrypt(ct, aad)
 	if err != nil {
 		return fmt.Errorf("decryption failed")
 	}

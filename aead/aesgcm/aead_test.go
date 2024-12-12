@@ -484,7 +484,7 @@ func TestPrimitiveCreator(t *testing.T) {
 			}
 			a, ok := p.(tink.AEAD)
 			if !ok {
-				t.Errorf("primitiveConstructor(key) has type %T, wanted *aesgcm.AEAD", a)
+				t.Errorf("primitiveConstructor(key) has type %T, wanted *tink.AEAD", a)
 			}
 			decrypted, err := a.Decrypt(testCase.ciphertext, nil)
 			if err != nil {

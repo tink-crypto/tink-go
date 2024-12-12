@@ -20,6 +20,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 const (
@@ -34,7 +35,9 @@ const (
 // AESGCM is an implementation of the [tink.AEAD] interface.
 //
 // This primitive adds no prefix to the ciphertext.
-type AESGCM = aesgcm.AEAD
+type AESGCM struct {
+	aeadImpl tink.AEAD
+}
 
 // NewAESGCM returns an [*AESGCM] value from the given key.
 //
@@ -55,5 +58,19 @@ func NewAESGCM(key []byte) (*AESGCM, error) {
 	if err != nil {
 		return nil, fmt.Errorf("subtle.NewAESGCM: %v", err)
 	}
-	return aesgcm.NewAEAD(k)
+	aead, err := aesgcm.NewAEAD(k)
+	if err != nil {
+		return nil, fmt.Errorf("subtle.NewAESGCM: %v", err)
+	}
+	return &AESGCM{aeadImpl: aead}, nil
+}
+
+// Encrypt encrypts the plaintext with the associated data.
+func (a *AESGCM) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
+	return a.aeadImpl.Encrypt(plaintext, associatedData)
+}
+
+// Decrypt decrypts the ciphertext with the associated data.
+func (a *AESGCM) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
+	return a.aeadImpl.Decrypt(ciphertext, associatedData)
 }
