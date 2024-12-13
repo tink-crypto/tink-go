@@ -20,8 +20,9 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/keyset"
-	subtleMac "github.com/tink-crypto/tink-go/v2/mac/subtle"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	ctrpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_go_proto"
 	aeadpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
@@ -44,28 +45,35 @@ type keyManager struct{}
 // Primitive creates a [subtle.NewEncryptThenAuthenticate] primitive for the given
 // serialized [aeadpb.AesCtrHmacAeadKey].
 func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
-	key := new(aeadpb.AesCtrHmacAeadKey)
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
+	protoKey := new(aeadpb.AesCtrHmacAeadKey)
+	if err := proto.Unmarshal(serializedKey, protoKey); err != nil {
 		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: invalid key")
 	}
-	if err := km.validateKey(key); err != nil {
+	if err := km.validateKey(protoKey); err != nil {
 		return nil, err
 	}
-
-	ctr, err := subtle.NewAESCTR(key.GetAesCtrKey().GetKeyValue(), int(key.GetAesCtrKey().GetParams().GetIvSize()))
+	params, err := NewParameters(ParametersOpts{
+		AESKeySizeInBytes:  int(len(protoKey.GetAesCtrKey().GetKeyValue())),
+		HMACKeySizeInBytes: int(len(protoKey.GetHmacKey().GetKeyValue())),
+		IVSizeInBytes:      int(protoKey.GetAesCtrKey().GetParams().GetIvSize()),
+		TagSizeInBytes:     int(protoKey.GetHmacKey().GetParams().GetTagSize()),
+		HashType:           HashType(protoKey.GetHmacKey().GetParams().GetHash()),
+		Variant:            VariantNoPrefix,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: cannot create new primitive: %v", err)
+		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: %s", err)
 	}
-
-	hmacKey := key.GetHmacKey()
-	hmac, err := subtleMac.NewHMAC(hmacKey.GetParams().GetHash().String(), hmacKey.GetKeyValue(), hmacKey.GetParams().GetTagSize())
+	key, err := NewKey(KeyOpts{
+		AESKeyBytes:  secretdata.NewBytesFromData(protoKey.GetAesCtrKey().GetKeyValue(), insecuresecretdataaccess.Token{}),
+		HMACKeyBytes: secretdata.NewBytesFromData(protoKey.GetHmacKey().GetKeyValue(), insecuresecretdataaccess.Token{}),
+		Parameters:   params,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: cannot create mac primitive, error: %v", err)
+		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: %s", err)
 	}
-
-	aead, err := subtle.NewEncryptThenAuthenticate(ctr, hmac, int(hmacKey.GetParams().GetTagSize()))
+	aead, err := newAEAD(key)
 	if err != nil {
-		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: cannot create encrypt then authenticate primitive, error: %v", err)
+		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: %s", err)
 	}
 	return aead, nil
 }

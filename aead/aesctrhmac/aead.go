@@ -16,18 +16,22 @@ package aesctrhmac
 
 import (
 	"bytes"
+	"encoding/binary"
+	"errors"
 	"fmt"
-	"slices"
 
-	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/aead"
+	"github.com/tink-crypto/tink-go/v2/internal/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/key"
-	subtlemac "github.com/tink-crypto/tink-go/v2/mac/subtle"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 type fullAEAD struct {
-	aead    *subtle.EncryptThenAuthenticate
+	aesCTR  *aead.AESCTR
+	hmac    *hmac.HMAC
+	ivSize  int
+	tagSize int
 	prefix  []byte
 	variant Variant
 }
@@ -35,43 +39,75 @@ type fullAEAD struct {
 var _ tink.AEAD = (*fullAEAD)(nil)
 
 func newAEAD(key *Key) (tink.AEAD, error) {
-	aesCTR, err := subtle.NewAESCTR(key.AESKeyBytes().Data(insecuresecretdataaccess.Token{}), key.parameters.IVSizeInBytes())
+	tagSize := key.parameters.TagSizeInBytes()
+	ivSize := key.parameters.IVSizeInBytes()
+	aesCTR, err := aead.NewAESCTR(key.AESKeyBytes().Data(insecuresecretdataaccess.Token{}), ivSize)
 	if err != nil {
 		return nil, err
 	}
-	hmac, err := subtlemac.NewHMAC(key.parameters.HashType().String(), key.HMACKeyBytes().Data(insecuresecretdataaccess.Token{}), uint32(key.parameters.TagSizeInBytes()))
-	if err != nil {
-		return nil, err
-	}
-	eta, err := subtle.NewEncryptThenAuthenticate(aesCTR, hmac, key.parameters.TagSizeInBytes())
+	hmac, err := hmac.New(key.parameters.HashType().String(), key.HMACKeyBytes().Data(insecuresecretdataaccess.Token{}), uint32(tagSize))
 	if err != nil {
 		return nil, err
 	}
 	return &fullAEAD{
-		aead:    eta,
+		aesCTR:  aesCTR,
+		hmac:    hmac,
+		ivSize:  ivSize,
+		tagSize: tagSize,
 		prefix:  key.OutputPrefix(),
 		variant: key.parameters.Variant(),
 	}, nil
 }
 
+func aadSizeInBits(associatedData []byte) []byte {
+	n := uint64(len(associatedData)) * 8
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, n)
+	return buf
+}
+
+// Encrypt encrypts plaintext with associatedData.
+//
+// The plaintext is encrypted with an AES-CTR, then HMAC is computed over
+// (associatedData || ciphertext || n) where n is associatedData's length
+// in bits represented as a 64-bit big endian unsigned integer. The final
+// ciphertext format is (IND-CPA ciphertext || mac).
 func (a *fullAEAD) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
-	ciphertext, err := a.aead.Encrypt(plaintext, associatedData)
+	ctSize := len(a.prefix) + a.ivSize + len(plaintext)
+	ciphertext := make([]byte, ctSize, ctSize+a.tagSize)
+	if n := copy(ciphertext, a.prefix); n != len(a.prefix) {
+		return nil, fmt.Errorf("aesctrhmac: failed to copy prefix")
+	}
+	ctNoPrefix, err := a.aesCTR.Encrypt(ciphertext[len(a.prefix):], plaintext)
 	if err != nil {
 		return nil, err
 	}
-	return slices.Concat(a.prefix, ciphertext), nil
+	tag, err := a.hmac.ComputeMAC(associatedData, ctNoPrefix, aadSizeInBits(associatedData))
+	if err != nil {
+		return nil, err
+	}
+	if len(tag) != a.tagSize {
+		return nil, errors.New("aesctrhmac: invalid tag size")
+	}
+	return append(ciphertext, tag...), nil
 }
 
+// Decrypt decrypts ciphertext with associatedData.
 func (a *fullAEAD) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
-	if len(ciphertext) < len(a.prefix) {
-		return nil, fmt.Errorf("ciphertext with size %d is too short", len(ciphertext))
+	prefixSize := len(a.prefix)
+	if len(ciphertext) < prefixSize+a.ivSize+a.tagSize {
+		return nil, fmt.Errorf("aesctrhmac: ciphertext with size %d is too short", len(ciphertext))
 	}
-	prefix := ciphertext[:len(a.prefix)]
-	ciphertextNoPrefix := ciphertext[len(a.prefix):]
+	prefix := ciphertext[:prefixSize]
 	if !bytes.Equal(prefix, a.prefix) {
-		return nil, fmt.Errorf("ciphertext prefix does not match: got %x, want %x", prefix, a.prefix)
+		return nil, fmt.Errorf("aesctrhmac: ciphertext prefix does not match: got %x, want %x", prefix, a.prefix)
 	}
-	return a.aead.Decrypt(ciphertextNoPrefix, associatedData)
+	payload := ciphertext[prefixSize : len(ciphertext)-a.tagSize]
+	tag := ciphertext[len(ciphertext)-a.tagSize:]
+	if err := a.hmac.VerifyMAC(tag, associatedData, payload, aadSizeInBits(associatedData)); err != nil {
+		return nil, fmt.Errorf("aesctrhmac: %v", err)
+	}
+	return a.aesCTR.Decrypt(nil, payload)
 }
 
 // primitiveConstructor creates a [tink.AEAD] from a [key.Key].
