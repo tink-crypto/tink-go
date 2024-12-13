@@ -90,10 +90,7 @@ func TestParsePublicKeyFails(t *testing.T) {
 		E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
 		Version: publicKeyProtoVersion,
 	}
-	serializedPublicKey, err := proto.Marshal(&publicKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal(publicKey) err = %v, want nil", err)
-	}
+	serializedPublicKey := mustMarshalProto(t, &publicKey)
 	for _, tc := range []struct {
 		name             string
 		keySerialization *protoserialization.KeySerialization
@@ -122,21 +119,14 @@ func TestParsePublicKeyFails(t *testing.T) {
 			name: "wrong key version",
 			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: verifierTypeURL,
-				Value: func() []byte {
-					publicKey := rsassapkcs1pb.RsaSsaPkcs1PublicKey{
-						Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
-							HashType: commonpb.HashType_SHA256,
-						},
-						N:       mustDecodeBase64(t, n2048Base64),
-						E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
-						Version: publicKeyProtoVersion + 1,
-					}
-					serializedPublicKey, err := proto.Marshal(&publicKey)
-					if err != nil {
-						t.Fatalf("proto.Marshal(publicKey) err = %v, want nil", err)
-					}
-					return serializedPublicKey
-				}(),
+				Value: mustMarshalProto(t, &rsassapkcs1pb.RsaSsaPkcs1PublicKey{
+					Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+						HashType: commonpb.HashType_SHA256,
+					},
+					N:       mustDecodeBase64(t, n2048Base64),
+					E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
+					Version: publicKeyProtoVersion + 1,
+				}),
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_TINK, 123),
 		},
@@ -144,21 +134,14 @@ func TestParsePublicKeyFails(t *testing.T) {
 			name: "invalid modulus",
 			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: verifierTypeURL,
-				Value: func() []byte {
-					publicKey := rsassapkcs1pb.RsaSsaPkcs1PublicKey{
-						Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
-							HashType: commonpb.HashType_SHA256,
-						},
-						N:       mustDecodeBase64(t, n2048Base64[:255]),
-						E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
-						Version: publicKeyProtoVersion + 1,
-					}
-					serializedPublicKey, err := proto.Marshal(&publicKey)
-					if err != nil {
-						t.Fatalf("proto.Marshal(publicKey) err = %v, want nil", err)
-					}
-					return serializedPublicKey
-				}(),
+				Value: mustMarshalProto(t, &rsassapkcs1pb.RsaSsaPkcs1PublicKey{
+					Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+						HashType: commonpb.HashType_SHA256,
+					},
+					N:       mustDecodeBase64(t, n2048Base64[:255]),
+					E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
+					Version: publicKeyProtoVersion + 1,
+				}),
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_TINK, 123),
 		},
@@ -166,28 +149,21 @@ func TestParsePublicKeyFails(t *testing.T) {
 			name: "invalid exponent",
 			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: verifierTypeURL,
-				Value: func() []byte {
-					publicKey := rsassapkcs1pb.RsaSsaPkcs1PublicKey{
-						Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
-							HashType: commonpb.HashType_SHA256,
-						},
-						N:       mustDecodeBase64(t, n2048Base64),
-						E:       new(big.Int).Sub(new(big.Int).SetUint64(uint64(f4)), big.NewInt(1)).Bytes(),
-						Version: publicKeyProtoVersion + 1,
-					}
-					serializedPublicKey, err := proto.Marshal(&publicKey)
-					if err != nil {
-						t.Fatalf("proto.Marshal(publicKey) err = %v, want nil", err)
-					}
-					return serializedPublicKey
-				}(),
+				Value: mustMarshalProto(t, &rsassapkcs1pb.RsaSsaPkcs1PublicKey{
+					Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+						HashType: commonpb.HashType_SHA256,
+					},
+					N:       mustDecodeBase64(t, n2048Base64),
+					E:       new(big.Int).Sub(new(big.Int).SetUint64(uint64(f4)), big.NewInt(1)).Bytes(),
+					Version: publicKeyProtoVersion + 1,
+				}),
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_TINK, 123),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &publicKeyParser{}
-			if _, err = p.ParseKey(tc.keySerialization); err == nil {
+			if _, err := p.ParseKey(tc.keySerialization); err == nil {
 				t.Errorf("p.ParseKey(%v) err = nil, want non-nil", tc.keySerialization)
 			}
 		})
@@ -222,10 +198,7 @@ func TestParsePublicKeyWithZeroPaddingModulus(t *testing.T) {
 		E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
 		Version: publicKeyProtoVersion,
 	}
-	serializedPublicKey, err := proto.Marshal(publicKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", publicKey, err)
-	}
+	serializedPublicKey := mustMarshalProto(t, publicKey)
 
 	keySerialization := mustCreateKeySerialization(t, &tinkpb.KeyData{
 		TypeUrl:         "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PublicKey",
@@ -255,10 +228,7 @@ func TestParseAndSerializePublicKey(t *testing.T) {
 		E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
 		Version: publicKeyProtoVersion,
 	}
-	serialized2048ProtoPublicKey, err := proto.Marshal(&publicKey2048)
-	if err != nil {
-		t.Fatalf("proto.Marshal(publicKey2048) err = %v, want nil", err)
-	}
+	serialized2048ProtoPublicKey := mustMarshalProto(t, &publicKey2048)
 	proto3072SHA384PublicKey := rsassapkcs1pb.RsaSsaPkcs1PublicKey{
 		Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 			HashType: commonpb.HashType_SHA384,
@@ -267,10 +237,7 @@ func TestParseAndSerializePublicKey(t *testing.T) {
 		E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
 		Version: publicKeyProtoVersion,
 	}
-	serialized3072SHA384ProtoPublicKey, err := proto.Marshal(&proto3072SHA384PublicKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal(proto3072SHA384PublicKey) err = %v, want nil", err)
-	}
+	serialized3072SHA384ProtoPublicKey := mustMarshalProto(t, &proto3072SHA384PublicKey)
 	proto3072SHA512PublicKey := rsassapkcs1pb.RsaSsaPkcs1PublicKey{
 		Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 			HashType: commonpb.HashType_SHA512,
@@ -279,10 +246,7 @@ func TestParseAndSerializePublicKey(t *testing.T) {
 		E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
 		Version: publicKeyProtoVersion,
 	}
-	serialized3072SHA512ProtoPublicKey, err := proto.Marshal(&proto3072SHA512PublicKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal(proto3072SHA512PublicKey) err = %v, want nil", err)
-	}
+	serialized3072SHA512ProtoPublicKey := mustMarshalProto(t, &proto3072SHA512PublicKey)
 	proto4096PublicKey := rsassapkcs1pb.RsaSsaPkcs1PublicKey{
 		Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 			HashType: commonpb.HashType_SHA512,
@@ -291,10 +255,7 @@ func TestParseAndSerializePublicKey(t *testing.T) {
 		E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
 		Version: publicKeyProtoVersion,
 	}
-	serialized4096ProtoPublicKey, err := proto.Marshal(&proto4096PublicKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal(proto4096PublicKey) err = %v, want nil", err)
-	}
+	serialized4096ProtoPublicKey := mustMarshalProto(t, &proto4096PublicKey)
 
 	for _, tc := range []struct {
 		name                   string
@@ -510,6 +471,15 @@ func TestSerializePublicKeyFails(t *testing.T) {
 	}
 }
 
+func mustMarshalProto(t *testing.T, message proto.Message) []byte {
+	t.Helper()
+	serializedPrivateKey, err := proto.Marshal(message)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", message, err)
+	}
+	return serializedPrivateKey
+}
+
 func TestParsePrivateKeyFails(t *testing.T) {
 	privateKey := &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
 		D: mustDecodeBase64(t, d2048Base64),
@@ -525,24 +495,15 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		Version: privateKeyProtoVersion,
 	}
-	serializedPrivateKey, err := proto.Marshal(privateKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", privateKey, err)
-	}
+	serializedPrivateKey := mustMarshalProto(t, privateKey)
 
 	publicKeyWithWrongPrivateKeyVersion := proto.Clone(privateKey).(*rsassapkcs1pb.RsaSsaPkcs1PrivateKey)
 	publicKeyWithWrongPrivateKeyVersion.Version = privateKeyProtoVersion + 1
-	serializedPrivateKeyWithWrongPrivateKeyVersion, err := proto.Marshal(publicKeyWithWrongPrivateKeyVersion)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", publicKeyWithWrongPrivateKeyVersion, err)
-	}
+	serializedPrivateKeyWithWrongPrivateKeyVersion := mustMarshalProto(t, publicKeyWithWrongPrivateKeyVersion)
 
 	privateKeyWithWrongPublicKeyVersion := proto.Clone(privateKey).(*rsassapkcs1pb.RsaSsaPkcs1PrivateKey)
 	privateKeyWithWrongPublicKeyVersion.PublicKey.Version = publicKeyProtoVersion + 1
-	serializedPrivateKeyWithWrongPublicKeyVersion, err := proto.Marshal(privateKeyWithWrongPublicKeyVersion)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", privateKeyWithWrongPublicKeyVersion, err)
-	}
+	serializedPrivateKeyWithWrongPublicKeyVersion := mustMarshalProto(t, privateKeyWithWrongPublicKeyVersion)
 
 	privateKeyWithWrongPublicKey := &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
 		D: mustDecodeBase64(t, d2048Base64),
@@ -558,10 +519,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		},
 		Version: privateKeyProtoVersion,
 	}
-	serializedPrivateKeyWithWrongPublicKeyBytes, err := proto.Marshal(privateKeyWithWrongPublicKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", privateKeyWithWrongPublicKey, err)
-	}
+	serializedPrivateKeyWithWrongPublicKeyBytes := mustMarshalProto(t, privateKeyWithWrongPublicKey)
 
 	for _, tc := range []struct {
 		name             string
@@ -622,7 +580,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &privateKeyParser{}
-			if _, err = p.ParseKey(tc.keySerialization); err == nil {
+			if _, err := p.ParseKey(tc.keySerialization); err == nil {
 				t.Errorf("p.ParseKey(%v) err = nil, want non-nil", tc.keySerialization)
 			}
 		})
@@ -664,10 +622,7 @@ func TestParsePrivateKeyWithZeroPaddingModulus(t *testing.T) {
 		},
 		Version: privateKeyProtoVersion,
 	}
-	serializedPrivateKey, err := proto.Marshal(privateKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", privateKey, err)
-	}
+	serializedPrivateKey := mustMarshalProto(t, privateKey)
 	token := insecuresecretdataaccess.Token{}
 	keySerialization := mustCreateKeySerialization(t, &tinkpb.KeyData{
 		TypeUrl:         "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey",
@@ -707,10 +662,7 @@ func TestParseAndSerializePrivateKey(t *testing.T) {
 		},
 		Version: privateKeyProtoVersion,
 	}
-	serializedPrivateKey2048, err := proto.Marshal(privateKey2048)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", privateKey2048, err)
-	}
+	serializedPrivateKey2048 := mustMarshalProto(t, privateKey2048)
 
 	privateKey3072 := &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
 		D:   mustDecodeBase64(t, d3072Base64),
@@ -729,10 +681,7 @@ func TestParseAndSerializePrivateKey(t *testing.T) {
 		},
 		Version: privateKeyProtoVersion,
 	}
-	serializedPrivateKey3072, err := proto.Marshal(privateKey3072)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", privateKey3072, err)
-	}
+	serializedPrivateKey3072 := mustMarshalProto(t, privateKey3072)
 
 	privateKey4096 := &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
 		D:   mustDecodeBase64(t, d4096Base64),
@@ -751,10 +700,7 @@ func TestParseAndSerializePrivateKey(t *testing.T) {
 		},
 		Version: privateKeyProtoVersion,
 	}
-	serializedPrivateKey4096, err := proto.Marshal(privateKey4096)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", privateKey4096, err)
-	}
+	serializedPrivateKey4096 := mustMarshalProto(t, privateKey4096)
 
 	token := insecuresecretdataaccess.Token{}
 	for _, tc := range []struct {
@@ -997,10 +943,7 @@ func TestSerializeParametersFailsWithWrongParameters(t *testing.T) {
 
 func mustCreateKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixType, format *rsassapkcs1pb.RsaSsaPkcs1KeyFormat) *tinkpb.KeyTemplate {
 	t.Helper()
-	serializedFormat, err := proto.Marshal(format)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", format, err)
-	}
+	serializedFormat := mustMarshalProto(t, format)
 	return &tinkpb.KeyTemplate{
 		TypeUrl:          "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey",
 		OutputPrefixType: outputPrefixType,
