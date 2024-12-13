@@ -699,7 +699,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		{
 			name: "mismatched hash types",
 			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl: verifierTypeURL,
+				TypeUrl: "type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey",
 				Value: func() []byte {
 					privateKey := &rsassapsspb.RsaSsaPssPrivateKey{
 						D: mustDecodeBase64(t, d2048Base64),
@@ -723,13 +723,13 @@ func TestParsePrivateKeyFails(t *testing.T) {
 					}
 					return serializedPrivateKey
 				}(),
-				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 123),
 		},
 		{
 			name: "negative salt length",
 			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
-				TypeUrl: verifierTypeURL,
+				TypeUrl: "type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey",
 				Value: func() []byte {
 					privateKey := &rsassapsspb.RsaSsaPssPrivateKey{
 						D: mustDecodeBase64(t, d2048Base64),
@@ -753,7 +753,7 @@ func TestParsePrivateKeyFails(t *testing.T) {
 					}
 					return serializedPrivateKey
 				}(),
-				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 123),
 		},
 	} {
