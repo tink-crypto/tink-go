@@ -17,6 +17,7 @@ package rsassapss
 import (
 	"encoding/base64"
 	"math/big"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -274,7 +275,7 @@ func TestParsePublicKeyWithZeroPaddingModulus(t *testing.T) {
 			Mgf1Hash:   commonpb.HashType_SHA256,
 			SaltLength: 42,
 		},
-		N:       append([]byte{0, 0, 0, 0}, n...),
+		N:       slices.Concat([]byte{0, 0, 0, 0}, n),
 		E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
 		Version: publicKeyProtoVersion,
 	}
@@ -561,9 +562,12 @@ func TestSerializePublicKeyFails(t *testing.T) {
 
 func TestParsePrivateKeyFails(t *testing.T) {
 	privateKey := &rsassapsspb.RsaSsaPssPrivateKey{
-		D: mustDecodeBase64(t, d2048Base64),
-		P: mustDecodeBase64(t, p2048Base64),
-		Q: mustDecodeBase64(t, q2048Base64),
+		D:   mustDecodeBase64(t, d2048Base64),
+		P:   mustDecodeBase64(t, p2048Base64),
+		Q:   mustDecodeBase64(t, q2048Base64),
+		Dp:  mustDecodeBase64(t, dp2048Base64),
+		Dq:  mustDecodeBase64(t, dq2048Base64),
+		Crt: mustDecodeBase64(t, qInv2048Base64),
 		PublicKey: &rsassapsspb.RsaSsaPssPublicKey{
 			Params: &rsassapsspb.RsaSsaPssParams{
 				SigHash:    commonpb.HashType_SHA256,
@@ -587,9 +591,12 @@ func TestParsePrivateKeyFails(t *testing.T) {
 	serializedPrivateKeyWithWrongPublicKeyVersion := mustMarshalProto(t, privateKeyWithWrongPublicKeyVersion)
 
 	privateKeyWithWrongPublicKey := &rsassapsspb.RsaSsaPssPrivateKey{
-		D: mustDecodeBase64(t, d2048Base64),
-		P: mustDecodeBase64(t, p2048Base64),
-		Q: mustDecodeBase64(t, q2048Base64),
+		D:   mustDecodeBase64(t, d2048Base64),
+		P:   mustDecodeBase64(t, p2048Base64),
+		Q:   mustDecodeBase64(t, q2048Base64),
+		Dp:  mustDecodeBase64(t, dp2048Base64),
+		Dq:  mustDecodeBase64(t, dq2048Base64),
+		Crt: mustDecodeBase64(t, qInv2048Base64),
 		PublicKey: &rsassapsspb.RsaSsaPssPublicKey{
 			Params: &rsassapsspb.RsaSsaPssParams{
 				SigHash:    commonpb.HashType_SHA256,
@@ -603,6 +610,11 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		Version: privateKeyProtoVersion,
 	}
 	serializedPrivateKeyWithWrongPublicKeyBytes := mustMarshalProto(t, privateKeyWithWrongPublicKey)
+
+	// From https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/rsa_pkcs1_2048_test.json#L348.
+	invalidDp := "PGEOZW9DtcYO0D3S4T0NwSICkvg7_RWlbW_-O5GZjbLgiqkelWeRFcdcP7_St5VDouNKsCS7F0lRRlQyZ91tpCF3TBuOj9tCmHfme3xbZYCnRUplwniDErBQOLCRzW2EanRrsTk5wfjNTCa24C-ONAoum42GFTnaZQbHXLy90VE"
+	invalidDq := "qy_pDD2wmbqstiLK09V9Gb_BAWbZRIilYHIbBr8PtZmiaIJc9bZcdaaCCW1cYg4OevITF7nfyDAlE--acEqfDvzC-kd775MeNh2w5VzQ6SOZiKneGD7Ko98jFaUyF7mG-6RDS6Cs9DfmJGZ4rtsrt2ivYjQ-pujTPux9TYSOeAE"
+	invalidQInv := "U4LZcUWgEjw4Pt5rXe0hfOUKN1HQkmFIqniV9QFWPRMavML_IiFQs-NeNT_bAGIy8fUh4pQe7FGBCl2yLBr0E78ySRjN-eAMkW7Hkctqw_vLBPomOW8FQEcKvZKZgxcvSEsQLiH0TIqwhn7JCnfX9Gpv_hBGuNTn4mF8A1v-FIo"
 
 	for _, tc := range []struct {
 		name             string
@@ -661,29 +673,103 @@ func TestParsePrivateKeyFails(t *testing.T) {
 			}, tinkpb.OutputPrefixType_TINK, 12345),
 		},
 		{
+			name: "invalid Dp",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey",
+				Value: mustMarshalProto(t, &rsassapsspb.RsaSsaPssPrivateKey{
+					D:   mustDecodeBase64(t, d2048Base64),
+					P:   mustDecodeBase64(t, p2048Base64),
+					Q:   mustDecodeBase64(t, q2048Base64),
+					Dp:  mustDecodeBase64(t, invalidDp),
+					Dq:  mustDecodeBase64(t, dq2048Base64),
+					Crt: mustDecodeBase64(t, qInv2048Base64),
+					PublicKey: &rsassapsspb.RsaSsaPssPublicKey{
+						Params: &rsassapsspb.RsaSsaPssParams{
+							SigHash:    commonpb.HashType_SHA256,
+							Mgf1Hash:   commonpb.HashType_SHA256,
+							SaltLength: 42,
+						},
+						N:       mustDecodeBase64(t, n2048Base64),
+						E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
+						Version: publicKeyProtoVersion,
+					},
+					Version: privateKeyProtoVersion,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+		},
+		{
+			name: "invalid Dq",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey",
+				Value: mustMarshalProto(t, &rsassapsspb.RsaSsaPssPrivateKey{
+					D:   mustDecodeBase64(t, d2048Base64),
+					P:   mustDecodeBase64(t, p2048Base64),
+					Q:   mustDecodeBase64(t, q2048Base64),
+					Dp:  mustDecodeBase64(t, dp2048Base64),
+					Dq:  mustDecodeBase64(t, invalidDq),
+					Crt: mustDecodeBase64(t, qInv2048Base64),
+					PublicKey: &rsassapsspb.RsaSsaPssPublicKey{
+						Params: &rsassapsspb.RsaSsaPssParams{
+							SigHash:    commonpb.HashType_SHA256,
+							Mgf1Hash:   commonpb.HashType_SHA256,
+							SaltLength: 42,
+						},
+						N:       mustDecodeBase64(t, n2048Base64),
+						E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
+						Version: publicKeyProtoVersion,
+					},
+					Version: privateKeyProtoVersion,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+		},
+		{
+			name: "invalid QInv",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey",
+				Value: mustMarshalProto(t, &rsassapsspb.RsaSsaPssPrivateKey{
+					D:   mustDecodeBase64(t, d2048Base64),
+					P:   mustDecodeBase64(t, p2048Base64),
+					Q:   mustDecodeBase64(t, q2048Base64),
+					Dp:  mustDecodeBase64(t, dp2048Base64),
+					Dq:  mustDecodeBase64(t, dq2048Base64),
+					Crt: mustDecodeBase64(t, invalidQInv),
+					PublicKey: &rsassapsspb.RsaSsaPssPublicKey{
+						Params: &rsassapsspb.RsaSsaPssParams{
+							SigHash:    commonpb.HashType_SHA256,
+							Mgf1Hash:   commonpb.HashType_SHA256,
+							SaltLength: 42,
+						},
+						N:       mustDecodeBase64(t, n2048Base64),
+						E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
+						Version: publicKeyProtoVersion,
+					},
+					Version: privateKeyProtoVersion,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+		},
+		{
 			name: "mismatched hash types",
 			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey",
-				Value: func() []byte {
-					privateKey := &rsassapsspb.RsaSsaPssPrivateKey{
-						D: mustDecodeBase64(t, d2048Base64),
-						P: mustDecodeBase64(t, p2048Base64),
-						Q: mustDecodeBase64(t, q2048Base64),
-						PublicKey: &rsassapsspb.RsaSsaPssPublicKey{
-							Params: &rsassapsspb.RsaSsaPssParams{
-								SigHash:    commonpb.HashType_SHA256,
-								Mgf1Hash:   commonpb.HashType_SHA384,
-								SaltLength: 42,
-							},
-							N:       mustDecodeBase64(t, n2048Base64),
-							E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
-							Version: publicKeyProtoVersion,
+				Value: mustMarshalProto(t, &rsassapsspb.RsaSsaPssPrivateKey{
+					D:   mustDecodeBase64(t, d2048Base64),
+					P:   mustDecodeBase64(t, p2048Base64),
+					Q:   mustDecodeBase64(t, q2048Base64),
+					Dp:  mustDecodeBase64(t, dp2048Base64),
+					Dq:  mustDecodeBase64(t, dq2048Base64),
+					Crt: mustDecodeBase64(t, qInv2048Base64),
+					PublicKey: &rsassapsspb.RsaSsaPssPublicKey{
+						Params: &rsassapsspb.RsaSsaPssParams{
+							SigHash:    commonpb.HashType_SHA256,
+							Mgf1Hash:   commonpb.HashType_SHA384,
+							SaltLength: 42,
 						},
 						Version: privateKeyProtoVersion,
-					}
-					serializedPrivateKey := mustMarshalProto(t, privateKey)
-					return serializedPrivateKey
-				}(),
+					},
+				}),
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 123),
 		},
@@ -691,26 +777,22 @@ func TestParsePrivateKeyFails(t *testing.T) {
 			name: "negative salt length",
 			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey",
-				Value: func() []byte {
-					privateKey := &rsassapsspb.RsaSsaPssPrivateKey{
-						D: mustDecodeBase64(t, d2048Base64),
-						P: mustDecodeBase64(t, p2048Base64),
-						Q: mustDecodeBase64(t, q2048Base64),
-						PublicKey: &rsassapsspb.RsaSsaPssPublicKey{
-							Params: &rsassapsspb.RsaSsaPssParams{
-								SigHash:    commonpb.HashType_SHA256,
-								Mgf1Hash:   commonpb.HashType_SHA256,
-								SaltLength: -1,
-							},
-							N:       mustDecodeBase64(t, n2048Base64),
-							E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
-							Version: publicKeyProtoVersion,
+				Value: mustMarshalProto(t, &rsassapsspb.RsaSsaPssPrivateKey{
+					D:   mustDecodeBase64(t, d2048Base64),
+					P:   mustDecodeBase64(t, p2048Base64),
+					Q:   mustDecodeBase64(t, q2048Base64),
+					Dp:  mustDecodeBase64(t, dp2048Base64),
+					Dq:  mustDecodeBase64(t, dq2048Base64),
+					Crt: mustDecodeBase64(t, qInv2048Base64),
+					PublicKey: &rsassapsspb.RsaSsaPssPublicKey{
+						Params: &rsassapsspb.RsaSsaPssParams{
+							SigHash:    commonpb.HashType_SHA256,
+							Mgf1Hash:   commonpb.HashType_SHA256,
+							SaltLength: -1,
 						},
 						Version: privateKeyProtoVersion,
-					}
-					serializedPrivateKey := mustMarshalProto(t, privateKey)
-					return serializedPrivateKey
-				}(),
+					},
+				}),
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 123),
 		},
@@ -733,21 +815,18 @@ func mustCreatePrivateKey(t *testing.T, publicKey *PublicKey, privateKeyValues P
 	return privateKey
 }
 
-func TestParsePrivateKeyWithZeroPaddingModulus(t *testing.T) {
+func TestParsePrivateKeyWithZeroPaddingValues(t *testing.T) {
 	n := mustDecodeBase64(t, n2048Base64)
 	p := mustDecodeBase64(t, p2048Base64)
 	q := mustDecodeBase64(t, q2048Base64)
 	d := mustDecodeBase64(t, d2048Base64)
-	dp := mustDecodeBase64(t, dp2048Base64)
-	dq := mustDecodeBase64(t, dq2048Base64)
-	qInv := mustDecodeBase64(t, qInv2048Base64)
 	privateKey := &rsassapsspb.RsaSsaPssPrivateKey{
-		D:   d,
-		P:   p,
-		Q:   q,
-		Dp:  dp,
-		Dq:  dq,
-		Crt: qInv,
+		D:   slices.Concat([]byte{0, 0, 0, 0}, d),
+		P:   slices.Concat([]byte{0, 0, 0, 0}, p),
+		Q:   slices.Concat([]byte{0, 0, 0, 0}, q),
+		Dp:  slices.Concat([]byte{0, 0, 0, 0}, mustDecodeBase64(t, dp2048Base64)),
+		Dq:  slices.Concat([]byte{0, 0, 0, 0}, mustDecodeBase64(t, dq2048Base64)),
+		Crt: slices.Concat([]byte{0, 0, 0, 0}, mustDecodeBase64(t, qInv2048Base64)),
 		PublicKey: &rsassapsspb.RsaSsaPssPublicKey{
 			Params: &rsassapsspb.RsaSsaPssParams{
 				SigHash:    commonpb.HashType_SHA256,
@@ -755,8 +834,8 @@ func TestParsePrivateKeyWithZeroPaddingModulus(t *testing.T) {
 				SaltLength: 42,
 			},
 			// Pad with zeros.
-			N:       append([]byte{0, 0, 0, 0}, mustDecodeBase64(t, n2048Base64)...),
-			E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
+			N:       slices.Concat([]byte{0, 0, 0, 0}, mustDecodeBase64(t, n2048Base64)),
+			E:       slices.Concat([]byte{0, 0, 0, 0}, new(big.Int).SetUint64(uint64(f4)).Bytes()),
 			Version: publicKeyProtoVersion,
 		},
 		Version: privateKeyProtoVersion,
