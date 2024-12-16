@@ -182,6 +182,10 @@ type privateKeyParser struct{}
 
 var _ protoserialization.KeyParser = (*privateKeyParser)(nil)
 
+func removeLeadingZeros(keyBytes []byte) []byte {
+	return new(big.Int).SetBytes(keyBytes).Bytes()
+}
+
 func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
 	if keySerialization == nil {
 		return nil, fmt.Errorf("key serialization is nil")
@@ -226,11 +230,26 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 		return nil, err
 	}
 	token := insecuresecretdataaccess.Token{}
-	return NewPrivateKey(publicKey, PrivateKeyValues{
+	privateKey, err := NewPrivateKey(publicKey, PrivateKeyValues{
 		P: secretdata.NewBytesFromData(protoPrivateKey.GetP(), token),
 		Q: secretdata.NewBytesFromData(protoPrivateKey.GetQ(), token),
 		D: secretdata.NewBytesFromData(protoPrivateKey.GetD(), token),
 	})
+	if err != nil {
+		return nil, err
+	}
+	// Make sure the precomputed values match the ones in the proto.
+	if !privateKey.DP().Equal(secretdata.NewBytesFromData(removeLeadingZeros(protoPrivateKey.GetDp()), token)) {
+		return nil, fmt.Errorf("private key DP doesn't match")
+	}
+	if !privateKey.DQ().Equal(secretdata.NewBytesFromData(removeLeadingZeros(protoPrivateKey.GetDq()), token)) {
+		return nil, fmt.Errorf("private key DQ doesn't match")
+	}
+	if !privateKey.QInv().Equal(secretdata.NewBytesFromData(removeLeadingZeros(protoPrivateKey.GetCrt()), token)) {
+		return nil, fmt.Errorf("private key QInv doesn't match")
+	}
+
+	return privateKey, nil
 }
 
 type privateKeySerializer struct{}
