@@ -291,6 +291,45 @@ func TestSignerKeyManagerPrimitiveWithInvalidInputFails(t *testing.T) {
 				Crt:       validPrivKey.GetCrt(),
 			},
 		},
+		{
+			name: "invalid precomputed Dp values in private key",
+			key: &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
+				Version:   validPrivKey.GetVersion(),
+				PublicKey: validPrivKey.GetPublicKey(),
+				D:         validPrivKey.GetD(),
+				P:         validPrivKey.GetP(),
+				Q:         validPrivKey.GetQ(),
+				Dp:        nil,
+				Dq:        validPrivKey.GetDq(),
+				Crt:       validPrivKey.GetCrt(),
+			},
+		},
+		{
+			name: "invalid precomputed Dq values in private key",
+			key: &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
+				Version:   validPrivKey.GetVersion(),
+				PublicKey: validPrivKey.GetPublicKey(),
+				D:         validPrivKey.GetD(),
+				P:         validPrivKey.GetP(),
+				Q:         validPrivKey.GetQ(),
+				Dp:        validPrivKey.GetDp(),
+				Dq:        nil,
+				Crt:       validPrivKey.GetCrt(),
+			},
+		},
+		{
+			name: "invalid precomputed Crt values in private key",
+			key: &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
+				Version:   validPrivKey.GetVersion(),
+				PublicKey: validPrivKey.GetPublicKey(),
+				D:         validPrivKey.GetD(),
+				P:         validPrivKey.GetP(),
+				Q:         validPrivKey.GetQ(),
+				Dp:        validPrivKey.GetDp(),
+				Dq:        validPrivKey.GetDq(),
+				Crt:       nil,
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			serializedKey, err := proto.Marshal(tc.key)
