@@ -19,11 +19,12 @@ import (
 	"crypto/rsa"
 	"fmt"
 
-	"errors"
 	"math/big"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
@@ -36,8 +37,6 @@ const (
 	signerTypeURL    = "type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey"
 )
 
-var errInvalidSignKey = errors.New("rsassapss_signer_key_manager: invalid key")
-
 type signerKeyManager struct{}
 
 var _ registry.PrivateKeyManager = (*signerKeyManager)(nil)
@@ -45,43 +44,23 @@ var _ registry.PrivateKeyManager = (*signerKeyManager)(nil)
 func hashName(h commonpb.HashType) string { return commonpb.HashType_name[int32(h)] }
 
 func (km *signerKeyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, errInvalidSignKey
-	}
-	key := &rsassapsspb.RsaSsaPssPrivateKey{}
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         signerTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
 		return nil, err
 	}
-	if err := validateRSAPSSPrivateKey(key); err != nil {
+	key, err := protoserialization.ParseKey(keySerialization)
+	if err != nil {
 		return nil, err
 	}
-
-	privKey := &rsa.PrivateKey{
-		PublicKey: rsa.PublicKey{
-			N: new(big.Int).SetBytes(key.GetPublicKey().GetN()),
-			E: int(new(big.Int).SetBytes(key.GetPublicKey().GetE()).Uint64()),
-		},
-		D: new(big.Int).SetBytes(key.GetD()),
-		Primes: []*big.Int{
-			new(big.Int).SetBytes(key.GetP()),
-			new(big.Int).SetBytes(key.GetQ()),
-		},
+	signerKey, ok := key.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type: got %T, want *rsassapss.PrivateKey", key)
 	}
-	if err := privKey.Validate(); err != nil {
-		return nil, err
-	}
-
-	// Instead of extracting Dp, Dq, and Qinv values from the key proto,
-	// the values must be computed by the Go library.
-	//
-	// See https://pkg.go.dev/crypto/rsa#PrivateKey.
-	privKey.Precompute()
-
-	params := key.GetPublicKey().GetParams()
-	if err := internal.Validate_RSA_SSA_PSS(hashName(params.GetSigHash()), int(params.GetSaltLength()), privKey); err != nil {
-		return nil, err
-	}
-	return internal.New_RSA_SSA_PSS_Signer(hashName(params.GetSigHash()), int(params.GetSaltLength()), privKey)
+	return NewSigner(signerKey, internalapi.Token{})
 }
 
 func validateRSAPSSPrivateKey(privKey *rsassapsspb.RsaSsaPssPrivateKey) error {
@@ -99,7 +78,7 @@ func validateRSAPSSPrivateKey(privKey *rsassapsspb.RsaSsaPssPrivateKey) error {
 		len(privKey.GetDp()) == 0 ||
 		len(privKey.GetDq()) == 0 ||
 		len(privKey.GetCrt()) == 0 {
-		return errInvalidSignKey
+		return fmt.Errorf("rsassapss_signer_key_manager: invalid key")
 	}
 	return nil
 }
