@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package xaesgcm provides a Tink key type for X-AES-GCM, which is specified
-// in https://c2sp.org/XAES-256-GCM.
-//
-// This implementation uses AES-CMAC as the KDF to derive the per-message key,
-// as per NIST SP 800-108 Rev. 1.
 package xaesgcm
 
 import (
