@@ -22,7 +22,6 @@ import (
 	"math/big"
 
 	"github.com/tink-crypto/tink-go/v2/subtle"
-	"github.com/tink-crypto/tink-go/v2/tink"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 )
 
@@ -72,38 +71,6 @@ func ValidateRSAPublicKeyParams(hashAlg commonpb.HashType, modSizeBits int, pubE
 		return fmt.Errorf("public exponent can't fit in a 64 bit integer")
 	}
 	return RSAValidPublicExponent(int(e.Int64()))
-}
-
-const (
-	testMsg          = "Tink and Wycheproof."
-	signVerifyErrMsg = "signing with private key followed by verifying with public key failed, the key may be corrupted"
-)
-
-// Validate_RSA_SSA_PSS validates that the corresponding private key is valid by signing and verifying a message.
-func Validate_RSA_SSA_PSS(hashAlg string, saltLen int, privKey *rsa.PrivateKey) error {
-	signer, err := New_RSA_SSA_PSS_Signer(hashAlg, saltLen, privKey)
-	if err != nil {
-		return err
-	}
-	verifier, err := New_RSA_SSA_PSS_Verifier(hashAlg, saltLen, &privKey.PublicKey)
-	if err != nil {
-		return err
-	}
-	if err := validateSignerVerifier(signer, verifier); err != nil {
-		return fmt.Errorf("RSA-SSA-PSS: %q", signVerifyErrMsg)
-	}
-	return nil
-}
-
-func validateSignerVerifier(signer tink.Signer, verifier tink.Verifier) error {
-	signature, err := signer.Sign([]byte(testMsg))
-	if err != nil {
-		return err
-	}
-	if err := verifier.Verify([]byte(signature), []byte(testMsg)); err != nil {
-		return err
-	}
-	return nil
 }
 
 func validRSAPublicKey(publicKey *rsa.PublicKey) error {
