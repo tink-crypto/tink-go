@@ -43,6 +43,18 @@ func TestKeyTemplates(t *testing.T) {
 			name:     "AES256_GCM_NO_PREFIX",
 			template: aead.AES256GCMNoPrefixKeyTemplate(),
 		}, {
+			name:     "XAES256_GCM_192_BIT_NONCE",
+			template: aead.XAES256GCM192BitNonceKeyTemplate(),
+		}, {
+			name:     "XAES256_GCM_192_BIT_NONCE_NO_PREFIX",
+			template: aead.XAES256GCM192BitNonceNoPrefixKeyTemplate(),
+		}, {
+			name:     "XAES256_GCM_160_BIT_NONCE",
+			template: aead.XAES256GCM160BitNonceKeyTemplate(),
+		}, {
+			name:     "XAES256_GCM_160_BIT_NONCE_NO_PREFIX",
+			template: aead.XAES256GCM160BitNonceNoPrefixKeyTemplate(),
+		}, {
 			name:     "AES128_GCM_SIV",
 			template: aead.AES128GCMSIVKeyTemplate(),
 		}, {

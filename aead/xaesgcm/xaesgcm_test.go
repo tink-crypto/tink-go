@@ -26,6 +26,59 @@ import (
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
+func TestCreateKeysetHandleFromKeysetKey(t *testing.T) {
+	keysetHandle, err := keyset.NewHandle(aead.XAES256GCM192BitNonceKeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.NewHandle(aead.XAES256GCM192BitNonceKeyTemplate()) err = %v, want nil", err)
+	}
+	aeadPrimitive, err := aead.New(keysetHandle)
+	if err != nil {
+		t.Fatalf("aead.New(keysetHandle) err = %v, want nil", err)
+	}
+	plaintext := []byte("plaintext")
+	associatedData := []byte("associatedData")
+	ciphertext, err := aeadPrimitive.Encrypt(plaintext, associatedData)
+	if err != nil {
+		t.Fatalf("aeadPrimitive.Encrypt(%v, %v) err = %v, want nil", plaintext, associatedData, err)
+	}
+
+	entry, err := keysetHandle.Entry(0)
+	if err != nil {
+		t.Fatalf("keysetHandle.Entry(0) err = %v, want nil", err)
+	}
+	key, ok := entry.Key().(*xaesgcm.Key)
+	if !ok {
+		t.Fatalf("entry.Key() is not *xaesgcm.Key")
+	}
+
+	// Create a new keyset handle with the same key.
+	manager := keyset.NewManager()
+	keyID, err := manager.AddKey(key)
+	if err != nil {
+		t.Fatalf("manager.AddKey(key) err = %v, want nil", err)
+	}
+	if err = manager.SetPrimary(keyID); err != nil {
+		t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+	}
+	newHandle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+
+	// Get an AEAD primitive from the new handle and decrypt the ciphertext.
+	newAEAD, err := aead.New(newHandle)
+	if err != nil {
+		t.Fatalf("aead.New(newHandle) err = %v, want nil", err)
+	}
+	decrypt, err := newAEAD.Decrypt(ciphertext, associatedData)
+	if err != nil {
+		t.Fatalf("decrypt.New(otherAEADPrimitivce, %v, %v) err = %v, want nil", ciphertext, associatedData, err)
+	}
+	if !bytes.Equal(decrypt, plaintext) {
+		t.Errorf("decrypt = %v, want %v", decrypt, plaintext)
+	}
+}
+
 func TestCreateKeysetHandleFromKey(t *testing.T) {
 	params, err := xaesgcm.NewParameters(xaesgcm.VariantTink, 12)
 	if err != nil {

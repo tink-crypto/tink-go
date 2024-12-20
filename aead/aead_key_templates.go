@@ -27,10 +27,12 @@ import (
 	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_go_proto"
 	kmsenvpb "github.com/tink-crypto/tink-go/v2/proto/kms_envelope_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+	xaesgcmpb "github.com/tink-crypto/tink-go/v2/proto/x_aes_gcm_go_proto"
 )
 
 const (
 	aesGCMTypeURL            = "type.googleapis.com/google.crypto.tink.AesGcmKey"
+	xAESGCMTypeURL           = "type.googleapis.com/google.crypto.tink.XAesGcmKey"
 	chaCha20Poly1305TypeURL  = "type.googleapis.com/google.crypto.tink.ChaCha20Poly1305Key"
 	xChaCha20Poly1305TypeURL = "type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key"
 	aesCTRHMACAEADTypeURL    = "type.googleapis.com/google.crypto.tink.AesCtrHmacAeadKey"
@@ -59,6 +61,38 @@ func AES256GCMKeyTemplate() *tinkpb.KeyTemplate {
 //   - Output prefix type: RAW
 func AES256GCMNoPrefixKeyTemplate() *tinkpb.KeyTemplate {
 	return createAESGCMKeyTemplate(32, tinkpb.OutputPrefixType_RAW)
+}
+
+// XAES256GCM192BitNonceKeyTemplate is a KeyTemplate that generates an
+// X-AES-GCM key with the following parameters:
+//   - Salt size: 12 bytes
+//   - Output prefix type: TINK
+func XAES256GCM192BitNonceKeyTemplate() *tinkpb.KeyTemplate {
+	return createXAESGCMKeyTemplate(12, tinkpb.OutputPrefixType_TINK)
+}
+
+// XAES256GCM192BitNonceNoPrefixKeyTemplate is a KeyTemplate that generates an
+// X-AES-GCM key with the following parameters:
+//   - Salt size: 12 bytes
+//   - Output prefix type: RAW
+func XAES256GCM192BitNonceNoPrefixKeyTemplate() *tinkpb.KeyTemplate {
+	return createXAESGCMKeyTemplate(12, tinkpb.OutputPrefixType_RAW)
+}
+
+// XAES256GCM160BitNonceKeyTemplate is a KeyTemplate that generates an
+// X-AES-GCM key with the following parameters:
+//   - Salt size: 8 bytes
+//   - Output prefix type: TINK
+func XAES256GCM160BitNonceKeyTemplate() *tinkpb.KeyTemplate {
+	return createXAESGCMKeyTemplate(8, tinkpb.OutputPrefixType_TINK)
+}
+
+// XAES256GCM160BitNonceNoPrefixKeyTemplate is a KeyTemplate that generates an
+// X-AES-GCM key with the following parameters:
+//   - Salt size: 8 bytes
+//   - Output prefix type: RAW
+func XAES256GCM160BitNonceNoPrefixKeyTemplate() *tinkpb.KeyTemplate {
+	return createXAESGCMKeyTemplate(8, tinkpb.OutputPrefixType_RAW)
 }
 
 // AES128GCMSIVKeyTemplate is a KeyTemplate that generates an AES-GCM-SIV key with the following parameters:
@@ -199,6 +233,25 @@ func createAESGCMKeyTemplate(keySize uint32, outputPrefixType tinkpb.OutputPrefi
 	}
 	return &tinkpb.KeyTemplate{
 		TypeUrl:          aesGCMTypeURL,
+		Value:            serializedFormat,
+		OutputPrefixType: outputPrefixType,
+	}
+}
+
+// createXAESGCMKeyTemplate creates a new X-AES-GCM key template with the given
+// salt size in bytes.
+func createXAESGCMKeyTemplate(saltSize uint32, outputPrefixType tinkpb.OutputPrefixType) *tinkpb.KeyTemplate {
+	format := &xaesgcmpb.XAesGcmKeyFormat{
+		Params: &xaesgcmpb.XAesGcmParams{
+			SaltSize: saltSize,
+		},
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		tinkerror.Fail(fmt.Sprintf("failed to marshal key format: %s", err))
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          xAESGCMTypeURL,
 		Value:            serializedFormat,
 		OutputPrefixType: outputPrefixType,
 	}
