@@ -93,6 +93,22 @@ func TestKeyTemplates(t *testing.T) {
 			template: hybrid.ECIESHKDFAES128CTRHMACSHA256KeyTemplate(),
 		},
 		{
+			name:     "DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_128_GCM",
+			template: hybrid.DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_128_GCM_Key_Template(),
+		},
+		{
+			name:     "DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_128_GCM_RAW",
+			template: hybrid.DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_128_GCM_Raw_Key_Template(),
+		},
+		{
+			name:     "DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_256_GCM",
+			template: hybrid.DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_256_GCM_Key_Template(),
+		},
+		{
+			name:     "DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_256_GCM_RAW",
+			template: hybrid.DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_256_GCM_Raw_Key_Template(),
+		},
+		{
 			name:     "DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_AES_128_GCM",
 			template: hybrid.DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_AES_128_GCM_Key_Template(),
 		},

@@ -29,6 +29,70 @@ import (
 // This file contains pre-generated KeyTemplates for HybridEncrypt keys. One
 // can use these templates to generate new Keysets.
 
+// DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_128_GCM_Key_Template creates a HPKE
+// key template with:
+//   - KEM: DHKEM_P256_HKDF_SHA256,
+//   - KDF: HKDF_SHA256, and
+//   - AEAD: AES_128_GCM.
+//
+// It adds the 5-byte Tink prefix to ciphertexts.
+func DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_128_GCM_Key_Template() *tinkpb.KeyTemplate {
+	return createHPKEKeyTemplate(
+		hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+		hpkepb.HpkeKdf_HKDF_SHA256,
+		hpkepb.HpkeAead_AES_128_GCM,
+		tinkpb.OutputPrefixType_TINK,
+	)
+}
+
+// DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_128_GCM_Raw_Key_Template creates a
+// HPKE key template with:
+//   - KEM: DHKEM_P256_HKDF_SHA256,
+//   - KDF: HKDF_SHA256, and
+//   - AEAD: AES_128_GCM.
+//
+// It does not add a prefix to ciphertexts.
+func DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_128_GCM_Raw_Key_Template() *tinkpb.KeyTemplate {
+	return createHPKEKeyTemplate(
+		hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+		hpkepb.HpkeKdf_HKDF_SHA256,
+		hpkepb.HpkeAead_AES_128_GCM,
+		tinkpb.OutputPrefixType_RAW,
+	)
+}
+
+// DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_256_GCM_Key_Template creates a HPKE
+// key template with:
+//   - KEM: DHKEM_P256_HKDF_SHA256,
+//   - KDF: HKDF_SHA256, and
+//   - AEAD: AES_256_GCM.
+//
+// It adds the 5-byte Tink prefix to ciphertexts.
+func DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_256_GCM_Key_Template() *tinkpb.KeyTemplate {
+	return createHPKEKeyTemplate(
+		hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+		hpkepb.HpkeKdf_HKDF_SHA256,
+		hpkepb.HpkeAead_AES_256_GCM,
+		tinkpb.OutputPrefixType_TINK,
+	)
+}
+
+// DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_256_GCM_Raw_Key_Template creates a
+// HPKE key template with:
+//   - KEM: DHKEM_P256_HKDF_SHA256,
+//   - KDF: HKDF_SHA256, and
+//   - AEAD: AES_256_GCM.
+//
+// It does not add a prefix to ciphertexts.
+func DHKEM_P256_HKDF_SHA256_HKDF_SHA256_AES_256_GCM_Raw_Key_Template() *tinkpb.KeyTemplate {
+	return createHPKEKeyTemplate(
+		hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+		hpkepb.HpkeKdf_HKDF_SHA256,
+		hpkepb.HpkeAead_AES_256_GCM,
+		tinkpb.OutputPrefixType_RAW,
+	)
+}
+
 // DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_AES_128_GCM_Key_Template creates a HPKE
 // key template with:
 //   - KEM: DHKEM_X25519_HKDF_SHA256,
