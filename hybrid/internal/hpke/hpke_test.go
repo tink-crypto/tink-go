@@ -26,7 +26,7 @@ import (
 	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
-// TODO(b/201070904): Separate tests into internal_test package.
+// TODO: b/201070904 - Separate tests into internal_test package.
 
 // aeadIDs are specified at
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-7.3.
@@ -81,18 +81,18 @@ type encryptionString struct {
 	ciphertext     string
 }
 
-// TODO(b/201070904): Include all Tink-supported RFC vectors.
-func internetDraftVector(t *testing.T) (hpkeID, vector) {
-	t.Helper()
+type hpkeRFCTestVector struct {
+	mode                                                                                    uint8
+	kemID, kdfID, aeadID                                                                    uint16
+	info, pkEm, skEm, pkRm, skRm, enc, sharedSecret, keyScheduleCtx, secret, key, baseNonce string
+	consecutiveEncryptions, otherEncryptions                                                []encryptionString
+}
 
+// TODO: b/201070904 - Include all Tink-supported RFC vectors.
+func rfcVectorA1(t *testing.T) (hpkeID, vector) {
 	// Test vector from HPKE RFC
 	// https://www.rfc-editor.org/rfc/rfc9180.html#appendix-A.1.1.
-	v := struct {
-		mode                                                                                    uint8
-		kemID, kdfID, aeadID                                                                    uint16
-		info, pkEm, skEm, pkRm, skRm, enc, sharedSecret, keyScheduleCtx, secret, key, baseNonce string
-		consecutiveEncryptions, otherEncryptions                                                []encryptionString
-	}{
+	v := hpkeRFCTestVector{
 		mode:           0,
 		kemID:          32,
 		kdfID:          1,
@@ -155,6 +155,152 @@ func internetDraftVector(t *testing.T) (hpkeID, vector) {
 			},
 		},
 	}
+
+	return rfcVector(t, v)
+}
+
+func rfcVectorA3(t *testing.T) (hpkeID, vector) {
+	// Test vector from HPKE RFC
+	// https://www.rfc-editor.org/rfc/rfc9180.html#appendix-A.3.1.
+	v := hpkeRFCTestVector{
+		mode:           0,
+		kemID:          16,
+		kdfID:          1,
+		aeadID:         1,
+		info:           "4f6465206f6e2061204772656369616e2055726e",
+		pkEm:           "04a92719c6195d5085104f469a8b9814d5838ff72b60501e2c4466e5e67b325ac98536d7b61a1af4b78e5b7f951c0900be863c403ce65c9bfcb9382657222d18c4",
+		skEm:           "4995788ef4b9d6132b249ce59a77281493eb39af373d236a1fe415cb0c2d7beb",
+		pkRm:           "04fe8c19ce0905191ebc298a9245792531f26f0cece2460639e8bc39cb7f706a826a779b4cf969b8a0e539c7f62fb3d30ad6aa8f80e30f1d128aafd68a2ce72ea0",
+		skRm:           "f3ce7fdae57e1a310d87f1ebbde6f328be0a99cdbcadf4d6589cf29de4b8ffd2",
+		enc:            "04a92719c6195d5085104f469a8b9814d5838ff72b60501e2c4466e5e67b325ac98536d7b61a1af4b78e5b7f951c0900be863c403ce65c9bfcb9382657222d18c4",
+		sharedSecret:   "c0d26aeab536609a572b07695d933b589dcf363ff9d93c93adea537aeabb8cb8",
+		keyScheduleCtx: "00b88d4e6d91759e65e87c470e8b9141113e9ad5f0c8ceefc1e088c82e6980500798e486f9c9c09c9b5c753ac72d6005de254c607d1b534ed11d493ae1c1d9ac85",
+		secret:         "2eb7b6bf138f6b5aff857414a058a3f1750054a9ba1f72c2cf0684a6f20b10e1",
+		key:            "868c066ef58aae6dc589b6cfdd18f97e",
+		baseNonce:      "4e0bc5018beba4bf004cca59",
+		consecutiveEncryptions: []encryptionString{
+			{
+				sequenceNumber: 0,
+				plaintext:      "4265617574792069732074727574682c20747275746820626561757479",
+				associatedData: "436f756e742d30",
+				nonce:          "4e0bc5018beba4bf004cca59",
+				ciphertext:     "5ad590bb8baa577f8619db35a36311226a896e7342a6d836d8b7bcd2f20b6c7f9076ac232e3ab2523f39513434",
+			},
+			{
+				sequenceNumber: 1,
+				plaintext:      "4265617574792069732074727574682c20747275746820626561757479",
+				associatedData: "436f756e742d31",
+				nonce:          "4e0bc5018beba4bf004cca58",
+				ciphertext:     "fa6f037b47fc21826b610172ca9637e82d6e5801eb31cbd3748271affd4ecb06646e0329cbdf3c3cd655b28e82",
+			},
+			{
+				sequenceNumber: 2,
+				plaintext:      "4265617574792069732074727574682c20747275746820626561757479",
+				associatedData: "436f756e742d32",
+				nonce:          "4e0bc5018beba4bf004cca5b",
+				ciphertext:     "895cabfac50ce6c6eb02ffe6c048bf53b7f7be9a91fc559402cbc5b8dcaeb52b2ccc93e466c28fb55fed7a7fec",
+			},
+		},
+		otherEncryptions: []encryptionString{
+			{
+				sequenceNumber: 4,
+				plaintext:      "4265617574792069732074727574682c20747275746820626561757479",
+				associatedData: "436f756e742d34",
+				nonce:          "4e0bc5018beba4bf004cca5d",
+				ciphertext:     "8787491ee8df99bc99a246c4b3216d3d57ab5076e18fa27133f520703bc70ec999dd36ce042e44f0c3169a6a8f",
+			},
+			{
+				sequenceNumber: 255,
+				plaintext:      "4265617574792069732074727574682c20747275746820626561757479",
+				associatedData: "436f756e742d323535",
+				nonce:          "4e0bc5018beba4bf004ccaa6",
+				ciphertext:     "2ad71c85bf3f45c6eca301426289854b31448bcf8a8ccb1deef3ebd87f60848aa53c538c30a4dac71d619ee2cd",
+			},
+			{
+				sequenceNumber: 256,
+				plaintext:      "4265617574792069732074727574682c20747275746820626561757479",
+				associatedData: "436f756e742d323536",
+				nonce:          "4e0bc5018beba4bf004ccb59",
+				ciphertext:     "10f179686aa2caec1758c8e554513f16472bd0a11e2a907dde0b212cbe87d74f367f8ffe5e41cd3e9962a6afb2",
+			},
+		},
+	}
+
+	return rfcVector(t, v)
+}
+
+func rfcVectorA6(t *testing.T) (hpkeID, vector) {
+	// Test vector from HPKE RFC
+	// https://www.rfc-editor.org/rfc/rfc9180.html#appendix-A.6.1.
+	v := hpkeRFCTestVector{
+		mode:           0,
+		kemID:          18,
+		kdfID:          3,
+		aeadID:         2,
+		info:           "4f6465206f6e2061204772656369616e2055726e",
+		pkEm:           "040138b385ca16bb0d5fa0c0665fbbd7e69e3ee29f63991d3e9b5fa740aab8900aaeed46ed73a49055758425a0ce36507c54b29cc5b85a5cee6bae0cf1c21f2731ece2013dc3fb7c8d21654bb161b463962ca19e8c654ff24c94dd2898de12051f1ed0692237fb02b2f8d1dc1c73e9b366b529eb436e98a996ee522aef863dd5739d2f29b0",
+		skEm:           "014784c692da35df6ecde98ee43ac425dbdd0969c0c72b42f2e708ab9d535415a8569bdacfcc0a114c85b8e3f26acf4d68115f8c91a66178cdbd03b7bcc5291e374b",
+		pkRm:           "0401b45498c1714e2dce167d3caf162e45e0642afc7ed435df7902ccae0e84ba0f7d373f646b7738bbbdca11ed91bdeae3cdcba3301f2457be452f271fa6837580e661012af49583a62e48d44bed350c7118c0d8dc861c238c72a2bda17f64704f464b57338e7f40b60959480c0e58e6559b190d81663ed816e523b6b6a418f66d2451ec64",
+		skRm:           "01462680369ae375e4b3791070a7458ed527842f6a98a79ff5e0d4cbde83c27196a3916956655523a6a2556a7af62c5cadabe2ef9da3760bb21e005202f7b2462847",
+		enc:            "040138b385ca16bb0d5fa0c0665fbbd7e69e3ee29f63991d3e9b5fa740aab8900aaeed46ed73a49055758425a0ce36507c54b29cc5b85a5cee6bae0cf1c21f2731ece2013dc3fb7c8d21654bb161b463962ca19e8c654ff24c94dd2898de12051f1ed0692237fb02b2f8d1dc1c73e9b366b529eb436e98a996ee522aef863dd5739d2f29b0",
+		sharedSecret:   "776ab421302f6eff7d7cb5cb1adaea0cd50872c71c2d63c30c4f1d5e43653336fef33b103c67e7a98add2d3b66e2fda95b5b2a667aa9dac7e59cc1d46d30e818",
+		keyScheduleCtx: "0083a27c5b2358ab4dae1b2f5d8f57f10ccccc822a473326f543f239a70aee46347324e84e02d7651a10d08fb3dda739d22d50c53fbfa8122baacd0f9ae5913072ef45baa1f3a4b169e141feb957e48d03f28c837d8904c3d6775308c3d3faa75dd64adfa44e1a1141edf9349959b8f8e5291cbdc56f62b0ed6527d692e85b09a4",
+		secret:         "49fd9f53b0f93732555b2054edfdc0e3101000d75df714b98ce5aa295a37f1b18dfa86a1c37286d805d3ea09a20b72f93c21e83955a1f01eb7c5eead563d21e7",
+		key:            "751e346ce8f0ddb2305c8a2a85c70d5cf559c53093656be636b9406d4d7d1b70",
+		baseNonce:      "55ff7a7d739c69f44b25447b",
+		consecutiveEncryptions: []encryptionString{
+			{
+				sequenceNumber: 0,
+				plaintext:      "4265617574792069732074727574682c20747275746820626561757479",
+				associatedData: "436f756e742d30",
+				nonce:          "55ff7a7d739c69f44b25447b",
+				ciphertext:     "170f8beddfe949b75ef9c387e201baf4132fa7374593dfafa90768788b7b2b200aafcc6d80ea4c795a7c5b841a",
+			},
+			{
+				sequenceNumber: 1,
+				plaintext:      "4265617574792069732074727574682c20747275746820626561757479",
+				associatedData: "436f756e742d31",
+				nonce:          "55ff7a7d739c69f44b25447a",
+				ciphertext:     "d9ee248e220ca24ac00bbbe7e221a832e4f7fa64c4fbab3945b6f3af0c5ecd5e16815b328be4954a05fd352256",
+			},
+			{
+				sequenceNumber: 2,
+				plaintext:      "4265617574792069732074727574682c20747275746820626561757479",
+				associatedData: "436f756e742d32",
+				nonce:          "55ff7a7d739c69f44b254479",
+				ciphertext:     "142cf1e02d1f58d9285f2af7dcfa44f7c3f2d15c73d460c48c6e0e506a3144bae35284e7e221105b61d24e1c7a",
+			},
+		},
+		otherEncryptions: []encryptionString{
+			{
+				sequenceNumber: 4,
+				plaintext:      "4265617574792069732074727574682c20747275746820626561757479",
+				associatedData: "436f756e742d34",
+				nonce:          "55ff7a7d739c69f44b25447f",
+				ciphertext:     "3bb3a5a07100e5a12805327bf3b152df728b1c1be75a9fd2cb2bf5eac0cca1fb80addb37eb2a32938c7268e3e5",
+			},
+			{
+				sequenceNumber: 255,
+				plaintext:      "4265617574792069732074727574682c20747275746820626561757479",
+				associatedData: "436f756e742d323535",
+				nonce:          "55ff7a7d739c69f44b254484",
+				ciphertext:     "4f268d0930f8d50b8fd9d0f26657ba25b5cb08b308c92e33382f369c768b558e113ac95a4c70dd60909ad1adc7",
+			},
+			{
+				sequenceNumber: 256,
+				plaintext:      "4265617574792069732074727574682c20747275746820626561757479",
+				associatedData: "436f756e742d323536",
+				nonce:          "55ff7a7d739c69f44b25457b",
+				ciphertext:     "dbbfc44ae037864e75f136e8b4b4123351d480e6619ae0e0ae437f036f2f8f1ef677686323977a1ccbb4b4f16a",
+			},
+		},
+	}
+
+	return rfcVector(t, v)
+}
+
+func rfcVector(t *testing.T, v hpkeRFCTestVector) (hpkeID, vector) {
+	t.Helper()
 
 	var info, senderPubKey, senderPrivKey, recipientPubKey, recipientPrivKey, encapsulatedKey, sharedSecret, keyScheduleCtx, secret, key, baseNonce []byte
 	var err error
@@ -358,6 +504,9 @@ func aeadRFCVectors(t *testing.T) map[hpkeID]encryptionVector {
 
 const testVectorsDir = "testdata/testvectors"
 
+// hpke_boringssl.json contains 128 test vectors.
+// There are 4 KEMs with 32 vectors each: P-256, P-521, X25519, X448.
+// There are no test vectors for P-384.
 func getTestVectorsFilePath(t *testing.T) string {
 	t.Helper()
 	srcDir, ok := os.LookupEnv("TEST_SRCDIR")
@@ -371,10 +520,8 @@ func getTestVectorsFilePath(t *testing.T) string {
 	return filepath.Join("../../../", testVectorsDir, "hpke_boringssl.json")
 }
 
-// baseModeX25519HKDFSHA256Vectors returns BoringSSL test vectors for HPKE base
-// mode with Diffie-Hellman-based X25519, HKDF-SHA256 KEM as per
-// https://www.rfc-editor.org/rfc/rfc9180.html#section-7.1.
-func baseModeX25519HKDFSHA256Vectors(t *testing.T) map[hpkeID]vector {
+// hpkeBaseModeVectors returns BoringSSL test vectors for HPKE base mode.
+func hpkeBaseModeVectors(t *testing.T) map[hpkeID]vector {
 	t.Helper()
 
 	f, err := os.Open(getTestVectorsFilePath(t))
@@ -406,7 +553,7 @@ func baseModeX25519HKDFSHA256Vectors(t *testing.T) map[hpkeID]vector {
 
 	m := make(map[hpkeID]vector)
 	for i, v := range vecs {
-		if v.Mode != baseMode || v.KEMID != x25519HKDFSHA256 {
+		if v.Mode != baseMode {
 			continue
 		}
 
@@ -465,6 +612,39 @@ func TestValidatePrivateKeyLength(t *testing.T) {
 		name string
 		key  *hpkepb.HpkePrivateKey
 	}{
+		{
+			name: "DHKEM_P256_HKDF_SHA256",
+			key: &hpkepb.HpkePrivateKey{
+				PublicKey: &hpkepb.HpkePublicKey{
+					Params: &hpkepb.HpkeParams{
+						Kem: hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+					},
+				},
+				PrivateKey: make([]byte, kemLengths[p256HKDFSHA256].nSK),
+			},
+		},
+		{
+			name: "DHKEM_P384_HKDF_SHA384",
+			key: &hpkepb.HpkePrivateKey{
+				PublicKey: &hpkepb.HpkePublicKey{
+					Params: &hpkepb.HpkeParams{
+						Kem: hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384,
+					},
+				},
+				PrivateKey: make([]byte, kemLengths[p384HKDFSHA384].nSK),
+			},
+		},
+		{
+			name: "DHKEM_P521_HKDF_SHA512",
+			key: &hpkepb.HpkePrivateKey{
+				PublicKey: &hpkepb.HpkePublicKey{
+					Params: &hpkepb.HpkeParams{
+						Kem: hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512,
+					},
+				},
+				PrivateKey: make([]byte, kemLengths[p521HKDFSHA512].nSK),
+			},
+		},
 		{
 			name: "DHKEM_X25519_HKDF_SHA256",
 			key: &hpkepb.HpkePrivateKey{
@@ -557,6 +737,33 @@ func TestValidatePublicKeyLength(t *testing.T) {
 		name string
 		key  *hpkepb.HpkePublicKey
 	}{
+		{
+			name: "DHKEM_P256_HKDF_SHA256",
+			key: &hpkepb.HpkePublicKey{
+				Params: &hpkepb.HpkeParams{
+					Kem: hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+				},
+				PublicKey: make([]byte, kemLengths[p256HKDFSHA256].nPK),
+			},
+		},
+		{
+			name: "DHKEM_P384_HKDF_SHA384",
+			key: &hpkepb.HpkePublicKey{
+				Params: &hpkepb.HpkeParams{
+					Kem: hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384,
+				},
+				PublicKey: make([]byte, kemLengths[p384HKDFSHA384].nPK),
+			},
+		},
+		{
+			name: "DHKEM_P521_HKDF_SHA512",
+			key: &hpkepb.HpkePublicKey{
+				Params: &hpkepb.HpkeParams{
+					Kem: hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512,
+				},
+				PublicKey: make([]byte, kemLengths[p521HKDFSHA512].nPK),
+			},
+		},
 		{
 			name: "DHKEM_X25519_HKDF_SHA256",
 			key: &hpkepb.HpkePublicKey{

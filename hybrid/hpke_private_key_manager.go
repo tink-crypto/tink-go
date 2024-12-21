@@ -15,6 +15,8 @@
 package hybrid
 
 import (
+	"crypto/ecdh"
+	"crypto/rand"
 	"errors"
 	"fmt"
 
@@ -72,13 +74,41 @@ func (p *hpkePrivateKeyManager) NewKey(serializedKeyFormat []byte) (proto.Messag
 		return nil, err
 	}
 
-	privKeyBytes, err := subtle.GeneratePrivateKeyX25519()
-	if err != nil {
-		return nil, fmt.Errorf("generate X25519 private key: %v", err)
-	}
-	pubKeyBytes, err := subtle.PublicFromPrivateX25519(privKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("get X25519 public key from private key: %v", err)
+	var privKeyBytes, pubKeyBytes []byte
+	switch keyFormat.GetParams().GetKem() {
+	case hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256:
+		privKey, err := ecdh.P256().GenerateKey(rand.Reader)
+		if err != nil {
+			return nil, fmt.Errorf("generate P-256 private key: %v", err)
+		}
+		privKeyBytes = privKey.Bytes()
+		pubKeyBytes = privKey.PublicKey().Bytes()
+	case hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384:
+		privKey, err := ecdh.P384().GenerateKey(rand.Reader)
+		if err != nil {
+			return nil, fmt.Errorf("generate P-384 private key: %v", err)
+		}
+		privKeyBytes = privKey.Bytes()
+		pubKeyBytes = privKey.PublicKey().Bytes()
+	case hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512:
+		privKey, err := ecdh.P521().GenerateKey(rand.Reader)
+		if err != nil {
+			return nil, fmt.Errorf("generate P-521 private key: %v", err)
+		}
+		privKeyBytes = privKey.Bytes()
+		pubKeyBytes = privKey.PublicKey().Bytes()
+	case hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256:
+		var err error
+		privKeyBytes, err = subtle.GeneratePrivateKeyX25519()
+		if err != nil {
+			return nil, fmt.Errorf("generate X25519 private key: %v", err)
+		}
+		pubKeyBytes, err = subtle.PublicFromPrivateX25519(privKeyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("get X25519 public key from private key: %v", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported KEM: %v", keyFormat.GetParams().GetKem())
 	}
 
 	return &hpkepb.HpkePrivateKey{

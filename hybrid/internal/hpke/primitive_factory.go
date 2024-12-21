@@ -55,20 +55,36 @@ func newPrimitivesFromProto(params *pb.HpkeParams) (kem, kdf, aead, error) {
 // newKEM constructs a HPKE KEM using kemID, which are specified at
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-7.1.
 func newKEM(kemID uint16) (kem, error) {
-	if kemID == x25519HKDFSHA256 {
+	switch kemID {
+	case p256HKDFSHA256:
+		return newNISTCurvesKEM(p256HKDFSHA256)
+	case p384HKDFSHA384:
+		return newNISTCurvesKEM(p384HKDFSHA384)
+	case p521HKDFSHA512:
+		return newNISTCurvesKEM(p521HKDFSHA512)
+	case x25519HKDFSHA256:
 		return newX25519KEM(sha256)
+	default:
+		return nil, fmt.Errorf("KEM ID %d is not supported", kemID)
 	}
-	return nil, fmt.Errorf("KEM ID %d is not supported", kemID)
 }
 
 // kemIDFromProto returns the KEM ID from the HpkeKem enum value. KEM IDs are
 // specified at
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-7.1.
 func kemIDFromProto(enum pb.HpkeKem) (uint16, error) {
-	if enum == pb.HpkeKem_DHKEM_X25519_HKDF_SHA256 {
+	switch enum {
+	case pb.HpkeKem_DHKEM_P256_HKDF_SHA256:
+		return p256HKDFSHA256, nil
+	case pb.HpkeKem_DHKEM_P384_HKDF_SHA384:
+		return p384HKDFSHA384, nil
+	case pb.HpkeKem_DHKEM_P521_HKDF_SHA512:
+		return p521HKDFSHA512, nil
+	case pb.HpkeKem_DHKEM_X25519_HKDF_SHA256:
 		return x25519HKDFSHA256, nil
+	default:
+		return 0, fmt.Errorf("HpkeKem enum value %d is not supported", enum)
 	}
-	return 0, fmt.Errorf("HpkeKem enum value %d is not supported", enum)
 }
 
 // newKDF constructs a HPKE KDF using kdfID, which are specified at
@@ -76,6 +92,12 @@ func kemIDFromProto(enum pb.HpkeKem) (uint16, error) {
 func newKDF(kdfID uint16) (kdf, error) {
 	if kdfID == hkdfSHA256 {
 		return newHKDFKDF(sha256)
+	}
+	if kdfID == hkdfSHA384 {
+		return newHKDFKDF(sha384)
+	}
+	if kdfID == hkdfSHA512 {
+		return newHKDFKDF(sha512)
 	}
 	return nil, fmt.Errorf("KDF ID %d is not supported", kdfID)
 }
@@ -86,6 +108,12 @@ func newKDF(kdfID uint16) (kdf, error) {
 func kdfIDFromProto(enum pb.HpkeKdf) (uint16, error) {
 	if enum == pb.HpkeKdf_HKDF_SHA256 {
 		return hkdfSHA256, nil
+	}
+	if enum == pb.HpkeKdf_HKDF_SHA384 {
+		return hkdfSHA384, nil
+	}
+	if enum == pb.HpkeKdf_HKDF_SHA512 {
+		return hkdfSHA512, nil
 	}
 	return 0, fmt.Errorf("HpkeKdf enum value %d is not supported", enum)
 }

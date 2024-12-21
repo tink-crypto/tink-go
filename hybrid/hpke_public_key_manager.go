@@ -85,12 +85,17 @@ func validatePublicKey(key *hpkepb.HpkePublicKey) error {
 
 func validateParams(params *hpkepb.HpkeParams) error {
 	switch params.GetKem() {
+	case hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256:
+	case hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384:
+	case hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512:
 	case hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256:
 	default:
 		return errInvalidHPKEParams
 	}
 	switch params.GetKdf() {
 	case hpkepb.HpkeKdf_HKDF_SHA256:
+	case hpkepb.HpkeKdf_HKDF_SHA384:
+	case hpkepb.HpkeKdf_HKDF_SHA512:
 	default:
 		return errInvalidHPKEParams
 	}

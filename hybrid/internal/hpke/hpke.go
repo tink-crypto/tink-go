@@ -30,10 +30,15 @@ const (
 	baseMode uint8 = 0x00
 
 	// KEM algorithm identifiers.
+	p256HKDFSHA256   uint16 = 0x0010
+	p384HKDFSHA384   uint16 = 0x0011
+	p521HKDFSHA512   uint16 = 0x0012
 	x25519HKDFSHA256 uint16 = 0x0020
 
 	// KDF algorithm identifiers.
 	hkdfSHA256 uint16 = 0x0001
+	hkdfSHA384 uint16 = 0x0002
+	hkdfSHA512 uint16 = 0x0003
 
 	// AEAD algorithm identifiers.
 	aes128GCM        uint16 = 0x0001
@@ -41,6 +46,8 @@ const (
 	chaCha20Poly1305 uint16 = 0x0003
 
 	sha256 = "SHA256"
+	sha384 = "SHA384"
+	sha512 = "SHA512"
 	hpkeV1 = "HPKE-v1"
 )
 
@@ -49,6 +56,9 @@ var (
 	kemLengths = map[uint16]struct {
 		nSecret, nEnc, nPK, nSK int
 	}{
+		p256HKDFSHA256:   {nSecret: 32, nEnc: 65, nPK: 65, nSK: 32},
+		p384HKDFSHA384:   {nSecret: 48, nEnc: 97, nPK: 97, nSK: 48},
+		p521HKDFSHA512:   {nSecret: 64, nEnc: 133, nPK: 133, nSK: 66},
 		x25519HKDFSHA256: {nSecret: 32, nEnc: 32, nPK: 32, nSK: 32},
 	}
 

@@ -36,6 +36,12 @@ func newHKDFKDF(hashFunction string) (*hkdfKDF, error) {
 	if hashFunction == sha256 {
 		return &hkdfKDF{kdfID: hkdfSHA256, hashFunction: crypto.SHA256}, nil
 	}
+	if hashFunction == sha384 {
+		return &hkdfKDF{kdfID: hkdfSHA384, hashFunction: crypto.SHA384}, nil
+	}
+	if hashFunction == sha512 {
+		return &hkdfKDF{kdfID: hkdfSHA512, hashFunction: crypto.SHA512}, nil
+	}
 	return nil, fmt.Errorf("hash function %s is not supported", hashFunction)
 }
 

@@ -23,10 +23,10 @@ import (
 	"github.com/tink-crypto/tink-go/v2/subtle"
 )
 
-// TODO(b/201070904): Write tests using internetDraftVector.
+// TODO: b/201070904 - Write tests using rfcVector.
 func TestX25519KEMEncapsulateBoringSSLVectors(t *testing.T) {
 	i := 0
-	vecs := baseModeX25519HKDFSHA256Vectors(t)
+	vecs := hpkeBaseModeVectors(t)
 	for key, vec := range vecs {
 		if key.mode != baseMode ||
 			key.kemID != x25519HKDFSHA256 ||
@@ -66,7 +66,7 @@ func TestX25519KEMEncapsulateBoringSSLVectors(t *testing.T) {
 }
 
 func TestX25519KEMEncapsulateBadRecipientPubKey(t *testing.T) {
-	_, v := internetDraftVector(t)
+	_, v := rfcVectorA1(t)
 	kem, err := newKEM(x25519HKDFSHA256)
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +78,7 @@ func TestX25519KEMEncapsulateBadRecipientPubKey(t *testing.T) {
 }
 
 func TestX25519KEMEncapsulateBadSenderPrivKey(t *testing.T) {
-	_, v := internetDraftVector(t)
+	_, v := rfcVectorA1(t)
 	kem, err := newKEM(x25519HKDFSHA256)
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func TestX25519KEMEncapsulateBadSenderPrivKey(t *testing.T) {
 
 func TestX25519KEMDecapsulateBoringSSLVectors(t *testing.T) {
 	i := 0
-	vecs := baseModeX25519HKDFSHA256Vectors(t)
+	vecs := hpkeBaseModeVectors(t)
 	for key, vec := range vecs {
 		if key.mode != baseMode ||
 			key.kemID != x25519HKDFSHA256 ||
@@ -131,7 +131,7 @@ func TestX25519KEMDecapsulateBoringSSLVectors(t *testing.T) {
 // https://github.com/google/tink/blob/619b6c1bb1f8573ca56de50cfc6ba23d355670db/go/hybrid/hpke/encrypt.go#L61
 // --that decapsulate does not modify the larger slice.
 func TestX25519KEMDecapsulateEncapsulatedKeyPrefixesLargerSlice(t *testing.T) {
-	_, v := internetDraftVector(t)
+	_, v := rfcVectorA1(t)
 	kem, err := newKEM(x25519HKDFSHA256)
 	if err != nil {
 		t.Fatal(err)
@@ -159,7 +159,7 @@ func TestX25519KEMDecapsulateEncapsulatedKeyPrefixesLargerSlice(t *testing.T) {
 }
 
 func TestX25519KEMDecapsulateBadEncapsulatedKey(t *testing.T) {
-	_, v := internetDraftVector(t)
+	_, v := rfcVectorA1(t)
 	kem, err := newKEM(x25519HKDFSHA256)
 	if err != nil {
 		t.Fatal(err)
@@ -171,7 +171,7 @@ func TestX25519KEMDecapsulateBadEncapsulatedKey(t *testing.T) {
 }
 
 func TestX25519KEMDecapsulateBadRecipientPrivKey(t *testing.T) {
-	_, v := internetDraftVector(t)
+	_, v := rfcVectorA1(t)
 	kem, err := newKEM(x25519HKDFSHA256)
 	if err != nil {
 		t.Fatal(err)

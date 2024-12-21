@@ -254,72 +254,76 @@ func TestPrivateKeyManagerNewKeyEncryptDecrypt(t *testing.T) {
 	wantPT := random.GetRandomBytes(200)
 	ctxInfo := random.GetRandomBytes(100)
 
-	for _, aeadID := range hpkeAEADs {
-		keyFormat := &hpkepb.HpkeKeyFormat{
-			Params: &hpkepb.HpkeParams{
-				Kem:  hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
-				Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
-				Aead: aeadID,
-			},
-		}
-		serializedKeyFormat, err := proto.Marshal(keyFormat)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, kemID := range hpkeKEMs {
+		for _, kdfID := range hpkeKDFs {
+			for _, aeadID := range hpkeAEADs {
+				keyFormat := &hpkepb.HpkeKeyFormat{
+					Params: &hpkepb.HpkeParams{
+						Kem:  kemID,
+						Kdf:  kdfID,
+						Aead: aeadID,
+					},
+				}
+				serializedKeyFormat, err := proto.Marshal(keyFormat)
+				if err != nil {
+					t.Fatal(err)
+				}
 
-		privKeyProto, err := km.NewKey(serializedKeyFormat)
-		if err != nil {
-			t.Fatalf("NewKey() err = %v, want nil", err)
-		}
-		privKey, ok := privKeyProto.(*hpkepb.HpkePrivateKey)
-		if !ok {
-			t.Fatal("primitive is not HpkePrivateKey")
-		}
-		if privKey.GetVersion() != 0 {
-			t.Errorf("private key version = %d, want %d", privKey.GetVersion(), 0)
-		}
-		if len(privKey.GetPrivateKey()) == 0 {
-			t.Error("private key is missing")
-		}
+				privKeyProto, err := km.NewKey(serializedKeyFormat)
+				if err != nil {
+					t.Fatalf("NewKey() err = %v, want nil", err)
+				}
+				privKey, ok := privKeyProto.(*hpkepb.HpkePrivateKey)
+				if !ok {
+					t.Fatal("primitive is not HpkePrivateKey")
+				}
+				if privKey.GetVersion() != 0 {
+					t.Errorf("private key version = %d, want %d", privKey.GetVersion(), 0)
+				}
+				if len(privKey.GetPrivateKey()) == 0 {
+					t.Error("private key is missing")
+				}
 
-		pubKey := privKey.GetPublicKey()
-		if pubKey.GetVersion() != 0 {
-			t.Errorf("public key version = %d, want %d", pubKey.GetVersion(), 0)
-		}
-		if !cmp.Equal(pubKey.GetParams(), keyFormat.GetParams(), protocmp.Transform()) {
-			t.Errorf("key params = %v, want %v", pubKey.GetParams(), keyFormat.GetParams())
-		}
-		if len(pubKey.GetPublicKey()) == 0 {
-			t.Error("public key is missing")
-		}
+				pubKey := privKey.GetPublicKey()
+				if pubKey.GetVersion() != 0 {
+					t.Errorf("public key version = %d, want %d", pubKey.GetVersion(), 0)
+				}
+				if !cmp.Equal(pubKey.GetParams(), keyFormat.GetParams(), protocmp.Transform()) {
+					t.Errorf("key params = %v, want %v", pubKey.GetParams(), keyFormat.GetParams())
+				}
+				if len(pubKey.GetPublicKey()) == 0 {
+					t.Error("public key is missing")
+				}
 
-		enc, err := hpke.NewEncrypt(pubKey)
-		if err != nil {
-			t.Fatalf("hpke.NewEncrypt() err = %v, want nil", err)
-		}
-		serializedPrivKey, err := proto.Marshal(privKeyProto)
-		if err != nil {
-			t.Fatal(err)
-		}
-		d, err := km.Primitive(serializedPrivKey)
-		if err != nil {
-			t.Fatalf("Primitive() err = %v, want nil", err)
-		}
-		dec, ok := d.(*hpke.Decrypt)
-		if !ok {
-			t.Fatal("primitive is not Decrypt")
-		}
+				enc, err := hpke.NewEncrypt(pubKey)
+				if err != nil {
+					t.Fatalf("hpke.NewEncrypt() err = %v, want nil", err)
+				}
+				serializedPrivKey, err := proto.Marshal(privKeyProto)
+				if err != nil {
+					t.Fatal(err)
+				}
+				d, err := km.Primitive(serializedPrivKey)
+				if err != nil {
+					t.Fatalf("Primitive() err = %v, want nil", err)
+				}
+				dec, ok := d.(*hpke.Decrypt)
+				if !ok {
+					t.Fatal("primitive is not Decrypt")
+				}
 
-		ct, err := enc.Encrypt(wantPT, ctxInfo)
-		if err != nil {
-			t.Fatalf("Encrypt() err = %v, want nil", err)
-		}
-		gotPT, err := dec.Decrypt(ct, ctxInfo)
-		if err != nil {
-			t.Fatalf("Decrypt() err = %v, want nil", err)
-		}
-		if !bytes.Equal(gotPT, wantPT) {
-			t.Errorf("Decrypt() = %x, want %x", gotPT, wantPT)
+				ct, err := enc.Encrypt(wantPT, ctxInfo)
+				if err != nil {
+					t.Fatalf("Encrypt() err = %v, want nil", err)
+				}
+				gotPT, err := dec.Decrypt(ct, ctxInfo)
+				if err != nil {
+					t.Fatalf("Decrypt() err = %v, want nil", err)
+				}
+				if !bytes.Equal(gotPT, wantPT) {
+					t.Errorf("Decrypt() = %x, want %x", gotPT, wantPT)
+				}
+			}
 		}
 	}
 }

@@ -23,9 +23,9 @@ import (
 	pb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
-// TODO(b/201070904): Write tests using baseModeX25519HKDFSHA256Vectors.
+// TODO: b/201070904 - Write tests using baseModeX25519HKDFSHA256Vectors.
 func TestContextSender(t *testing.T) {
-	id, vec := internetDraftVector(t)
+	id, vec := rfcVectorA1(t)
 	kem, err := newKEM(id.kemID)
 	if err != nil {
 		t.Fatalf("newKEM(%d): err %q", id.kemID, err)
@@ -76,7 +76,7 @@ func TestContextSender(t *testing.T) {
 }
 
 func TestContextRecipient(t *testing.T) {
-	id, vec := internetDraftVector(t)
+	id, vec := rfcVectorA1(t)
 	kem, err := newKEM(id.kemID)
 	if err != nil {
 		t.Fatalf("newKEM(%d): err %q", id.kemID, err)
@@ -133,7 +133,7 @@ func TestContextMaxSequenceNumber(t *testing.T) {
 }
 
 func TestComputeNonce(t *testing.T) {
-	id, vec := internetDraftVector(t)
+	id, vec := rfcVectorA1(t)
 	kem, err := newKEM(id.kemID)
 	if err != nil {
 		t.Fatalf("newKEM(%d): err %q", id.kemID, err)

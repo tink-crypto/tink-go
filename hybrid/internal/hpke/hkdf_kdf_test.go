@@ -24,13 +24,13 @@ import (
 	"github.com/tink-crypto/tink-go/v2/subtle"
 )
 
-// TODO(b/201070904): Write tests using baseModeX25519HKDFSHA256Vectors.
+// TODO: b/201070904 - Write tests using baseModeX25519HKDFSHA256Vectors.
 func TestHKDFKDFLabeledExtract(t *testing.T) {
 	kdf, err := newKDF(hkdfSHA256)
 	if err != nil {
 		t.Fatalf("newKDF(hkdfSHA256): got err %q, want success", err)
 	}
-	id, v := internetDraftVector(t)
+	id, v := rfcVectorA1(t)
 	suiteID := hpkeSuiteID(id.kemID, id.kdfID, id.aeadID)
 
 	// Base mode uses a default empty value for the pre-shared key (PSK), see
@@ -53,7 +53,7 @@ func TestHKDFKDFLabeledExpand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newKDF(hkdfSHA256): got err %q, want success", err)
 	}
-	id, v := internetDraftVector(t)
+	id, v := rfcVectorA1(t)
 	suiteID := hpkeSuiteID(id.kemID, id.kdfID, id.aeadID)
 
 	tests := []struct {
@@ -156,7 +156,7 @@ func TestHKDFKDFExtractAndExpand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newKDF(hkdfSHA256): got err %q, want success", err)
 	}
-	_, v := internetDraftVector(t)
+	_, v := rfcVectorA1(t)
 
 	dhSharedSecret, err := subtle.ComputeSharedSecretX25519(v.senderPrivKey, v.recipientPubKey)
 	if err != nil {

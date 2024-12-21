@@ -16,6 +16,8 @@ package hybrid
 
 import (
 	"bytes"
+	"crypto/ecdh"
+	"crypto/rand"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -25,6 +27,19 @@ import (
 	"github.com/tink-crypto/tink-go/v2/subtle"
 	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
+
+var hpkeKEMs = []hpkepb.HpkeKem{
+	hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+	hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384,
+	hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512,
+	hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+}
+
+var hpkeKDFs = []hpkepb.HpkeKdf{
+	hpkepb.HpkeKdf_HKDF_SHA256,
+	hpkepb.HpkeKdf_HKDF_SHA384,
+	hpkepb.HpkeKdf_HKDF_SHA512,
+}
 
 var hpkeAEADs = []hpkepb.HpkeAead{
 	hpkepb.HpkeAead_AES_128_GCM,
@@ -120,41 +135,45 @@ func TestPublicKeyManagerPrimitiveEncryptDecrypt(t *testing.T) {
 	wantPT := random.GetRandomBytes(200)
 	ctxInfo := random.GetRandomBytes(100)
 
-	for _, aeadID := range hpkeAEADs {
-		params := &hpkepb.HpkeParams{
-			Kem:  hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
-			Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
-			Aead: aeadID,
-		}
-		pubKey, privKey := pubPrivKeys(t, params)
-		serializedPubKey, err := proto.Marshal(pubKey)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, kemID := range hpkeKEMs {
+		for _, kdfID := range hpkeKDFs {
+			for _, aeadID := range hpkeAEADs {
+				params := &hpkepb.HpkeParams{
+					Kem:  kemID,
+					Kdf:  kdfID,
+					Aead: aeadID,
+				}
+				pubKey, privKey := pubPrivKeys(t, params)
+				serializedPubKey, err := proto.Marshal(pubKey)
+				if err != nil {
+					t.Fatal(err)
+				}
 
-		e, err := km.Primitive(serializedPubKey)
-		if err != nil {
-			t.Fatalf("Primitive() err = %v, want nil", err)
-		}
-		enc, ok := e.(*hpke.Encrypt)
-		if !ok {
-			t.Fatal("primitive is not Encrypt")
-		}
-		dec, err := hpke.NewDecrypt(privKey)
-		if err != nil {
-			t.Fatalf("hpke.NewDecrypt() err = %v, want nil", err)
-		}
+				e, err := km.Primitive(serializedPubKey)
+				if err != nil {
+					t.Fatalf("Primitive() err = %v, want nil", err)
+				}
+				enc, ok := e.(*hpke.Encrypt)
+				if !ok {
+					t.Fatal("primitive is not Encrypt")
+				}
+				dec, err := hpke.NewDecrypt(privKey)
+				if err != nil {
+					t.Fatalf("hpke.NewDecrypt() err = %v, want nil", err)
+				}
 
-		ct, err := enc.Encrypt(wantPT, ctxInfo)
-		if err != nil {
-			t.Fatalf("Encrypt() err = %v, want nil", err)
-		}
-		gotPT, err := dec.Decrypt(ct, ctxInfo)
-		if err != nil {
-			t.Fatalf("Decrypt() err = %v, want nil", err)
-		}
-		if !bytes.Equal(gotPT, wantPT) {
-			t.Errorf("Decrypt() = %x, want %x", gotPT, wantPT)
+				ct, err := enc.Encrypt(wantPT, ctxInfo)
+				if err != nil {
+					t.Fatalf("Encrypt() err = %v, want nil", err)
+				}
+				gotPT, err := dec.Decrypt(ct, ctxInfo)
+				if err != nil {
+					t.Fatalf("Decrypt() err = %v, want nil", err)
+				}
+				if !bytes.Equal(gotPT, wantPT) {
+					t.Errorf("Decrypt() = %x, want %x", gotPT, wantPT)
+				}
+			}
 		}
 	}
 }
@@ -213,24 +232,52 @@ func serializedPubPrivKeys(t *testing.T, params *hpkepb.HpkeParams) ([]byte, []b
 func pubPrivKeys(t *testing.T, params *hpkepb.HpkeParams) (*hpkepb.HpkePublicKey, *hpkepb.HpkePrivateKey) {
 	t.Helper()
 
-	priv, err := subtle.GeneratePrivateKeyX25519()
-	if err != nil {
-		t.Fatalf("GeneratePrivateKeyX25519: err %q", err)
-	}
-	pub, err := subtle.PublicFromPrivateX25519(priv)
-	if err != nil {
-		t.Fatalf("PublicFromPrivateX25519: err %q", err)
+	var privKeyBytes, pubKeyBytes []byte
+	switch params.GetKem() {
+	case hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256:
+		privKey, err := ecdh.P256().GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatalf("ecdh.P256().GenerateKey: err %q", err)
+		}
+		privKeyBytes = privKey.Bytes()
+		pubKeyBytes = privKey.PublicKey().Bytes()
+	case hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384:
+		privKey, err := ecdh.P384().GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatalf("ecdh.P384().GenerateKey: err %q", err)
+		}
+		privKeyBytes = privKey.Bytes()
+		pubKeyBytes = privKey.PublicKey().Bytes()
+	case hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512:
+		privKey, err := ecdh.P521().GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatalf("ecdh.P521().GenerateKey: err %q", err)
+		}
+		privKeyBytes = privKey.Bytes()
+		pubKeyBytes = privKey.PublicKey().Bytes()
+	case hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256:
+		var err error
+		privKeyBytes, err = subtle.GeneratePrivateKeyX25519()
+		if err != nil {
+			t.Fatalf("GeneratePrivateKeyX25519: err %q", err)
+		}
+		pubKeyBytes, err = subtle.PublicFromPrivateX25519(privKeyBytes)
+		if err != nil {
+			t.Fatalf("PublicFromPrivateX25519: err %q", err)
+		}
+	default:
+		// Create invalid keys for testing.
 	}
 
 	pubKey := &hpkepb.HpkePublicKey{
 		Version:   0,
 		Params:    params,
-		PublicKey: pub,
+		PublicKey: pubKeyBytes,
 	}
 	privKey := &hpkepb.HpkePrivateKey{
 		Version:    0,
 		PublicKey:  pubKey,
-		PrivateKey: priv,
+		PrivateKey: privKeyBytes,
 	}
 	return pubKey, privKey
 }
