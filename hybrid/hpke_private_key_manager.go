@@ -53,10 +53,7 @@ func (p *hpkePrivateKeyManager) Primitive(serializedKey []byte) (any, error) {
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
 		return nil, errInvalidHPKEPrivateKey
 	}
-	if err := keyset.ValidateKeyVersion(key.GetVersion(), maxSupportedHPKEPrivateKeyVersion); err != nil {
-		return nil, err
-	}
-	if err := keyset.ValidateKeyVersion(key.GetPublicKey().GetVersion(), maxSupportedHPKEPublicKeyVersion); err != nil {
+	if err := validatePrivateKey(key); err != nil {
 		return nil, err
 	}
 	return hpke.NewDecrypt(key)
@@ -112,14 +109,14 @@ func (p *hpkePrivateKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.
 }
 
 func (p *hpkePrivateKeyManager) PublicKeyData(serializedPrivKey []byte) (*tinkpb.KeyData, error) {
+	if len(serializedPrivKey) == 0 {
+		return nil, errInvalidHPKEPrivateKey
+	}
 	privKey := new(hpkepb.HpkePrivateKey)
 	if err := proto.Unmarshal(serializedPrivKey, privKey); err != nil {
 		return nil, errInvalidHPKEPrivateKey
 	}
-	if err := keyset.ValidateKeyVersion(privKey.GetVersion(), maxSupportedHPKEPrivateKeyVersion); err != nil {
-		return nil, err
-	}
-	if err := keyset.ValidateKeyVersion(privKey.GetPublicKey().GetVersion(), maxSupportedHPKEPublicKeyVersion); err != nil {
+	if err := validatePrivateKey(privKey); err != nil {
 		return nil, err
 	}
 	serializedPubKey, err := proto.Marshal(privKey.GetPublicKey())
@@ -141,13 +138,16 @@ func (p *hpkePrivateKeyManager) TypeURL() string {
 	return hpkePrivateKeyTypeURL
 }
 
-func validateKeyFormat(kf *hpkepb.HpkeKeyFormat) error {
-	params := kf.GetParams()
-	kem, kdf, aead := params.GetKem(), params.GetKdf(), params.GetAead()
-	if kem != hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256 ||
-		kdf != hpkepb.HpkeKdf_HKDF_SHA256 ||
-		(aead != hpkepb.HpkeAead_AES_128_GCM && aead != hpkepb.HpkeAead_AES_256_GCM && aead != hpkepb.HpkeAead_CHACHA20_POLY1305) {
-		return errInvalidHPKEPrivateKeyFormat
+func validatePrivateKey(key *hpkepb.HpkePrivateKey) error {
+	if err := keyset.ValidateKeyVersion(key.GetVersion(), maxSupportedHPKEPrivateKeyVersion); err != nil {
+		return err
 	}
-	return nil
+	if err := hpke.ValidatePrivateKeyLength(key); err != nil {
+		return err
+	}
+	return validatePublicKey(key.GetPublicKey())
+}
+
+func validateKeyFormat(kf *hpkepb.HpkeKeyFormat) error {
+	return validateParams(kf.GetParams())
 }

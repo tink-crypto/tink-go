@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
 // TODO(b/201070904): Separate tests into internal_test package.
@@ -456,5 +457,173 @@ func TestLabelInfoMemoryAllocatedIsExact(t *testing.T) {
 	}
 	if len(info) != cap(info) {
 		t.Errorf("want len(info) == cap(info), got %d != %d", len(info), cap(info))
+	}
+}
+
+func TestValidatePrivateKeyLength(t *testing.T) {
+	tests := []struct {
+		name string
+		key  *hpkepb.HpkePrivateKey
+	}{
+		{
+			name: "DHKEM_X25519_HKDF_SHA256",
+			key: &hpkepb.HpkePrivateKey{
+				PublicKey: &hpkepb.HpkePublicKey{
+					Params: &hpkepb.HpkeParams{
+						Kem: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+					},
+				},
+				PrivateKey: make([]byte, kemLengths[x25519HKDFSHA256].nSK),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := ValidatePrivateKeyLength(test.key); err != nil {
+				t.Errorf("ValidatePrivateKeyLength(): got %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestValidatePrivateKeyLengthErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		key  *hpkepb.HpkePrivateKey
+	}{
+		{
+			name: "Missing private key",
+			key: &hpkepb.HpkePrivateKey{
+				PublicKey: &hpkepb.HpkePublicKey{
+					Params: &hpkepb.HpkeParams{
+						Kem: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+					},
+				},
+			},
+		},
+		{
+			name: "Missing public key",
+			key: &hpkepb.HpkePrivateKey{
+				PrivateKey: []byte{},
+			},
+		},
+		{
+			name: "Zero length private key",
+			key: &hpkepb.HpkePrivateKey{
+				PublicKey: &hpkepb.HpkePublicKey{
+					Params: &hpkepb.HpkeParams{
+						Kem: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+					},
+				},
+				PrivateKey: []byte{},
+			},
+		},
+		{
+			name: "Wrong length private key",
+			key: &hpkepb.HpkePrivateKey{
+				PublicKey: &hpkepb.HpkePublicKey{
+					Params: &hpkepb.HpkeParams{
+						Kem: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+					},
+				},
+				PrivateKey: make([]byte, kemLengths[x25519HKDFSHA256].nSK+1),
+			},
+		},
+		{
+			name: "Invalid KEM",
+			key: &hpkepb.HpkePrivateKey{
+				PublicKey: &hpkepb.HpkePublicKey{
+					Params: &hpkepb.HpkeParams{
+						Kem: hpkepb.HpkeKem_KEM_UNKNOWN,
+					},
+				},
+				PrivateKey: make([]byte, kemLengths[x25519HKDFSHA256].nSK),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := ValidatePrivateKeyLength(test.key); err == nil {
+				t.Errorf("ValidatePrivateKeyLength(): got nil, want error")
+			}
+		})
+	}
+}
+
+func TestValidatePublicKeyLength(t *testing.T) {
+	tests := []struct {
+		name string
+		key  *hpkepb.HpkePublicKey
+	}{
+		{
+			name: "DHKEM_X25519_HKDF_SHA256",
+			key: &hpkepb.HpkePublicKey{
+				Params: &hpkepb.HpkeParams{
+					Kem: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+				},
+				PublicKey: make([]byte, kemLengths[x25519HKDFSHA256].nPK),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := ValidatePublicKeyLength(test.key); err != nil {
+				t.Errorf("ValidatePublicKeyLength(): got %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestValidatePublicKeyLengthErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		key  *hpkepb.HpkePublicKey
+	}{
+		{
+			name: "Missing public key",
+			key: &hpkepb.HpkePublicKey{
+				Params: &hpkepb.HpkeParams{
+					Kem: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+				},
+			},
+		},
+		{
+			name: "Zero length public key",
+			key: &hpkepb.HpkePublicKey{
+				Params: &hpkepb.HpkeParams{
+					Kem: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+				},
+				PublicKey: []byte{},
+			},
+		},
+		{
+			name: "Wrong length public key",
+			key: &hpkepb.HpkePublicKey{
+				Params: &hpkepb.HpkeParams{
+					Kem: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+				},
+				PublicKey: make([]byte, kemLengths[x25519HKDFSHA256].nPK+1),
+			},
+		},
+		{
+			name: "Invalid KEM",
+			key: &hpkepb.HpkePublicKey{
+				Params: &hpkepb.HpkeParams{
+					Kem: hpkepb.HpkeKem_KEM_UNKNOWN,
+				},
+				PublicKey: make([]byte, kemLengths[x25519HKDFSHA256].nPK),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := ValidatePublicKeyLength(test.key); err == nil {
+				t.Errorf("ValidatePublicKeyLength(): got nil, want error")
+			}
+		})
 	}
 }

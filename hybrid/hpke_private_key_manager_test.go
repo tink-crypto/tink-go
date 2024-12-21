@@ -438,7 +438,7 @@ func TestPrivateKeyManagerPublicKeyDataRejectsInvalidPublicKeyVersion(t *testing
 	}
 }
 
-func TestPrivateKeyManagerPublicKeyDataAcceptsNilKey(t *testing.T) {
+func TestPrivateKeyManagerPublicKeyDataRejectsNilKey(t *testing.T) {
 	k, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
 	if err != nil {
 		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
@@ -447,8 +447,8 @@ func TestPrivateKeyManagerPublicKeyDataAcceptsNilKey(t *testing.T) {
 	if !ok {
 		t.Errorf("primitive is not PrivateKeyManager")
 	}
-	if _, err := km.PublicKeyData(nil); err != nil {
-		t.Errorf("PublicKeyData() err = %v, want nil", err)
+	if _, err := km.PublicKeyData(nil); err == nil {
+		t.Errorf("PublicKeyData() err = nil, want error")
 	}
 }
 

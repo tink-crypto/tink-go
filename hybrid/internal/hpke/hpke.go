@@ -17,7 +17,10 @@ package hpke
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
+
+	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
 const (
@@ -42,6 +45,17 @@ const (
 )
 
 var (
+	// KEM lengths from https://www.rfc-editor.org/rfc/rfc9180.html#section-7.1
+	kemLengths = map[uint16]struct {
+		nSecret, nEnc, nPK, nSK int
+	}{
+		x25519HKDFSHA256: {nSecret: 32, nEnc: 32, nPK: 32, nSK: 32},
+	}
+
+	errInvalidHPKEParams           = errors.New("invalid HPKE parameters")
+	errInvalidHPKEPrivateKeyLength = errors.New("invalid HPKE private key length")
+	errInvalidHPKEPublicKeyLength  = errors.New("invalid HPKE public key length")
+
 	emptySalt           = []byte{}
 	emptyIKM            = []byte{}
 	emptyAssociatedData = []byte{}
@@ -104,4 +118,36 @@ func labelInfo(label string, info, suiteID []byte, length int) ([]byte, error) {
 	res = append(res, label...)
 	res = append(res, info...)
 	return res, nil
+}
+
+// ValidatePrivateKeyLength validates the length of the private key.
+func ValidatePrivateKeyLength(key *hpkepb.HpkePrivateKey) error {
+	kemID, err := kemIDFromProto(key.GetPublicKey().GetParams().GetKem())
+	if err != nil {
+		return err
+	}
+	lengths, ok := kemLengths[kemID]
+	if !ok {
+		return errInvalidHPKEParams
+	}
+	if lengths.nSK != len(key.GetPrivateKey()) {
+		return errInvalidHPKEPrivateKeyLength
+	}
+	return nil
+}
+
+// ValidatePublicKeyLength validates the length of the public key.
+func ValidatePublicKeyLength(key *hpkepb.HpkePublicKey) error {
+	kemID, err := kemIDFromProto(key.GetParams().GetKem())
+	if err != nil {
+		return err
+	}
+	lengths, ok := kemLengths[kemID]
+	if !ok {
+		return errInvalidHPKEParams
+	}
+	if lengths.nPK != len(key.GetPublicKey()) {
+		return errInvalidHPKEPublicKeyLength
+	}
+	return nil
 }

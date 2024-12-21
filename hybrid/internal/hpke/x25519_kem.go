@@ -80,7 +80,7 @@ func (x *x25519KEM) id() uint16 {
 }
 
 func (x *x25519KEM) encapsulatedKeyLength() int {
-	return 32
+	return kemLengths[x.kemID].nEnc
 }
 
 // deriveKEMSharedSecret returns a pseudorandom key obtained via HKDF SHA256.

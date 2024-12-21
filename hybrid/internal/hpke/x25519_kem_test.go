@@ -187,7 +187,7 @@ func TestX25519KEMEncapsulatedKeyLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if kem.encapsulatedKeyLength() != 32 {
-		t.Errorf("encapsulatedKeyLength: got %d, want 32", kem.encapsulatedKeyLength())
+	if kem.encapsulatedKeyLength() != kemLengths[x25519HKDFSHA256].nEnc {
+		t.Errorf("encapsulatedKeyLength: got %d, want %d", kem.encapsulatedKeyLength(), kemLengths[x25519HKDFSHA256].nEnc)
 	}
 }

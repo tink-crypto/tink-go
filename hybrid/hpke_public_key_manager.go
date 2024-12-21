@@ -33,6 +33,7 @@ const (
 )
 
 var (
+	errInvalidHPKEParams    = errors.New("invalid HPKE parameters")
 	errInvalidHPKEPublicKey = errors.New("invalid HPKE public key")
 	errNotSupportedOnHPKE   = errors.New("not supported on HPKE public key manager")
 )
@@ -50,7 +51,7 @@ func (p *hpkePublicKeyManager) Primitive(serializedKey []byte) (any, error) {
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
 		return nil, errInvalidHPKEPublicKey
 	}
-	if err := keyset.ValidateKeyVersion(key.GetVersion(), maxSupportedHPKEPublicKeyVersion); err != nil {
+	if err := validatePublicKey(key); err != nil {
 		return nil, err
 	}
 	return hpke.NewEncrypt(key)
@@ -70,4 +71,35 @@ func (p *hpkePublicKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message
 
 func (p *hpkePublicKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
 	return nil, errNotSupportedOnHPKE
+}
+
+func validatePublicKey(key *hpkepb.HpkePublicKey) error {
+	if err := keyset.ValidateKeyVersion(key.GetVersion(), maxSupportedHPKEPublicKeyVersion); err != nil {
+		return err
+	}
+	if err := hpke.ValidatePublicKeyLength(key); err != nil {
+		return err
+	}
+	return validateParams(key.GetParams())
+}
+
+func validateParams(params *hpkepb.HpkeParams) error {
+	switch params.GetKem() {
+	case hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256:
+	default:
+		return errInvalidHPKEParams
+	}
+	switch params.GetKdf() {
+	case hpkepb.HpkeKdf_HKDF_SHA256:
+	default:
+		return errInvalidHPKEParams
+	}
+	switch params.GetAead() {
+	case hpkepb.HpkeAead_AES_128_GCM:
+	case hpkepb.HpkeAead_AES_256_GCM:
+	case hpkepb.HpkeAead_CHACHA20_POLY1305:
+	default:
+		return errInvalidHPKEParams
+	}
+	return nil
 }
