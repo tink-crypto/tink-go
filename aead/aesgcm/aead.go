@@ -83,7 +83,9 @@ func (a *fullAEAD) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
 	}
 	iv := ciphertext[len(a.prefix) : len(a.prefix)+ivSize]
 	ciphertextWithTag := ciphertext[len(a.prefix)+ivSize:]
-	return a.cipher.Open(nil, iv, ciphertextWithTag, associatedData)
+	plaintextLen := len(ciphertextWithTag) - tagSize
+	output := make([]byte, 0, plaintextLen)
+	return a.cipher.Open(output, iv, ciphertextWithTag, associatedData)
 }
 
 // NewAEAD creates a [tink.AEAD] from a [Key].
