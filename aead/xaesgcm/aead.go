@@ -136,5 +136,6 @@ func (a *aead) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("xaesgcm: failed to create cipher.AEAD")
 	}
-	return aesGCM.Open(nil, iv, ciphertextNoPrefixWithTag, associatedData)
+	dst := make([]byte, 0, len(ciphertextNoPrefixWithTag)-tagSize)
+	return aesGCM.Open(dst, iv, ciphertextNoPrefixWithTag, associatedData)
 }

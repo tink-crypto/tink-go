@@ -59,6 +59,9 @@ func BenchmarkEncrypt(b *testing.B) {
 		}, {
 			name:     "AES256_GCM_SIV",
 			template: aead.AES256GCMSIVKeyTemplate(),
+		}, {
+			name:     "XAES256_GCM",
+			template: aead.XAES256GCM192BitNonceKeyTemplate(),
 		},
 	}
 	for _, tc := range testCases {
@@ -120,6 +123,9 @@ func BenchmarkDecrypt(b *testing.B) {
 		}, {
 			name:     "AES256_GCM_SIV",
 			template: aead.AES256GCMSIVKeyTemplate(),
+		}, {
+			name:     "XAES256_GCM",
+			template: aead.XAES256GCM192BitNonceKeyTemplate(),
 		},
 	}
 	for _, tc := range testCases {
