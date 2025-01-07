@@ -42,7 +42,7 @@ func NewAESCMACPRF(key []byte) (*AESCMACPRF, error) {
 	var err error
 	aesCmac.bc, err = aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("Could not obtain cipher: %v", err)
+		return nil, fmt.Errorf("could not obtain cipher: %v", err)
 	}
 	bs := aesCmac.bc.BlockSize()
 	zeroBlock := make([]byte, bs)
@@ -60,13 +60,16 @@ func NewAESCMACPRF(key []byte) (*AESCMACPRF, error) {
 // ValidateAESCMACPRFParams checks that the key is the recommended size for AES-CMAC.
 func ValidateAESCMACPRFParams(keySize uint32) error {
 	if keySize != recommendedKeySize {
-		return fmt.Errorf("Recommended key size for AES-CMAC is %d, but %d given", recommendedKeySize, keySize)
+		return fmt.Errorf("recommended key size for AES-CMAC is %d, but %d given", recommendedKeySize, keySize)
 	}
 	return nil
 }
 
-// ComputePRF computes the AES-CMAC for the given key and data, returning outputLength bytes.
-// The timing of this function will only depend on len(data), and not leak any additional information about the key or the data.
+// ComputePRF computes the AES-CMAC for the given key and data, returning
+// outputLength bytes.
+//
+// The timing of this function will only depend on len(data), and not leak any
+// additional information about the key or the data.
 func (a AESCMACPRF) ComputePRF(data []byte, outputLength uint32) ([]byte, error) {
 	// Setup
 	bs := a.bc.BlockSize()
@@ -77,7 +80,7 @@ func (a AESCMACPRF) ComputePRF(data []byte, outputLength uint32) ([]byte, error)
 	// Pad
 	flag := false
 	n := len(data)/bs + 1
-	// if only depends on len(data).
+	// The following "if" only depends on len(data).
 	if len(data) > 0 && len(data)%bs == 0 {
 		n--
 		flag = true
@@ -85,32 +88,30 @@ func (a AESCMACPRF) ComputePRF(data []byte, outputLength uint32) ([]byte, error)
 	mLast := make([]byte, bs)
 	mLastStart := (n - 1) * bs
 	for i := 0; i < bs; i++ {
-		// if depends on mLastStart and len(data), which depend on len(data)
+		// The following "if" only depends on mLastStart and len(data), which
+		// depend on len(data).
 		if i+mLastStart < len(data) {
 			mLast[i] = data[i+mLastStart]
 		} else if i+mLastStart == len(data) {
 			mLast[i] = pad
 		}
-		// if only depends on flag, which depends on len(data)
-		if flag {
-			mLast[i] ^= a.subkey1[i]
-		} else {
-			mLast[i] ^= a.subkey2[i]
-		}
 	}
-	input := make([]byte, bs)
+	// The following "if" only depends on flag, which depends on len(data).
+	if flag {
+		subtle.XORBytes(mLast, mLast, a.subkey1)
+	} else {
+		subtle.XORBytes(mLast, mLast, a.subkey2)
+	}
+
 	output := make([]byte, bs)
 	for i := 0; i < n; i++ {
-		// if depends on n, which depends on len(data)
+		// The following "if" depends on n, which depends on len(data).
 		if i+1 == n {
-			copy(input, mLast)
+			subtle.XORBytes(output, mLast, output)
 		} else {
-			copy(input, data[i*bs:(i+1)*bs])
+			subtle.XORBytes(output, data[i*bs:(i+1)*bs], output)
 		}
-		for j := 0; j < bs; j++ {
-			input[j] ^= output[j]
-		}
-		a.bc.Encrypt(output, input)
+		a.bc.Encrypt(output, output)
 	}
 	return output[:outputLength], nil
 }
