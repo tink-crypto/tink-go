@@ -15,6 +15,7 @@
 package aead_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead"
@@ -25,46 +26,71 @@ import (
 
 // Benchmarks for AEAD algorithms.
 
-func BenchmarkEncrypt(b *testing.B) {
-	const (
-		plaintextSize      = 16 * 1024
-		associatedDataSize = 256
-	)
+type testCase struct {
+	name          string
+	template      *tinkpb.KeyTemplate
+	plaintextSize uint32
+}
 
-	testCases := []struct {
-		name     string
-		template *tinkpb.KeyTemplate
-	}{
-		{
-			name:     "AES128_GCM",
-			template: aead.AES128GCMKeyTemplate(),
-		}, {
-			name:     "AES256_GCM",
-			template: aead.AES256GCMKeyTemplate(),
-		}, {
-			name:     "CHACHA20_POLY1305",
-			template: aead.ChaCha20Poly1305KeyTemplate(),
-		}, {
-			name:     "XCHACHA20_POLY1305",
-			template: aead.XChaCha20Poly1305KeyTemplate(),
-		}, {
-			name:     "AES128_CTR_HMAC",
-			template: aead.AES128CTRHMACSHA256KeyTemplate(),
-		}, {
-			name:     "AES256_CTR_HMAC",
-			template: aead.AES256CTRHMACSHA256KeyTemplate(),
-		}, {
-			name:     "AES128_GCM_SIV",
-			template: aead.AES128GCMSIVKeyTemplate(),
-		}, {
-			name:     "AES256_GCM_SIV",
-			template: aead.AES256GCMSIVKeyTemplate(),
-		}, {
-			name:     "XAES256_GCM",
-			template: aead.XAES256GCM192BitNonceKeyTemplate(),
-		},
+func testCases() []testCase {
+	tcs := []testCase{}
+	for _, plaintextSize := range []uint32{
+		1,               // 1 Byte
+		1 * 1024,        // 1 KByte,
+		1 * 1024 * 1024, // 1 MByte
+	} {
+		tcs = append(tcs, testCase{
+			name:          fmt.Sprintf("AES128_GCM-%d", plaintextSize),
+			template:      aead.AES128GCMKeyTemplate(),
+			plaintextSize: plaintextSize,
+		})
+		tcs = append(tcs, testCase{
+			name:          fmt.Sprintf("AES256_GCM-%d", plaintextSize),
+			template:      aead.AES256GCMKeyTemplate(),
+			plaintextSize: plaintextSize,
+		})
+		tcs = append(tcs, testCase{
+			name:          fmt.Sprintf("CHACHA20_POLY1305-%d", plaintextSize),
+			template:      aead.ChaCha20Poly1305KeyTemplate(),
+			plaintextSize: plaintextSize,
+		})
+		tcs = append(tcs, testCase{
+			name:          fmt.Sprintf("XCHACHA20_POLY1305-%d", plaintextSize),
+			template:      aead.XChaCha20Poly1305KeyTemplate(),
+			plaintextSize: plaintextSize,
+		})
+		tcs = append(tcs, testCase{
+			name:          fmt.Sprintf("AES128_CTR_HMAC-%d", plaintextSize),
+			template:      aead.AES128CTRHMACSHA256KeyTemplate(),
+			plaintextSize: plaintextSize,
+		})
+		tcs = append(tcs, testCase{
+			name:          fmt.Sprintf("AES256_CTR_HMAC-%d", plaintextSize),
+			template:      aead.AES256CTRHMACSHA256KeyTemplate(),
+			plaintextSize: plaintextSize,
+		})
+		tcs = append(tcs, testCase{
+			name:          fmt.Sprintf("AES128_GCM_SIV-%d", plaintextSize),
+			template:      aead.AES128GCMSIVKeyTemplate(),
+			plaintextSize: plaintextSize,
+		})
+		tcs = append(tcs, testCase{
+			name:          fmt.Sprintf("AES256_GCM_SIV-%d", plaintextSize),
+			template:      aead.AES256GCMSIVKeyTemplate(),
+			plaintextSize: plaintextSize,
+		})
+		tcs = append(tcs, testCase{
+			name:          fmt.Sprintf("XAES256_GCM-%d", plaintextSize),
+			template:      aead.XAES256GCM192BitNonceKeyTemplate(),
+			plaintextSize: plaintextSize,
+		})
 	}
-	for _, tc := range testCases {
+	return tcs
+}
+
+func BenchmarkEncrypt(b *testing.B) {
+	const associatedDataSize = 256
+	for _, tc := range testCases() {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 
@@ -76,7 +102,7 @@ func BenchmarkEncrypt(b *testing.B) {
 			if err != nil {
 				b.Fatal(err)
 			}
-			plaintext := random.GetRandomBytes(plaintextSize)
+			plaintext := random.GetRandomBytes(tc.plaintextSize)
 			associatedData := random.GetRandomBytes(associatedDataSize)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -90,45 +116,8 @@ func BenchmarkEncrypt(b *testing.B) {
 }
 
 func BenchmarkDecrypt(b *testing.B) {
-	const (
-		plaintextSize      = 16 * 1024
-		associatedDataSize = 256
-	)
-
-	testCases := []struct {
-		name     string
-		template *tinkpb.KeyTemplate
-	}{
-		{
-			name:     "AES128_GCM",
-			template: aead.AES128GCMKeyTemplate(),
-		}, {
-			name:     "AES256_GCM",
-			template: aead.AES256GCMKeyTemplate(),
-		}, {
-			name:     "CHACHA20_POLY1305",
-			template: aead.ChaCha20Poly1305KeyTemplate(),
-		}, {
-			name:     "XCHACHA20_POLY1305",
-			template: aead.XChaCha20Poly1305KeyTemplate(),
-		}, {
-			name:     "AES128_CTR_HMAC",
-			template: aead.AES128CTRHMACSHA256KeyTemplate(),
-		}, {
-			name:     "AES256_CTR_HMAC",
-			template: aead.AES256CTRHMACSHA256KeyTemplate(),
-		}, {
-			name:     "AES128_GCM_SIV",
-			template: aead.AES128GCMSIVKeyTemplate(),
-		}, {
-			name:     "AES256_GCM_SIV",
-			template: aead.AES256GCMSIVKeyTemplate(),
-		}, {
-			name:     "XAES256_GCM",
-			template: aead.XAES256GCM192BitNonceKeyTemplate(),
-		},
-	}
-	for _, tc := range testCases {
+	const associatedDataSize = 256
+	for _, tc := range testCases() {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 
@@ -140,7 +129,7 @@ func BenchmarkDecrypt(b *testing.B) {
 			if err != nil {
 				b.Fatal(err)
 			}
-			plaintext := random.GetRandomBytes(plaintextSize)
+			plaintext := random.GetRandomBytes(tc.plaintextSize)
 			associatedData := random.GetRandomBytes(associatedDataSize)
 			ciphertext, err := primitive.Encrypt(plaintext, associatedData)
 			if err != nil {
