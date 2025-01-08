@@ -23,6 +23,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -138,4 +139,15 @@ func (a *aead) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
 	}
 	dst := make([]byte, 0, len(ciphertextNoPrefixWithTag)-tagSize)
 	return aesGCM.Open(dst, iv, ciphertextNoPrefixWithTag, associatedData)
+}
+
+// primitiveConstructor creates a [aead] from a [key.Key].
+//
+// The key must be of type [*Key].
+func primitiveConstructor(k key.Key) (any, error) {
+	that, ok := k.(*Key)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T; needed *xaesgcm.Key", k)
+	}
+	return NewAEAD(that, internalapi.Token{})
 }
