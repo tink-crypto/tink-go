@@ -15,52 +15,35 @@
 package subtle
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/subtle"
 	"fmt"
+
+	"github.com/tink-crypto/tink-go/v2/internal/mac/aescmac"
 
 	// Placeholder for internal crypto/cipher allowlist, please ignore.
 	// Placeholder for internal crypto/subtle allowlist, please ignore.
 )
 
-const (
-	mul                = 0x87
-	pad                = byte(0x80)
-	recommendedKeySize = uint32(32)
-)
-
-// AESCMACPRF is a type that can be used to compute several CMACs with the same key material.
+// AESCMACPRF is a type that can be used to compute several CMACs with the same
+// key material.
 type AESCMACPRF struct {
-	bc               cipher.Block
-	subkey1, subkey2 []byte
+	cmac *aescmac.CMAC
 }
 
-// NewAESCMACPRF creates a new AESCMACPRF object and initializes it with the correct key material.
+// NewAESCMACPRF creates a new AESCMACPRF object and initializes it with the
+// correct key material.
 func NewAESCMACPRF(key []byte) (*AESCMACPRF, error) {
-	aesCmac := &AESCMACPRF{}
-	var err error
-	aesCmac.bc, err = aes.NewCipher(key)
+	cmac, err := aescmac.New(key)
 	if err != nil {
-		return nil, fmt.Errorf("could not obtain cipher: %v", err)
+		return nil, fmt.Errorf("aescmacprf: %v", err)
 	}
-	bs := aesCmac.bc.BlockSize()
-	zeroBlock := make([]byte, bs)
-
-	// Generate Subkeys
-	aesCmac.subkey1 = make([]byte, bs)
-	aesCmac.subkey2 = make([]byte, bs)
-	aesCmac.bc.Encrypt(aesCmac.subkey1, zeroBlock)
-	mulByX(aesCmac.subkey1)
-	copy(aesCmac.subkey2, aesCmac.subkey1)
-	mulByX(aesCmac.subkey2)
-	return aesCmac, nil
+	return &AESCMACPRF{cmac: cmac}, nil
 }
 
-// ValidateAESCMACPRFParams checks that the key is the recommended size for AES-CMAC.
+// ValidateAESCMACPRFParams checks that the key is the recommended size for
+// AES-CMAC.
 func ValidateAESCMACPRFParams(keySize uint32) error {
-	if keySize != recommendedKeySize {
-		return fmt.Errorf("recommended key size for AES-CMAC is %d, but %d given", recommendedKeySize, keySize)
+	if keySize != 32 {
+		return fmt.Errorf("aescmacprf: got key size %d, want recommended size 32", keySize)
 	}
 	return nil
 }
@@ -71,56 +54,8 @@ func ValidateAESCMACPRFParams(keySize uint32) error {
 // The timing of this function will only depend on len(data), and not leak any
 // additional information about the key or the data.
 func (a AESCMACPRF) ComputePRF(data []byte, outputLength uint32) ([]byte, error) {
-	// Setup
-	bs := a.bc.BlockSize()
-	if outputLength > uint32(bs) {
-		return nil, fmt.Errorf("outputLength must be between 0 and %d", bs)
+	if outputLength > aescmac.BlockSize {
+		return nil, fmt.Errorf("aescmacprf: invalid output length %d, want between 0 and %d", outputLength, aescmac.BlockSize)
 	}
-
-	// Pad
-	flag := false
-	n := len(data)/bs + 1
-	// The following "if" only depends on len(data).
-	if len(data) > 0 && len(data)%bs == 0 {
-		n--
-		flag = true
-	}
-	mLast := make([]byte, bs)
-	mLastStart := (n - 1) * bs
-	for i := 0; i < bs; i++ {
-		// The following "if" only depends on mLastStart and len(data), which
-		// depend on len(data).
-		if i+mLastStart < len(data) {
-			mLast[i] = data[i+mLastStart]
-		} else if i+mLastStart == len(data) {
-			mLast[i] = pad
-		}
-	}
-	// The following "if" only depends on flag, which depends on len(data).
-	if flag {
-		subtle.XORBytes(mLast, mLast, a.subkey1)
-	} else {
-		subtle.XORBytes(mLast, mLast, a.subkey2)
-	}
-
-	output := make([]byte, bs)
-	for i := 0; i < n; i++ {
-		// The following "if" depends on n, which depends on len(data).
-		if i+1 == n {
-			subtle.XORBytes(output, mLast, output)
-		} else {
-			subtle.XORBytes(output, data[i*bs:(i+1)*bs], output)
-		}
-		a.bc.Encrypt(output, output)
-	}
-	return output[:outputLength], nil
-}
-
-func mulByX(block []byte) {
-	bs := len(block)
-	v := int(block[0] >> 7)
-	for i := 0; i < bs-1; i++ {
-		block[i] = block[i]<<1 | block[i+1]>>7
-	}
-	block[bs-1] = (block[bs-1] << 1) ^ byte(subtle.ConstantTimeSelect(v, mul, 0x00))
+	return a.cmac.Compute(data)[:outputLength], nil
 }
