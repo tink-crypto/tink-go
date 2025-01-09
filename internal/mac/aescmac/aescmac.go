@@ -25,7 +25,7 @@ import (
 const (
 	// BlockSize is the block size of AES.
 	BlockSize = aes.BlockSize
-	mul       = 0x87
+	mul       = 0x87 // 0x87 is the generator of GF(2^128).
 	pad       = byte(0x80)
 )
 
@@ -35,13 +35,20 @@ type CMAC struct {
 	k1, k2 [BlockSize]byte
 }
 
+// multiplyByX multiplies an element in GF(2^128) by its generator.
+//
+// This is used to for key generation in section 2.3 of RFC 4493.
 func mulByX(block []byte) {
-	bs := len(block)
+	// This is computed as:
+	// if block[0] >> 7 == 1:
+	//   leftShift(block, 1) XOR 0x87
+	// else:
+	//   leftShift(block, 1)
 	v := int(block[0] >> 7)
-	for i := 0; i < bs-1; i++ {
+	for i := 0; i < BlockSize-1; i++ {
 		block[i] = block[i]<<1 | block[i+1]>>7
 	}
-	block[bs-1] = (block[bs-1] << 1) ^ byte(subtle.ConstantTimeSelect(v, mul, 0x00))
+	block[BlockSize-1] = (block[BlockSize-1] << 1) ^ byte(subtle.ConstantTimeSelect(v, mul, 0x00))
 }
 
 // New returns a new CMAC instance.
@@ -65,7 +72,7 @@ func New(key []byte) (*CMAC, error) {
 	return cmac, nil
 }
 
-// Compute computes the AES-CMAC for the given key and data.
+// Compute computes the AES-CMAC of the given data.
 //
 // The timing of this function will only depend on len(data), and not leak any
 // additional information about the key or the data.
@@ -100,4 +107,60 @@ func (c *CMAC) Compute(data []byte) []byte {
 	subtle.XORBytes(output, output, lastBlock[:])
 	c.bc.Encrypt(output, output)
 	return output
+}
+
+// XOREndAndCompute computes the AES-CMAC over "data xorend last".
+//
+// data must be >= BlockSize.
+// last and out must be == BlockSize.
+//
+// The `xorend` function is XOR(data[len(data)-BlockSize:], last)
+//
+// The timing of this function will only depend on len(data), and not leak any
+// additional information about the key or the data.
+func (c *CMAC) XOREndAndCompute(data, last []byte) ([]byte, error) {
+	if len(last) != BlockSize {
+		return nil, fmt.Errorf("aescmac: invalid size for \"last\"; got %d, want %d", len(last), BlockSize)
+	}
+	if len(data) < BlockSize {
+		return nil, fmt.Errorf("aescmac: invalid size for \"data\"; got %d, want at least %d", len(data), BlockSize)
+	}
+
+	numBlocksButLast := len(data) / BlockSize
+	// The following "if" only depends on len(data).
+	if len(data)%BlockSize == 0 {
+		numBlocksButLast--
+	}
+
+	// Starting position for the portion of`data` to be XORed with `last`.
+	startPos := len(data) - BlockSize
+	output := make([]byte, BlockSize)
+	// Process blocks from M_0, ..., M_(n/BlockSize-1).
+	for i := 0; i < numBlocksButLast; i++ {
+		subtle.XORBytes(output, data[:BlockSize], output)
+		if (i+1)*BlockSize > startPos {
+			// XOR a portion of the current block with `last`.
+			portionSize := (i+1)*BlockSize - startPos
+			subtle.XORBytes(output[BlockSize-portionSize:], output[BlockSize-portionSize:], last[:portionSize])
+			last = last[portionSize:]
+		}
+		c.bc.Encrypt(output, output)
+		data = data[BlockSize:]
+	}
+
+	// Last block M_n.
+	var lastBlock [BlockSize]byte
+	subtle.XORBytes(lastBlock[:], data[:], last[:])
+	// The following "if" only depends on len(data).
+	if len(data) == BlockSize {
+		// Full last block.
+		subtle.XORBytes(lastBlock[:], lastBlock[:], c.k1[:])
+	} else {
+		// Partial last block.
+		lastBlock[len(data)] = pad
+		subtle.XORBytes(lastBlock[:], lastBlock[:], c.k2[:])
+	}
+	subtle.XORBytes(output, output, lastBlock[:])
+	c.bc.Encrypt(output, output)
+	return output, nil
 }

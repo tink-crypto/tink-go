@@ -16,11 +16,14 @@ package aescmac_test
 
 import (
 	"bytes"
+	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/internal/mac/aescmac"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
@@ -45,6 +48,63 @@ func TestNewWrongKeySize(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := aescmac.New(tc.key); err == nil {
 				t.Errorf("aescmac.New(%x) err = nil, want error", tc.key)
+			}
+		})
+	}
+}
+
+func xorEnd(data, last []byte) []byte {
+	dataXOREnd := slices.Clone(data)
+	subtle.XORBytes(dataXOREnd[len(data)-aescmac.BlockSize:], data[len(data)-aescmac.BlockSize:], last)
+	return dataXOREnd
+}
+
+func TestXOREndAndCompute(t *testing.T) {
+	key := random.GetRandomBytes(32)
+	a, err := aescmac.New(key)
+	if err != nil {
+		t.Fatalf("aescmac.New(%x) err = %v, want nil", key, err)
+	}
+	for _, size := range []uint32{16, 19, 33, 64, 110} {
+		data := random.GetRandomBytes(size)
+		lastBlock := random.GetRandomBytes(aescmac.BlockSize)
+		want := a.Compute(xorEnd(data, lastBlock))
+		got, err := a.XOREndAndCompute(data, lastBlock)
+		if err != nil {
+			t.Fatalf("a.XOREndAndCompute(%x, %x) err = %v, want nil", data, lastBlock, err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Errorf("a.XOREndAndCompute(%x, %x) = %x, want %x", data, lastBlock, got, want)
+		}
+	}
+}
+
+func TestXOREndAndComputeFailsWithInvalidInputs(t *testing.T) {
+	key := random.GetRandomBytes(32)
+	a, err := aescmac.New(key)
+	if err != nil {
+		t.Fatalf("aescmac.New(%x) err = %v, want nil", key, err)
+	}
+	for _, tc := range []struct {
+		name  string
+		data  []byte
+		last  []byte
+		block []byte
+	}{
+		{
+			name: "last is too short",
+			data: random.GetRandomBytes(16),
+			last: random.GetRandomBytes(15),
+		},
+		{
+			name: "data is too short",
+			data: random.GetRandomBytes(15),
+			last: random.GetRandomBytes(16),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := a.XOREndAndCompute(tc.data, tc.last); err == nil {
+				t.Errorf("a.XOREndAndCompute(%x, %x) err = nil, want error", tc.data, tc.last)
 			}
 		})
 	}

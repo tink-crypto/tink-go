@@ -22,7 +22,9 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
-	"math"
+	"slices"
+
+	"github.com/tink-crypto/tink-go/v2/internal/mac/aescmac"
 
 	// Placeholder for internal crypto/cipher allowlist, please ignore.
 	// Placeholder for internal crypto/subtle allowlist, please ignore.
@@ -50,11 +52,8 @@ import (
 // and RFC 5297 only supports same size encryption and MAC keys this
 // implies that keys must be 64 bytes (2*256 bits) long.
 type AESSIV struct {
-	k1     []byte
-	k2     []byte
-	cmacK1 []byte
-	cmacK2 []byte
-	cipher cipher.Block
+	k1, k2 []byte
+	cmac   *aescmac.CMAC
 }
 
 const (
@@ -73,27 +72,13 @@ func NewAESSIV(key []byte) (*AESSIV, error) {
 
 	k1 := key[:32]
 	k2 := key[32:]
-	c, err := aes.NewCipher(k1)
+
+	cmac, err := aescmac.New(k1)
 	if err != nil {
-		return nil, fmt.Errorf("aes_siv: aes.NewCipher() failed: %v", err)
+		return nil, fmt.Errorf("aes_siv: %v", err)
 	}
 
-	block := make([]byte, aes.BlockSize)
-	c.Encrypt(block, block)
-	multiplyByX(block)
-	cmacK1 := make([]byte, aes.BlockSize)
-	copy(cmacK1, block)
-	multiplyByX(block)
-	cmacK2 := make([]byte, aes.BlockSize)
-	copy(cmacK2, block)
-
-	return &AESSIV{
-		k1:     k1,
-		k2:     k2,
-		cmacK1: cmacK1,
-		cmacK2: cmacK2,
-		cipher: c,
-	}, nil
+	return &AESSIV{k1: k1, k2: k2, cmac: cmac}, nil
 }
 
 // multiplyByX multiplies an element in GF(2^128) by its generator.
@@ -113,9 +98,7 @@ func (asc *AESSIV) EncryptDeterministically(plaintext, associatedData []byte) ([
 	if len(plaintext) > maxInt-aes.BlockSize {
 		return nil, fmt.Errorf("aes_siv: plaintext too long")
 	}
-	siv := make([]byte, aes.BlockSize)
-	asc.s2v(plaintext, associatedData, siv)
-
+	siv := asc.s2v(plaintext, associatedData)
 	ct := make([]byte, len(plaintext)+aes.BlockSize)
 	copy(ct[:aes.BlockSize], siv)
 	if err := asc.ctrCrypt(siv, plaintext, ct[aes.BlockSize:]); err != nil {
@@ -134,8 +117,7 @@ func (asc *AESSIV) DecryptDeterministically(ciphertext, associatedData []byte) (
 	pt := make([]byte, len(ciphertext)-aes.BlockSize)
 	siv := ciphertext[:aes.BlockSize]
 	asc.ctrCrypt(siv, ciphertext[aes.BlockSize:], pt)
-	s2v := make([]byte, aes.BlockSize)
-	asc.s2v(pt, associatedData, s2v)
+	s2v := asc.s2v(pt, associatedData)
 
 	diff := byte(0)
 	for i := 0; i < aes.BlockSize; i++ {
@@ -152,8 +134,7 @@ func (asc *AESSIV) DecryptDeterministically(ciphertext, associatedData []byte) (
 // result to out.
 func (asc *AESSIV) ctrCrypt(siv, in, out []byte) error {
 	// siv might be used outside of ctrCrypt(), so making a copy of it.
-	iv := make([]byte, aes.BlockSize)
-	copy(iv, siv)
+	iv := slices.Clone(siv)
 	iv[8] &= 0x7f
 	iv[12] &= 0x7f
 
@@ -167,95 +148,30 @@ func (asc *AESSIV) ctrCrypt(siv, in, out []byte) error {
 	return nil
 }
 
-// s2v is a Pseudo-Random Function (PRF) construction:
-// https://tools.ietf.org/html/rfc5297.
-func (asc *AESSIV) s2v(msg, ad, siv []byte) {
-	block := make([]byte, aes.BlockSize)
-	asc.cmac(block, block)
+var zeroBlock [aes.BlockSize]byte
+
+// s2v is a Pseudo-Random Function (PRF) construction as defined in
+// Section 2.4 of RFC 5297.
+func (asc *AESSIV) s2v(msg, ad []byte) []byte {
+	block := asc.cmac.Compute(zeroBlock[:])
 	multiplyByX(block)
 
-	adMac := make([]byte, aes.BlockSize)
-	asc.cmac(ad, adMac)
-	xorBlock(adMac, block)
-
+	// block := CMAC(AD) XOR block
+	adMac := asc.cmac.Compute(ad)
+	subtle.XORBytes(block, block, adMac)
 	if len(msg) >= aes.BlockSize {
-		asc.cmacLong(msg, block, siv)
-	} else {
-		multiplyByX(block)
-		for i := 0; i < len(msg); i++ {
-			block[i] ^= msg[i]
+		// v := CMAC(msg XOREND block)
+		res, err := asc.cmac.XOREndAndCompute(msg, block)
+		// This should never happen, so we prefer to panic.
+		if err != nil {
+			panic(err)
 		}
-		block[len(msg)] ^= 0x80
-		asc.cmac(block, siv)
+		return res
 	}
-}
-
-// cmacLong computes CMAC(XorEnd(data, last)), where XorEnd xors the bytes in
-// last to the last bytes in data.
-//
-// The size of the data must be at least 16 bytes.
-func (asc *AESSIV) cmacLong(data, last, mac []byte) {
-	block := make([]byte, aes.BlockSize)
-	copy(block, data[:aes.BlockSize])
-
-	idx := aes.BlockSize
-	for aes.BlockSize <= len(data)-idx {
-		asc.cipher.Encrypt(block, block)
-		xorBlock(data[idx:idx+aes.BlockSize], block)
-		idx += aes.BlockSize
-	}
-
-	remaining := len(data) - idx
-	for i := 0; i < aes.BlockSize-remaining; i++ {
-		block[remaining+i] ^= last[i]
-	}
-	if remaining == 0 {
-		xorBlock(asc.cmacK1, block)
-	} else {
-		asc.cipher.Encrypt(block, block)
-		for i := 0; i < remaining; i++ {
-			block[i] ^= last[aes.BlockSize-remaining+i]
-			block[i] ^= data[idx+i]
-		}
-		block[remaining] ^= 0x80
-		xorBlock(asc.cmacK2, block)
-	}
-
-	asc.cipher.Encrypt(mac, block)
-}
-
-// cmac computes a CMAC of some data.
-func (asc *AESSIV) cmac(data, mac []byte) {
-	numBs := int(math.Ceil(float64(len(data)) / aes.BlockSize))
-	if numBs == 0 {
-		numBs = 1
-	}
-	lastBSize := len(data) - (numBs-1)*aes.BlockSize
-
-	block := make([]byte, aes.BlockSize)
-	idx := 0
-	for i := 0; i < numBs-1; i++ {
-		xorBlock(data[idx:idx+aes.BlockSize], block)
-		asc.cipher.Encrypt(block, block)
-		idx += aes.BlockSize
-	}
-	for j := 0; j < lastBSize; j++ {
-		block[j] ^= data[idx+j]
-	}
-
-	if lastBSize == aes.BlockSize {
-		xorBlock(asc.cmacK1, block)
-	} else {
-		block[lastBSize] ^= 0x80
-		xorBlock(asc.cmacK2, block)
-	}
-
-	asc.cipher.Encrypt(mac, block)
-}
-
-// xorBlock sets block[i] = x[i] ^ block[i].
-func xorBlock(x, block []byte) {
-	for i := 0; i < aes.BlockSize; i++ {
-		block[i] ^= x[i]
-	}
+	// block := MultiplyByX(block) XOR pad(msg)
+	multiplyByX(block)
+	subtle.XORBytes(block, block, msg)
+	block[len(msg)] ^= 0x80
+	// v := CMAC(block)
+	return asc.cmac.Compute(block)
 }
