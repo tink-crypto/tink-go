@@ -19,8 +19,12 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead"
+	aeadtestutil "github.com/tink-crypto/tink-go/v2/aead/internal/testutil"
+	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	subtleMac "github.com/tink-crypto/tink-go/v2/mac/subtle"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	ctrpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_go_proto"
 	achpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
@@ -138,6 +142,24 @@ func TestKeyManagerNewKeyWithInvalidSerializedKeyFormat(t *testing.T) {
 	}
 }
 
+func mustCreateSubtleAEAD(t *testing.T, key []byte, ivSize int, hashAlgo string, macKey []byte, tagSize int) tink.AEAD {
+	ctr, err := subtle.NewAESCTR(key, ivSize)
+	if err != nil {
+		t.Fatalf("subtle.NewAESCTR(key, ivSize) err = %v, want nil", err)
+	}
+
+	mac, err := subtleMac.NewHMAC(hashAlgo, macKey, uint32(tagSize))
+	if err != nil {
+		t.Fatalf("subtleMac.NewHMAC(hashAlgo, macKey, uint32(tagSize)) err = %v, want nil", err)
+	}
+
+	cipher, err := subtle.NewEncryptThenAuthenticate(ctr, mac, tagSize)
+	if err != nil {
+		t.Fatalf("subtle.NewEncryptThenAuthenticate(ctr, mac, tagSize) err = %v, want nil", err)
+	}
+	return cipher
+}
+
 func TestKeyManagerPrimitive(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACAEADTypeURL)
 	if err != nil {
@@ -148,12 +170,12 @@ func TestKeyManagerPrimitive(t *testing.T) {
 		Version: 0,
 		AesCtrKey: &ctrpb.AesCtrKey{
 			Version:  0,
-			KeyValue: make([]byte, 32),
+			KeyValue: []byte("0123456789abcdef0123456789abcdef"),
 			Params:   &ctrpb.AesCtrParams{IvSize: 16},
 		},
 		HmacKey: &hmacpb.HmacKey{
 			Version:  0,
-			KeyValue: make([]byte, 32),
+			KeyValue: []byte("fedba9876543210fedcba9876543210"),
 			Params:   &hmacpb.HmacParams{Hash: commonpb.HashType_SHA256, TagSize: 32},
 		},
 	}
@@ -162,9 +184,21 @@ func TestKeyManagerPrimitive(t *testing.T) {
 		t.Fatalf("failed to marshal key: %s", err)
 	}
 
-	_, err = keyManager.Primitive(serializedKey)
+	p, err := keyManager.Primitive(serializedKey)
 	if err != nil {
 		t.Errorf("Primitive() err = %v, want nil", err)
+	}
+
+	aesCTRHMACAEAD, ok := p.(tink.AEAD)
+	if !ok {
+		t.Errorf("Primitive() returned %T, want tink.AEAD", p)
+	}
+	other := mustCreateSubtleAEAD(t, key.AesCtrKey.GetKeyValue(), 16, "SHA256", key.HmacKey.GetKeyValue(), 32)
+	if err := aeadtestutil.EncryptDecrypt(aesCTRHMACAEAD, other); err != nil {
+		t.Errorf("aeadtestutil.EncryptDecrypt(aesCTRHMACAEAD, other) err = %v, want nil", err)
+	}
+	if err := aeadtestutil.EncryptDecrypt(other, aesCTRHMACAEAD); err != nil {
+		t.Errorf("aeadtestutil.EncryptDecrypt(other, aesCTRHMACAEAD) err = %v, want nil", err)
 	}
 }
 

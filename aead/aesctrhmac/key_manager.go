@@ -20,9 +20,8 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
-	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	ctrpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_go_proto"
 	aeadpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
@@ -45,37 +44,27 @@ type keyManager struct{}
 // Primitive creates a [subtle.NewEncryptThenAuthenticate] primitive for the given
 // serialized [aeadpb.AesCtrHmacAeadKey].
 func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
-	protoKey := new(aeadpb.AesCtrHmacAeadKey)
-	if err := proto.Unmarshal(serializedKey, protoKey); err != nil {
-		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: invalid key")
-	}
-	if err := km.validateKey(protoKey); err != nil {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         typeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
 		return nil, err
 	}
-	params, err := NewParameters(ParametersOpts{
-		AESKeySizeInBytes:  int(len(protoKey.GetAesCtrKey().GetKeyValue())),
-		HMACKeySizeInBytes: int(len(protoKey.GetHmacKey().GetKeyValue())),
-		IVSizeInBytes:      int(protoKey.GetAesCtrKey().GetParams().GetIvSize()),
-		TagSizeInBytes:     int(protoKey.GetHmacKey().GetParams().GetTagSize()),
-		HashType:           HashType(protoKey.GetHmacKey().GetParams().GetHash()),
-		Variant:            VariantNoPrefix,
-	})
+	key, err := protoserialization.ParseKey(keySerialization)
 	if err != nil {
-		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: %s", err)
+		return nil, err
 	}
-	key, err := NewKey(KeyOpts{
-		AESKeyBytes:  secretdata.NewBytesFromData(protoKey.GetAesCtrKey().GetKeyValue(), insecuresecretdataaccess.Token{}),
-		HMACKeyBytes: secretdata.NewBytesFromData(protoKey.GetHmacKey().GetKeyValue(), insecuresecretdataaccess.Token{}),
-		Parameters:   params,
-	})
+	aesCTRHMACKey, ok := key.(*Key)
+	if !ok {
+		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: invalid key type: got %T, want %T", key, (*Key)(nil))
+	}
+	ret, err := newAEAD(aesCTRHMACKey)
 	if err != nil {
-		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: %s", err)
+		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: %v", err)
 	}
-	aead, err := newAEAD(key)
-	if err != nil {
-		return nil, fmt.Errorf("aes_ctr_hmac_aead_key_manager: %s", err)
-	}
-	return aead, nil
+	return ret, nil
 }
 
 // NewKey creates a new key according to the given serialized
