@@ -15,14 +15,13 @@
 package aesgcmsiv_test
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
+	aeadtestutil "github.com/tink-crypto/tink-go/v2/aead/internal/testutil"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	gcmsivpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_siv_go_proto"
@@ -56,11 +55,11 @@ func TestKeyManagerGetPrimitiveBasic(t *testing.T) {
 			if err != nil {
 				t.Fatalf("subtle.NewAESGCMSIV(key.GetKeyValue()) err = %v, want nil", err)
 			}
-			if err := encryptDecrypt(aesGCMSIV, subtleAESGCMSIV); err != nil {
-				t.Errorf("encryptDecrypt(aesGCMSIV, subtleAESGCMSIV) err = %v, want nil", err)
+			if err := aeadtestutil.EncryptDecrypt(aesGCMSIV, subtleAESGCMSIV); err != nil {
+				t.Errorf("aeadtestutil.EncryptDecrypt(aesGCMSIV, subtleAESGCMSIV) err = %v, want nil", err)
 			}
-			if err := encryptDecrypt(subtleAESGCMSIV, aesGCMSIV); err != nil {
-				t.Errorf("encryptDecrypt(subtleAESGCMSIV, aesGCMSIV) err = %v, want nil", err)
+			if err := aeadtestutil.EncryptDecrypt(subtleAESGCMSIV, aesGCMSIV); err != nil {
+				t.Errorf("aeadtestutil.EncryptDecrypt(subtleAESGCMSIV, aesGCMSIV) err = %v, want nil", err)
 			}
 		})
 	}
@@ -223,11 +222,11 @@ func TestKeyManagerNewKeyDataBasic(t *testing.T) {
 			t.Errorf("subtle.NewAESGCMSIV(key.GetKeyValue()) err = %v, want nil", err)
 			continue
 		}
-		if err := encryptDecrypt(aesGCMSIV, subtleAESGCMSIV); err != nil {
-			t.Errorf("encryptDecrypt(aesGCMSIV, subtleAESGCMSIV) err = %v, want nil", err)
+		if err := aeadtestutil.EncryptDecrypt(aesGCMSIV, subtleAESGCMSIV); err != nil {
+			t.Errorf("aeadtestutil.EncryptDecrypt(aesGCMSIV, subtleAESGCMSIV) err = %v, want nil", err)
 		}
-		if err := encryptDecrypt(subtleAESGCMSIV, aesGCMSIV); err != nil {
-			t.Errorf("encryptDecrypt(subtleAESGCMSIV, aesGCMSIV) err = %v, want nil", err)
+		if err := aeadtestutil.EncryptDecrypt(subtleAESGCMSIV, aesGCMSIV); err != nil {
+			t.Errorf("aeadtestutil.EncryptDecrypt(subtleAESGCMSIV, aesGCMSIV) err = %v, want nil", err)
 		}
 	}
 }
@@ -317,23 +316,5 @@ func validateAESGCMSIVKey(key *gcmsivpb.AesGcmSivKey, format *gcmsivpb.AesGcmSiv
 	if err != nil {
 		return fmt.Errorf("subtle.NewAESGCMSIV(key=%v): Invalid key; err=%v", key.KeyValue, err)
 	}
-	return encryptDecrypt(p, p)
-}
-
-func encryptDecrypt(encryptor, decryptor tink.AEAD) error {
-	// Try to encrypt and decrypt random data.
-	pt := random.GetRandomBytes(32)
-	aad := random.GetRandomBytes(32)
-	ct, err := encryptor.Encrypt(pt, aad)
-	if err != nil {
-		return fmt.Errorf("encryptor.Encrypt() err = %v, want nil", err)
-	}
-	decrypted, err := decryptor.Decrypt(ct, aad)
-	if err != nil {
-		return fmt.Errorf("decryptor.Decrypt() err = %v, want nil", err)
-	}
-	if !bytes.Equal(decrypted, pt) {
-		return fmt.Errorf("decryptor.Decrypt() = %v, want %v", decrypted, pt)
-	}
-	return nil
+	return aeadtestutil.EncryptDecrypt(p, p)
 }

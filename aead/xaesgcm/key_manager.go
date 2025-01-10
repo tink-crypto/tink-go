@@ -58,11 +58,11 @@ func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
 	}
 	xAESGCMKey, ok := key.(*Key)
 	if !ok {
-		return nil, fmt.Errorf("invalid key type: got %T, want *xaesgcm.Key", key)
+		return nil, fmt.Errorf("xaesgcm_key_manager: invalid key type: got %T, want %T", key, (*Key)(nil))
 	}
 	ret, err := NewAEAD(xAESGCMKey, internalapi.Token{})
 	if err != nil {
-		return nil, fmt.Errorf("xaesgcm_key_manager: cannot create new primitive: %v", err)
+		return nil, fmt.Errorf("xaesgcm_key_manager: %v", err)
 	}
 	return ret, nil
 }

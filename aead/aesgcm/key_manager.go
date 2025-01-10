@@ -20,10 +20,9 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/aead"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
-	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -47,37 +46,27 @@ var _ registry.KeyManager = (*keyManager)(nil)
 
 // Primitive creates an AESGCM subtle for the given serialized AESGCMKey proto.
 func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, errInvalidKey
-	}
-	protoKey := new(gcmpb.AesGcmKey)
-	if err := proto.Unmarshal(serializedKey, protoKey); err != nil {
-		return nil, errInvalidKey
-	}
-	if err := km.validateKey(protoKey); err != nil {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         typeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
 		return nil, err
 	}
-
-	keyBytes := secretdata.NewBytesFromData(protoKey.GetKeyValue(), insecuresecretdataaccess.Token{})
-	opts := ParametersOpts{
-		KeySizeInBytes: keyBytes.Len(),
-		IVSizeInBytes:  ivSize,
-		TagSizeInBytes: tagSize,
-		Variant:        VariantNoPrefix,
-	}
-	parameters, err := NewParameters(opts)
+	key, err := protoserialization.ParseKey(keySerialization)
 	if err != nil {
-		return nil, fmt.Errorf("aes_gcm_key_manager: cannot create new parameters: %s", err)
+		return nil, err
 	}
-	key, err := NewKey(keyBytes, 0, parameters)
+	aesGCMKey, ok := key.(*Key)
+	if !ok {
+		return nil, fmt.Errorf("xaesgcm_key_manager: invalid key type: got %T, want %T", key, (*Key)(nil))
+	}
+	ret, err := NewAEAD(aesGCMKey)
 	if err != nil {
-		return nil, fmt.Errorf("aes_gcm_key_manager: cannot create new key: %s", err)
+		return nil, fmt.Errorf("xaesgcm_key_manager: %v", err)
 	}
-	primitive, err := NewAEAD(key)
-	if err != nil {
-		return nil, fmt.Errorf("aes_gcm_key_manager: cannot create new AEAD: %s", err)
-	}
-	return primitive, nil
+	return ret, nil
 }
 
 // NewKey creates a new key according to specification the given serialized AESGCMKeyFormat.
