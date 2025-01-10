@@ -20,11 +20,12 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	xpb "github.com/tink-crypto/tink-go/v2/proto/xchacha20_poly1305_go_proto"
 )
@@ -44,19 +45,25 @@ var _ registry.KeyManager = (*keyManager)(nil)
 // Primitive constructs a XChaCha20Poly1305 for the given serialized
 // [xpb.XChaCha20Poly1305Key].
 func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, fmt.Errorf("xchacha20poly1305_key_manager: empty key")
-	}
-	key := new(xpb.XChaCha20Poly1305Key)
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, fmt.Errorf("xchacha20poly1305_key_manager: invalid key")
-	}
-	if err := km.validateKey(key); err != nil {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         typeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
 		return nil, err
 	}
-	ret, err := subtle.NewXChaCha20Poly1305(key.KeyValue)
+	key, err := protoserialization.ParseKey(keySerialization)
 	if err != nil {
-		return nil, fmt.Errorf("xchacha20poly1305_key_manager: cannot create new primitive: %v", err)
+		return nil, err
+	}
+	xChaCha20Poly1305Key, ok := key.(*Key)
+	if !ok {
+		return nil, fmt.Errorf("xchacha20poly1305_key_manager: invalid key type: got %T, want %T", key, (*Key)(nil))
+	}
+	ret, err := newAEAD(xChaCha20Poly1305Key)
+	if err != nil {
+		return nil, fmt.Errorf("xchacha20poly1305_key_manager: %v", err)
 	}
 	return ret, nil
 }
