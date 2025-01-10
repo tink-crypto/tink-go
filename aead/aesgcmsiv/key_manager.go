@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	gcmsivpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_siv_go_proto"
@@ -37,19 +38,25 @@ var _ registry.KeyManager = (*aesGCMSIVKeyManager)(nil)
 // Primitive creates an [tink.AEAD] primitive from a serialized
 // [gcmsivpb.AesGcmSivKey].
 func (km *aesGCMSIVKeyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, fmt.Errorf("aes_gcm_siv_key_manager: invalid key")
-	}
-	key := new(gcmsivpb.AesGcmSivKey)
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, fmt.Errorf("aes_gcm_siv_key_manager: invalid key")
-	}
-	if err := km.validateKey(key); err != nil {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         typeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
 		return nil, err
 	}
-	ret, err := subtle.NewAESGCMSIV(key.KeyValue)
+	key, err := protoserialization.ParseKey(keySerialization)
 	if err != nil {
-		return nil, fmt.Errorf("aes_gcm_siv_key_manager: cannot create new primitive: %s", err)
+		return nil, err
+	}
+	aesGCMSIVKey, ok := key.(*Key)
+	if !ok {
+		return nil, fmt.Errorf("aes_gcm_siv_key_manager: invalid key type: got %T, want %T", key, (*Key)(nil))
+	}
+	ret, err := newAEAD(aesGCMSIVKey)
+	if err != nil {
+		return nil, fmt.Errorf("aes_gcm_siv_key_manager: %v", err)
 	}
 	return ret, nil
 }

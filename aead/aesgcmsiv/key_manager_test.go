@@ -24,6 +24,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	gcmsivpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_siv_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -36,21 +37,32 @@ func TestKeyManagerGetPrimitiveBasic(t *testing.T) {
 		t.Fatalf("registry.GetKeyManager(typeURL=%s): Cannot obtain AES-GCM-SIV key manager; err=%v", testutil.AESGCMSIVTypeURL, err)
 	}
 	for _, keySize := range aesGCMSIVKeySizes {
-		key := testutil.NewAESGCMSIVKey(testutil.AESGCMSIVKeyVersion, uint32(keySize))
-		serializedKey, err := proto.Marshal(key)
-		if err != nil {
-			t.Errorf("proto.Marshal(data=%+v): Failed to serialize key for keySize=%d, skipping test iteration; err=%v", key, keySize, err)
-			continue
-		}
-		p, err := keyManager.Primitive(serializedKey)
-		if err != nil {
-			t.Errorf("Primitive(serializedKey=%v): Unexpected error creating AES-GCM-SIV primitive with keySize=%d, skipping test iteration; err=%v", serializedKey, keySize, err)
-			continue
-		}
-		if err := validateAESGCMSIVPrimitive(p, key); err != nil {
-			t.Errorf("validateAESGCMSIVPrimitive(key=%v): Error validating AES-GCM-SIV primitive with keySize=%d, skipping test iteration; err=%v", key, keySize, err)
-			continue
-		}
+		t.Run(fmt.Sprintf("keySize=%d", keySize), func(t *testing.T) {
+			key := testutil.NewAESGCMSIVKey(testutil.AESGCMSIVKeyVersion, uint32(keySize))
+			serializedKey, err := proto.Marshal(key)
+			if err != nil {
+				t.Fatalf("proto.Marshal(data=%+v): Failed to serialize key for keySize=%d, skipping test iteration; err=%v", key, keySize, err)
+			}
+			p, err := keyManager.Primitive(serializedKey)
+			if err != nil {
+				t.Fatalf("Primitive(serializedKey=%v): Unexpected error creating AES-GCM-SIV primitive with keySize=%d, skipping test iteration; err=%v", serializedKey, keySize, err)
+			}
+			aesGCMSIV, ok := p.(tink.AEAD)
+			if !ok {
+				t.Fatalf("Primitive(serializedKey=%v): Primitive is not a tink.AEAD", serializedKey)
+			}
+
+			subtleAESGCMSIV, err := subtle.NewAESGCMSIV(key.GetKeyValue())
+			if err != nil {
+				t.Fatalf("subtle.NewAESGCMSIV(key.GetKeyValue()) err = %v, want nil", err)
+			}
+			if err := encryptDecrypt(aesGCMSIV, subtleAESGCMSIV); err != nil {
+				t.Errorf("encryptDecrypt(aesGCMSIV, subtleAESGCMSIV) err = %v, want nil", err)
+			}
+			if err := encryptDecrypt(subtleAESGCMSIV, aesGCMSIV); err != nil {
+				t.Errorf("encryptDecrypt(subtleAESGCMSIV, aesGCMSIV) err = %v, want nil", err)
+			}
+		})
 	}
 }
 
@@ -200,9 +212,22 @@ func TestKeyManagerNewKeyDataBasic(t *testing.T) {
 		if err != nil {
 			t.Errorf("registry.PrimitiveFromKeyData(keyData) err = %v, want nil", err)
 		}
-		_, ok := p.(*subtle.AESGCMSIV)
+		aesGCMSIV, ok := p.(tink.AEAD)
 		if !ok {
-			t.Error("registry.PrimitiveFromKeyData(keyData) did not return a AESGCMSIV primitive")
+			t.Error("registry.PrimitiveFromKeyData(keyData) not a tink.AEAD")
+			continue
+		}
+
+		subtleAESGCMSIV, err := subtle.NewAESGCMSIV(key.GetKeyValue())
+		if err != nil {
+			t.Errorf("subtle.NewAESGCMSIV(key.GetKeyValue()) err = %v, want nil", err)
+			continue
+		}
+		if err := encryptDecrypt(aesGCMSIV, subtleAESGCMSIV); err != nil {
+			t.Errorf("encryptDecrypt(aesGCMSIV, subtleAESGCMSIV) err = %v, want nil", err)
+		}
+		if err := encryptDecrypt(subtleAESGCMSIV, aesGCMSIV); err != nil {
+			t.Errorf("encryptDecrypt(subtleAESGCMSIV, aesGCMSIV) err = %v, want nil", err)
 		}
 	}
 }
@@ -282,34 +307,33 @@ func genInvalidAESGCMSIVKeyFormats() []proto.Message {
 
 func validateAESGCMSIVKey(key *gcmsivpb.AesGcmSivKey, format *gcmsivpb.AesGcmSivKeyFormat) error {
 	if uint32(len(key.KeyValue)) != format.KeySize {
-		return fmt.Errorf("Incorrect key size, got %d, want %d", uint32(len(key.KeyValue)), format.KeySize)
+		return fmt.Errorf("incorrect key size, got %d, want %d", uint32(len(key.KeyValue)), format.KeySize)
 	}
 	if key.Version != testutil.AESGCMSIVKeyVersion {
-		return fmt.Errorf("Incorrect key version, got %d, want %d", key.Version, testutil.AESGCMSIVKeyVersion)
+		return fmt.Errorf("incorrect key version, got %d, want %d", key.Version, testutil.AESGCMSIVKeyVersion)
 	}
 	// Try to encrypt and decrypt random data.
 	p, err := subtle.NewAESGCMSIV(key.KeyValue)
 	if err != nil {
 		return fmt.Errorf("subtle.NewAESGCMSIV(key=%v): Invalid key; err=%v", key.KeyValue, err)
 	}
-	return validateAESGCMSIVPrimitive(p, key)
+	return encryptDecrypt(p, p)
 }
 
-func validateAESGCMSIVPrimitive(p any, key *gcmsivpb.AesGcmSivKey) error {
-	cipher := p.(*subtle.AESGCMSIV)
+func encryptDecrypt(encryptor, decryptor tink.AEAD) error {
 	// Try to encrypt and decrypt random data.
 	pt := random.GetRandomBytes(32)
 	aad := random.GetRandomBytes(32)
-	ct, err := cipher.Encrypt(pt, aad)
+	ct, err := encryptor.Encrypt(pt, aad)
 	if err != nil {
-		return fmt.Errorf("subtle.AESGCMSIV.Encrypt(pt=%v, aad=%v): Encryption failed; err=%v", pt, aad, err)
+		return fmt.Errorf("encryptor.Encrypt() err = %v, want nil", err)
 	}
-	decrypted, err := cipher.Decrypt(ct, aad)
+	decrypted, err := decryptor.Decrypt(ct, aad)
 	if err != nil {
-		return fmt.Errorf("subtle.AESGCMSIV.Decrypt(ct=%v, aad=%v): Decryption failed; err=%v", ct, aad, err)
+		return fmt.Errorf("decryptor.Decrypt() err = %v, want nil", err)
 	}
 	if !bytes.Equal(decrypted, pt) {
-		return fmt.Errorf("subtle.AESGCMSIV.Decrypt(ct=%v, aad=%v): Decrypted bytes did not match original, got %v, want %v", ct, aad, decrypted, pt)
+		return fmt.Errorf("decryptor.Decrypt() = %v, want %v", decrypted, pt)
 	}
 	return nil
 }
