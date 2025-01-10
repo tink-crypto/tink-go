@@ -23,8 +23,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
-	_ "github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
+	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
+
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -53,8 +55,20 @@ func TestKeyManagerGetPrimitive(t *testing.T) {
 	if err != nil {
 		t.Errorf("km.Primitive(%v) = %v; want nil", serializedKey, err)
 	}
-	if err := validateXAESGCMPrimitive(p, key); err != nil {
-		t.Errorf("validateXAESGCMPrimitive(p, key) = %v; want nil", err)
+	xAESGCM, ok := p.(tink.AEAD)
+	if !ok {
+		t.Fatalf("km.Primitive(serializedKey) = %T, want tink.AEAD", p)
+	}
+
+	wantXAESGCM, err := xaesgcm.NewAEAD(mustCreateKey(t, key.GetKeyValue(), xaesgcm.VariantNoPrefix, 12, 0), internalapi.Token{})
+	if err != nil {
+		t.Fatalf("xaesgcm.NewAEAD() err = %v, want nil", err)
+	}
+	if err := encryptDecrypt(xAESGCM, wantXAESGCM); err != nil {
+		t.Errorf("encryptDecrypt(xAESGCM, wantXAESGCM) err = %v, want nil", err)
+	}
+	if err := encryptDecrypt(wantXAESGCM, xAESGCM); err != nil {
+		t.Errorf("encryptDecrypt(wantXAESGCM, xAESGCM) err = %v, want nil", err)
 	}
 }
 
@@ -350,22 +364,20 @@ func TestKeyManagerDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
 	}
 }
 
-func validateXAESGCMPrimitive(p any, key *xaesgcmpb.XAesGcmKey) error {
-	cipher := p.(tink.AEAD)
-
-	// Try to encrypt and decrypt.
+func encryptDecrypt(encryptor, decryptor tink.AEAD) error {
+	// Try to encrypt and decrypt random data.
 	pt := random.GetRandomBytes(32)
 	aad := random.GetRandomBytes(32)
-	ct, err := cipher.Encrypt(pt, aad)
+	ct, err := encryptor.Encrypt(pt, aad)
 	if err != nil {
-		return fmt.Errorf("encryption failed")
+		return fmt.Errorf("encryptor.Encrypt() err = %v, want nil", err)
 	}
-	decrypted, err := cipher.Decrypt(ct, aad)
+	decrypted, err := decryptor.Decrypt(ct, aad)
 	if err != nil {
-		return fmt.Errorf("decryption failed")
+		return fmt.Errorf("decryptor.Decrypt() err = %v, want nil", err)
 	}
 	if !bytes.Equal(decrypted, pt) {
-		return fmt.Errorf("decryption failed")
+		return fmt.Errorf("decryptor.Decrypt() = %v, want %v", decrypted, pt)
 	}
 	return nil
 }
@@ -383,5 +395,5 @@ func validateXAESGCMKey(key *xaesgcmpb.XAesGcmKey) error {
 	if err != nil {
 		return fmt.Errorf("invalid key: %v", key.KeyValue)
 	}
-	return validateXAESGCMPrimitive(p, key)
+	return encryptDecrypt(p, p)
 }
