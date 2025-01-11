@@ -19,7 +19,7 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 
@@ -44,19 +44,25 @@ type keyManager struct{}
 
 // Primitive creates an ChaCha20Poly1305 subtle for the given serialized ChaCha20Poly1305Key proto.
 func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, errInvalidKey
-	}
-	key := new(cppb.ChaCha20Poly1305Key)
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidKey
-	}
-	if err := km.validateKey(key); err != nil {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         typeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
 		return nil, err
 	}
-	ret, err := subtle.NewChaCha20Poly1305(key.KeyValue)
+	key, err := protoserialization.ParseKey(keySerialization)
 	if err != nil {
-		return nil, fmt.Errorf("chacha20poly1305_key_manager: cannot create new primitive: %s", err)
+		return nil, err
+	}
+	chaCha20Poly1305Key, ok := key.(*Key)
+	if !ok {
+		return nil, fmt.Errorf("chacha20poly1305_key_manager: invalid key type: got %T, want %T", key, (*Key)(nil))
+	}
+	ret, err := newAEAD(chaCha20Poly1305Key)
+	if err != nil {
+		return nil, fmt.Errorf("chacha20poly1305_key_manager: %v", err)
 	}
 	return ret, nil
 }

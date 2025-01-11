@@ -15,15 +15,16 @@
 package chacha20poly1305_test
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"google.golang.org/protobuf/proto"
+	aeadtestutil "github.com/tink-crypto/tink-go/v2/aead/internal/testutil"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	cppb "github.com/tink-crypto/tink-go/v2/proto/chacha20_poly1305_go_proto"
@@ -51,8 +52,19 @@ func TestKeyManagerGetPrimitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("km.Primitive(%v) = %v; want nil", serializedKey, err)
 	}
-	if err := validateChaCha20Poly1305Primitive(p, key); err != nil {
-		t.Errorf("validateChaCha20Poly1305Primitive(p, key) = %v; want nil", err)
+	aead, ok := p.(tink.AEAD)
+	if !ok {
+		t.Fatalf("km.Primitive(serializedKey) = %T, want tink.AEAD", p)
+	}
+	expectedAEAD, err := subtle.NewChaCha20Poly1305(key.GetKeyValue())
+	if err != nil {
+		t.Fatalf("subtle.NewChaCha20Poly1305(%v) err = %v, want nil", key.GetKeyValue(), err)
+	}
+	if err := aeadtestutil.EncryptDecrypt(aead, expectedAEAD); err != nil {
+		t.Errorf("aeadtestutil.EncryptDecrypt(aead, expectedAEAD) = %v; want nil", err)
+	}
+	if err := aeadtestutil.EncryptDecrypt(expectedAEAD, aead); err != nil {
+		t.Errorf("aeadtestutil.EncryptDecrypt(expectedAEAD, aead) = %v; want nil", err)
 	}
 }
 
@@ -117,9 +129,19 @@ func TestKeyManagerNewKeyData(t *testing.T) {
 	if err != nil {
 		t.Errorf("registry.PrimitiveFromKeyData(kd) err = %v, want nil", err)
 	}
-	_, ok := p.(*subtle.ChaCha20Poly1305)
+	aead, ok := p.(tink.AEAD)
 	if !ok {
-		t.Error("registry.PrimitiveFromKeyData(kd) did not return a ChaCha20Poly1305 primitive")
+		t.Fatalf("km.Primitive(serializedKey) = %T, want tink.AEAD", p)
+	}
+	expectedAEAD, err := subtle.NewChaCha20Poly1305(key.GetKeyValue())
+	if err != nil {
+		t.Fatalf("subtle.NewChaCha20Poly1305(%v) err = %v, want nil", key.GetKeyValue(), err)
+	}
+	if err := aeadtestutil.EncryptDecrypt(aead, expectedAEAD); err != nil {
+		t.Errorf("aeadtestutil.EncryptDecrypt(aead, expectedAEAD) = %v; want nil", err)
+	}
+	if err := aeadtestutil.EncryptDecrypt(expectedAEAD, aead); err != nil {
+		t.Errorf("aeadtestutil.EncryptDecrypt(expectedAEAD, aead) = %v; want nil", err)
 	}
 }
 
@@ -169,39 +191,18 @@ func genInvalidChaCha20Poly1305Keys() []*cppb.ChaCha20Poly1305Key {
 	}
 }
 
-func validateChaCha20Poly1305Primitive(p any, key *cppb.ChaCha20Poly1305Key) error {
-	cipher := p.(*subtle.ChaCha20Poly1305)
-
-	wantPT := random.GetRandomBytes(32)
-	aad := random.GetRandomBytes(32)
-	ct, err := cipher.Encrypt(wantPT, aad)
-	if err != nil {
-		return fmt.Errorf("encryption failed")
-	}
-
-	gotPT, err := cipher.Decrypt(ct, aad)
-	if err != nil {
-		return fmt.Errorf("decryption failed")
-	}
-	if !bytes.Equal(gotPT, wantPT) {
-		return fmt.Errorf("decryption failed")
-	}
-
-	return nil
-}
-
 func validateChaCha20Poly1305Key(key *cppb.ChaCha20Poly1305Key) error {
-	if key.Version != testutil.ChaCha20Poly1305KeyVersion {
+	if key.GetVersion() != testutil.ChaCha20Poly1305KeyVersion {
 		return fmt.Errorf("incorrect key version: keyVersion != %d", testutil.ChaCha20Poly1305KeyVersion)
 	}
-	if uint32(len(key.KeyValue)) != chacha20poly1305.KeySize {
+	if uint32(len(key.GetKeyValue())) != chacha20poly1305.KeySize {
 		return fmt.Errorf("incorrect key size: keySize != %d", chacha20poly1305.KeySize)
 	}
 
 	// Try to encrypt and decrypt.
-	p, err := subtle.NewChaCha20Poly1305(key.KeyValue)
+	p, err := subtle.NewChaCha20Poly1305(key.GetKeyValue())
 	if err != nil {
-		return fmt.Errorf("invalid key: %v", key.KeyValue)
+		return fmt.Errorf("subtle.NewChaCha20Poly1305(%v) = _, %v, want _, nil", key.GetKeyValue(), err)
 	}
-	return validateChaCha20Poly1305Primitive(p, key)
+	return aeadtestutil.EncryptDecrypt(p, p)
 }
