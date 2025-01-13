@@ -22,8 +22,9 @@ import (
 	"io"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
-	"github.com/tink-crypto/tink-go/v2/signature/subtle"
 	ed25519pb "github.com/tink-crypto/tink-go/v2/proto/ed25519_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -45,23 +46,23 @@ type signerKeyManager struct{}
 // Primitive creates a [subtle.ED25519Signer] instance for the given serialized
 // [ed25519pb.Ed25519PrivateKey] proto.
 func (km *signerKeyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, errInvalidSignKey
-	}
-	key := new(ed25519pb.Ed25519PrivateKey)
-
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidSignKey
-	}
-	if err := km.validateKey(key); err != nil {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         signerTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
 		return nil, err
 	}
-
-	ret, err := subtle.NewED25519Signer(key.KeyValue)
+	key, err := protoserialization.ParseKey(keySerialization)
 	if err != nil {
-		return nil, fmt.Errorf("%s", err)
+		return nil, err
 	}
-	return ret, nil
+	signerKey, ok := key.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("ed25519_signer_key_manager: invalid key type: got %T, want %T", key, (*PrivateKey)(nil))
+	}
+	return NewSigner(signerKey, internalapi.Token{})
 }
 
 // NewKey creates a new [ed25519pb.Ed25519PrivateKey] according to
@@ -156,10 +157,10 @@ func (km *signerKeyManager) DeriveKey(serializedKeyFormat []byte, pseudorandomne
 // validateKey validates the given [ed25519pb.Ed25519PrivateKey].
 func (km *signerKeyManager) validateKey(key *ed25519pb.Ed25519PrivateKey) error {
 	if err := keyset.ValidateKeyVersion(key.Version, signerKeyVersion); err != nil {
-		return fmt.Errorf("invalid key: %s", err)
+		return fmt.Errorf("ed25519_signer_key_manager: invalid key: %s", err)
 	}
 	if len(key.KeyValue) != ed25519.SeedSize {
-		return fmt.Errorf("invalid key length, got %d", len(key.KeyValue))
+		return fmt.Errorf("ed25519_signer_key_manager: invalid key length, got %d", len(key.KeyValue))
 	}
 	return nil
 }

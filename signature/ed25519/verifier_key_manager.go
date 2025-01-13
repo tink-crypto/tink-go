@@ -19,8 +19,9 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
-	"github.com/tink-crypto/tink-go/v2/signature/subtle"
 	ed25519pb "github.com/tink-crypto/tink-go/v2/proto/ed25519_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -37,33 +38,35 @@ type verifierKeyManager struct{}
 // Primitive creates a [subtle.ED25519Verifier] for the given serialized
 // [ed25519pb.Ed25519PublicKey] proto.
 func (km *verifierKeyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, fmt.Errorf("invalid key")
-	}
-	key := new(ed25519pb.Ed25519PublicKey)
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, fmt.Errorf("invalid key")
-	}
-	if err := km.validateKey(key); err != nil {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         verifierTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
 		return nil, err
 	}
-	ret, err := subtle.NewED25519Verifier(key.KeyValue)
+	key, err := protoserialization.ParseKey(keySerialization)
 	if err != nil {
-		return nil, fmt.Errorf("invalid key: %s", err)
+		return nil, err
 	}
-	return ret, nil
+	verifierKey, ok := key.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("ed25519_verifier_key_manager: invalid key type: got %T, want %T", key, (*PublicKey)(nil))
+	}
+	return NewVerifier(verifierKey, internalapi.Token{})
 }
 
 // NewKey is not implemented.
 func (km *verifierKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, fmt.Errorf("ed25519_verifier_key_manager: not implemented")
 }
 
 // NewKeyData creates a new KeyData according to specification in  the given
 // serialized ED25519KeyFormat. It should be used solely by the key management
 // API.
 func (km *verifierKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, fmt.Errorf("ed25519_verifier_key_manager: not implemented")
 }
 
 // DoesSupport indicates if this key manager supports the given key type.
@@ -80,7 +83,7 @@ func (km *verifierKeyManager) validateKey(key *ed25519pb.Ed25519PublicKey) error
 		return err
 	}
 	if len(key.KeyValue) != ed25519.PublicKeySize {
-		return fmt.Errorf("invalid key length, required :%d", ed25519.PublicKeySize)
+		return fmt.Errorf("ed25519_verifier_key_manager: invalid key length, required :%d", ed25519.PublicKeySize)
 	}
 	return nil
 }

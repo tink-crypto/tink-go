@@ -18,6 +18,8 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/signature/subtle"
 	ecdsapb "github.com/tink-crypto/tink-go/v2/proto/ecdsa_go_proto"
@@ -40,22 +42,23 @@ type verifierKeyManager struct{}
 // Primitive creates an [subtleSignature.ECDSAVerifier] for the given
 // serialized [ecdsapb.EcdsaPublicKey] proto.
 func (km *verifierKeyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, errInvalidVerifierKey
-	}
-	key := new(ecdsapb.EcdsaPublicKey)
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidVerifierKey
-	}
-	if err := km.validateKey(key); err != nil {
-		return nil, err
-	}
-	hash, curve, encoding := paramNames(key.GetParams())
-	ret, err := subtle.NewECDSAVerifier(hash, curve, encoding, key.X, key.Y)
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         verifierTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+	}, tinkpb.OutputPrefixType_RAW, 0)
 	if err != nil {
 		return nil, err
 	}
-	return ret, nil
+	key, err := protoserialization.ParseKey(keySerialization)
+	if err != nil {
+		return nil, err
+	}
+	verifierKey, ok := key.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("ecdsa_verifier_key_manager: invalid key type: got %T, want %T", key, (*PublicKey)(nil))
+	}
+	return NewVerifier(verifierKey, internalapi.Token{})
 }
 
 // NewKey is not implemented.

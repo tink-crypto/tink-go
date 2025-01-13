@@ -23,7 +23,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/internal/signature"
+	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
@@ -119,8 +119,39 @@ func TestVerifierKeyManagerPrimitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Primitive() err = %v, want nil", err)
 	}
-	if _, ok := p.(*signature.RSA_SSA_PKCS1_Verifier); !ok {
-		t.Fatalf("primitive isn't a RSA_SSA_PKCS1_Verifier")
+	verifier, ok := p.(tink.Verifier)
+	if !ok {
+		t.Fatalf("primitive isn't %T, got %T", p, (tink.Verifier)(nil))
+	}
+
+	// Make sure it can verify RSASSA PKCS1 signatures.
+	rsaPrivateKey := &rsa.PrivateKey{
+		PublicKey: rsa.PublicKey{
+			N: new(big.Int).SetBytes(privKey.GetPublicKey().GetN()),
+			E: int(new(big.Int).SetBytes(privKey.GetPublicKey().GetE()).Int64()),
+		},
+		D: new(big.Int).SetBytes(privKey.GetD()),
+		Primes: []*big.Int{
+			new(big.Int).SetBytes(privKey.GetP()),
+			new(big.Int).SetBytes(privKey.GetQ()),
+		},
+	}
+	if err := rsaPrivateKey.Validate(); err != nil {
+		t.Fatalf("rsaPrivateKey.Validate() err = %v, want nil", err)
+	}
+	rsaPrivateKey.Precompute()
+
+	signer, err := internal.New_RSA_SSA_PKCS1_Signer("SHA256", rsaPrivateKey)
+	if err != nil {
+		t.Fatalf("primitive isn't %T, got %T", p, (tink.Signer)(nil))
+	}
+	toSign := random.GetRandomBytes(100)
+	sig, err := signer.Sign(toSign)
+	if err != nil {
+		t.Fatalf("signer.Sign(toSign) err = %v, want nil", err)
+	}
+	if err := verifier.Verify(sig, toSign); err != nil {
+		t.Errorf("verifier.Verify(sig, toSign) err = %v, want nil", err)
 	}
 }
 

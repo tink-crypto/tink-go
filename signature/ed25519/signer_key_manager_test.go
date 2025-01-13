@@ -28,6 +28,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/signature/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	ed25519pb "github.com/tink-crypto/tink-go/v2/proto/ed25519_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -46,23 +47,12 @@ func TestSignerKeyManagerGetPrimitiveBasic(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpect error in test case: %s ", err)
 	}
-	var s = tmp.(*subtle.ED25519Signer)
+	var s = tmp.(tink.Signer)
 
-	kmPub, err := registry.GetKeyManager(testutil.ED25519VerifierTypeURL)
+	v, err := subtle.NewED25519Verifier(pvtKey.GetPublicKey().GetKeyValue())
 	if err != nil {
-		t.Errorf("cannot obtain ED25519Signer key manager: %s", err)
+		t.Errorf("unexpected error when creating ED25519Verifier: %s", err)
 	}
-	pubKey := pvtKey.PublicKey
-	serializedKey, err = proto.Marshal(pubKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal() err = %v, want nil", err)
-	}
-	tmp, err = kmPub.Primitive(serializedKey)
-	if err != nil {
-		t.Errorf("unexpect error in test case: %s ", err)
-	}
-	var v = tmp.(*subtle.ED25519Verifier)
-
 	data := random.GetRandomBytes(1281)
 	signature, err := s.Sign(data)
 	if err != nil {
@@ -72,7 +62,6 @@ func TestSignerKeyManagerGetPrimitiveBasic(t *testing.T) {
 	if err := v.Verify(signature, data); err != nil {
 		t.Errorf("unexpected error when verifying signature: %s", err)
 	}
-
 }
 
 func TestSignerKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {

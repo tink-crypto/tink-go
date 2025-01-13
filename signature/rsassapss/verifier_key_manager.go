@@ -15,13 +15,14 @@
 package rsassapss
 
 import (
-	"crypto/rsa"
 	"errors"
 	"fmt"
 	"math/big"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	rsassapsspb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pss_go_proto"
@@ -43,21 +44,23 @@ type verifierKeyManager struct{}
 var _ (registry.KeyManager) = (*verifierKeyManager)(nil)
 
 func (km *verifierKeyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, errInvalidVerifierKey
-	}
-	key := &rsassapsspb.RsaSsaPssPublicKey{}
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidVerifierKey
-	}
-	if err := validateRSAPSSPublicKey(key); err != nil {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         verifierTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
 		return nil, err
 	}
-	pubKey := &rsa.PublicKey{
-		E: int(new(big.Int).SetBytes(key.E).Uint64()),
-		N: new(big.Int).SetBytes(key.N),
+	key, err := protoserialization.ParseKey(keySerialization)
+	if err != nil {
+		return nil, err
 	}
-	return internal.New_RSA_SSA_PSS_Verifier(hashName(key.GetParams().GetSigHash()), int(key.GetParams().GetSaltLength()), pubKey)
+	verifierKey, ok := key.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("rsassapss_verifier_key_manager: invalid key type: got %T, want %T", key, (*PublicKey)(nil))
+	}
+	return NewVerifier(verifierKey, internalapi.Token{})
 }
 
 func validateRSAPSSPublicKey(pubKey *rsassapsspb.RsaSsaPssPublicKey) error {

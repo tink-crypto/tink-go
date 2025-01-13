@@ -58,7 +58,7 @@ func (km *signerKeyManager) Primitive(serializedKey []byte) (any, error) {
 	}
 	signerKey, ok := key.(*PrivateKey)
 	if !ok {
-		return nil, fmt.Errorf("invalid key type: got %T, want *rsassapss.PrivateKey", key)
+		return nil, fmt.Errorf("rsassapss_signer_key_manager: invalid key type: got %T, want %T", key, (*PrivateKey)(nil))
 	}
 	return NewSigner(signerKey, internalapi.Token{})
 }
@@ -104,7 +104,7 @@ func (km *signerKeyManager) PublicKeyData(serializedPrivKey []byte) (*tinkpb.Key
 
 func (km *signerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
 	if len(serializedKeyFormat) == 0 {
-		return nil, fmt.Errorf("invalid key format")
+		return nil, fmt.Errorf("rsassapss_signer_key_manager: invalid key format")
 	}
 	keyFormat := &rsassapsspb.RsaSsaPssKeyFormat{}
 	if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
@@ -112,10 +112,10 @@ func (km *signerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, e
 	}
 	params := keyFormat.GetParams()
 	if params.GetSigHash() != params.GetMgf1Hash() {
-		return nil, fmt.Errorf("rsassapss hash and mgf1 hash must be the same")
+		return nil, fmt.Errorf("rsassapss_signer_key_manager: rsassapss hash and mgf1 hash must be the same")
 	}
 	if params.GetSaltLength() < 0 {
-		return nil, fmt.Errorf("salt length can't be negative")
+		return nil, fmt.Errorf("rsassapss_signer_key_manager: salt length can't be negative")
 	}
 	if err := internal.ValidateRSAPublicKeyParams(params.GetSigHash(), int(keyFormat.GetModulusSizeInBits()), keyFormat.GetPublicExponent()); err != nil {
 		return nil, err

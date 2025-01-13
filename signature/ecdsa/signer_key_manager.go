@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	subtleSignature "github.com/tink-crypto/tink-go/v2/signature/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle"
@@ -46,22 +48,23 @@ type signerKeyManager struct{}
 // Primitive creates an [subtleSignature.ECDSASigner] for the given serialized
 // [ecdsapb.EcdsaPrivateKey] proto.
 func (km *signerKeyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, errInvalidSignKey
-	}
-	key := new(ecdsapb.EcdsaPrivateKey)
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidSignKey
-	}
-	if err := km.validateKey(key); err != nil {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         signerTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
 		return nil, err
 	}
-	hash, curve, encoding := paramNames(key.GetPublicKey().GetParams())
-	ret, err := subtleSignature.NewECDSASigner(hash, curve, encoding, key.KeyValue)
+	key, err := protoserialization.ParseKey(keySerialization)
 	if err != nil {
-		return nil, fmt.Errorf("ecdsa_signer_key_manager: %s", err)
+		return nil, err
 	}
-	return ret, nil
+	signerKey, ok := key.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("ecdsa_signer_key_manager: invalid key type: got %T, want %T", key, (*PrivateKey)(nil))
+	}
+	return NewSigner(signerKey, internalapi.Token{})
 }
 
 // NewKey creates a new [ecdsapb.EcdsaPrivateKey] according to specification

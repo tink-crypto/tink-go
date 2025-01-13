@@ -22,7 +22,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/internal/signature"
 	_ "github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1" // Register the key managers.
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -121,9 +120,9 @@ func TestSignerKeyManagerPrimitiveSignVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("rsaSSAPKCS1VerifierKeyManager.Primitive() failed: %v", err)
 	}
-	v, ok := p.(*signature.RSA_SSA_PKCS1_Verifier)
+	v, ok := p.(tink.Verifier)
 	if !ok {
-		t.Fatalf("primitve is not of type RSA_SSA_PKCS1_Verifier")
+		t.Fatalf("primitve is not of type tink.Verifier")
 	}
 	data := random.GetRandomBytes(1281)
 	signature, err := signer.Sign(data)

@@ -63,7 +63,7 @@ func (km *signerKeyManager) Primitive(serializedKey []byte) (any, error) {
 	}
 	signerKey, ok := key.(*PrivateKey)
 	if !ok {
-		return nil, fmt.Errorf("invalid key type: got %T, want *rsassapkcs1.PrivateKey", key)
+		return nil, fmt.Errorf("rsassapkcs1_signer_key_manager: invalid key type: got %T, want %T", key, (*PrivateKey)(nil))
 	}
 	return NewSigner(signerKey, internalapi.Token{})
 }
