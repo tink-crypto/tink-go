@@ -19,25 +19,40 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 )
 
 func TestVerifierKeyManagerGetPrimitiveBasic(t *testing.T) {
-	testParams := genValidECDSAParams()
 	keyManager, err := registry.GetKeyManager(testutil.ECDSAVerifierTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ECDSAVerifierTypeURL, err)
 	}
-	for i := 0; i < len(testParams); i++ {
-		serializedKey, err := proto.Marshal(testutil.NewRandomECDSAPublicKey(testParams[i].hashType, testParams[i].curve))
-		if err != nil {
-			t.Errorf("proto.Marshal() err = %v, want nil", err)
+	for _, tc := range primitiveTestVectors(t) {
+		if tc.publicKey.Parameters().(*ecdsa.Parameters).Variant() != ecdsa.VariantNoPrefix {
+			// Skip non-RAW test cases.
+			continue
 		}
-		_, err = keyManager.Primitive(serializedKey)
-		if err != nil {
-			t.Errorf("unexpect error in test case %d: %s ", i, err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			keySerialization, err := protoserialization.SerializeKey(tc.publicKey)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeKey(%v) err = %v, want nil", tc.publicKey, err)
+			}
+			p, err := keyManager.Primitive(keySerialization.KeyData().GetValue())
+			if err != nil {
+				t.Fatalf("keyManager.Primitive(keySerialization.KeyData().GetValue()) err = %v, want nil", err)
+			}
+			v, ok := p.(tink.Verifier)
+			if !ok {
+				t.Fatalf("keyManager.Primitive(keySerialization.KeyData().GetValue()) = %T, want %T", p, (tink.Verifier)(nil))
+			}
+			if err := v.Verify(tc.signature, tc.message); err != nil {
+				t.Errorf("v.Verify(tc.signature, tc.message) err = %v, want nil", err)
+			}
+		})
 	}
 }
 

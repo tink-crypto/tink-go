@@ -15,6 +15,7 @@
 package rsassapkcs1_test
 
 import (
+	"bytes"
 	"encoding/hex"
 	"math/big"
 	"testing"
@@ -22,8 +23,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1"
 	_ "github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1" // Register the key managers.
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	cpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	rsassapkcs1pb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pkcs1_go_proto"
@@ -92,45 +96,63 @@ func TestSignerKeyManagerPrimitiveSignVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
-	privKey, err := makeValidRSAPKCS1Key()
+	// Test vector from https://github.com/tink-crypto/tink-java/tree/v1.15.0/src/main/java/com/google/crypto/tink/signature/internal/testing/RsaSsaPkcs1TestUtil.java#L35
+	modulus2048Base64 := "t6Q8PWSi1dkJj9hTP8hNYFlvadM7DflW9mWepOJhJ66w7nyoK1gPNqFMSQRy" +
+		"O125Gp-TEkodhWr0iujjHVx7BcV0llS4w5ACGgPrcAd6ZcSR0-Iqom-QFcNP" +
+		"8Sjg086MwoqQU_LYywlAGZ21WSdS_PERyGFiNnj3QQlO8Yns5jCtLCRwLHL0" +
+		"Pb1fEv45AuRIuUfVcPySBWYnDyGxvjYGDSM-AqWS9zIQ2ZilgT-GqUmipg0X" +
+		"OC0Cc20rgLe2ymLHjpHciCKVAbY5-L32-lSeZO-Os6U15_aXrk9Gw8cPUaX1" +
+		"_I8sLGuSiVdt3C_Fn2PZ3Z8i744FPFGGcG1qs2Wz-Q"
+	publicKey := mustCreatePublicKey(t, mustDecodeBase64(t, modulus2048Base64), 0, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantNoPrefix))
+	privateKey, err := rsassapkcs1.NewPrivateKey(publicKey, rsassapkcs1.PrivateKeyValues{
+		P: secretdata.NewBytesFromData(mustDecodeBase64(t, "2rnSOV4hKSN8sS4CgcQHFbs08XboFDqKum3sc4h3GRxrTmQdl1ZK9uw-PIHf"+
+			"QP0FkxXVrx-WE-ZEbrqivH_2iCLUS7wAl6XvARt1KkIaUxPPSYB9yk31s0Q8"+
+			"UK96E3_OrADAYtAJs-M3JxCLfNgqh56HDnETTQhH3rCT5T3yJws"), insecuresecretdataaccess.Token{}),
+		Q: secretdata.NewBytesFromData(mustDecodeBase64(t, "1u_RiFDP7LBYh3N4GXLT9OpSKYP0uQZyiaZwBtOCBNJgQxaj10RWjsZu0c6I"+
+			"edis4S7B_coSKB0Kj9PaPaBzg-IySRvvcQuPamQu66riMhjVtG6TlV8CLCYK"+
+			"rYl52ziqK0E_ym2QnkwsUX7eYTB7LbAHRK9GqocDE5B0f808I4s"), insecuresecretdataaccess.Token{}),
+		D: secretdata.NewBytesFromData(mustDecodeBase64(t, "GRtbIQmhOZtyszfgKdg4u_N-R_mZGU_9k7JQ_jn1DnfTuMdSNprTeaSTyWfS"+
+			"NkuaAwnOEbIQVy1IQbWVV25NY3ybc_IhUJtfri7bAXYEReWaCl3hdlPKXy9U"+
+			"vqPYGR0kIXTQRqns-dVJ7jahlI7LyckrpTmrM8dWBo4_PMaenNnPiQgO0xnu"+
+			"ToxutRZJfJvG4Ox4ka3GORQd9CsCZ2vsUDmsXOfUENOyMqADC6p1M3h33tsu"+
+			"rY15k9qMSpG9OX_IJAXmxzAh_tWiZOwk2K4yxH9tS3Lq1yX8C1EWmeRDkK2a"+
+			"hecG85-oLKQt5VEpWHKmjOi_gJSdSgqcN96X52esAQ"), insecuresecretdataaccess.Token{}),
+	})
 	if err != nil {
-		t.Fatalf("makeValidRSAPKCS1Key() err = %v, want nil", err)
+		t.Fatalf("rsassapkcs1.NewPrivateKey() err = %v, want nil", err)
 	}
-	serializedPrivate, err := proto.Marshal(privKey)
+	message, err := hex.DecodeString("aa")
 	if err != nil {
-		t.Fatalf("proto.Marshal() err = %v, want nil", err)
+		t.Fatalf("hex.DecodeString(%v) = %v, want nil", "aa", err)
 	}
-	p, err := skm.Primitive(serializedPrivate)
+	wantSig, err := hex.DecodeString("3d10ce911833c1fe3f3356580017d159e1557e019096499950f62c3768c716bca418828dc140e930ecceff" +
+		"ebc532db66c77b433e51cef6dfbac86cb3aff6f5fc2a488faf35199b2e12c9fe2de7be3eea63bdc9" +
+		"60e6694e4474c29e5610f5f7fa30ac23b015041353658c74998c3f620728b5859bad9c63d07be0b2" +
+		"d3bbbea8b9121f47385e4cad92b31c0ef656eee782339d14fd6350bb3756663c03cb261f7ece6e03" +
+		"355c7a4ecfe812c965f68890b2571916de0e2cd40814f9db9571065b5340ef7aa66d55a78cd62f4a" +
+		"1bd496623184a3d29dd886c1d1331754915bcbb243e5677ea7bb21a18d1ee22b6ba92c15a23ed6ae" +
+		"de20abc29b290cc04fa0846027")
 	if err != nil {
-		t.Fatalf("Primitive() err = %v, want nil", err)
+		t.Fatalf("hex.DecodeString() = %v, want nil", err)
 	}
-	signer, ok := p.(tink.Signer)
+	keySerialization, err := protoserialization.SerializeKey(privateKey)
+	if err != nil {
+		t.Fatalf("protoserialization.SerializeKey(privateKey) err = %v, want nil", err)
+	}
+	p, err := skm.Primitive(keySerialization.KeyData().GetValue())
+	if err != nil {
+		t.Fatalf("skm.Primitive(keySerialization.KeyData().GetValue())) err = %v, want nil", err)
+	}
+	s, ok := p.(tink.Signer)
 	if !ok {
-		t.Fatalf("primitive is not of type tink.Signer")
+		t.Fatalf("vkm.Primitive(keySerialization.KeyData().GetValue()) = %T, want %T", p, (tink.Signer)(nil))
 	}
-	vkm, err := registry.GetKeyManager(publicKeyTypeURL)
+	got, err := s.Sign(message)
 	if err != nil {
-		t.Fatalf("regitry.GetKeyManager(%q) err = %v, want nil", publicKeyTypeURL, err)
+		t.Fatalf("s.Sign(message) err = %v, want nil", err)
 	}
-	serializedPublic, err := proto.Marshal(privKey.PublicKey)
-	if err != nil {
-		t.Fatalf("Failed serializing public key proto: %v", err)
-	}
-	p, err = vkm.Primitive(serializedPublic)
-	if err != nil {
-		t.Fatalf("rsaSSAPKCS1VerifierKeyManager.Primitive() failed: %v", err)
-	}
-	v, ok := p.(tink.Verifier)
-	if !ok {
-		t.Fatalf("primitve is not of type tink.Verifier")
-	}
-	data := random.GetRandomBytes(1281)
-	signature, err := signer.Sign(data)
-	if err != nil {
-		t.Fatalf("Sign() err = %v, want nil", err)
-	}
-	if err := v.Verify(signature, data); err != nil {
-		t.Fatalf("Verify() err = %v, want nil", err)
+	if !bytes.Equal(got, wantSig) {
+		t.Errorf("s.Sign(message) = %x, want %x", got, wantSig)
 	}
 }
 

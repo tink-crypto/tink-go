@@ -24,7 +24,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
+	tinked25519 "github.com/tink-crypto/tink-go/v2/signature/ed25519"
 	"github.com/tink-crypto/tink-go/v2/signature/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
@@ -36,31 +40,45 @@ import (
 func TestSignerKeyManagerGetPrimitiveBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.ED25519SignerTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain ED25519Signer key manager: %s", err)
-	}
-	pvtKey := testutil.NewED25519PrivateKey()
-	serializedKey, err := proto.Marshal(pvtKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal() err = %v, want nil", err)
-	}
-	tmp, err := km.Primitive(serializedKey)
-	if err != nil {
-		t.Errorf("unexpect error in test case: %s ", err)
-	}
-	var s = tmp.(tink.Signer)
-
-	v, err := subtle.NewED25519Verifier(pvtKey.GetPublicKey().GetKeyValue())
-	if err != nil {
-		t.Errorf("unexpected error when creating ED25519Verifier: %s", err)
-	}
-	data := random.GetRandomBytes(1281)
-	signature, err := s.Sign(data)
-	if err != nil {
-		t.Errorf("unexpected error when signing: %s", err)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ED25519SignerTypeURL, err)
 	}
 
-	if err := v.Verify(signature, data); err != nil {
-		t.Errorf("unexpected error when verifying signature: %s", err)
+	// Taken from https://datatracker.ietf.org/doc/html/rfc8032#section-7.1 - TEST 3.
+	message := []byte{0xaf, 0x82}
+	signatureHex := "6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a"
+	wantSignature, err := hex.DecodeString(signatureHex)
+	if err != nil {
+		t.Fatalf("hex.DecodeString(%q) err = %v, want nil", signatureHex, err)
+	}
+	params, err := tinked25519.NewParameters(tinked25519.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("tinked25519.NewParameters(%v) err = %v, want nil", tinked25519.VariantNoPrefix, err)
+	}
+	_, privateKeyBytes := getTestKeyPair(t)
+	privateKey, err := tinked25519.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}), 0, params)
+	if err != nil {
+		t.Fatalf("tinked25519.NewPrivateKey(%v, %v, %v) err = %v, want nil", privateKeyBytes, 0, params, err)
+	}
+
+	keySerialization, err := protoserialization.SerializeKey(privateKey)
+	if err != nil {
+		t.Fatalf("protoserialization.SerializeKey(%v) err = %v, want nil", privateKey, err)
+	}
+	p, err := km.Primitive(keySerialization.KeyData().GetValue())
+	if err != nil {
+		t.Fatalf("km.Primitive(keySerialization.KeyData().GetValue()) err = %v, want nil", err)
+	}
+	s, ok := p.(tink.Signer)
+	if !ok {
+		t.Fatalf("km.Primitive(keySerialization.KeyData().GetValue()) = %T, want %T", p, (tink.Signer)(nil))
+	}
+
+	got, err := s.Sign(message)
+	if err != nil {
+		t.Fatalf("signer.Sign(%x) err = %v, want nil", message, err)
+	}
+	if diff := cmp.Diff(got, wantSignature); diff != "" {
+		t.Errorf("signer.Sign() returned unexpected diff (-want +got):\n%s", diff)
 	}
 }
 

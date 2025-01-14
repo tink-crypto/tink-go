@@ -23,7 +23,8 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
@@ -107,51 +108,42 @@ func TestVerifierKeyManagerPrimitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", publicKeyTypeURL, err)
 	}
-	privKey, err := makeValidRSAPKCS1Key()
+	// Test vector from https://github.com/tink-crypto/tink-java/tree/v1.15.0/src/main/java/com/google/crypto/tink/signature/internal/testing/RsaSsaPkcs1TestUtil.java#L35
+	modulus2048Base64 := "t6Q8PWSi1dkJj9hTP8hNYFlvadM7DflW9mWepOJhJ66w7nyoK1gPNqFMSQRy" +
+		"O125Gp-TEkodhWr0iujjHVx7BcV0llS4w5ACGgPrcAd6ZcSR0-Iqom-QFcNP" +
+		"8Sjg086MwoqQU_LYywlAGZ21WSdS_PERyGFiNnj3QQlO8Yns5jCtLCRwLHL0" +
+		"Pb1fEv45AuRIuUfVcPySBWYnDyGxvjYGDSM-AqWS9zIQ2ZilgT-GqUmipg0X" +
+		"OC0Cc20rgLe2ymLHjpHciCKVAbY5-L32-lSeZO-Os6U15_aXrk9Gw8cPUaX1" +
+		"_I8sLGuSiVdt3C_Fn2PZ3Z8i744FPFGGcG1qs2Wz-Q"
+	publicKey := mustCreatePublicKey(t, mustDecodeBase64(t, modulus2048Base64), 0, mustCreateParameters(t, 2048, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantNoPrefix))
+	message, err := hex.DecodeString("aa")
 	if err != nil {
-		t.Fatalf("makeValidRSAPKCS1Key() err = %v, want nil", err)
+		t.Fatalf("hex.DecodeString(%v) = %v, want nil", "aa", err)
 	}
-	serializedPubKey, err := proto.Marshal(privKey.GetPublicKey())
+	sig, err := hex.DecodeString("3d10ce911833c1fe3f3356580017d159e1557e019096499950f62c3768c716bca418828dc140e930ecceff" +
+		"ebc532db66c77b433e51cef6dfbac86cb3aff6f5fc2a488faf35199b2e12c9fe2de7be3eea63bdc9" +
+		"60e6694e4474c29e5610f5f7fa30ac23b015041353658c74998c3f620728b5859bad9c63d07be0b2" +
+		"d3bbbea8b9121f47385e4cad92b31c0ef656eee782339d14fd6350bb3756663c03cb261f7ece6e03" +
+		"355c7a4ecfe812c965f68890b2571916de0e2cd40814f9db9571065b5340ef7aa66d55a78cd62f4a" +
+		"1bd496623184a3d29dd886c1d1331754915bcbb243e5677ea7bb21a18d1ee22b6ba92c15a23ed6ae" +
+		"de20abc29b290cc04fa0846027")
 	if err != nil {
-		t.Fatalf("proto.Marshall() err = %v, want nil", err)
+		t.Fatalf("hex.DecodeString() = %v, want nil", err)
 	}
-	p, err := vkm.Primitive(serializedPubKey)
+	keySerialization, err := protoserialization.SerializeKey(publicKey)
 	if err != nil {
-		t.Fatalf("Primitive() err = %v, want nil", err)
+		t.Fatalf("protoserialization.SerializeKey(publicKey) err = %v, want nil", err)
 	}
-	verifier, ok := p.(tink.Verifier)
+	p, err := vkm.Primitive(keySerialization.KeyData().GetValue())
+	if err != nil {
+		t.Fatalf("vkm.Primitive(keySerialization.KeyData().GetValue())) err = %v, want nil", err)
+	}
+	v, ok := p.(tink.Verifier)
 	if !ok {
-		t.Fatalf("primitive isn't %T, got %T", p, (tink.Verifier)(nil))
+		t.Fatalf("vkm.Primitive(keySerialization.KeyData().GetValue()) = %T, want %T", p, (tink.Verifier)(nil))
 	}
-
-	// Make sure it can verify RSASSA PKCS1 signatures.
-	rsaPrivateKey := &rsa.PrivateKey{
-		PublicKey: rsa.PublicKey{
-			N: new(big.Int).SetBytes(privKey.GetPublicKey().GetN()),
-			E: int(new(big.Int).SetBytes(privKey.GetPublicKey().GetE()).Int64()),
-		},
-		D: new(big.Int).SetBytes(privKey.GetD()),
-		Primes: []*big.Int{
-			new(big.Int).SetBytes(privKey.GetP()),
-			new(big.Int).SetBytes(privKey.GetQ()),
-		},
-	}
-	if err := rsaPrivateKey.Validate(); err != nil {
-		t.Fatalf("rsaPrivateKey.Validate() err = %v, want nil", err)
-	}
-	rsaPrivateKey.Precompute()
-
-	signer, err := internal.New_RSA_SSA_PKCS1_Signer("SHA256", rsaPrivateKey)
-	if err != nil {
-		t.Fatalf("primitive isn't %T, got %T", p, (tink.Signer)(nil))
-	}
-	toSign := random.GetRandomBytes(100)
-	sig, err := signer.Sign(toSign)
-	if err != nil {
-		t.Fatalf("signer.Sign(toSign) err = %v, want nil", err)
-	}
-	if err := verifier.Verify(sig, toSign); err != nil {
-		t.Errorf("verifier.Verify(sig, toSign) err = %v, want nil", err)
+	if err := v.Verify(sig, message); err != nil {
+		t.Errorf("v.Verify(sig, message) err = %v, want nil", err)
 	}
 }
 

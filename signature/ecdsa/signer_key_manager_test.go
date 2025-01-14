@@ -21,10 +21,13 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	_ "github.com/tink-crypto/tink-go/v2/signature/ecdsa" // register ECDSA key managers
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
 	"github.com/tink-crypto/tink-go/v2/signature/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	ecdsapb "github.com/tink-crypto/tink-go/v2/proto/ecdsa_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -36,20 +39,42 @@ type ecdsaParams struct {
 }
 
 func TestSignerKeyManagerGetPrimitiveBasic(t *testing.T) {
-	testParams := genValidECDSAParams()
 	keyManager, err := registry.GetKeyManager(testutil.ECDSASignerTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.ECDSASignerTypeURL, err)
 	}
-	for i := 0; i < len(testParams); i++ {
-		serializedKey, err := proto.Marshal(testutil.NewRandomECDSAPrivateKey(testParams[i].hashType, testParams[i].curve))
-		if err != nil {
-			t.Fatalf("proto.Marshal() err = %q, want nil", err)
+	for _, tc := range primitiveTestVectors(t) {
+		if tc.publicKey.Parameters().(*ecdsa.Parameters).Variant() != ecdsa.VariantNoPrefix {
+			// Skip non-RAW test cases.
+			continue
 		}
-		_, err = keyManager.Primitive(serializedKey)
-		if err != nil {
-			t.Errorf("unexpect error in test case %d: %s ", i, err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			keySerialization, err := protoserialization.SerializeKey(tc.privateKey)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeKey(%v) err = %v, want nil", tc.privateKey, err)
+			}
+			p, err := keyManager.Primitive(keySerialization.KeyData().GetValue())
+			if err != nil {
+				t.Fatalf("keyManager.Primitive(keySerialization.KeyData().GetValue()) err = %v, want nil", err)
+			}
+			s, ok := p.(tink.Signer)
+			if !ok {
+				t.Fatalf("keyManager.Primitive(keySerialization.KeyData().GetValue()) = %T, want %T", p, (tink.Signer)(nil))
+			}
+
+			// Validate the primitive signing/verifying.
+			v, err := ecdsa.NewVerifier(tc.publicKey, internalapi.Token{})
+			if err != nil {
+				t.Fatalf("ecdsa.NewVerifier(tc.publicKey, internalapi.Token{}) err = %v, want nil", err)
+			}
+			sig, err := s.Sign(tc.message)
+			if err != nil {
+				t.Fatalf("s.Sign(nil) err = %v, want nil", err)
+			}
+			if err := v.Verify(sig, tc.message); err != nil {
+				t.Errorf("v.Verify(nil, nil) err = %v, want nil", err)
+			}
+		})
 	}
 }
 
