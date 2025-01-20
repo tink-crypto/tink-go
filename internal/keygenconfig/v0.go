@@ -21,6 +21,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
+	"github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 )
 
@@ -37,6 +38,9 @@ func mustCreateConfigV0() Config {
 	}
 	if err := config.RegisterKeyCreator(reflect.TypeFor[*aesgcmsiv.Parameters](), aesgcmsiv.KeyCreator(internalapi.Token{})); err != nil {
 		panic(fmt.Sprintf("keygenconfig: failed to register AES-GCM-SIV: %v", err))
+	}
+	if err := config.RegisterKeyCreator(reflect.TypeFor[*chacha20poly1305.Parameters](), chacha20poly1305.KeyCreator(internalapi.Token{})); err != nil {
+		panic(fmt.Sprintf("keygenconfig: failed to register ChaCha20-Poly1305: %v", err))
 	}
 
 	return *config

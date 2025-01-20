@@ -18,9 +18,11 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -313,5 +315,30 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 				t.Errorf("firstKey.Equal(secondKey) = true, want false")
 			}
 		})
+	}
+}
+
+func TestKeyCreator(t *testing.T) {
+	keyCreator := chacha20poly1305.KeyCreator(internalapi.Token{})
+	params, err := chacha20poly1305.NewParameters(chacha20poly1305.VariantTink)
+	if err != nil {
+		t.Fatalf("chacha20poly1305.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keyCreator(params, 123)
+	if err != nil {
+		t.Fatalf("keyCreator(%v, 123) err = %v, want nil", params, err)
+	}
+	chaCha20Poly1305Key, ok := key.(*chacha20poly1305.Key)
+	if !ok {
+		t.Fatalf("keyCreator(%v, 123) returned key of type %T, want %T", params, key, (*chacha20poly1305.Key)(nil))
+	}
+
+	idRequirement, hasIDRequirement := chaCha20Poly1305Key.IDRequirement()
+	if !hasIDRequirement || idRequirement != 123 {
+		t.Errorf("chaCha20Poly1305Key.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 123, true)
+	}
+	if diff := cmp.Diff(chaCha20Poly1305Key.Parameters(), params); diff != "" {
+		t.Errorf("chaCha20Poly1305Key.Parameters() diff (-want +got):\n%s", diff)
 	}
 }

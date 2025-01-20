@@ -21,6 +21,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
+	"github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 )
@@ -60,6 +61,15 @@ func mustCreateAESCTRHMACParams(t *testing.T, variant aesctrhmac.Variant) *aesct
 	})
 	if err != nil {
 		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
+	}
+	return params
+}
+
+func mustCreateChaCha20Poly1305Params(t *testing.T, variant chacha20poly1305.Variant) *chacha20poly1305.Parameters {
+	t.Helper()
+	params, err := chacha20poly1305.NewParameters(variant)
+	if err != nil {
+		t.Fatalf("chacha20poly1305.NewParameters() err = %v, want nil", err)
 	}
 	return params
 }
@@ -114,6 +124,18 @@ func TestV0(t *testing.T) {
 			p:             mustCreateAESGCMSIVParams(t, aesgcmsiv.VariantNoPrefix),
 			idRequirement: 0,
 			tryCast:       tryCast[*aesgcmsiv.Key],
+		},
+		{
+			name:          "ChaCha20-Poly1305-TINK",
+			p:             mustCreateChaCha20Poly1305Params(t, chacha20poly1305.VariantTink),
+			idRequirement: 123,
+			tryCast:       tryCast[*chacha20poly1305.Key],
+		},
+		{
+			name:          "ChaCha20-Poly1305-NO_PREFIX",
+			p:             mustCreateChaCha20Poly1305Params(t, chacha20poly1305.VariantNoPrefix),
+			idRequirement: 0,
+			tryCast:       tryCast[*chacha20poly1305.Key],
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
