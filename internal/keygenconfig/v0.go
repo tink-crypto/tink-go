@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 )
@@ -29,6 +30,9 @@ func mustCreateConfigV0() Config {
 
 	if err := config.RegisterKeyCreator(reflect.TypeFor[*aesgcm.Parameters](), aesgcm.KeyCreator(internalapi.Token{})); err != nil {
 		panic(fmt.Sprintf("keygenconfig: failed to register AES-GCM: %v", err))
+	}
+	if err := config.RegisterKeyCreator(reflect.TypeFor[*aesctrhmac.Parameters](), aesctrhmac.KeyCreator(internalapi.Token{})); err != nil {
+		panic(fmt.Sprintf("keygenconfig: failed to register AES-CTR-HMAC: %v", err))
 	}
 
 	return *config

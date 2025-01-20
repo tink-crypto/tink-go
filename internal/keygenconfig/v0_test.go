@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -33,6 +34,22 @@ func mustCreateAESGCMParams(t *testing.T, variant aesgcm.Variant) *aesgcm.Parame
 	})
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	return params
+}
+
+func mustCreateAESCTRHMACParams(t *testing.T, variant aesctrhmac.Variant) *aesctrhmac.Parameters {
+	t.Helper()
+	params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
+		AESKeySizeInBytes:  32,
+		HMACKeySizeInBytes: 32,
+		IVSizeInBytes:      12,
+		TagSizeInBytes:     16,
+		HashType:           aesctrhmac.SHA256,
+		Variant:            variant,
+	})
+	if err != nil {
+		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
 	}
 	return params
 }
@@ -63,6 +80,18 @@ func TestV0(t *testing.T) {
 			p:             mustCreateAESGCMParams(t, aesgcm.VariantNoPrefix),
 			idRequirement: 0,
 			tryCast:       tryCast[*aesgcm.Key],
+		},
+		{
+			name:          "AES-CTR-HMAC-TINK",
+			p:             mustCreateAESCTRHMACParams(t, aesctrhmac.VariantTink),
+			idRequirement: 123,
+			tryCast:       tryCast[*aesctrhmac.Key],
+		},
+		{
+			name:          "AES-CTR-HMAC-NO_PREFIX",
+			p:             mustCreateAESCTRHMACParams(t, aesctrhmac.VariantNoPrefix),
+			idRequirement: 0,
+			tryCast:       tryCast[*aesctrhmac.Key],
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -22,6 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -701,5 +702,43 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 				t.Errorf("firstKey.Equal(secondKey) = true, want false")
 			}
 		})
+	}
+}
+
+func TestRegisterKeyCreator(t *testing.T) {
+	keyCreator := aesctrhmac.KeyCreator(internalapi.Token{})
+	params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
+		AESKeySizeInBytes:  16,
+		HMACKeySizeInBytes: 32,
+		IVSizeInBytes:      12,
+		TagSizeInBytes:     16,
+		HashType:           aesctrhmac.SHA256,
+		Variant:            aesctrhmac.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keyCreator(params, 123)
+	if err != nil {
+		t.Fatalf("keyCreator(%v, 123) err = %v, want nil", params, err)
+	}
+	then, ok := key.(*aesctrhmac.Key)
+	if !ok {
+		t.Fatalf("keyCreator(%v, 123) returned key of type %T, want %T", params, key, (*aesctrhmac.Key)(nil))
+	}
+
+	idRequirement, hasIDRequirement := then.IDRequirement()
+	if !hasIDRequirement || idRequirement != 123 {
+		t.Errorf("then.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 123, true)
+	}
+	if got := then.AESKeyBytes().Len(); got != params.AESKeySizeInBytes() {
+		t.Errorf("then.AESKeyBytes().Len() = %d, want 32", then.AESKeyBytes().Len())
+	}
+	if got := then.HMACKeyBytes().Len(); got != params.HMACKeySizeInBytes() {
+		t.Errorf("then.HMACKeyBytes().Len() = %d, want 32", got)
+	}
+	if diff := cmp.Diff(then.Parameters(), params); diff != "" {
+		t.Errorf("then.Parameters() diff (-want +got):\n%s", diff)
 	}
 }
