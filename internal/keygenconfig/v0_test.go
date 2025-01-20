@@ -20,6 +20,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 )
@@ -34,6 +35,15 @@ func mustCreateAESGCMParams(t *testing.T, variant aesgcm.Variant) *aesgcm.Parame
 	})
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	return params
+}
+
+func mustCreateAESGCMSIVParams(t *testing.T, variant aesgcmsiv.Variant) *aesgcmsiv.Parameters {
+	t.Helper()
+	params, err := aesgcmsiv.NewParameters(32, variant)
+	if err != nil {
+		t.Fatalf("aesgcmsiv.NewParameters() err = %v, want nil", err)
 	}
 	return params
 }
@@ -92,6 +102,18 @@ func TestV0(t *testing.T) {
 			p:             mustCreateAESCTRHMACParams(t, aesctrhmac.VariantNoPrefix),
 			idRequirement: 0,
 			tryCast:       tryCast[*aesctrhmac.Key],
+		},
+		{
+			name:          "AES-GCM-SIV-TINK",
+			p:             mustCreateAESGCMSIVParams(t, aesgcmsiv.VariantTink),
+			idRequirement: 123,
+			tryCast:       tryCast[*aesgcmsiv.Key],
+		},
+		{
+			name:          "AES-GCM-SIV-NO_PREFIX",
+			p:             mustCreateAESGCMSIVParams(t, aesgcmsiv.VariantNoPrefix),
+			idRequirement: 0,
+			tryCast:       tryCast[*aesgcmsiv.Key],
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
