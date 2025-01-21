@@ -18,9 +18,11 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -310,5 +312,30 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 				t.Errorf("firstKey.Equal(secondKey) = true, want false")
 			}
 		})
+	}
+}
+
+func TestKeyCreator(t *testing.T) {
+	keyCreator := xaesgcm.KeyCreator(internalapi.Token{})
+	params, err := xaesgcm.NewParameters(xaesgcm.VariantTink, 12)
+	if err != nil {
+		t.Fatalf("xaesgcm.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keyCreator(params, 123)
+	if err != nil {
+		t.Fatalf("keyCreator(%v, 123) err = %v, want nil", params, err)
+	}
+	xAESGCMKey, ok := key.(*xaesgcm.Key)
+	if !ok {
+		t.Fatalf("keyCreator(%v, 123) returned key of type %T, want %T", params, key, (*xaesgcm.Key)(nil))
+	}
+
+	idRequirement, hasIDRequirement := xAESGCMKey.IDRequirement()
+	if !hasIDRequirement || idRequirement != 123 {
+		t.Errorf("xAESGCMKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 123, true)
+	}
+	if diff := cmp.Diff(xAESGCMKey.Parameters(), params); diff != "" {
+		t.Errorf("xAESGCMKey.Parameters() diff (-want +got):\n%s", diff)
 	}
 }

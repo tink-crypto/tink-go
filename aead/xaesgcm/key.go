@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -169,4 +170,23 @@ func (k *Key) Equal(other key.Key) bool {
 	return ok && k.Parameters().Equal(that.Parameters()) &&
 		k.idRequirement == that.idRequirement &&
 		k.keyBytes.Equal(that.keyBytes)
+}
+
+func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	xAESGCMParams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T; needed %T", p, (*Parameters)(nil))
+	}
+	keyBytes, err := secretdata.NewBytesFromRand(uint32(32))
+	if err != nil {
+		return nil, err
+	}
+	return NewKey(keyBytes, idRequirement, xAESGCMParams)
+}
+
+// KeyCreator returns a key creator function.
+//
+// It is *NOT* part of the public API.
+func KeyCreator(t internalapi.Token) func(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	return createKey
 }
