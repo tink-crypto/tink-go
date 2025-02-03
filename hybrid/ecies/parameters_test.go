@@ -257,3 +257,129 @@ func TestNewParameters(t *testing.T) {
 		})
 	}
 }
+
+func TestParametersNotEqual(t *testing.T) {
+	aesGCMDEMParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	aesGCMSIVDEMParams, err := aesgcmsiv.NewParameters(32, aesgcmsiv.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("aesgcmsiv.NewParameters() err = %v, want nil", err)
+	}
+
+	type paramsTestCase struct {
+		params *ecies.Parameters
+	}
+
+	for _, tc := range []struct {
+		name        string
+		paramsOpts1 ecies.ParametersOpts
+		paramsOpts2 ecies.ParametersOpts
+	}{
+		{
+			name: "Different DEM parameters",
+			paramsOpts1: ecies.ParametersOpts{
+				CurveType:            ecies.X25519,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.UnspecifiedPointFormat,
+				DEMParameters:        aesGCMDEMParams,
+				Variant:              ecies.VariantTink,
+			},
+			paramsOpts2: ecies.ParametersOpts{
+				CurveType:            ecies.X25519,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.UnspecifiedPointFormat,
+				DEMParameters:        aesGCMSIVDEMParams,
+				Variant:              ecies.VariantTink,
+			},
+		},
+		{
+			name: "Different variant",
+			paramsOpts1: ecies.ParametersOpts{
+				CurveType:            ecies.X25519,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.UnspecifiedPointFormat,
+				DEMParameters:        aesGCMDEMParams,
+				Variant:              ecies.VariantTink,
+			},
+			paramsOpts2: ecies.ParametersOpts{
+				CurveType:            ecies.X25519,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.UnspecifiedPointFormat,
+				DEMParameters:        aesGCMDEMParams,
+				Variant:              ecies.VariantCrunchy,
+			},
+		},
+		{
+			name: "Different point format",
+			paramsOpts1: ecies.ParametersOpts{
+				CurveType:            ecies.NISTP256,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.CompressedPointFormat,
+				DEMParameters:        aesGCMDEMParams,
+				Variant:              ecies.VariantTink,
+			},
+			paramsOpts2: ecies.ParametersOpts{
+				CurveType:            ecies.NISTP256,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.UncompressedPointFormat,
+				DEMParameters:        aesGCMDEMParams,
+				Variant:              ecies.VariantTink,
+			},
+		},
+		{
+			name: "Different NIST curve",
+			paramsOpts1: ecies.ParametersOpts{
+				CurveType:            ecies.NISTP256,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.CompressedPointFormat,
+				DEMParameters:        aesGCMDEMParams,
+				Variant:              ecies.VariantTink,
+			},
+			paramsOpts2: ecies.ParametersOpts{
+				CurveType:            ecies.NISTP384,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.CompressedPointFormat,
+				DEMParameters:        aesGCMDEMParams,
+				Variant:              ecies.VariantTink,
+			},
+		},
+		{
+			name: "Different hash",
+			paramsOpts1: ecies.ParametersOpts{
+				CurveType:            ecies.NISTP256,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.CompressedPointFormat,
+				DEMParameters:        aesGCMDEMParams,
+				Variant:              ecies.VariantTink,
+			},
+			paramsOpts2: ecies.ParametersOpts{
+				CurveType:            ecies.NISTP256,
+				HashType:             ecies.SHA512,
+				NISTCurvePointFormat: ecies.CompressedPointFormat,
+				DEMParameters:        aesGCMDEMParams,
+				Variant:              ecies.VariantTink,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			params1, err := ecies.NewParameters(tc.paramsOpts1)
+			if err != nil {
+				t.Fatalf("ecies.NewParameters(%v) err = %v, want nil", tc.paramsOpts1, err)
+			}
+			params2, err := ecies.NewParameters(tc.paramsOpts2)
+			if err != nil {
+				t.Fatalf("ecies.NewParameters(%v) err = %v, want nil", tc.paramsOpts2, err)
+			}
+			if params1.Equal(params2) {
+				t.Errorf("params1.Equal(params2) = true, want false")
+			}
+		})
+	}
+}
