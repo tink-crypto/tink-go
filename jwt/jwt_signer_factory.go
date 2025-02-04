@@ -31,7 +31,7 @@ func NewSigner(handle *keyset.Handle) (Signer, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := handle.Primitives(internalapi.Token{})
+	ps, err := keyset.Primitives[*signerWithKID](handle, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("jwt_signer_factory: cannot obtain primitive set: %v", err)
 	}
@@ -40,13 +40,13 @@ func NewSigner(handle *keyset.Handle) (Signer, error) {
 
 // wrappedSigner is a JWT Signer implementation that uses the underlying primitive set for JWT Sign.
 type wrappedSigner struct {
-	ps     *primitiveset.PrimitiveSet
+	ps     *primitiveset.PrimitiveSet[*signerWithKID]
 	logger monitoring.Logger
 }
 
 var _ Signer = (*wrappedSigner)(nil)
 
-func createSignerLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, error) {
+func createSignerLogger(ps *primitiveset.PrimitiveSet[*signerWithKID]) (monitoring.Logger, error) {
 	// only keysets which contain annotations are monitored.
 	if len(ps.Annotations) == 0 {
 		return &monitoringutil.DoNothingLogger{}, nil
@@ -62,17 +62,11 @@ func createSignerLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, error
 	})
 }
 
-func newWrappedSigner(ps *primitiveset.PrimitiveSet) (*wrappedSigner, error) {
-	if _, ok := (ps.Primary.Primitive).(*signerWithKID); !ok {
-		return nil, fmt.Errorf("jwt_signer_factory: not a JWT Signer primitive")
-	}
+func newWrappedSigner(ps *primitiveset.PrimitiveSet[*signerWithKID]) (*wrappedSigner, error) {
 	for _, primitives := range ps.Entries {
 		for _, p := range primitives {
 			if p.PrefixType != tinkpb.OutputPrefixType_RAW && p.PrefixType != tinkpb.OutputPrefixType_TINK {
 				return nil, fmt.Errorf("jwt_signer_factory: invalid OutputPrefixType: %s", p.PrefixType)
-			}
-			if _, ok := (p.Primitive).(*signerWithKID); !ok {
-				return nil, fmt.Errorf("jwt_signer_factory: not a JWT Signer primitive")
 			}
 		}
 	}
@@ -88,11 +82,7 @@ func newWrappedSigner(ps *primitiveset.PrimitiveSet) (*wrappedSigner, error) {
 
 func (w *wrappedSigner) SignAndEncode(rawJWT *RawJWT) (string, error) {
 	primary := w.ps.Primary
-	p, ok := (primary.Primitive).(*signerWithKID)
-	if !ok {
-		return "", fmt.Errorf("jwt_signer_factory: not a JWT Signer primitive")
-	}
-	token, err := p.SignAndEncodeWithKID(rawJWT, keyID(primary.KeyID, primary.PrefixType))
+	token, err := primary.Primitive.SignAndEncodeWithKID(rawJWT, keyID(primary.KeyID, primary.PrefixType))
 	if err != nil {
 		w.logger.LogFailure()
 		return "", err

@@ -29,10 +29,10 @@ import (
 
 // Entry represents a single entry in the keyset. In addition to the actual
 // primitive, it holds the identifier and status of the primitive.
-type Entry struct {
+type Entry[T any] struct {
 	KeyID         uint32
-	Primitive     any
-	FullPrimitive any
+	Primitive     T
+	FullPrimitive T
 	Prefix        string
 	PrefixType    tinkpb.OutputPrefixType
 	Status        tinkpb.KeyStatusType
@@ -47,50 +47,47 @@ type Entry struct {
 // actual crypto operations: to encrypt data the primary AEAD-primitive from
 // the set is used, and upon decryption the ciphertext's prefix determines the
 // id of the primitive from the set.
-//
-// PrimitiveSet is a public to allow its use in implementations of custom
-// primitives.
-type PrimitiveSet struct {
+type PrimitiveSet[T any] struct {
 	// Primary entry.
-	Primary *Entry
+	Primary *Entry[T]
 
 	// The primitives are stored in a map of (ciphertext prefix, list of
 	// primitives sharing the prefix). This allows quickly retrieving the
 	// primitives sharing some particular prefix.
-	Entries map[string][]*Entry
+	Entries map[string][]*Entry[T]
 	// Stores entries in the original keyset key order.
-	EntriesInKeysetOrder []*Entry
+	EntriesInKeysetOrder []*Entry[T]
 
 	Annotations map[string]string
 }
 
 // New returns an empty instance of PrimitiveSet.
-func New() *PrimitiveSet {
-	return &PrimitiveSet{
+func New[T any]() *PrimitiveSet[T] {
+	return &PrimitiveSet[T]{
 		Primary:              nil,
-		Entries:              make(map[string][]*Entry),
-		EntriesInKeysetOrder: make([]*Entry, 0),
+		Entries:              make(map[string][]*Entry[T]),
+		EntriesInKeysetOrder: make([]*Entry[T], 0),
 		Annotations:          nil,
 	}
 }
 
 // RawEntries returns all primitives in the set that have RAW prefix.
-func (ps *PrimitiveSet) RawEntries() ([]*Entry, error) {
+func (ps *PrimitiveSet[T]) RawEntries() ([]*Entry[T], error) {
 	return ps.EntriesForPrefix(cryptofmt.RawPrefix)
 }
 
 // EntriesForPrefix returns all primitives in the set that have the given prefix.
-func (ps *PrimitiveSet) EntriesForPrefix(prefix string) ([]*Entry, error) {
+func (ps *PrimitiveSet[T]) EntriesForPrefix(prefix string) ([]*Entry[T], error) {
 	result, found := ps.Entries[prefix]
 	if !found {
-		return []*Entry{}, nil
+		return []*Entry[T]{}, nil
 	}
 	return result, nil
 }
 
-func (ps *PrimitiveSet) add(primitive any, key *tinkpb.Keyset_Key, isFullPrimitive bool) (*Entry, error) {
-	if key == nil || primitive == nil {
-		return nil, fmt.Errorf("primitive_set: key and primitive must not be nil")
+func (ps *PrimitiveSet[T]) add(primitive T, key *tinkpb.Keyset_Key, isFullPrimitive bool) (*Entry[T], error) {
+	if key == nil {
+		return nil, fmt.Errorf("primitive_set: key must not be nil")
 	}
 	if key.GetKeyData() == nil {
 		return nil, fmt.Errorf("primitive_set: keyData must not be nil")
@@ -102,7 +99,7 @@ func (ps *PrimitiveSet) add(primitive any, key *tinkpb.Keyset_Key, isFullPrimiti
 	if err != nil {
 		return nil, fmt.Errorf("primitive_set: %s", err)
 	}
-	e := &Entry{
+	e := &Entry[T]{
 		KeyID:      key.GetKeyId(),
 		Prefix:     prefix,
 		Status:     key.GetStatus(),
@@ -120,11 +117,11 @@ func (ps *PrimitiveSet) add(primitive any, key *tinkpb.Keyset_Key, isFullPrimiti
 }
 
 // Add creates a new entry in the primitive set and returns the added entry.
-func (ps *PrimitiveSet) Add(primitive any, key *tinkpb.Keyset_Key) (*Entry, error) {
+func (ps *PrimitiveSet[T]) Add(primitive T, key *tinkpb.Keyset_Key) (*Entry[T], error) {
 	return ps.add(primitive, key, false)
 }
 
 // AddFullPrimitive adds a full primitive to the primitive set.
-func (ps *PrimitiveSet) AddFullPrimitive(primitive any, key *tinkpb.Keyset_Key) (*Entry, error) {
+func (ps *PrimitiveSet[T]) AddFullPrimitive(primitive T, key *tinkpb.Keyset_Key) (*Entry[T], error) {
 	return ps.add(primitive, key, true)
 }

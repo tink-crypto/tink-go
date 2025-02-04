@@ -29,44 +29,25 @@ var errNotKeysetDeriverPrimitive = errors.New("keyset_deriver_factory: not a Key
 
 // New generates a new instance of the Keyset Deriver primitive.
 func New(handle *keyset.Handle) (KeysetDeriver, error) {
-	if handle == nil {
-		return nil, errors.New("keyset_deriver_factory: keyset handle can't be nil")
-	}
-	ps, err := handle.Primitives(internalapi.Token{})
+	ps, err := keyset.Primitives[KeysetDeriver](handle, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("keyset_deriver_factory: cannot obtain primitive set: %v", err)
 	}
-	return newWrappedKeysetDeriver(ps)
+	return &wrappedKeysetDeriver{ps: ps}, nil
 }
 
 // wrappedKeysetDeriver is a Keyset Deriver implementation that uses the underlying primitive set to derive keysets.
 type wrappedKeysetDeriver struct {
-	ps *primitiveset.PrimitiveSet
+	ps *primitiveset.PrimitiveSet[KeysetDeriver]
 }
 
 // Asserts that wrappedKeysetDeriver implements the KeysetDeriver interface.
 var _ KeysetDeriver = (*wrappedKeysetDeriver)(nil)
 
-func newWrappedKeysetDeriver(ps *primitiveset.PrimitiveSet) (*wrappedKeysetDeriver, error) {
-	if _, ok := (ps.Primary.Primitive).(KeysetDeriver); !ok {
-		return nil, errNotKeysetDeriverPrimitive
-	}
-	for _, p := range ps.EntriesInKeysetOrder {
-		if _, ok := (p.Primitive).(KeysetDeriver); !ok {
-			return nil, errNotKeysetDeriverPrimitive
-		}
-	}
-	return &wrappedKeysetDeriver{ps: ps}, nil
-}
-
 func (w *wrappedKeysetDeriver) DeriveKeyset(salt []byte) (*keyset.Handle, error) {
 	keys := make([]*tinkpb.Keyset_Key, 0, len(w.ps.EntriesInKeysetOrder))
 	for _, e := range w.ps.EntriesInKeysetOrder {
-		p, ok := (e.Primitive).(KeysetDeriver)
-		if !ok {
-			return nil, errNotKeysetDeriverPrimitive
-		}
-		handle, err := p.DeriveKeyset(salt)
+		handle, err := e.Primitive.DeriveKeyset(salt)
 		if err != nil {
 			return nil, errors.New("keyset_deriver_factory: keyset derivation failed")
 		}
