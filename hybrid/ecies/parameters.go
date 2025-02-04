@@ -139,7 +139,8 @@ func (ht HashType) String() string {
 	}
 }
 
-// PointFormat is the elliptic curve point format.
+// PointFormat is the elliptic curve point format for encoding the public key
+// in the KEM prefix added to the ciphertext.
 type PointFormat int
 
 const (
