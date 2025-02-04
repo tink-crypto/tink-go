@@ -30,7 +30,7 @@ import (
 
 // NewSigner returns a Signer primitive from the given keyset handle.
 func NewSigner(handle *keyset.Handle) (tink.Signer, error) {
-	ps, err := keyset.Primitives[tink.Signer](handle, internalapi.Token{})
+	ps, err := handle.Primitives(internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("public_key_sign_factory: cannot obtain primitive set: %s", err)
 	}
@@ -71,18 +71,26 @@ func (a *fullSignerAdapter) Sign(data []byte) ([]byte, error) {
 // primitive.
 //
 // It wraps legacy primitives in a full primitive adapter.
-func extractFullSigner(entry *primitiveset.Entry[tink.Signer]) (tink.Signer, error) {
+func extractFullSigner(entry *primitiveset.Entry) (tink.Signer, error) {
 	if entry.FullPrimitive != nil {
-		return entry.FullPrimitive, nil
+		p, ok := (entry.FullPrimitive).(tink.Signer)
+		if !ok {
+			return nil, fmt.Errorf("public_key_sign_factory: not a Signer primitive")
+		}
+		return p, nil
+	}
+	p, ok := (entry.Primitive).(tink.Signer)
+	if !ok {
+		return nil, fmt.Errorf("public_key_sign_factory: not a Signer primitive")
 	}
 	return &fullSignerAdapter{
-		primitive:  entry.Primitive,
+		primitive:  p,
 		prefix:     []byte(entry.Prefix),
 		prefixType: entry.PrefixType,
 	}, nil
 }
 
-func newWrappedSigner(ps *primitiveset.PrimitiveSet[tink.Signer]) (*wrappedSigner, error) {
+func newWrappedSigner(ps *primitiveset.PrimitiveSet) (*wrappedSigner, error) {
 	signer, err := extractFullSigner(ps.Primary)
 	if err != nil {
 		return nil, err
@@ -106,7 +114,7 @@ func newWrappedSigner(ps *primitiveset.PrimitiveSet[tink.Signer]) (*wrappedSigne
 	}, nil
 }
 
-func createSignerLogger(ps *primitiveset.PrimitiveSet[tink.Signer]) (monitoring.Logger, error) {
+func createSignerLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, error) {
 	// Only keysets which contain annotations are monitored.
 	if len(ps.Annotations) == 0 {
 		return &monitoringutil.DoNothingLogger{}, nil

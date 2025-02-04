@@ -27,15 +27,18 @@ import (
 
 // NewPRFSet creates a prf.Set primitive from the given keyset handle.
 func NewPRFSet(handle *keyset.Handle) (*Set, error) {
-	ps, err := keyset.Primitives[PRF](handle, internalapi.Token{})
+	ps, err := handle.Primitives(internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("prf_set_factory: cannot obtain primitive set: %s", err)
 	}
 	return wrapPRFset(ps)
 }
 
-func wrapPRFset(ps *primitiveset.PrimitiveSet[PRF]) (*Set, error) {
+func wrapPRFset(ps *primitiveset.PrimitiveSet) (*Set, error) {
 	set := &Set{}
+	if _, ok := (ps.Primary.Primitive).(PRF); !ok {
+		return nil, fmt.Errorf("prf_set_factory: not a PRF primitive")
+	}
 	set.PrimaryID = ps.Primary.KeyID
 	set.PRFs = make(map[uint32]PRF)
 	logger, err := createLogger(ps)
@@ -53,8 +56,12 @@ func wrapPRFset(ps *primitiveset.PrimitiveSet[PRF]) (*Set, error) {
 		return nil, fmt.Errorf("Only raw entries allowed for prf.Set")
 	}
 	for _, entry := range entries {
+		prf, ok := (entry.Primitive).(PRF)
+		if !ok {
+			return nil, fmt.Errorf("prf_set_factory: not a PRF primitive")
+		}
 		set.PRFs[entry.KeyID] = &monitoredPRF{
-			prf:    entry.Primitive,
+			prf:    prf,
 			keyID:  entry.KeyID,
 			logger: logger,
 		}
@@ -62,7 +69,7 @@ func wrapPRFset(ps *primitiveset.PrimitiveSet[PRF]) (*Set, error) {
 	return set, nil
 }
 
-func createLogger(ps *primitiveset.PrimitiveSet[PRF]) (monitoring.Logger, error) {
+func createLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, error) {
 	if len(ps.Annotations) == 0 {
 		return &monitoringutil.DoNothingLogger{}, nil
 	}

@@ -59,7 +59,7 @@ func parseKeyTypeURL(ktu string) string {
 
 // KeysetInfoFromPrimitiveSet creates a `KeysetInfo` from a `PrimitiveSet`.
 // This function doesn't guarantee to preserve the ordering of the keys in the keyset.
-func KeysetInfoFromPrimitiveSet[T any](ps *primitiveset.PrimitiveSet[T]) (*monitoring.KeysetInfo, error) {
+func KeysetInfoFromPrimitiveSet(ps *primitiveset.PrimitiveSet) (*monitoring.KeysetInfo, error) {
 	if ps == nil {
 		return nil, fmt.Errorf("primitive set is nil")
 	}

@@ -31,7 +31,7 @@ func NewMAC(handle *keyset.Handle) (MAC, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := keyset.Primitives[*macWithKID](handle, internalapi.Token{})
+	ps, err := handle.Primitives(internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("jwt_mac_factory: cannot obtain primitive set: %v", err)
 	}
@@ -40,18 +40,24 @@ func NewMAC(handle *keyset.Handle) (MAC, error) {
 
 // wrappedJWTMAC is a JWTMAC implementation that uses the underlying primitive set for JWT MAC.
 type wrappedJWTMAC struct {
-	ps            *primitiveset.PrimitiveSet[*macWithKID]
+	ps            *primitiveset.PrimitiveSet
 	computeLogger monitoring.Logger
 	verifyLogger  monitoring.Logger
 }
 
 var _ MAC = (*wrappedJWTMAC)(nil)
 
-func newWrappedJWTMAC(ps *primitiveset.PrimitiveSet[*macWithKID]) (*wrappedJWTMAC, error) {
+func newWrappedJWTMAC(ps *primitiveset.PrimitiveSet) (*wrappedJWTMAC, error) {
+	if _, ok := (ps.Primary.Primitive).(*macWithKID); !ok {
+		return nil, fmt.Errorf("jwt_mac_factory: not a JWT MAC primitive")
+	}
 	for _, primitives := range ps.Entries {
 		for _, p := range primitives {
 			if p.PrefixType != tinkpb.OutputPrefixType_RAW && p.PrefixType != tinkpb.OutputPrefixType_TINK {
 				return nil, fmt.Errorf("jwt_mac_factory: invalid OutputPrefixType: %s", p.PrefixType)
+			}
+			if _, ok := (p.Primitive).(*macWithKID); !ok {
+				return nil, fmt.Errorf("jwt_mac_factory: not a JWT MAC primitive")
 			}
 		}
 	}
@@ -62,7 +68,7 @@ func newWrappedJWTMAC(ps *primitiveset.PrimitiveSet[*macWithKID]) (*wrappedJWTMA
 	return &wrappedJWTMAC{ps: ps, computeLogger: computeLogger, verifyLogger: verifyLogger}, nil
 }
 
-func createLoggers(ps *primitiveset.PrimitiveSet[*macWithKID]) (monitoring.Logger, monitoring.Logger, error) {
+func createLoggers(ps *primitiveset.PrimitiveSet) (monitoring.Logger, monitoring.Logger, error) {
 	if len(ps.Annotations) == 0 {
 		return &monitoringutil.DoNothingLogger{}, &monitoringutil.DoNothingLogger{}, nil
 	}
@@ -92,7 +98,11 @@ func createLoggers(ps *primitiveset.PrimitiveSet[*macWithKID]) (monitoring.Logge
 
 func (w *wrappedJWTMAC) ComputeMACAndEncode(token *RawJWT) (string, error) {
 	primary := w.ps.Primary
-	signedToken, err := primary.Primitive.ComputeMACAndEncodeWithKID(token, keyID(primary.KeyID, primary.PrefixType))
+	p, ok := (primary.Primitive).(*macWithKID)
+	if !ok {
+		return "", fmt.Errorf("jwt_mac_factory: not a JWT MAC primitive")
+	}
+	signedToken, err := p.ComputeMACAndEncodeWithKID(token, keyID(primary.KeyID, primary.PrefixType))
 	if err != nil {
 		w.computeLogger.LogFailure()
 		return "", err
@@ -105,7 +115,11 @@ func (w *wrappedJWTMAC) VerifyMACAndDecode(compact string, validator *Validator)
 	var interestingErr error
 	for _, s := range w.ps.Entries {
 		for _, e := range s {
-			verifiedJWT, err := e.Primitive.VerifyMACAndDecodeWithKID(compact, validator, keyID(e.KeyID, e.PrefixType))
+			p, ok := e.Primitive.(*macWithKID)
+			if !ok {
+				return nil, fmt.Errorf("jwt_mac_factory: not a JWT MAC primitive")
+			}
+			verifiedJWT, err := p.VerifyMACAndDecodeWithKID(compact, validator, keyID(e.KeyID, e.PrefixType))
 			if err == nil {
 				w.verifyLogger.Log(e.KeyID, 1)
 				return verifiedJWT, nil

@@ -18,24 +18,23 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
-	"github.com/tink-crypto/tink-go/v2/tink"
 	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestKeysetInfoFromPrimitiveSetWithNilPrimitiveSetFails(t *testing.T) {
-	if _, err := monitoringutil.KeysetInfoFromPrimitiveSet[any](nil); err == nil {
-		t.Errorf("monitoringutil.KeysetInfoFromPrimitiveSet[any](nil) err = nil, want error")
+	if _, err := monitoringutil.KeysetInfoFromPrimitiveSet(nil); err == nil {
+		t.Errorf("KeysetInfoFromPrimitiveSet(nil) err = nil, want error")
 	}
 }
 
-func validPrimitiveSet() *primitiveset.PrimitiveSet[tink.AEAD] {
-	return &primitiveset.PrimitiveSet[tink.AEAD]{
-		Primary: &primitiveset.Entry[tink.AEAD]{},
-		Entries: map[string][]*primitiveset.Entry[tink.AEAD]{
-			"one": []*primitiveset.Entry[tink.AEAD]{
+func validPrimitiveSet() *primitiveset.PrimitiveSet {
+	return &primitiveset.PrimitiveSet{
+		Primary: &primitiveset.Entry{},
+		Entries: map[string][]*primitiveset.Entry{
+			"one": []*primitiveset.Entry{
 				{
 					Status:  tpb.KeyStatusType_ENABLED,
 					TypeURL: "type.googleapis.com/google.crypto.tink.AesGcmKey",
@@ -69,7 +68,7 @@ func TestKeysetInfoFromPrimitiveSetWithNoPrimaryFails(t *testing.T) {
 
 func TestKeysetInfoFromPrimitiveSetWithInvalidKeyStatusFails(t *testing.T) {
 	ps := validPrimitiveSet()
-	ps.Entries["invalid_key_status"] = []*primitiveset.Entry[tink.AEAD]{
+	ps.Entries["invalid_key_status"] = []*primitiveset.Entry{
 		{
 			KeyID:  123,
 			Status: tpb.KeyStatusType_UNKNOWN_STATUS,
@@ -81,30 +80,30 @@ func TestKeysetInfoFromPrimitiveSetWithInvalidKeyStatusFails(t *testing.T) {
 }
 
 func TestKeysetInfoFromPrimitiveSet(t *testing.T) {
-	ps := &primitiveset.PrimitiveSet[tink.AEAD]{
-		Primary: &primitiveset.Entry[tink.AEAD]{
+	ps := &primitiveset.PrimitiveSet{
+		Primary: &primitiveset.Entry{
 			KeyID: 1,
 		},
 		Annotations: map[string]string{
 			"foo": "bar",
 			"zoo": "far",
 		},
-		Entries: map[string][]*primitiveset.Entry[tink.AEAD]{
+		Entries: map[string][]*primitiveset.Entry{
 			// Adding all entries under the same prefix to get deterministic output.
-			"one": []*primitiveset.Entry[tink.AEAD]{
-				&primitiveset.Entry[tink.AEAD]{
+			"one": []*primitiveset.Entry{
+				&primitiveset.Entry{
 					KeyID:      1,
 					Status:     tpb.KeyStatusType_ENABLED,
 					TypeURL:    "type.googleapis.com/google.crypto.tink.AesSivKey",
 					PrefixType: tpb.OutputPrefixType_TINK,
 				},
-				&primitiveset.Entry[tink.AEAD]{
+				&primitiveset.Entry{
 					KeyID:      2,
 					Status:     tpb.KeyStatusType_DISABLED,
 					TypeURL:    "type.googleapis.com/google.crypto.tink.AesGcmKey",
 					PrefixType: tpb.OutputPrefixType_TINK,
 				},
-				&primitiveset.Entry[tink.AEAD]{
+				&primitiveset.Entry{
 					KeyID:      3,
 					Status:     tpb.KeyStatusType_DESTROYED,
 					TypeURL:    "type.googleapis.com/google.crypto.tink.AesCtrHmacKey",

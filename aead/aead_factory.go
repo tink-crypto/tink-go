@@ -30,7 +30,7 @@ import (
 
 // New returns an AEAD primitive from the given keyset handle.
 func New(handle *keyset.Handle) (tink.AEAD, error) {
-	ps, err := keyset.Primitives[tink.AEAD](handle, internalapi.Token{})
+	ps, err := handle.Primitives(internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("aead_factory: cannot obtain primitive set: %s", err)
 	}
@@ -40,7 +40,7 @@ func New(handle *keyset.Handle) (tink.AEAD, error) {
 // NewWithConfig creates an AEAD primitive from the given [keyset.Handle] using
 // the provided [Config].
 func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.AEAD, error) {
-	ps, err := keyset.Primitives[tink.AEAD](handle, internalapi.Token{}, keyset.WithConfig(config))
+	ps, err := handle.Primitives(internalapi.Token{}, keyset.WithConfig(config))
 	if err != nil {
 		return nil, fmt.Errorf("aead_factory: cannot obtain primitive set with config: %s", err)
 	}
@@ -90,18 +90,26 @@ func (a *fullAEADPrimitiveAdapter) Decrypt(ciphertext, associatedData []byte) ([
 }
 
 // extractFullAEAD returns a full aeadAndKeyID primitive from the given
-// [primitiveset.Entry[tink.AEAD]].
-func extractFullAEAD(entry *primitiveset.Entry[tink.AEAD]) (*aeadAndKeyID, error) {
+// [primitiveset.Entry].
+func extractFullAEAD(entry *primitiveset.Entry) (*aeadAndKeyID, error) {
 	if entry.FullPrimitive != nil {
-		return &aeadAndKeyID{primitive: entry.FullPrimitive, keyID: entry.KeyID}, nil
+		a, ok := (entry.FullPrimitive).(tink.AEAD)
+		if !ok {
+			return nil, fmt.Errorf("aead_factory: not an AEAD primitive")
+		}
+		return &aeadAndKeyID{primitive: a, keyID: entry.KeyID}, nil
+	}
+	a, ok := (entry.Primitive).(tink.AEAD)
+	if !ok {
+		return nil, fmt.Errorf("aead_factory: not an AEAD primitive")
 	}
 	return &aeadAndKeyID{
-		primitive: &fullAEADPrimitiveAdapter{primitive: entry.Primitive, prefix: []byte(entry.Prefix)},
+		primitive: &fullAEADPrimitiveAdapter{primitive: a, prefix: []byte(entry.Prefix)},
 		keyID:     entry.KeyID,
 	}, nil
 }
 
-func newWrappedAead(ps *primitiveset.PrimitiveSet[tink.AEAD]) (*wrappedAead, error) {
+func newWrappedAead(ps *primitiveset.PrimitiveSet) (*wrappedAead, error) {
 	primary, err := extractFullAEAD(ps.Primary)
 	if err != nil {
 		return nil, err
@@ -128,7 +136,7 @@ func newWrappedAead(ps *primitiveset.PrimitiveSet[tink.AEAD]) (*wrappedAead, err
 	}, nil
 }
 
-func createLoggers(ps *primitiveset.PrimitiveSet[tink.AEAD]) (monitoring.Logger, monitoring.Logger, error) {
+func createLoggers(ps *primitiveset.PrimitiveSet) (monitoring.Logger, monitoring.Logger, error) {
 	if len(ps.Annotations) == 0 {
 		return &monitoringutil.DoNothingLogger{}, &monitoringutil.DoNothingLogger{}, nil
 	}

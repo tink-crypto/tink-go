@@ -31,7 +31,7 @@ func NewVerifier(handle *keyset.Handle) (Verifier, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := keyset.Primitives[*verifierWithKID](handle, internalapi.Token{})
+	ps, err := handle.Primitives(internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("jwt_verifier_factory: cannot obtain primitive set: %v", err)
 	}
@@ -40,13 +40,13 @@ func NewVerifier(handle *keyset.Handle) (Verifier, error) {
 
 // wrappedVerifier is a JWT Verifier implementation that uses the underlying primitive set for JWT Verifier.
 type wrappedVerifier struct {
-	ps     *primitiveset.PrimitiveSet[*verifierWithKID]
+	ps     *primitiveset.PrimitiveSet
 	logger monitoring.Logger
 }
 
 var _ Verifier = (*wrappedVerifier)(nil)
 
-func createVerifierLogger(ps *primitiveset.PrimitiveSet[*verifierWithKID]) (monitoring.Logger, error) {
+func createVerifierLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, error) {
 	// only keysets which contain annotations are monitored.
 	if len(ps.Annotations) == 0 {
 		return &monitoringutil.DoNothingLogger{}, nil
@@ -62,11 +62,17 @@ func createVerifierLogger(ps *primitiveset.PrimitiveSet[*verifierWithKID]) (moni
 	})
 }
 
-func newWrappedVerifier(ps *primitiveset.PrimitiveSet[*verifierWithKID]) (*wrappedVerifier, error) {
+func newWrappedVerifier(ps *primitiveset.PrimitiveSet) (*wrappedVerifier, error) {
+	if _, ok := (ps.Primary.Primitive).(*verifierWithKID); !ok {
+		return nil, fmt.Errorf("jwt_verifier_factory: not a JWT Verifier primitive")
+	}
 	for _, primitives := range ps.Entries {
 		for _, p := range primitives {
 			if p.PrefixType != tinkpb.OutputPrefixType_RAW && p.PrefixType != tinkpb.OutputPrefixType_TINK {
 				return nil, fmt.Errorf("jwt_verifier_factory: invalid OutputPrefixType: %s", p.PrefixType)
+			}
+			if _, ok := (p.Primitive).(*verifierWithKID); !ok {
+				return nil, fmt.Errorf("jwt_verifier_factory: not a JWT Verifier primitive")
 			}
 		}
 	}
@@ -84,7 +90,11 @@ func (w *wrappedVerifier) VerifyAndDecode(compact string, validator *Validator) 
 	var interestingErr error
 	for _, s := range w.ps.Entries {
 		for _, e := range s {
-			verifiedJWT, err := e.Primitive.VerifyAndDecodeWithKID(compact, validator, keyID(e.KeyID, e.PrefixType))
+			p, ok := e.Primitive.(*verifierWithKID)
+			if !ok {
+				return nil, fmt.Errorf("jwt_verifier_factory: not a JWT Verifier primitive")
+			}
+			verifiedJWT, err := p.VerifyAndDecodeWithKID(compact, validator, keyID(e.KeyID, e.PrefixType))
 			if err == nil {
 				w.logger.Log(e.KeyID, 1)
 				return verifiedJWT, nil

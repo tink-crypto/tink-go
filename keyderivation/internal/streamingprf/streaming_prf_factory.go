@@ -27,7 +27,10 @@ import (
 
 // New generates a new instance of the Streaming PRF primitive.
 func New(h *keyset.Handle) (StreamingPRF, error) {
-	ps, err := keyset.PrimitivesWithKeyManager[StreamingPRF](h, new(HKDFStreamingPRFKeyManager), internalapi.Token{})
+	if h == nil {
+		return nil, errors.New("keyset handle can't be nil")
+	}
+	ps, err := h.PrimitivesWithKeyManager(new(HKDFStreamingPRFKeyManager), internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("streaming_prf_factory: cannot obtain primitive set: %v", err)
 	}
@@ -36,19 +39,22 @@ func New(h *keyset.Handle) (StreamingPRF, error) {
 
 // wrappedStreamingPRF is a Streaming PRF implementation that uses the underlying primitive set for Streaming PRF.
 type wrappedStreamingPRF struct {
-	ps *primitiveset.PrimitiveSet[StreamingPRF]
+	ps *primitiveset.PrimitiveSet
 }
 
 // Asserts that wrappedStreamingPRF implements the StreamingPRF interface.
 var _ StreamingPRF = (*wrappedStreamingPRF)(nil)
 
-func newWrappedStreamingPRF(ps *primitiveset.PrimitiveSet[StreamingPRF]) (*wrappedStreamingPRF, error) {
+func newWrappedStreamingPRF(ps *primitiveset.PrimitiveSet) (*wrappedStreamingPRF, error) {
 	if rawEntries, err := ps.RawEntries(); err != nil || len(rawEntries) != 1 {
 		return nil, errors.New("streaming_prf_factory: only accepts keysets with 1 RAW key")
 	}
 	// ps.Entries is a map of prefix type -> []*Entry.
 	if len(ps.Entries) != 1 {
 		return nil, errors.New("streaming_prf_factory: only accepts keys with prefix type RAW")
+	}
+	if _, ok := (ps.Primary.Primitive).(StreamingPRF); !ok {
+		return nil, errors.New("streaming_prf_factory: not a Streaming PRF primitive")
 	}
 	if ps.Primary.PrefixType != tinkpb.OutputPrefixType_RAW {
 		return nil, errors.New("streaming_prf_factory: primary key prefix type is not RAW")
@@ -60,5 +66,10 @@ func newWrappedStreamingPRF(ps *primitiveset.PrimitiveSet[StreamingPRF]) (*wrapp
 }
 
 func (w *wrappedStreamingPRF) Compute(input []byte) (io.Reader, error) {
-	return w.ps.Primary.Primitive.Compute(input)
+	primary := w.ps.Primary
+	p, ok := (primary.Primitive).(StreamingPRF)
+	if !ok {
+		return nil, errors.New("streaming_prf_factory: not a Streaming PRF primitive")
+	}
+	return p.Compute(input)
 }
