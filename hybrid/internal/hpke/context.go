@@ -15,6 +15,7 @@
 package hpke
 
 import (
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"math/big"
@@ -116,12 +117,7 @@ func (c *context) computeNonce() ([]byte, error) {
 		return nil, fmt.Errorf("sequence number length (%d) is larger than nonce length (%d)", len(sequenceNumber), len(nonce))
 	}
 	copy(nonce[index:], sequenceNumber)
-
-	// nonce XOR c.baseNonce.
-	for i, b := range c.baseNonce {
-		nonce[i] ^= b
-	}
-
+	subtle.XORBytes(nonce, nonce, c.baseNonce)
 	return nonce, nil
 }
 
