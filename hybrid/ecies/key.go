@@ -19,8 +19,10 @@ import (
 	"crypto/ecdh"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
 // PublicKey represents an ECIES public key.
@@ -109,4 +111,97 @@ func (k *PublicKey) Equal(other key.Key) bool {
 	return ok && k.Parameters().Equal(otherKey.Parameters()) &&
 		k.idRequirement == otherKey.idRequirement &&
 		bytes.Equal(k.publicKeyBytes, otherKey.publicKeyBytes)
+}
+
+// PrivateKey represents an ECIES private key.
+type PrivateKey struct {
+	publicKey       *PublicKey
+	privateKeyBytes secretdata.Bytes
+}
+
+var _ key.Key = (*PrivateKey)(nil)
+
+// NewPrivateKey creates a new ECIES private key from privateKeyBytes,
+// idRequirement and a [Parameters].
+//
+// If X25519 curve is used, the private key value must be 32 bytes.
+// If NIST curve is used, the private key value must be octet encoded as per
+// [SEC 1 v2.0, Section 2.3.5].
+//
+// [SEC 1 v2.0, Section 2.3.5]: https://www.secg.org/sec1-v2.pdf#page=17.08
+func NewPrivateKey(privateKeyBytes secretdata.Bytes, idRequirement uint32, params *Parameters) (*PrivateKey, error) {
+	curveType := params.CurveType()
+	curve, err := ecdhCurveFromCurveType(curveType)
+	if err != nil {
+		return nil, err
+	}
+	ecdhPrivateKey, err := curve.NewPrivateKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	if err != nil {
+		return nil, fmt.Errorf("ecies.NewPrivateKey: private key validation failed: %v", err)
+	}
+	publicKey, err := NewPublicKey(ecdhPrivateKey.PublicKey().Bytes(), idRequirement, params)
+	if err != nil {
+		return nil, fmt.Errorf("ecies.NewPrivateKey: %v", err)
+	}
+	return &PrivateKey{
+		publicKey:       publicKey,
+		privateKeyBytes: privateKeyBytes,
+	}, nil
+}
+
+// NewPrivateKeyFromPublicKey creates a new ECIES private key from
+// privateKeyBytes and a [PublicKey].
+//
+// If X25519 curve is used, the private key value must be 32 bytes.
+// If NIST curve is used, the private key value must be octet encoded as per
+// [SEC 1 v2.0, Section 2.3.5].
+//
+// [SEC 1 v2.0, Section 2.3.5]: https://www.secg.org/sec1-v2.pdf#page=17.08
+func NewPrivateKeyFromPublicKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey) (*PrivateKey, error) {
+	curveType := pubKey.Parameters().(*Parameters).CurveType()
+	curve, err := ecdhCurveFromCurveType(curveType)
+	if err != nil {
+		return nil, fmt.Errorf("ecies.NewPrivateKey: %v", err)
+	}
+	ecdhPrivateKey, err := curve.NewPrivateKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	if err != nil {
+		return nil, fmt.Errorf("ecies.NewPrivateKey: private key validation failed: %v", err)
+	}
+	ecdhPublicKeyFromPublicKey, err := curve.NewPublicKey(pubKey.publicKeyBytes)
+	if err != nil {
+		// Should never happen.
+		return nil, fmt.Errorf("ecies.NewPrivateKey: invalid public key point: %v", err)
+	}
+	if !ecdhPrivateKey.PublicKey().Equal(ecdhPublicKeyFromPublicKey) {
+		return nil, fmt.Errorf("ecies.NewPrivateKey: 	invalid private key value")
+	}
+	return &PrivateKey{
+		publicKey:       pubKey,
+		privateKeyBytes: privateKeyBytes,
+	}, nil
+}
+
+// PrivateKeyBytes returns the private key bytes.
+func (k *PrivateKey) PrivateKeyBytes() secretdata.Bytes { return k.privateKeyBytes }
+
+// PublicKey returns the public key of the key.
+//
+// This implements the privateKey interface defined in handle.go.
+func (k *PrivateKey) PublicKey() (key.Key, error) { return k.publicKey, nil }
+
+// Parameters returns the parameters of the key.
+func (k *PrivateKey) Parameters() key.Parameters { return k.publicKey.Parameters() }
+
+// IDRequirement returns the ID requirement of the key, and whether it is
+// required.
+func (k *PrivateKey) IDRequirement() (uint32, bool) { return k.publicKey.IDRequirement() }
+
+// OutputPrefix returns the output prefix of this key.
+func (k *PrivateKey) OutputPrefix() []byte { return bytes.Clone(k.publicKey.outputPrefix) }
+
+// Equal returns true if this key is equal to other.
+func (k *PrivateKey) Equal(other key.Key) bool {
+	otherKey, ok := other.(*PrivateKey)
+	return ok && k.publicKey.Equal(otherKey.publicKey) &&
+		k.privateKeyBytes.Equal(otherKey.privateKeyBytes)
 }
