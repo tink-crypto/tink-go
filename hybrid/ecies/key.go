@@ -94,6 +94,9 @@ func NewPublicKey(publicKeyBytes []byte, idRequirement uint32, parameters *Param
 	}, nil
 }
 
+// PublicKeyBytes returns the public key bytes.
+func (k *PublicKey) PublicKeyBytes() []byte { return k.publicKeyBytes }
+
 // Parameters returns the parameters of this key.
 func (k *PublicKey) Parameters() key.Parameters { return k.parameters }
 

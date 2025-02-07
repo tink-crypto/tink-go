@@ -346,6 +346,9 @@ func TestNewPublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ecies.NewPublicKey(%v, %v, %v) err = %v, want nil", tc.publicKeyBytes, tc.idRequirement, tc.params, err)
 			}
+			if got, want := key.PublicKeyBytes(), tc.publicKeyBytes; !bytes.Equal(got, want) {
+				t.Errorf("key.PublicKeyBytes() = %v, want %v", got, want)
+			}
 			if got, want := key.Parameters(), tc.params; !got.Equal(want) {
 				t.Errorf("key.Parameters() = %v, want %v", got, want)
 			}
