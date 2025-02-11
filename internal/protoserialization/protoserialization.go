@@ -36,6 +36,8 @@ var (
 	keySerializers          = make(map[reflect.Type]KeySerializer) // KeyType -> KeySerializer
 	parametersSerializersMu sync.RWMutex
 	parameterSerializers    = make(map[reflect.Type]ParametersSerializer) // ParameterType -> ParametersSerializer
+	parametersParsersMu     sync.RWMutex
+	parameterParsers        = make(map[string]ParametersParser) // TypeURL -> ParametersParser
 )
 
 type fallbackProtoKeyParams struct {
@@ -206,11 +208,18 @@ type KeySerializer interface {
 	SerializeKey(key key.Key) (*KeySerialization, error)
 }
 
-// ParametersSerializer is an interface for serializing parameters into a proto
-// key template.
+// ParametersSerializer is an interface for serializing [key.Parameters] into
+// [*tinkpb.KeyTemplate].
 type ParametersSerializer interface {
 	// Serialize serializes the given parameters into a proto key template.
 	Serialize(parameters key.Parameters) (*tinkpb.KeyTemplate, error)
+}
+
+// ParametersParser is an interface for parsing key templates into a
+// [key.Parameters].
+type ParametersParser interface {
+	// Parse parses the given [*tinkpb.KeyTemplate] into a [key.Parameters].
+	Parse(template *tinkpb.KeyTemplate) (key.Parameters, error)
 }
 
 // RegisterKeySerializer registers the given key serializer for keys of type K.
@@ -221,7 +230,7 @@ func RegisterKeySerializer[K key.Key](keySerializer KeySerializer) error {
 	defer keySerializersMu.Unlock()
 	keyType := reflect.TypeFor[K]()
 	if _, found := keySerializers[keyType]; found {
-		return fmt.Errorf("serialization.RegisterKeySerializer: type %v already registered", keyType)
+		return fmt.Errorf("protoserialization.RegisterKeySerializer: type %v already registered", keyType)
 	}
 	keySerializers[keyType] = keySerializer
 	return nil
@@ -236,9 +245,23 @@ func RegisterParametersSerializer[P key.Parameters](parameterSerializer Paramete
 	defer parametersSerializersMu.Unlock()
 	parameterType := reflect.TypeOf((*P)(nil)).Elem()
 	if _, found := parameterSerializers[parameterType]; found {
-		return fmt.Errorf("serialization.RegisterParametersSerializer: type %v already registered", parameterType)
+		return fmt.Errorf("protoserialization.RegisterParametersSerializer: type %v already registered", parameterType)
 	}
 	parameterSerializers[parameterType] = parameterSerializer
+	return nil
+}
+
+// RegisterParametersParser registers the given parameter parser for
+// a given type URL.
+//
+// It doesn't allow replacing existing serializers.
+func RegisterParametersParser(keyTypeURL string, parameterParser ParametersParser) error {
+	parametersParsersMu.Lock()
+	defer parametersParsersMu.Unlock()
+	if _, found := parameterParsers[keyTypeURL]; found {
+		return fmt.Errorf("protoserialization.RegisterParametersParser: type %v already registered", keyTypeURL)
+	}
+	parameterParsers[keyTypeURL] = parameterParser
 	return nil
 }
 
@@ -247,7 +270,7 @@ func SerializeKey(key key.Key) (*KeySerialization, error) {
 	keyType := reflect.TypeOf(key)
 	serializer, ok := keySerializers[keyType]
 	if !ok {
-		return nil, fmt.Errorf("serialization.SerializeKey: no serializer for type %v", keyType)
+		return nil, fmt.Errorf("protoserialization.SerializeKey: no serializer for type %v", keyType)
 	}
 	return serializer.SerializeKey(key)
 }
@@ -255,12 +278,12 @@ func SerializeKey(key key.Key) (*KeySerialization, error) {
 // SerializeParameters serializes the given parameters into a proto key template.
 func SerializeParameters(parameters key.Parameters) (*tinkpb.KeyTemplate, error) {
 	if parameters == nil {
-		return nil, fmt.Errorf("serialization.SerializeParameters: parameters is nil")
+		return nil, fmt.Errorf("protoserialization.SerializeParameters: parameters is nil")
 	}
 	parametersType := reflect.TypeOf(parameters)
 	serializer, ok := parameterSerializers[parametersType]
 	if !ok {
-		return nil, fmt.Errorf("serialization.SerializeParameters: no serializer for type %v", parametersType)
+		return nil, fmt.Errorf("protoserialization.SerializeParameters: no serializer for type %v", parametersType)
 	}
 	return serializer.Serialize(parameters)
 }
@@ -290,6 +313,17 @@ func ParseKey(keySerialization *KeySerialization) (key.Key, error) {
 		return NewFallbackProtoKey(keySerialization), nil
 	}
 	return parser.ParseKey(keySerialization)
+}
+
+// ParseParameters parses the given keyset key into a [key.Parameters].
+//
+// If no parser is registered for the given type URL, returns an error.
+func ParseParameters(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	parser, found := parameterParsers[keyTemplate.GetTypeUrl()]
+	if !found {
+		return nil, fmt.Errorf("protoserialization.ParseParameters: no parser for type %s", keyTemplate.GetTypeUrl())
+	}
+	return parser.Parse(keyTemplate)
 }
 
 type fallbackProtoKeySerializer struct{}
@@ -345,6 +379,16 @@ func ClearParametersSerializers() {
 	parametersSerializersMu.Lock()
 	defer parametersSerializersMu.Unlock()
 	clear(parameterSerializers)
+}
+
+// UnregisterParametersParser removes the parameters parser for the given type
+// URL from the global registry.
+//
+// This function is intended to be used in tests only.
+func UnregisterParametersParser(keyTypeURL string) {
+	parametersParsersMu.Lock()
+	defer parametersParsersMu.Unlock()
+	delete(parameterParsers, keyTypeURL)
 }
 
 func init() {
