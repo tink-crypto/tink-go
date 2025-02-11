@@ -248,3 +248,37 @@ func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.Key
 		Value:            serializedFormat,
 	}, nil
 }
+
+type parametersParser struct{}
+
+var _ protoserialization.ParametersParser = (*parametersParser)(nil)
+
+func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	if keyTemplate.GetTypeUrl() != typeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyTemplate.GetTypeUrl(), typeURL)
+	}
+	format := new(aesctrhmacpb.AesCtrHmacAeadKeyFormat)
+	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
+		return nil, err
+	}
+	if format.GetHmacKeyFormat().GetVersion() != 0 {
+		return nil, fmt.Errorf("unsupported hmacpb.HmacKeyFormat version: got %q, want %q", format.GetHmacKeyFormat().GetVersion(), 0)
+	}
+
+	variant, err := variantFromProto(keyTemplate.GetOutputPrefixType())
+	if err != nil {
+		return nil, err
+	}
+	hashType, err := hashTypeFromProto(format.GetHmacKeyFormat().GetParams().GetHash())
+	if err != nil {
+		return nil, err
+	}
+	return NewParameters(ParametersOpts{
+		AESKeySizeInBytes:  int(format.GetAesCtrKeyFormat().GetKeySize()),
+		HMACKeySizeInBytes: int(format.GetHmacKeyFormat().GetKeySize()),
+		IVSizeInBytes:      int(format.GetAesCtrKeyFormat().GetParams().GetIvSize()),
+		TagSizeInBytes:     int(format.GetHmacKeyFormat().GetParams().GetTagSize()),
+		HashType:           hashType,
+		Variant:            variant,
+	})
+}

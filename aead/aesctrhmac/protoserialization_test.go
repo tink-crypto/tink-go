@@ -695,205 +695,404 @@ func mustCreateKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixTyp
 	}
 }
 
+type parametersSerializationTestCase struct {
+	name        string
+	parameters  *Parameters
+	keyTemplate *tinkpb.KeyTemplate
+}
+
+func mustCreateParametersTestParameters(t *testing.T) []parametersSerializationTestCase {
+	tcs := []parametersSerializationTestCase{}
+	for _, aesKeySize := range []int{16, 24, 32} { // AES key can be 16, 24 or 32 bytes.
+		for _, hmacKeySize := range []int{16, 32} { // HMAC key must be >= 16 bytes.
+			for _, ivSize := range []int{12, 16} { // IV size must be 12 <= IV size <= 16.
+				for _, variantAndPrefix := range []struct {
+					variant          Variant
+					outputPrefixType tinkpb.OutputPrefixType
+				}{
+					{
+						variant:          VariantTink,
+						outputPrefixType: tinkpb.OutputPrefixType_TINK,
+					},
+					{
+						variant:          VariantNoPrefix,
+						outputPrefixType: tinkpb.OutputPrefixType_RAW,
+					},
+					{
+						variant:          VariantCrunchy,
+						outputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
+					},
+				} {
+					for _, hashAndTagSize := range []struct {
+						hashType      HashType
+						protoHashType commonpb.HashType
+						tagSize       int
+					}{
+						// Min tag size is 10 bytes.
+						{
+							hashType:      SHA1,
+							protoHashType: commonpb.HashType_SHA1,
+							tagSize:       10,
+						},
+						{
+							hashType:      SHA224,
+							protoHashType: commonpb.HashType_SHA224,
+							tagSize:       10,
+						},
+						{
+							hashType:      SHA256,
+							protoHashType: commonpb.HashType_SHA256,
+							tagSize:       10,
+						},
+						{
+							hashType:      SHA384,
+							protoHashType: commonpb.HashType_SHA384,
+							tagSize:       10,
+						},
+						{
+							hashType:      SHA512,
+							protoHashType: commonpb.HashType_SHA512,
+							tagSize:       10,
+						},
+						// Max tag size.
+						{
+							hashType:      SHA1,
+							protoHashType: commonpb.HashType_SHA1,
+							tagSize:       20,
+						},
+						{
+							hashType:      SHA224,
+							protoHashType: commonpb.HashType_SHA224,
+							tagSize:       28,
+						},
+						{
+							hashType:      SHA256,
+							protoHashType: commonpb.HashType_SHA256,
+							tagSize:       32,
+						},
+						{
+							hashType:      SHA384,
+							protoHashType: commonpb.HashType_SHA384,
+							tagSize:       48,
+						},
+						{
+							hashType:      SHA512,
+							protoHashType: commonpb.HashType_SHA512,
+							tagSize:       64,
+						},
+					} {
+						tcs = append(tcs, parametersSerializationTestCase{
+							name: fmt.Sprintf("AES%d-IV%d-HMAC%d-%v-%s-TagSize%d", aesKeySize, ivSize, hmacKeySize, hashAndTagSize.hashType, variantAndPrefix.variant, hashAndTagSize.tagSize),
+							parameters: mustCreateParameters(t, ParametersOpts{
+								AESKeySizeInBytes:  aesKeySize,
+								HMACKeySizeInBytes: hmacKeySize,
+								IVSizeInBytes:      ivSize,
+								TagSizeInBytes:     hashAndTagSize.tagSize,
+								HashType:           hashAndTagSize.hashType,
+								Variant:            variantAndPrefix.variant,
+							}),
+							keyTemplate: mustCreateKeyTemplate(t, variantAndPrefix.outputPrefixType, uint32(aesKeySize), uint32(hmacKeySize), uint32(ivSize), uint32(hashAndTagSize.tagSize), hashAndTagSize.protoHashType),
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return tcs
+}
+
 func TestSerializeParameters(t *testing.T) {
+	for _, tc := range mustCreateParametersTestParameters(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.SerializeParameters(tc.parameters)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeParameters() err = %v, want nil", err)
+			}
+			if diff := cmp.Diff(tc.keyTemplate, got, protocmp.Transform()); diff != "" {
+				t.Errorf("protoserialization.SerializeParameters() returned unexpected diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func mustCreateParameters(t *testing.T, parametersOpts ParametersOpts) *Parameters {
+	t.Helper()
+	params, err := NewParameters(parametersOpts)
+	if err != nil {
+		t.Fatalf("NewParameters(%v) err = %v, want nil", parametersOpts, err)
+	}
+	return params
+}
+
+func TestParseParameters(t *testing.T) {
+	for _, tc := range mustCreateParametersTestParameters(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			params, err := protoserialization.ParseParameters(tc.keyTemplate)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseParameters(%v) err = %v, want nil", tc.keyTemplate, err)
+			}
+			if diff := cmp.Diff(tc.parameters, params); diff != "" {
+				t.Errorf("protoserialization.ParseParameters(%v) returned unexpected diff (-want +got):\n%s", tc.keyTemplate, diff)
+			}
+		})
+	}
+}
+
+func mustMarshal(t *testing.T, message proto.Message) []byte {
+	t.Helper()
+	serializedMessage, err := proto.Marshal(message)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", message, err)
+	}
+	return serializedMessage
+}
+
+func TestParseParametersFailsWithWrongKeyTemplate(t *testing.T) {
 	for _, tc := range []struct {
-		name            string
-		parametersOpts  ParametersOpts
-		wantKeyTemplate *tinkpb.KeyTemplate
+		name         string
+		keyTeamplate *tinkpb.KeyTemplate
 	}{
 		{
-			name: "AES128-IV12-HMAC128-TAG16-SHA1-Tink",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  16,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA1,
-				Variant:            VariantTink,
-			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 16, 16, 12, 16, commonpb.HashType_SHA1),
+			name:         "empty",
+			keyTeamplate: &tinkpb.KeyTemplate{},
 		},
 		{
-			name: "AES128-IV12-HMAC128-TAG16-SHA224-Tink",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  16,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA224,
-				Variant:            VariantTink,
+			name: "wrong value",
+			keyTeamplate: &tinkpb.KeyTemplate{
+				TypeUrl:          typeURL,
+				Value:            mustMarshal(t, &hmacpb.HmacKeyFormat{}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 16, 16, 12, 16, commonpb.HashType_SHA224),
 		},
 		{
-			name: "AES256-IV12-HMAC128-TAG16-SHA256-Tink",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  32,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA256,
-				Variant:            VariantTink,
+			name: "empty AES key format",
+			keyTeamplate: &tinkpb.KeyTemplate{
+				TypeUrl: typeURL,
+				Value: mustMarshal(t, &aesctrhmacpb.AesCtrHmacAeadKeyFormat{
+					HmacKeyFormat: &hmacpb.HmacKeyFormat{
+						KeySize: 16,
+						Params: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 16,
+						},
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 32, 16, 12, 16, commonpb.HashType_SHA256),
 		},
 		{
-			name: "AES256-IV12-HMAC128-TAG16-SHA384-Tink",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  32,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA384,
-				Variant:            VariantTink,
+			name: "empty HMAC key format",
+			keyTeamplate: &tinkpb.KeyTemplate{
+				TypeUrl: typeURL,
+				Value: mustMarshal(t, &aesctrhmacpb.AesCtrHmacAeadKeyFormat{
+					AesCtrKeyFormat: &aesctrpb.AesCtrKeyFormat{
+						KeySize: 16,
+						Params: &aesctrpb.AesCtrParams{
+							IvSize: 12,
+						},
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 32, 16, 12, 16, commonpb.HashType_SHA384),
 		},
 		{
-			name: "AES256-IV12-HMAC128-TAG16-SHA512-Tink",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  32,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA512,
-				Variant:            VariantTink,
+			name: "empty AES key format",
+			keyTeamplate: &tinkpb.KeyTemplate{
+				TypeUrl: typeURL,
+				Value: mustMarshal(t, &aesctrhmacpb.AesCtrHmacAeadKeyFormat{
+					HmacKeyFormat: &hmacpb.HmacKeyFormat{
+						KeySize: 16,
+						Params: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 16,
+						},
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 32, 16, 12, 16, commonpb.HashType_SHA512),
 		},
 		{
-			name: "AES128-IV12-HMAC128-TAG16-SHA1-NoPrefix",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  16,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA1,
-				Variant:            VariantNoPrefix,
+			name: "invalid type URL",
+			keyTeamplate: &tinkpb.KeyTemplate{
+				TypeUrl: "invalid",
+				Value: mustMarshal(t, &aesctrhmacpb.AesCtrHmacAeadKeyFormat{
+					AesCtrKeyFormat: &aesctrpb.AesCtrKeyFormat{
+						KeySize: 16,
+						Params: &aesctrpb.AesCtrParams{
+							IvSize: 12,
+						},
+					},
+					HmacKeyFormat: &hmacpb.HmacKeyFormat{
+						KeySize: 16,
+						Params: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 16,
+						},
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 16, 16, 12, 16, commonpb.HashType_SHA1),
 		},
 		{
-			name: "AES128-IV12-HMAC128-TAG16-SHA224-NoPrefix",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  16,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA224,
-				Variant:            VariantNoPrefix,
+			name: "invalid AES key size",
+			keyTeamplate: &tinkpb.KeyTemplate{
+				TypeUrl: typeURL,
+				Value: mustMarshal(t, &aesctrhmacpb.AesCtrHmacAeadKeyFormat{
+					AesCtrKeyFormat: &aesctrpb.AesCtrKeyFormat{
+						KeySize: 11,
+						Params: &aesctrpb.AesCtrParams{
+							IvSize: 12,
+						},
+					},
+					HmacKeyFormat: &hmacpb.HmacKeyFormat{
+						KeySize: 16,
+						Params: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 16,
+						},
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 16, 16, 12, 16, commonpb.HashType_SHA224),
 		},
 		{
-			name: "AES256-IV12-HMAC128-TAG16-SHA256-NoPrefix",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  32,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA256,
-				Variant:            VariantNoPrefix,
+			name: "invalid IV size",
+			keyTeamplate: &tinkpb.KeyTemplate{
+				TypeUrl: typeURL,
+				Value: mustMarshal(t, &aesctrhmacpb.AesCtrHmacAeadKeyFormat{
+					AesCtrKeyFormat: &aesctrpb.AesCtrKeyFormat{
+						KeySize: 16,
+						Params: &aesctrpb.AesCtrParams{
+							IvSize: 11,
+						},
+					},
+					HmacKeyFormat: &hmacpb.HmacKeyFormat{
+						KeySize: 16,
+						Params: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 16,
+						},
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 32, 16, 12, 16, commonpb.HashType_SHA256),
 		},
 		{
-			name: "AES256-IV12-HMAC128-TAG16-SHA384-NoPrefix",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  32,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA384,
-				Variant:            VariantNoPrefix,
+			name: "invalid hash function",
+			keyTeamplate: &tinkpb.KeyTemplate{
+				TypeUrl: typeURL,
+				Value: mustMarshal(t, &aesctrhmacpb.AesCtrHmacAeadKeyFormat{
+					AesCtrKeyFormat: &aesctrpb.AesCtrKeyFormat{
+						KeySize: 16,
+						Params: &aesctrpb.AesCtrParams{
+							IvSize: 12,
+						},
+					},
+					HmacKeyFormat: &hmacpb.HmacKeyFormat{
+						KeySize: 16,
+						Params: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_UNKNOWN_HASH,
+							TagSize: 16,
+						},
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 32, 16, 12, 16, commonpb.HashType_SHA384),
 		},
 		{
-			name: "AES256-IV12-HMAC128-TAG16-SHA512-NoPrefix",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  32,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA512,
-				Variant:            VariantNoPrefix,
+			name: "invalid hmac key size",
+			keyTeamplate: &tinkpb.KeyTemplate{
+				TypeUrl: typeURL,
+				Value: mustMarshal(t, &aesctrhmacpb.AesCtrHmacAeadKeyFormat{
+					AesCtrKeyFormat: &aesctrpb.AesCtrKeyFormat{
+						KeySize: 16,
+						Params: &aesctrpb.AesCtrParams{
+							IvSize: 12,
+						},
+					},
+					HmacKeyFormat: &hmacpb.HmacKeyFormat{
+						KeySize: 11,
+						Params: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 16,
+						},
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 32, 16, 12, 16, commonpb.HashType_SHA512),
 		},
 		{
-			name: "AES128-IV12-HMAC128-TAG16-SHA1-Crunchy",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  16,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA1,
-				Variant:            VariantCrunchy,
+			name: "invalid tag size",
+			keyTeamplate: &tinkpb.KeyTemplate{
+				TypeUrl: typeURL,
+				Value: mustMarshal(t, &aesctrhmacpb.AesCtrHmacAeadKeyFormat{
+					AesCtrKeyFormat: &aesctrpb.AesCtrKeyFormat{
+						KeySize: 16,
+						Params: &aesctrpb.AesCtrParams{
+							IvSize: 12,
+						},
+					},
+					HmacKeyFormat: &hmacpb.HmacKeyFormat{
+						KeySize: 11,
+						Params: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 100,
+						},
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, 16, 16, 12, 16, commonpb.HashType_SHA1),
 		},
 		{
-			name: "AES128-IV12-HMAC128-TAG16-SHA224-Crunchy",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  16,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA224,
-				Variant:            VariantCrunchy,
+			name: "invalid output prefix type",
+			keyTeamplate: &tinkpb.KeyTemplate{
+				TypeUrl: typeURL,
+				Value: mustMarshal(t, &aesctrhmacpb.AesCtrHmacAeadKeyFormat{
+					AesCtrKeyFormat: &aesctrpb.AesCtrKeyFormat{
+						KeySize: 16,
+						Params: &aesctrpb.AesCtrParams{
+							IvSize: 12,
+						},
+					},
+					HmacKeyFormat: &hmacpb.HmacKeyFormat{
+						KeySize: 16,
+						Params: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 16,
+						},
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, 16, 16, 12, 16, commonpb.HashType_SHA224),
 		},
 		{
-			name: "AES256-IV12-HMAC128-TAG16-SHA256-Crunchy",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  32,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA256,
-				Variant:            VariantCrunchy,
+			name: "invalid version",
+			keyTeamplate: &tinkpb.KeyTemplate{
+				TypeUrl: typeURL,
+				Value: mustMarshal(t, &aesctrhmacpb.AesCtrHmacAeadKeyFormat{
+					AesCtrKeyFormat: &aesctrpb.AesCtrKeyFormat{
+						KeySize: 16,
+						Params: &aesctrpb.AesCtrParams{
+							IvSize: 12,
+						},
+					},
+					HmacKeyFormat: &hmacpb.HmacKeyFormat{
+						KeySize: 16,
+						Params: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 16,
+						},
+						Version: 1,
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, 32, 16, 12, 16, commonpb.HashType_SHA256),
-		},
-		{
-			name: "AES256-IV12-HMAC128-TAG16-SHA384-Crunchy",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  32,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA384,
-				Variant:            VariantCrunchy,
-			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, 32, 16, 12, 16, commonpb.HashType_SHA384),
-		},
-		{
-			name: "AES256-IV12-HMAC128-TAG16-SHA512-Crunchy",
-			parametersOpts: ParametersOpts{
-				AESKeySizeInBytes:  32,
-				HMACKeySizeInBytes: 16,
-				IVSizeInBytes:      12,
-				TagSizeInBytes:     16,
-				HashType:           SHA512,
-				Variant:            VariantCrunchy,
-			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, 32, 16, 12, 16, commonpb.HashType_SHA512),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			serializer := &parametersSerializer{}
-			params, err := NewParameters(tc.parametersOpts)
-			if err != nil {
-				t.Fatalf("NewParameters(%v) err = %v, want nil", tc.parametersOpts, err)
-			}
-			gotKeyTemplate, err := serializer.Serialize(params)
-			if err != nil {
-				t.Fatalf("serializer.Serialize() err = %v, want nil", err)
-			}
-			if diff := cmp.Diff(tc.wantKeyTemplate, gotKeyTemplate, protocmp.Transform()); diff != "" {
-				t.Errorf("serializer.Serialize() returned unexpected diff (-want +got):\n%s", diff)
+			if _, err := protoserialization.ParseParameters(tc.keyTeamplate); err == nil {
+				t.Errorf("protoserialization.ParseParameters(%v) err = nil, want error", tc.keyTeamplate)
 			}
 		})
 	}
