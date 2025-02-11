@@ -421,3 +421,94 @@ func TestSerializeParameters(t *testing.T) {
 		})
 	}
 }
+
+func TestParseParameters(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		parameters  *Parameters
+		keyTemplate *tinkpb.KeyTemplate
+	}{
+		{
+			name: "TINK",
+			parameters: &Parameters{
+				variant: VariantTink,
+			},
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK),
+		},
+		{
+			name: "RAW",
+			parameters: &Parameters{
+				variant: VariantNoPrefix,
+			},
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW),
+		},
+		{
+			name: "CRUNCHY",
+			parameters: &Parameters{
+				variant: VariantCrunchy,
+			},
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseParameters(tc.keyTemplate)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseParameters(%v) err = %v, want nil", tc.keyTemplate, err)
+			}
+			if diff := cmp.Diff(tc.parameters, got); diff != "" {
+				t.Errorf("protoserialization.ParseParameters(%v) returned unexpected diff (-want +got):\n%s", tc.keyTemplate, diff)
+			}
+		})
+	}
+}
+
+func mustMarshal(t *testing.T, message proto.Message) []byte {
+	t.Helper()
+	serializedMessage, err := proto.Marshal(message)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", message, err)
+	}
+	return serializedMessage
+}
+
+func TestParseParametersFailsWithWrongKeyTemplate(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		keyTemplate *tinkpb.KeyTemplate
+	}{
+		{
+			name:        "empty",
+			keyTemplate: &tinkpb.KeyTemplate{},
+		},
+		{
+			name: "invalid format type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.ChaCha20Poly1305Key",
+				Value:            []byte("invalid format"),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "wrong type URL",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCtrHmacAeadKey",
+				Value:            mustMarshal(t, &cppb.ChaCha20Poly1305KeyFormat{}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "unknown output prefix type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.ChaCha20Poly1305Key",
+				Value:            mustMarshal(t, &cppb.ChaCha20Poly1305KeyFormat{}),
+				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseParameters(tc.keyTemplate); err == nil {
+				t.Errorf("protoserialization.ParseParameters(%v) err = nil, want error", tc.keyTemplate)
+			}
+		})
+	}
+}

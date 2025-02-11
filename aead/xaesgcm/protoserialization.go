@@ -159,3 +159,25 @@ func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.Key
 		Value:            serializedFormat,
 	}, nil
 }
+
+type parametersParser struct{}
+
+var _ protoserialization.ParametersParser = (*parametersParser)(nil)
+
+func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	if keyTemplate.GetTypeUrl() != typeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyTemplate.GetTypeUrl(), typeURL)
+	}
+	format := new(xaesgcmpb.XAesGcmKeyFormat)
+	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
+		return nil, err
+	}
+	if format.GetVersion() != 0 {
+		return nil, fmt.Errorf("unsupported xaesgcmpb.AesGcmSivKeyFormat version: got %q, want %q", format.GetVersion(), 0)
+	}
+	variant, err := variantFromProto(keyTemplate.GetOutputPrefixType())
+	if err != nil {
+		return nil, err
+	}
+	return NewParameters(variant, int(format.GetParams().GetSaltSize()))
+}

@@ -65,6 +65,9 @@ func init() {
 	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
 		panic(fmt.Sprintf("xchacha20poly1305.init() failed: %v", err))
 	}
+	if err := protoserialization.RegisterParametersParser(typeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("xchacha20poly1305.init() failed: %v", err))
+	}
 	if err := registryconfig.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("xchacha20poly1305.init() failed: %v", err))
 	}

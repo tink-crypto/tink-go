@@ -286,28 +286,181 @@ func mustCreateParameters(t *testing.T, variant xaesgcm.Variant, saltSize int) *
 
 func TestSerializeParameters(t *testing.T) {
 	for _, tc := range []struct {
-		name            string
-		parameters      key.Parameters
-		wantKeyTemplate *tinkpb.KeyTemplate
+		name        string
+		parameters  key.Parameters
+		keyTemplate *tinkpb.KeyTemplate
 	}{
 		{
-			name:            "TINK output prefix type",
-			parameters:      mustCreateParameters(t, xaesgcm.VariantTink, 12),
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 12),
+			name:        "TINK-SaltSize:12",
+			parameters:  mustCreateParameters(t, xaesgcm.VariantTink, 12),
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 12),
 		},
 		{
-			name:            "RAW output prefix type",
-			parameters:      mustCreateParameters(t, xaesgcm.VariantNoPrefix, 12),
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 12),
+			name:        "TINK-SaltSize:8",
+			parameters:  mustCreateParameters(t, xaesgcm.VariantTink, 8),
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 8),
+		},
+		{
+			name:        "RAW-SaltSize:12",
+			parameters:  mustCreateParameters(t, xaesgcm.VariantNoPrefix, 12),
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 12),
+		},
+		{
+			name:        "RAW-SaltSize:8",
+			parameters:  mustCreateParameters(t, xaesgcm.VariantNoPrefix, 8),
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 8),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			gotKeyTemplate, err := protoserialization.SerializeParameters(tc.parameters)
+			got, err := protoserialization.SerializeParameters(tc.parameters)
 			if err != nil {
 				t.Fatalf("protoserialization.SerializeParameters(%v) err = %v, want nil", tc.parameters, err)
 			}
-			if diff := cmp.Diff(tc.wantKeyTemplate, gotKeyTemplate, protocmp.Transform()); diff != "" {
+			if diff := cmp.Diff(tc.keyTemplate, got, protocmp.Transform()); diff != "" {
 				t.Errorf("protoserialization.SerializeParameters(%v) returned unexpected diff (-want +got):\n%s", tc.parameters, diff)
+			}
+		})
+	}
+}
+
+func TestParseParameters(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		parameters  key.Parameters
+		keyTemplate *tinkpb.KeyTemplate
+	}{
+		{
+			name:        "TINK-SaltSize:12",
+			parameters:  mustCreateParameters(t, xaesgcm.VariantTink, 12),
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 12),
+		},
+		{
+			name:        "TINK-SaltSize:8",
+			parameters:  mustCreateParameters(t, xaesgcm.VariantTink, 8),
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 8),
+		},
+		{
+			name:        "RAW-SaltSize:12",
+			parameters:  mustCreateParameters(t, xaesgcm.VariantNoPrefix, 12),
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 12),
+		},
+		{
+			name:        "RAW-SaltSize:8",
+			parameters:  mustCreateParameters(t, xaesgcm.VariantNoPrefix, 8),
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 8),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseParameters(tc.keyTemplate)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseParameters(%v) err = %v, want nil", tc.keyTemplate, err)
+			}
+			if diff := cmp.Diff(tc.parameters, got); diff != "" {
+				t.Errorf("protoserialization.ParseParameters(%v) returned unexpected diff (-want +got):\n%s", tc.keyTemplate, diff)
+			}
+		})
+	}
+}
+
+func mustMarshal(t *testing.T, message proto.Message) []byte {
+	t.Helper()
+	serializedMessage, err := proto.Marshal(message)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", message, err)
+	}
+	return serializedMessage
+}
+
+func TestParseParametersFailsWithWrongKeyTemplate(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		keyTemplate *tinkpb.KeyTemplate
+	}{
+		{
+			name:        "empty",
+			keyTemplate: &tinkpb.KeyTemplate{},
+		},
+		{
+			name: "empty format",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.XAesGcmKey",
+				Value:            mustMarshal(t, &xaesgcmpb.XAesGcmKeyFormat{}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "invalid format type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.XAesGcmKey",
+				Value:            []byte("invalid format"),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "wrong type URL",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacAeadKey",
+				Value: mustMarshal(t, &xaesgcmpb.XAesGcmKeyFormat{
+					Params: &xaesgcmpb.XAesGcmParams{
+						SaltSize: 8,
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "invalid version",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.XAesGcmKey",
+				Value: mustMarshal(t, &xaesgcmpb.XAesGcmKeyFormat{
+					Params: &xaesgcmpb.XAesGcmParams{
+						SaltSize: 8,
+					},
+					Version: 1,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "invalid salt size",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.XAesGcmKey",
+				Value: mustMarshal(t, &xaesgcmpb.XAesGcmKeyFormat{
+					Params: &xaesgcmpb.XAesGcmParams{
+						SaltSize: 2,
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "unknown output prefix type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.XAesGcmKey",
+				Value: mustMarshal(t, &xaesgcmpb.XAesGcmKeyFormat{
+					Params: &xaesgcmpb.XAesGcmParams{
+						SaltSize: 8,
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
+			},
+		},
+		{
+			name: "unsupported output prefix type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.XAesGcmKey",
+				Value: mustMarshal(t, &xaesgcmpb.XAesGcmKeyFormat{
+					Params: &xaesgcmpb.XAesGcmParams{
+						SaltSize: 8,
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_LEGACY,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseParameters(tc.keyTemplate); err == nil {
+				t.Errorf("protoserialization.ParseParameters(%v) err = nil, want error", tc.keyTemplate)
 			}
 		})
 	}

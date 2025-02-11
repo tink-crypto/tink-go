@@ -34,6 +34,9 @@ func init() {
 	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
 		panic(fmt.Sprintf("xaesgcm.init() failed: %v", err))
 	}
+	if err := protoserialization.RegisterParametersParser(typeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("xaesgcm.init() failed: %v", err))
+	}
 	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
 		panic(fmt.Sprintf("xaesgcm.init() failed: %v", err))
 	}
