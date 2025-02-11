@@ -12,21 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package ecies contains parameters for ECIES keys with HKDF and AEAD
-// encryption.
-//
-// This follows loosely ECIES ISO 18033-2 (Elliptic Curve Integrated Encryption
-// Scheme, see http://www.shoup.net/iso/std6.pdf), with some notable
-// differences:
-//
-//   - use of HKDF key derivation function (instead of KDF1 and KDF2) enabling
-//     the use of optional parameters to the key derivation function, which
-//     strengthen the overall security and allow for binding the key material
-//     to application-specific information (cf. RFC 5869,
-//     https://tools.ietf.org/html/rfc5869)
-//   - use of modern AEAD schemes rather than "manual composition" of symmetric
-//     encryption with message authentication codes (as in DEM1, DEM2, and DEM3
-//     schemes of ISO 18033-2)
 package ecies
 
 import (

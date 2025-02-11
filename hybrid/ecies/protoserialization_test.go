@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ecies
+package ecies_test
 
 import (
-	"encoding/hex"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -23,6 +22,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
@@ -55,7 +55,7 @@ func TestSerializePublicKeyFails(t *testing.T) {
 		},
 		{
 			name:      "invalid public key",
-			publicKey: &PublicKey{},
+			publicKey: &ecies.PublicKey{},
 		},
 		{
 			name:      "incorrect key type",
@@ -63,9 +63,8 @@ func TestSerializePublicKeyFails(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := &publicKeySerializer{}
-			if _, err := s.SerializeKey(tc.publicKey); err == nil {
-				t.Errorf("s.SerializeKey(%v) err = nil, want non-nil", tc.publicKey)
+			if _, err := protoserialization.SerializeKey(tc.publicKey); err == nil {
+				t.Errorf("protoserialization.SerializeKey(%v) err = nil, want non-nil", tc.publicKey)
 			}
 		})
 	}
@@ -89,59 +88,13 @@ func mustCreateKeySerialization(t *testing.T, url string, keyMaterialType tinkpb
 	return ks
 }
 
-type testCase struct {
+type protoSerializationTestCase struct {
 	name                   string
-	publicKey              *PublicKey
+	publicKey              *ecies.PublicKey
 	publicKeySerialization *protoserialization.KeySerialization
 }
 
-var (
-	// From https://datatracker.ietf.org/doc/html/rfc9180#appendix-A.1
-	x25519PublicKeyBytesHex = "37fda3567bdbd628e88668c3c8d7e97d1d1253b6d4ea6d44c150f741f1bf4431"
-
-	// From https://datatracker.ietf.org/doc/html/rfc9180#appendix-A.3
-	p256SHA256PublicKeyBytesHex = "04a92719c6195d5085104f469a8b9814d5838ff72b60501e2c4466e5e67b32" +
-		"5ac98536d7b61a1af4b78e5b7f951c0900be863c403ce65c9bfcb9382657222d18c4"
-
-	// From https://datatracker.ietf.org/doc/html/rfc9180#appendix-A.4
-	p256SHA512PublicKeyBytesHex = "0493ed86735bdfb978cc055c98b45695ad7ce61ce748f4dd63c525a3b8d53a" +
-		"15565c6897888070070c1579db1f86aaa56deb8297e64db7e8924e72866f9a472580"
-
-	// From https://datatracker.ietf.org/doc/html/rfc9180#appendix-A.6
-	p521SHA512PublicKeyBytesHex = "040138b385ca16bb0d5fa0c0665fbbd7e69e3ee29f63991d3e9b5fa740aab8" +
-		"900aaeed46ed73a49055758425a0ce36507c54b29cc5b85a5cee6bae0cf1c21f2731" +
-		"ece2013dc3fb7c8d21654bb161b463962ca19e8c654ff24c94dd2898de12051f1ed0" +
-		"692237fb02b2f8d1dc1c73e9b366b529eb436e98a996ee522aef863dd5739d2f29b0"
-)
-
-func mustHexDecode(t *testing.T, hexString string) []byte {
-	t.Helper()
-	b, err := hex.DecodeString(hexString)
-	if err != nil {
-		t.Fatalf("hex.DecodeString(%q) err = %v, want nil", hexString, err)
-	}
-	return b
-}
-
-func mustCreatePublicKey(t *testing.T, publicKeyBytes []byte, idRequirement uint32, params *Parameters) *PublicKey {
-	t.Helper()
-	pk, err := NewPublicKey(publicKeyBytes, idRequirement, params)
-	if err != nil {
-		t.Fatalf("NewPublicKey() err = %v, want nil", err)
-	}
-	return pk
-}
-
-func mustCreateParameters(t *testing.T, opts ParametersOpts) *Parameters {
-	t.Helper()
-	params, err := NewParameters(opts)
-	if err != nil {
-		t.Fatalf("NewParameters() err = %v, want nil", err)
-	}
-	return params
-}
-
-func mustCreateTestCases(t *testing.T) []testCase {
+func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 	t.Helper()
 	demParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
 		KeySizeInBytes: 32,
@@ -174,18 +127,18 @@ func mustCreateTestCases(t *testing.T) []testCase {
 	copy(p521SHA512PublicKeyX[1:], p521SHA512PublicKeyBytes[1:67])
 	copy(p521SHA512PublicKeyY[1:], p521SHA512PublicKeyBytes[67:])
 
-	testCases := []testCase{
-		testCase{
+	testCases := []protoSerializationTestCase{
+		protoSerializationTestCase{
 			name: "X25519-SHA256-Tink",
-			publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes, uint32(0x01020304), mustCreateParameters(t, ParametersOpts{
-				CurveType:            X25519,
-				HashType:             SHA256,
-				NISTCurvePointFormat: UnspecifiedPointFormat,
+			publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes, uint32(0x01020304), mustCreateParameters(t, ecies.ParametersOpts{
+				CurveType:            ecies.X25519,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.UnspecifiedPointFormat,
 				DEMParameters:        demParams,
-				Variant:              VariantTink,
+				Variant:              ecies.VariantTink,
 				Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 			})),
-			publicKeySerialization: mustCreateKeySerialization(t, publicKeyTypeURL, tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 				&eciespb.EciesAeadHkdfPublicKey{
 					Version: 0,
 					Params: &eciespb.EciesAeadHkdfParams{
@@ -202,17 +155,17 @@ func mustCreateTestCases(t *testing.T) []testCase {
 					X: x25519PublicKeyBytes,
 				}, tinkpb.OutputPrefixType_TINK, uint32(0x01020304)),
 		},
-		testCase{
+		protoSerializationTestCase{
 			name: "X25519-SHA256-NoPrefix",
-			publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes, 0, mustCreateParameters(t, ParametersOpts{
-				CurveType:            X25519,
-				HashType:             SHA256,
-				NISTCurvePointFormat: UnspecifiedPointFormat,
+			publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes, 0, mustCreateParameters(t, ecies.ParametersOpts{
+				CurveType:            ecies.X25519,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.UnspecifiedPointFormat,
 				DEMParameters:        demParams,
-				Variant:              VariantNoPrefix,
+				Variant:              ecies.VariantNoPrefix,
 				Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 			})),
-			publicKeySerialization: mustCreateKeySerialization(t, publicKeyTypeURL, tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 				&eciespb.EciesAeadHkdfPublicKey{
 					Version: 0,
 					Params: &eciespb.EciesAeadHkdfParams{
@@ -229,17 +182,17 @@ func mustCreateTestCases(t *testing.T) []testCase {
 					X: x25519PublicKeyBytes,
 				}, tinkpb.OutputPrefixType_RAW, 0),
 		},
-		testCase{
+		protoSerializationTestCase{
 			name: "NISTP256-SHA256-Compressed-Tink",
-			publicKey: mustCreatePublicKey(t, p256SHA256PublicKeyBytes, uint32(0x01020304), mustCreateParameters(t, ParametersOpts{
-				CurveType:            NISTP256,
-				HashType:             SHA256,
-				NISTCurvePointFormat: CompressedPointFormat,
+			publicKey: mustCreatePublicKey(t, p256SHA256PublicKeyBytes, uint32(0x01020304), mustCreateParameters(t, ecies.ParametersOpts{
+				CurveType:            ecies.NISTP256,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.CompressedPointFormat,
 				DEMParameters:        demParams,
-				Variant:              VariantTink,
+				Variant:              ecies.VariantTink,
 				Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 			})),
-			publicKeySerialization: mustCreateKeySerialization(t, publicKeyTypeURL, tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 				&eciespb.EciesAeadHkdfPublicKey{
 					Version: 0,
 					Params: &eciespb.EciesAeadHkdfParams{
@@ -257,17 +210,17 @@ func mustCreateTestCases(t *testing.T) []testCase {
 					Y: p256SHA256PublicKeyY,
 				}, tinkpb.OutputPrefixType_TINK, uint32(0x01020304)),
 		},
-		testCase{
+		protoSerializationTestCase{
 			name: "NISTP256-SHA256-Uncompressed-NoPrefix",
-			publicKey: mustCreatePublicKey(t, p256SHA256PublicKeyBytes, 0, mustCreateParameters(t, ParametersOpts{
-				CurveType:            NISTP256,
-				HashType:             SHA256,
-				NISTCurvePointFormat: UncompressedPointFormat,
+			publicKey: mustCreatePublicKey(t, p256SHA256PublicKeyBytes, 0, mustCreateParameters(t, ecies.ParametersOpts{
+				CurveType:            ecies.NISTP256,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.UncompressedPointFormat,
 				DEMParameters:        demParams,
-				Variant:              VariantNoPrefix,
+				Variant:              ecies.VariantNoPrefix,
 				Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 			})),
-			publicKeySerialization: mustCreateKeySerialization(t, publicKeyTypeURL, tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 				&eciespb.EciesAeadHkdfPublicKey{
 					Version: 0,
 					Params: &eciespb.EciesAeadHkdfParams{
@@ -285,17 +238,17 @@ func mustCreateTestCases(t *testing.T) []testCase {
 					Y: p256SHA256PublicKeyY,
 				}, tinkpb.OutputPrefixType_RAW, 0),
 		},
-		testCase{
+		protoSerializationTestCase{
 			name: "NISTP256-SHA512-Compressed-Tink",
-			publicKey: mustCreatePublicKey(t, p256SHA512PublicKeyBytes, uint32(0x01020304), mustCreateParameters(t, ParametersOpts{
-				CurveType:            NISTP256,
-				HashType:             SHA512,
-				NISTCurvePointFormat: CompressedPointFormat,
+			publicKey: mustCreatePublicKey(t, p256SHA512PublicKeyBytes, uint32(0x01020304), mustCreateParameters(t, ecies.ParametersOpts{
+				CurveType:            ecies.NISTP256,
+				HashType:             ecies.SHA512,
+				NISTCurvePointFormat: ecies.CompressedPointFormat,
 				DEMParameters:        demParams,
-				Variant:              VariantTink,
+				Variant:              ecies.VariantTink,
 				Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 			})),
-			publicKeySerialization: mustCreateKeySerialization(t, publicKeyTypeURL, tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 				&eciespb.EciesAeadHkdfPublicKey{
 					Version: 0,
 					Params: &eciespb.EciesAeadHkdfParams{
@@ -313,17 +266,17 @@ func mustCreateTestCases(t *testing.T) []testCase {
 					Y: p256SHA512PublicKeyY,
 				}, tinkpb.OutputPrefixType_TINK, uint32(0x01020304)),
 		},
-		testCase{
+		protoSerializationTestCase{
 			name: "NISTP256-SHA512-Uncompressed-NoPrefix",
-			publicKey: mustCreatePublicKey(t, p256SHA512PublicKeyBytes, 0, mustCreateParameters(t, ParametersOpts{
-				CurveType:            NISTP256,
-				HashType:             SHA512,
-				NISTCurvePointFormat: UncompressedPointFormat,
+			publicKey: mustCreatePublicKey(t, p256SHA512PublicKeyBytes, 0, mustCreateParameters(t, ecies.ParametersOpts{
+				CurveType:            ecies.NISTP256,
+				HashType:             ecies.SHA512,
+				NISTCurvePointFormat: ecies.UncompressedPointFormat,
 				DEMParameters:        demParams,
-				Variant:              VariantNoPrefix,
+				Variant:              ecies.VariantNoPrefix,
 				Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 			})),
-			publicKeySerialization: mustCreateKeySerialization(t, publicKeyTypeURL, tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 				&eciespb.EciesAeadHkdfPublicKey{
 					Version: 0,
 					Params: &eciespb.EciesAeadHkdfParams{
@@ -341,17 +294,17 @@ func mustCreateTestCases(t *testing.T) []testCase {
 					Y: p256SHA512PublicKeyY,
 				}, tinkpb.OutputPrefixType_RAW, 0),
 		},
-		testCase{
+		protoSerializationTestCase{
 			name: "NISTP521-SHA512-Compressed-Tink",
-			publicKey: mustCreatePublicKey(t, p521SHA512PublicKeyBytes, uint32(0x01020304), mustCreateParameters(t, ParametersOpts{
-				CurveType:            NISTP521,
-				HashType:             SHA512,
-				NISTCurvePointFormat: CompressedPointFormat,
+			publicKey: mustCreatePublicKey(t, p521SHA512PublicKeyBytes, uint32(0x01020304), mustCreateParameters(t, ecies.ParametersOpts{
+				CurveType:            ecies.NISTP521,
+				HashType:             ecies.SHA512,
+				NISTCurvePointFormat: ecies.CompressedPointFormat,
 				DEMParameters:        demParams,
-				Variant:              VariantTink,
+				Variant:              ecies.VariantTink,
 				Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 			})),
-			publicKeySerialization: mustCreateKeySerialization(t, publicKeyTypeURL, tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 				&eciespb.EciesAeadHkdfPublicKey{
 					Version: 0,
 					Params: &eciespb.EciesAeadHkdfParams{
@@ -369,17 +322,17 @@ func mustCreateTestCases(t *testing.T) []testCase {
 					Y: p521SHA512PublicKeyY,
 				}, tinkpb.OutputPrefixType_TINK, uint32(0x01020304)),
 		},
-		testCase{
+		protoSerializationTestCase{
 			name: "NISTP521-SHA512-Uncompressed-NoPrefix",
-			publicKey: mustCreatePublicKey(t, p521SHA512PublicKeyBytes, 0, mustCreateParameters(t, ParametersOpts{
-				CurveType:            NISTP521,
-				HashType:             SHA512,
-				NISTCurvePointFormat: UncompressedPointFormat,
+			publicKey: mustCreatePublicKey(t, p521SHA512PublicKeyBytes, 0, mustCreateParameters(t, ecies.ParametersOpts{
+				CurveType:            ecies.NISTP521,
+				HashType:             ecies.SHA512,
+				NISTCurvePointFormat: ecies.UncompressedPointFormat,
 				DEMParameters:        demParams,
-				Variant:              VariantNoPrefix,
+				Variant:              ecies.VariantNoPrefix,
 				Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 			})),
-			publicKeySerialization: mustCreateKeySerialization(t, publicKeyTypeURL, tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 				&eciespb.EciesAeadHkdfPublicKey{
 					Version: 0,
 					Params: &eciespb.EciesAeadHkdfParams{
@@ -397,17 +350,17 @@ func mustCreateTestCases(t *testing.T) []testCase {
 					Y: p521SHA512PublicKeyY,
 				}, tinkpb.OutputPrefixType_RAW, 0),
 		},
-		testCase{
+		protoSerializationTestCase{
 			name: "NISTP521-SHA512-Uncompressed-NoPrefix",
-			publicKey: mustCreatePublicKey(t, p521SHA512PublicKeyBytes, 0, mustCreateParameters(t, ParametersOpts{
-				CurveType:            NISTP521,
-				HashType:             SHA512,
-				NISTCurvePointFormat: UncompressedPointFormat,
+			publicKey: mustCreatePublicKey(t, p521SHA512PublicKeyBytes, 0, mustCreateParameters(t, ecies.ParametersOpts{
+				CurveType:            ecies.NISTP521,
+				HashType:             ecies.SHA512,
+				NISTCurvePointFormat: ecies.UncompressedPointFormat,
 				DEMParameters:        demParams,
-				Variant:              VariantNoPrefix,
+				Variant:              ecies.VariantNoPrefix,
 				Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 			})),
-			publicKeySerialization: mustCreateKeySerialization(t, publicKeyTypeURL, tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 				&eciespb.EciesAeadHkdfPublicKey{
 					Version: 0,
 					Params: &eciespb.EciesAeadHkdfParams{
@@ -432,13 +385,12 @@ func mustCreateTestCases(t *testing.T) []testCase {
 func TestSerializePublicKey(t *testing.T) {
 	for _, tc := range mustCreateTestCases(t) {
 		t.Run(tc.name, func(t *testing.T) {
-			s := &publicKeySerializer{}
-			got, err := s.SerializeKey(tc.publicKey)
+			got, err := protoserialization.SerializeKey(tc.publicKey)
 			if err != nil {
-				t.Fatalf("s.SerializeKey(%v) err = nil, want non-nil", tc.publicKey)
+				t.Fatalf("protoserialization.SerializeKey(%v) err = %v, want nil", tc.publicKey, err)
 			}
 			if diff := cmp.Diff(got, tc.publicKeySerialization, protocmp.Transform()); diff != "" {
-				t.Errorf("s.SerializeKey(%v) returned unexpected diff (-want +got):\n%s", tc.publicKey, diff)
+				t.Errorf("protoserialization.SerializeKey(%v) returned unexpected diff (-want +got):\n%s", tc.publicKey, diff)
 			}
 		})
 	}
