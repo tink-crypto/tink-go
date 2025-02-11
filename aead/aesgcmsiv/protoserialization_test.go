@@ -15,6 +15,7 @@
 package aesgcmsiv
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -383,62 +384,144 @@ func mustCreateKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixTyp
 	}
 }
 
+type parametersSerializationTestCase struct {
+	name        string
+	parameters  *Parameters
+	keyTemplate *tinkpb.KeyTemplate
+}
+
+func mustCreateParametersTestParameters(t *testing.T) []parametersSerializationTestCase {
+	tcs := []parametersSerializationTestCase{}
+	for _, keySize := range []int{16, 32} {
+		for _, variantAndPrefix := range []struct {
+			variant          Variant
+			outputPrefixType tinkpb.OutputPrefixType
+		}{
+			{variant: VariantTink, outputPrefixType: tinkpb.OutputPrefixType_TINK},
+			{variant: VariantCrunchy, outputPrefixType: tinkpb.OutputPrefixType_CRUNCHY},
+			{variant: VariantNoPrefix, outputPrefixType: tinkpb.OutputPrefixType_RAW},
+		} {
+			params, err := NewParameters(keySize, variantAndPrefix.variant)
+			if err != nil {
+				t.Fatalf("NewParameters(%v, %v) err = %v, want nil", keySize, variantAndPrefix.variant, err)
+			}
+			tcs = append(tcs, parametersSerializationTestCase{
+				name:        fmt.Sprintf("AES%d-GCM-SIV-%s", keySize*8, variantAndPrefix.variant),
+				parameters:  params,
+				keyTemplate: mustCreateKeyTemplate(t, variantAndPrefix.outputPrefixType, uint32(keySize)),
+			})
+		}
+	}
+	return tcs
+}
+
 func TestSerializeParameters(t *testing.T) {
+	for _, tc := range mustCreateParametersTestParameters(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.SerializeParameters(tc.parameters)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeParameters(%v) err = %v, want nil", tc.parameters, err)
+			}
+			if diff := cmp.Diff(tc.keyTemplate, got, protocmp.Transform()); diff != "" {
+				t.Errorf("protoserialization.SerializeParameters(%v) returned unexpected diff (-want +got):\n%s", tc.parameters, diff)
+			}
+		})
+	}
+}
+
+func TestParseParameters(t *testing.T) {
+	for _, tc := range mustCreateParametersTestParameters(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseParameters(tc.keyTemplate)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseParameters(%v) err = %v, want nil", tc.keyTemplate, err)
+			}
+			if diff := cmp.Diff(tc.parameters, got); diff != "" {
+				t.Errorf("protoserialization.ParseParameters(%v) returned unexpected diff (-want +got):\n%s", tc.keyTemplate, diff)
+			}
+		})
+	}
+}
+
+func mustMarshal(t *testing.T, message proto.Message) []byte {
+	t.Helper()
+	serializedMessage, err := proto.Marshal(message)
+	if err != nil {
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", message, err)
+	}
+	return serializedMessage
+}
+
+func TestParseParametersFailsWithWrongKeyTemplate(t *testing.T) {
 	for _, tc := range []struct {
-		name            string
-		keySizeInBytes  int
-		variant         Variant
-		wantKeyTemplate *tinkpb.KeyTemplate
+		name        string
+		keyTemplate *tinkpb.KeyTemplate
 	}{
 		{
-			name:            "AES128-GCM-SIV TINK output prefix type",
-			keySizeInBytes:  16,
-			variant:         VariantTink,
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 16),
+			name:        "empty",
+			keyTemplate: &tinkpb.KeyTemplate{},
 		},
 		{
-			name:            "AES256-GCM-SIV TINK output prefix type",
-			keySizeInBytes:  32,
-			variant:         VariantTink,
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, 32),
+			name: "empty format",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmSivKey",
+				Value:            mustMarshal(t, &aesgcmsivpb.AesGcmSivKeyFormat{}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
 		},
 		{
-			name:            "AES128-GCM-SIV RAW output prefix type",
-			keySizeInBytes:  16,
-			variant:         VariantNoPrefix,
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 16),
+			name: "invalid format type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmSivKey",
+				Value:            []byte("invalid format"),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
 		},
 		{
-			name:            "AES256-GCM-SIV RAW output prefix type",
-			keySizeInBytes:  32,
-			variant:         VariantNoPrefix,
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, 32),
+			name: "wrong type URL",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacAeadKey",
+				Value: mustMarshal(t, &aesgcmsivpb.AesGcmSivKeyFormat{
+					KeySize: 16,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
 		},
 		{
-			name:            "AES128-GCM-SIV CRUNCHY output prefix type",
-			keySizeInBytes:  16,
-			variant:         VariantCrunchy,
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, 16),
+			name: "invalid version",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesGcmSivKey",
+				Value: mustMarshal(t, &aesgcmsivpb.AesGcmSivKeyFormat{
+					KeySize: 16,
+					Version: 1,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
 		},
 		{
-			name:            "AES256-GCM-SIV CRUNCHY output prefix type",
-			keySizeInBytes:  32,
-			variant:         VariantCrunchy,
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, 32),
+			name: "invalid key size",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesGcmSivKey",
+				Value: mustMarshal(t, &aesgcmsivpb.AesGcmSivKeyFormat{
+					KeySize: 10,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "unknown output prefix type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesGcmSivKey",
+				Value: mustMarshal(t, &aesgcmsivpb.AesGcmSivKeyFormat{
+					KeySize: 16,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			params, err := NewParameters(tc.keySizeInBytes, tc.variant)
-			if err != nil {
-				t.Fatalf("NewParameters(%v, %v) err = %v, want nil", tc.keySizeInBytes, tc.variant, err)
-			}
-			serializer := &parametersSerializer{}
-			gotKeyTemplate, err := serializer.Serialize(params)
-			if err != nil {
-				t.Fatalf("serializer.Serialize(%v) err = %v, want nil", params, err)
-			}
-			if diff := cmp.Diff(tc.wantKeyTemplate, gotKeyTemplate, protocmp.Transform()); diff != "" {
-				t.Errorf("serializer.Serialize(%v) returned unexpected diff (-want +got):\n%s", params, diff)
+			if _, err := protoserialization.ParseParameters(tc.keyTemplate); err == nil {
+				t.Errorf("protoserialization.ParseParameters(%v) err = nil, want error", tc.keyTemplate)
 			}
 		})
 	}
