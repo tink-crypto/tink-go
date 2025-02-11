@@ -61,10 +61,13 @@ func init() {
 	if err := protoserialization.RegisterKeyParser(typeURL, &keyParser{}); err != nil {
 		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
 	}
-	if err := registryconfig.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
 		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
 	}
-	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
+	if err := protoserialization.RegisterParametersParser(typeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
+	}
+	if err := registryconfig.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
 	}
 }
