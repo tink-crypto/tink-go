@@ -16,6 +16,7 @@ package ecies
 
 import (
 	"fmt"
+	"slices"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -82,6 +83,8 @@ func protoEcPointFormatFromPointFormat(pointFormat PointFormat) (commonpb.EcPoin
 		return commonpb.EcPointFormat_COMPRESSED, nil
 	case UncompressedPointFormat:
 		return commonpb.EcPointFormat_UNCOMPRESSED, nil
+	case LegacyUncompressedPointFormat:
+		return commonpb.EcPointFormat_DO_NOT_USE_CRUNCHY_UNCOMPRESSED, nil
 	case UnspecifiedPointFormat:
 		// This is unspecified only for X25519, so we set it to COMPRESSED.
 		return commonpb.EcPointFormat_COMPRESSED, nil
@@ -218,4 +221,175 @@ func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.Key
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 	}
 	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
+}
+
+type publicKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*publicKeyParser)(nil)
+
+func curveTypeFromProto(curveType commonpb.EllipticCurveType) (CurveType, error) {
+	switch curveType {
+	case commonpb.EllipticCurveType_NIST_P256:
+		return NISTP256, nil
+	case commonpb.EllipticCurveType_NIST_P384:
+		return NISTP384, nil
+	case commonpb.EllipticCurveType_NIST_P521:
+		return NISTP521, nil
+	case commonpb.EllipticCurveType_CURVE25519:
+		return X25519, nil
+	default:
+		return UnknownCurveType, fmt.Errorf("unknown curve type: %v", curveType)
+	}
+}
+
+func hashTypeFromProto(hashType commonpb.HashType) (HashType, error) {
+	switch hashType {
+	case commonpb.HashType_SHA1:
+		return SHA1, nil
+	case commonpb.HashType_SHA224:
+		return SHA224, nil
+	case commonpb.HashType_SHA256:
+		return SHA256, nil
+	case commonpb.HashType_SHA384:
+		return SHA384, nil
+	case commonpb.HashType_SHA512:
+		return SHA512, nil
+	default:
+		return UnknownHashType, fmt.Errorf("unknown hash type: %v", hashType)
+	}
+}
+
+func variantFromProto(outputPrefixType tinkpb.OutputPrefixType) (Variant, error) {
+	switch outputPrefixType {
+	case tinkpb.OutputPrefixType_TINK:
+		return VariantTink, nil
+	case tinkpb.OutputPrefixType_CRUNCHY, tinkpb.OutputPrefixType_LEGACY:
+		return VariantCrunchy, nil
+	case tinkpb.OutputPrefixType_RAW:
+		return VariantNoPrefix, nil
+	default:
+		return VariantUnknown, fmt.Errorf("unknown output prefix: %v", outputPrefixType)
+	}
+}
+
+// removeLeftPaddingFromBigInt removes the leading zeros from the
+// given big integer representation.
+//
+// If bigIntValue is smaller than the given size, it is returned as is.
+// If the bytes representation of the big integer is longer than size, an error
+// is returned.
+func removeLeftPaddingFromBigInt(bigIntValue []byte, size int) ([]byte, error) {
+	if len(bigIntValue) <= size {
+		return bigIntValue, nil
+	}
+	// Remove the leading len(bigIntValue)-size bytes. Fail if any is not zero.
+	for i := 0; i < len(bigIntValue)-size; i++ {
+		if bigIntValue[i] != 0 {
+			return nil, fmt.Errorf("big int has invalid size: %v, want %v", len(bigIntValue)-i, size)
+		}
+	}
+	return bigIntValue[len(bigIntValue)-size:], nil
+}
+
+func pointFormatFromProtoPointFormat(pointFormat commonpb.EcPointFormat) (PointFormat, error) {
+	switch pointFormat {
+	case commonpb.EcPointFormat_COMPRESSED:
+		return CompressedPointFormat, nil
+	case commonpb.EcPointFormat_UNCOMPRESSED:
+		return UncompressedPointFormat, nil
+	case commonpb.EcPointFormat_DO_NOT_USE_CRUNCHY_UNCOMPRESSED:
+		return LegacyUncompressedPointFormat, nil
+	default:
+		return UnspecifiedPointFormat, fmt.Errorf("unknown point format: %v ", pointFormat)
+	}
+}
+
+func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	if keySerialization == nil {
+		return nil, fmt.Errorf("key serialization is nil")
+	}
+	keyData := keySerialization.KeyData()
+	if keyData.GetTypeUrl() != publicKeyTypeURL {
+		return nil, fmt.Errorf("invalid key type URL %v, want %v", keyData.GetTypeUrl(), publicKeyTypeURL)
+	}
+	if keyData.GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PUBLIC {
+		return nil, fmt.Errorf("invalid key material type: %v", keyData.GetKeyMaterialType())
+	}
+	protoECIESKey := new(eciespb.EciesAeadHkdfPublicKey)
+	if err := proto.Unmarshal(keyData.GetValue(), protoECIESKey); err != nil {
+		return nil, err
+	}
+	if protoECIESKey.GetVersion() != 0 {
+		return nil, fmt.Errorf("invalid key version: %v, want 0", protoECIESKey.GetVersion())
+	}
+	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
+	keyID, _ := keySerialization.IDRequirement()
+
+	curveType, err := curveTypeFromProto(protoECIESKey.GetParams().GetKemParams().GetCurveType())
+	if err != nil {
+		return nil, err
+	}
+	hashType, err := hashTypeFromProto(protoECIESKey.GetParams().GetKemParams().GetHkdfHashType())
+	if err != nil {
+		return nil, err
+	}
+	variant, err := variantFromProto(keySerialization.OutputPrefixType())
+	if err != nil {
+		return nil, err
+	}
+	pointFormat, err := pointFormatFromProtoPointFormat(protoECIESKey.GetParams().GetEcPointFormat())
+	if err != nil {
+		return nil, err
+	}
+	demParams, err := protoserialization.ParseParameters(protoECIESKey.GetParams().GetDemParams().GetAeadDem())
+	if err != nil {
+		return nil, err
+	}
+	if curveType == X25519 {
+		if pointFormat != CompressedPointFormat {
+			return nil, fmt.Errorf("for X25519, point format must be COMPRESSED, got %v", pointFormat)
+		}
+		// Leave unspecified for X25519.
+		pointFormat = UnspecifiedPointFormat
+	}
+
+	params, err := NewParameters(ParametersOpts{
+		CurveType:            curveType,
+		HashType:             hashType,
+		Variant:              variant,
+		NISTCurvePointFormat: pointFormat,
+		DEMParameters:        demParams,
+		Salt:                 protoECIESKey.GetParams().GetKemParams().GetHkdfSalt(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var publicKeyBytes []byte
+	if curveType == X25519 {
+		publicKeyBytes = protoECIESKey.GetX()
+	} else {
+		coordinateSize, err := coordinateSizeForCurve(curveType)
+		if err != nil {
+			return nil, err
+		}
+		// Tolerate arbitrary leading zeros in the coordinates.
+		// This is to support the case where the curve size in bytes + 1 is the
+		// length of the coordinate. This happens when Tink adds an extra leading
+		// 0x00 byte (see b/264525021).
+		x, err := removeLeftPaddingFromBigInt(protoECIESKey.GetX(), coordinateSize)
+		if err != nil {
+			return nil, err
+		}
+		y, err := removeLeftPaddingFromBigInt(protoECIESKey.GetY(), coordinateSize)
+		if err != nil {
+			return nil, err
+		}
+		publicKeyBytes = slices.Concat([]byte{0x04}, x, y)
+	}
+	publicKey, err := NewPublicKey(publicKeyBytes, keyID, params)
+	if err != nil {
+		return nil, err
+	}
+	return publicKey, nil
 }
