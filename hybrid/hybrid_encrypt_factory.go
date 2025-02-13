@@ -28,7 +28,7 @@ import (
 
 // NewHybridEncrypt returns an HybridEncrypt primitive from the given keyset handle.
 func NewHybridEncrypt(handle *keyset.Handle) (tink.HybridEncrypt, error) {
-	ps, err := handle.Primitives(internalapi.Token{})
+	ps, err := keyset.Primitives[tink.HybridEncrypt](handle, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("hybrid_factory: cannot obtain primitive set: %s", err)
 	}
@@ -37,22 +37,30 @@ func NewHybridEncrypt(handle *keyset.Handle) (tink.HybridEncrypt, error) {
 
 // encryptPrimitiveSet is an HybridEncrypt implementation that uses the underlying primitive set for encryption.
 type wrappedHybridEncrypt struct {
-	ps     *primitiveset.PrimitiveSet
+	ps     *primitiveset.PrimitiveSet[tink.HybridEncrypt]
 	logger monitoring.Logger
 }
 
 // compile time assertion that wrappedHybridEncrypt implements the HybridEncrypt interface.
 var _ tink.HybridEncrypt = (*wrappedHybridEncrypt)(nil)
 
-func newEncryptPrimitiveSet(ps *primitiveset.PrimitiveSet) (*wrappedHybridEncrypt, error) {
-	if err := isHybridEncrypt(ps.Primary.Primitive); err != nil {
-		return nil, err
+func isAEAD(p any) bool {
+	if p == nil {
+		return false
 	}
+	_, ok := p.(tink.AEAD)
+	return ok
+}
 
+func newEncryptPrimitiveSet(ps *primitiveset.PrimitiveSet[tink.HybridEncrypt]) (*wrappedHybridEncrypt, error) {
+	// Make sure the primitives do not implement tink.AEAD.
+	if isAEAD(ps.Primary.Primitive) || isAEAD(ps.Primary.FullPrimitive) {
+		return nil, fmt.Errorf("hybrid_factory: primary primitive must NOT implement tink.AEAD")
+	}
 	for _, primitives := range ps.Entries {
 		for _, p := range primitives {
-			if err := isHybridEncrypt(p.Primitive); err != nil {
-				return nil, err
+			if isAEAD(p.Primitive) || isAEAD(p.FullPrimitive) {
+				return nil, fmt.Errorf("hybrid_factory: primitive must NOT implement tink.AEAD")
 			}
 		}
 	}
@@ -66,7 +74,7 @@ func newEncryptPrimitiveSet(ps *primitiveset.PrimitiveSet) (*wrappedHybridEncryp
 	}, nil
 }
 
-func createEncryptLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, error) {
+func createEncryptLogger(ps *primitiveset.PrimitiveSet[tink.HybridEncrypt]) (monitoring.Logger, error) {
 	if len(ps.Annotations) == 0 {
 		return &monitoringutil.DoNothingLogger{}, nil
 	}
@@ -85,9 +93,7 @@ func createEncryptLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, erro
 // It returns the concatenation of the primary's identifier and the ciphertext.
 func (a *wrappedHybridEncrypt) Encrypt(plaintext, contextInfo []byte) ([]byte, error) {
 	primary := a.ps.Primary
-	p := primary.Primitive.(tink.HybridEncrypt) // verified in newEncryptPrimitiveSet
-
-	ct, err := p.Encrypt(plaintext, contextInfo)
+	ct, err := primary.Primitive.Encrypt(plaintext, contextInfo)
 	if err != nil {
 		a.logger.LogFailure()
 		return nil, err
@@ -100,16 +106,4 @@ func (a *wrappedHybridEncrypt) Encrypt(plaintext, contextInfo []byte) ([]byte, e
 	output = append(output, primary.Prefix...)
 	output = append(output, ct...)
 	return output, nil
-}
-
-// Asserts `p` implements tink.HybridEncrypt and not tink.AEAD. The latter check
-// is required as implementations of tink.AEAD also satisfy tink.HybridEncrypt.
-func isHybridEncrypt(p any) error {
-	if _, ok := p.(tink.AEAD); ok {
-		return fmt.Errorf("hybrid_factory: tink.AEAD is not tink.HybridEncrypt")
-	}
-	if _, ok := p.(tink.HybridEncrypt); !ok {
-		return fmt.Errorf("hybrid_factory: not tink.HybridEncrypt")
-	}
-	return nil
 }

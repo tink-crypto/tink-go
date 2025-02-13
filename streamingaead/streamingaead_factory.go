@@ -26,24 +26,10 @@ import (
 
 // New returns a StreamingAEAD primitive from the given keyset handle.
 func New(handle *keyset.Handle) (tink.StreamingAEAD, error) {
-	ps, err := handle.Primitives(internalapi.Token{})
+	ps, err := keyset.Primitives[tink.StreamingAEAD](handle, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("streamingaead_factory: cannot obtain primitive set: %s", err)
 	}
-
-	_, ok := (ps.Primary.Primitive).(tink.StreamingAEAD)
-	if !ok {
-		return nil, fmt.Errorf("streamingaead_factory: not a StreamingAEAD primitive")
-	}
-
-	for _, primitives := range ps.Entries {
-		for _, p := range primitives {
-			if _, ok := (p.Primitive).(tink.StreamingAEAD); !ok {
-				return nil, fmt.Errorf("streamingaead_factory: not a StreamingAEAD primitive")
-			}
-		}
-	}
-
 	ret := new(wrappedStreamingAEAD)
 	ret.ps = ps
 	return tink.StreamingAEAD(ret), nil
@@ -52,7 +38,7 @@ func New(handle *keyset.Handle) (tink.StreamingAEAD, error) {
 // wrappedStreamingAEAD is a StreamingAEAD implementation that uses the underlying primitive set
 // for streaming encryption and decryption.
 type wrappedStreamingAEAD struct {
-	ps *primitiveset.PrimitiveSet
+	ps *primitiveset.PrimitiveSet[tink.StreamingAEAD]
 }
 
 // Asserts that wrappedStreamingAEAD implements the StreamingAEAD interface.
@@ -64,12 +50,7 @@ var _ tink.StreamingAEAD = (*wrappedStreamingAEAD)(nil)
 // and has to be passed in as parameter for decryption.
 func (s *wrappedStreamingAEAD) NewEncryptingWriter(w io.Writer, aad []byte) (io.WriteCloser, error) {
 	primary := s.ps.Primary
-	p, ok := (primary.Primitive).(tink.StreamingAEAD)
-	if !ok {
-		return nil, fmt.Errorf("streamingaead_factory: not a StreamingAEAD primitive")
-	}
-
-	return p.NewEncryptingWriter(w, aad)
+	return primary.Primitive.NewEncryptingWriter(w, aad)
 }
 
 // NewDecryptingReader returns a wrapper around underlying io.Reader, such that any read-operation

@@ -20,7 +20,6 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -45,25 +44,22 @@ func (i *invalidDeriver) DeriveKeyset(salt []byte) (*keyset.Handle, error) {
 }
 
 func TestDeriveKeysetWithInvalidPrimitiveImplementationFails(t *testing.T) {
-	entry := &primitiveset.Entry{
+	entry := &primitiveset.Entry[KeysetDeriver]{
 		KeyID:     119,
 		Primitive: &invalidDeriver{},
 		Prefix:    cryptofmt.RawPrefix,
 		Status:    tinkpb.KeyStatusType_ENABLED,
 		TypeURL:   "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
 	}
-	ps := &primitiveset.PrimitiveSet{
+	ps := &primitiveset.PrimitiveSet[KeysetDeriver]{
 		Primary: entry,
-		Entries: map[string][]*primitiveset.Entry{
-			cryptofmt.RawPrefix: []*primitiveset.Entry{entry},
+		Entries: map[string][]*primitiveset.Entry[KeysetDeriver]{
+			cryptofmt.RawPrefix: []*primitiveset.Entry[KeysetDeriver]{entry},
 		},
-		EntriesInKeysetOrder: []*primitiveset.Entry{entry},
+		EntriesInKeysetOrder: []*primitiveset.Entry[KeysetDeriver]{entry},
 	}
-	wrappedDeriver, err := newWrappedKeysetDeriver(ps)
-	if err != nil {
-		t.Fatalf("newWrappedKeysetDeriver() err = %v, want nil", err)
-	}
-	_, err = wrappedDeriver.DeriveKeyset([]byte("salt"))
+	wrappedDeriver := &wrappedKeysetDeriver{ps: ps}
+	_, err := wrappedDeriver.DeriveKeyset([]byte("salt"))
 	if err == nil {
 		t.Fatal("DeriveKeyset() err = nil, want non-nil")
 	}
@@ -77,11 +73,7 @@ func TestNewWrappedKeysetDeriverWrongPrimitiveFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
 	}
-	ps, err := handle.Primitives(internalapi.Token{})
-	if err != nil {
-		t.Fatalf("handle.Primitives(internalapi.Token{}, ) err = %v, want nil", err)
-	}
-	if _, err := newWrappedKeysetDeriver(ps); err == nil {
-		t.Errorf("newWrappedKeysetDeriver() err = nil, want non-nil")
+	if _, err := New(handle); err == nil {
+		t.Errorf("New() err = nil, want non-nil")
 	}
 }

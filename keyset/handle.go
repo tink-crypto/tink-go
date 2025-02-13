@@ -469,8 +469,8 @@ func WithConfig(c Config) PrimitivesOption {
 // the corresponding Primitive-interface.
 //
 // NOTE: This is an internal API.
-func (h *Handle) Primitives(_ internalapi.Token, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
-	p, err := h.primitives(nil, opts...)
+func Primitives[T any](h *Handle, _ internalapi.Token, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet[T], error) {
+	p, err := primitives[T](h, nil, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("keyset.Handle: %v", err)
 	}
@@ -491,38 +491,48 @@ func (h *Handle) Primitives(_ internalapi.Token, opts ...PrimitivesOption) (*pri
 // the corresponding Primitive-interface.
 //
 // NOTE: This is an internal API.
-func (h *Handle) PrimitivesWithKeyManager(km registry.KeyManager, _ internalapi.Token) (*primitiveset.PrimitiveSet, error) {
-	p, err := h.primitives(km)
+func PrimitivesWithKeyManager[T any](h *Handle, km registry.KeyManager, _ internalapi.Token) (*primitiveset.PrimitiveSet[T], error) {
+	p, err := primitives[T](h, km)
 	if err != nil {
 		return nil, fmt.Errorf("keyset.Handle: %v", err)
 	}
 	return p, nil
 }
 
-func addToPrimitiveSet(primitiveSet *primitiveset.PrimitiveSet, entry *Entry, km registry.KeyManager, config Config) (*primitiveset.Entry, error) {
+func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry *Entry, km registry.KeyManager, config Config) (*primitiveset.Entry[T], error) {
 	protoKey, err := entryToProtoKey(entry)
 	if err != nil {
 		return nil, err
 	}
+	var primitive any
+	isFullPrimitive := false
 	if km != nil && km.DoesSupport(protoKey.GetKeyData().GetTypeUrl()) {
-		primitive, err := km.Primitive(protoKey.GetKeyData().GetValue())
+		primitive, err = km.Primitive(protoKey.GetKeyData().GetValue())
 		if err != nil {
 			return nil, fmt.Errorf("cannot get primitive from key: %v", err)
 		}
-		return primitiveSet.Add(primitive, protoKey)
+	} else {
+		primitive, err = config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
+		if err == nil {
+			isFullPrimitive = true
+		} else {
+			primitive, err = config.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})
+			if err != nil {
+				return nil, fmt.Errorf("cannot get primitive from key data: %v", err)
+			}
+		}
 	}
-	primitive, err := config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
-	if err == nil {
-		return primitiveSet.AddFullPrimitive(primitive, protoKey)
+	actualPrimitive, ok := primitive.(T)
+	if !ok {
+		return nil, fmt.Errorf("primitive is of type %T, want %T", primitive, (*T)(nil))
 	}
-	primitive, err = config.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("cannot get primitive from key data: %v", err)
+	if isFullPrimitive {
+		return primitiveSet.AddFullPrimitive(actualPrimitive, protoKey)
 	}
-	return primitiveSet.Add(primitive, protoKey)
+	return primitiveSet.Add(actualPrimitive, protoKey)
 }
 
-func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet, error) {
+func primitives[T any](h *Handle, km registry.KeyManager, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet[T], error) {
 	if h == nil {
 		return nil, fmt.Errorf("nil handle")
 	}
@@ -539,7 +549,7 @@ func (h *Handle) primitives(km registry.KeyManager, opts ...PrimitivesOption) (*
 	if config == nil {
 		config = &registryconfig.RegistryConfig{}
 	}
-	primitiveSet := primitiveset.New()
+	primitiveSet := primitiveset.New[T]()
 	primitiveSet.Annotations = h.annotations
 	for _, entry := range h.entries {
 		if entry.KeyStatus() != Enabled {

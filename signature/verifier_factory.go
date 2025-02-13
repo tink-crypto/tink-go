@@ -32,7 +32,7 @@ import (
 
 // NewVerifier returns a Verifier primitive from the given keyset handle.
 func NewVerifier(handle *keyset.Handle) (tink.Verifier, error) {
-	ps, err := handle.Primitives(internalapi.Token{})
+	ps, err := keyset.Primitives[tink.Verifier](handle, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("verifier_factory: cannot obtain primitive set: %s", err)
 	}
@@ -81,36 +81,22 @@ func (a *fullVerifierAdapter) Verify(signatureBytes, data []byte) error {
 // "full" primitive.
 //
 // It wraps legacy primitives in a full primitive adapter.
-func extractFullVerifier(entry *primitiveset.Entry) (tink.Verifier, error) {
+func extractFullVerifier(entry *primitiveset.Entry[tink.Verifier]) tink.Verifier {
 	if entry.FullPrimitive != nil {
-		p, ok := (entry.FullPrimitive).(tink.Verifier)
-		if !ok {
-			return nil, fmt.Errorf("verifier_factory: not a Verifier primitive")
-		}
-		return p, nil
-	}
-	p, ok := (entry.Primitive).(tink.Verifier)
-	if !ok {
-		return nil, fmt.Errorf("verifier_factory: not a Verifier primitive")
+		return entry.FullPrimitive
 	}
 	return &fullVerifierAdapter{
-		primitive:        p,
+		primitive:        entry.Primitive,
 		prefix:           []byte(entry.Prefix),
 		outputPrefixType: entry.PrefixType,
-	}, nil
+	}
 }
 
-func newWrappedVerifier(ps *primitiveset.PrimitiveSet) (*wrappedVerifier, error) {
-	if _, err := extractFullVerifier(ps.Primary); err != nil {
-		return nil, err
-	}
+func newWrappedVerifier(ps *primitiveset.PrimitiveSet[tink.Verifier]) (*wrappedVerifier, error) {
 	verifiers := make(map[string][]verifierAndID)
 	for _, entries := range ps.Entries {
 		for _, entry := range entries {
-			verifier, err := extractFullVerifier(entry)
-			if err != nil {
-				return nil, err
-			}
+			verifier := extractFullVerifier(entry)
 			verifiers[entry.Prefix] = append(verifiers[entry.Prefix], verifierAndID{
 				verifier: verifier,
 				keyID:    entry.KeyID,
@@ -127,7 +113,7 @@ func newWrappedVerifier(ps *primitiveset.PrimitiveSet) (*wrappedVerifier, error)
 	}, nil
 }
 
-func createVerifierLogger(ps *primitiveset.PrimitiveSet) (monitoring.Logger, error) {
+func createVerifierLogger(ps *primitiveset.PrimitiveSet[tink.Verifier]) (monitoring.Logger, error) {
 	// only keysets which contain annotations are monitored.
 	if len(ps.Annotations) == 0 {
 		return &monitoringutil.DoNothingLogger{}, nil

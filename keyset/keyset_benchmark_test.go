@@ -23,6 +23,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -91,7 +92,7 @@ func BenchmarkHandlePrimitives(b *testing.B) {
 			b.ResetTimer()
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				if _, err := h.Primitives(internalapi.Token{}); err != nil {
+				if _, err := keyset.Primitives[tink.AEAD](h, internalapi.Token{}); err != nil {
 					b.Fatalf("%v", err)
 				}
 			}
