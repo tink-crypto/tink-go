@@ -249,7 +249,7 @@ func TestAEADEncryptDecrypt(t *testing.T) {
 	const tagSize = 16
 	for _, variant := range []aesctrhmac.Variant{aesctrhmac.VariantNoPrefix, aesctrhmac.VariantTink, aesctrhmac.VariantCrunchy} {
 		t.Run(variant.String(), func(t *testing.T) {
-			cipher, err := createAEAD([]byte("1111111111111111"), ivSize, aesctrhmac.SHA1, []byte("2222222222222222"), tagSize, variant, 0)
+			cipher, err := createAEAD([]byte("1111111111111111"), ivSize, aesctrhmac.SHA256, []byte("2222222222222222"), tagSize, variant, 0)
 			if err != nil {
 				t.Fatalf("got: %v, want: success", err)
 			}
@@ -287,7 +287,7 @@ func TestAEADWithAssociatedDataSlice(t *testing.T) {
 	const tagSize = 16
 	for _, variant := range []aesctrhmac.Variant{aesctrhmac.VariantNoPrefix, aesctrhmac.VariantTink, aesctrhmac.VariantCrunchy} {
 		t.Run(variant.String(), func(t *testing.T) {
-			cipher, err := createAEAD([]byte("1111111111111111"), ivSize, aesctrhmac.SHA1, []byte("2222222222222222"), tagSize, variant, 0)
+			cipher, err := createAEAD([]byte("1111111111111111"), ivSize, aesctrhmac.SHA256, []byte("2222222222222222"), tagSize, variant, 0)
 			if err != nil {
 				t.Fatalf("got: %v, want: success", err)
 			}
@@ -311,7 +311,7 @@ func TestAEADEncryptDecryptRandomMessage(t *testing.T) {
 	const tagSize = 16
 	for _, variant := range []aesctrhmac.Variant{aesctrhmac.VariantNoPrefix, aesctrhmac.VariantTink, aesctrhmac.VariantCrunchy} {
 		t.Run(variant.String(), func(t *testing.T) {
-			cipher, err := createAEAD([]byte("1111111111111111"), ivSize, aesctrhmac.SHA1, []byte("2222222222222222"), tagSize, aesctrhmac.VariantTink, 0)
+			cipher, err := createAEAD([]byte("1111111111111111"), ivSize, aesctrhmac.SHA256, []byte("2222222222222222"), tagSize, aesctrhmac.VariantTink, 0)
 			if err != nil {
 				t.Fatalf("got: %v, want: success", err)
 			}
