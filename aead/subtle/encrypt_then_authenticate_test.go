@@ -160,7 +160,7 @@ func TestETAEncryptDecrypt(t *testing.T) {
 	const macKeySize = 16
 	const tagSize = 16
 
-	cipher, err := createAEAD(keySize, ivSize, "SHA1", macKeySize, tagSize)
+	cipher, err := createAEAD(keySize, ivSize, "SHA256", macKeySize, tagSize)
 	if err != nil {
 		t.Fatalf("got: %v, want: success", err)
 	}
@@ -192,7 +192,7 @@ func TestETAWithAssociatedDataSlice(t *testing.T) {
 	const ivSize = 12
 	const macKeySize = 16
 	const tagSize = 16
-	cipher, err := createAEAD(keySize, ivSize, "SHA1", macKeySize, tagSize)
+	cipher, err := createAEAD(keySize, ivSize, "SHA256", macKeySize, tagSize)
 	if err != nil {
 		t.Fatalf("got: %v, want: success", err)
 	}
@@ -218,7 +218,7 @@ func TestETAEncryptDecryptRandomMessage(t *testing.T) {
 	const macKeySize = 16
 	const tagSize = 16
 
-	cipher, err := createAEAD(keySize, ivSize, "SHA1", macKeySize, tagSize)
+	cipher, err := createAEAD(keySize, ivSize, "SHA256", macKeySize, tagSize)
 	if err != nil {
 		t.Fatalf("got: %v, want: success", err)
 	}
@@ -253,7 +253,7 @@ func TestETAMultipleEncrypt(t *testing.T) {
 	const macKeySize = 16
 	const tagSize = 16
 
-	cipher, err := createAEAD(keySize, ivSize, "SHA1", macKeySize, tagSize)
+	cipher, err := createAEAD(keySize, ivSize, "SHA256", macKeySize, tagSize)
 	if err != nil {
 		t.Fatalf("got: %v, want: success", err)
 	}
@@ -282,7 +282,7 @@ func TestETAInvalidTagSize(t *testing.T) {
 	const macKeySize = 16
 	const tagSize = 9 // Invalid!
 
-	if _, err := createAEAD(keySize, ivSize, "SHA1", macKeySize, tagSize); err == nil {
+	if _, err := createAEAD(keySize, ivSize, "SHA256", macKeySize, tagSize); err == nil {
 		t.Error("got: success, want: error invalid tag size")
 	}
 }
@@ -293,7 +293,7 @@ func TestETADecryptModifiedCiphertext(t *testing.T) {
 	const macKeySize = 16
 	const tagSize = 16
 
-	cipher, err := createAEAD(keySize, ivSize, "SHA1", macKeySize, tagSize)
+	cipher, err := createAEAD(keySize, ivSize, "SHA256", macKeySize, tagSize)
 	if err != nil {
 		t.Fatalf("got: %v, want: success", err)
 	}
@@ -356,7 +356,7 @@ func TestETAEmptyParams(t *testing.T) {
 	const macKeySize = 16
 	const tagSize = 16
 
-	cipher, err := createAEAD(keySize, ivSize, "SHA1", macKeySize, tagSize)
+	cipher, err := createAEAD(keySize, ivSize, "SHA256", macKeySize, tagSize)
 	if err != nil {
 		t.Fatalf("got: %v, want: success", err)
 	}
