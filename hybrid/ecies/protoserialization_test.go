@@ -217,7 +217,7 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 										HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 									},
 									DemParams: &eciespb.EciesAeadDemParams{
-										AeadDem: aead.AES256GCMNoPrefixKeyTemplate(),
+										AeadDem: aead.AES256GCMKeyTemplate(),
 									},
 									EcPointFormat: pointFormat.protoPointFormat,
 								},
@@ -243,7 +243,7 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 											HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 										},
 										DemParams: &eciespb.EciesAeadDemParams{
-											AeadDem: aead.AES256GCMNoPrefixKeyTemplate(),
+											AeadDem: aead.AES256GCMKeyTemplate(),
 										},
 										EcPointFormat: pointFormat.protoPointFormat,
 									},
@@ -274,7 +274,7 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 								HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 							},
 							DemParams: &eciespb.EciesAeadDemParams{
-								AeadDem: aead.AES256GCMNoPrefixKeyTemplate(),
+								AeadDem: aead.AES256GCMKeyTemplate(),
 							},
 							EcPointFormat: commonpb.EcPointFormat_COMPRESSED, // This is unspecified only for X25519, but always serialized as COMPRESSED.
 						},
@@ -299,7 +299,7 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 									HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 								},
 								DemParams: &eciespb.EciesAeadDemParams{
-									AeadDem: aead.AES256GCMNoPrefixKeyTemplate(),
+									AeadDem: aead.AES256GCMKeyTemplate(),
 								},
 								EcPointFormat: commonpb.EcPointFormat_COMPRESSED, // This is unspecified only for X25519, but always serialized as COMPRESSED.
 							},
@@ -324,10 +324,60 @@ func TestSerializePublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("protoserialization.SerializeKey(%v) err = %v, want nil", tc.publicKey, err)
 			}
-			if diff := cmp.Diff(got, tc.publicKeySerialization, protocmp.Transform()); diff != "" {
+			if diff := cmp.Diff(got, tc.publicKeySerialization); diff != "" {
 				t.Errorf("protoserialization.SerializeKey(%v) returned unexpected diff (-want +got):\n%s", tc.publicKey, diff)
 			}
 		})
+	}
+}
+
+// Make sure that we can parse a public key with a DEM that has any OutputPrefixType,
+// and that this is parsed with `VariantNoPrefix`.
+func TestParsePublicKeyParsesDEMWithAnyOutputPrefixType(t *testing.T) {
+	demParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
+	for _, demKeyTemplate := range []*tinkpb.KeyTemplate{
+		aead.AES256GCMNoPrefixKeyTemplate(),
+		aead.AES256GCMKeyTemplate(),
+	} {
+		publicKeySerialization := mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			&eciespb.EciesAeadHkdfPublicKey{
+				Params: &eciespb.EciesAeadHkdfParams{
+					KemParams: &eciespb.EciesHkdfKemParams{
+						CurveType:    commonpb.EllipticCurveType_CURVE25519,
+						HkdfHashType: commonpb.HashType_SHA256,
+						HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+					},
+					DemParams: &eciespb.EciesAeadDemParams{
+						AeadDem: demKeyTemplate,
+					},
+					EcPointFormat: commonpb.EcPointFormat_COMPRESSED,
+				},
+				X: x25519PublicKeyBytes,
+			}, tinkpb.OutputPrefixType_TINK, 1234)
+		want := mustCreatePublicKey(t, x25519PublicKeyBytes, 1234, mustCreateParameters(t, ecies.ParametersOpts{
+			CurveType:            ecies.X25519,
+			HashType:             ecies.SHA256,
+			NISTCurvePointFormat: ecies.UnspecifiedPointFormat,
+			DEMParameters:        demParams,
+			Variant:              ecies.VariantTink,
+			Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+		}))
+		got, err := protoserialization.ParseKey(publicKeySerialization)
+		if err != nil {
+			t.Fatalf("protoserialization.ParseKey(%v) err = %v, want nil", publicKeySerialization, err)
+		}
+		if diff := cmp.Diff(got, want); diff != "" {
+			t.Errorf("protoserialization.ParseKey(%v) returned unexpected diff (-want +got):\n%s", publicKeySerialization, diff)
+		}
 	}
 }
 

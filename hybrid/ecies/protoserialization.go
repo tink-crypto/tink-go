@@ -112,6 +112,8 @@ func createProtoECIESParams(p *Parameters) (*eciespb.EciesAeadHkdfParams, error)
 	if err != nil {
 		return nil, err
 	}
+	// NOTE: Always set the output prefix type to TINK for backward compatibility.
+	protoDEMParams.OutputPrefixType = tinkpb.OutputPrefixType_TINK
 
 	pointFormat, err := protoEcPointFormatFromPointFormat(p.NISTCurvePointFormat())
 	if err != nil {
@@ -358,7 +360,11 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	if err != nil {
 		return nil, err
 	}
-	demParams, err := protoserialization.ParseParameters(protoECIESKey.GetParams().GetDemParams().GetAeadDem())
+
+	// NOTE: Ignore the the output prefix type and use RAW for backward compatibility.
+	demTemplate := proto.Clone(protoECIESKey.GetParams().GetDemParams().GetAeadDem()).(*tinkpb.KeyTemplate)
+	demTemplate.OutputPrefixType = tinkpb.OutputPrefixType_RAW
+	demParams, err := protoserialization.ParseParameters(demTemplate)
 	if err != nil {
 		return nil, err
 	}
