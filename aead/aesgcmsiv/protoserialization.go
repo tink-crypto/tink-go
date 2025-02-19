@@ -22,13 +22,12 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
 	aesgcmsivpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_siv_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (
-	// protoVersion is the accepted [gcmpb.AesGcmKey] proto version.
+	// protoVersion is the accepted [aesgcmsivpb.AesGcmSivKey] proto version.
 	//
 	// Currently, only version 0 is supported; other versions are rejected.
 	protoVersion = 0
@@ -62,7 +61,7 @@ func (s *keySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerial
 		return nil, err
 	}
 	keyBytes := actualKey.KeyBytes()
-	protoKey := &gcmpb.AesGcmKey{
+	protoKey := &aesgcmsivpb.AesGcmSivKey{
 		KeyValue: keyBytes.Data(insecuresecretdataaccess.Token{}),
 		Version:  protoVersion,
 	}
