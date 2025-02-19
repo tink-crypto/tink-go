@@ -146,16 +146,25 @@ func coordinateSizeForCurve(curveType CurveType) (int, error) {
 	}
 }
 
-// padBigIntBytesToFixedSizeBuffer pads the given big integer bytes to the given size.
-func padBigIntBytesToFixedSizeBuffer(bigIntBytes []byte, size int) ([]byte, error) {
-	if len(bigIntBytes) > size {
-		return nil, fmt.Errorf("big int has invalid size: %d, want at most %d", len(bigIntBytes), size)
-	}
+// BigIntBytesToFixedSizeBuffer converts a big integer representation to a
+// fixed size buffer.
+func bigIntBytesToFixedSizeBuffer(bigIntBytes []byte, size int) ([]byte, error) {
+	// Nothing to do if the big integer representation is already of the given size.
 	if len(bigIntBytes) == size {
 		return bigIntBytes, nil
 	}
-	buf := make([]byte, size-len(bigIntBytes), size)
-	return append(buf, bigIntBytes...), nil
+	if len(bigIntBytes) < size {
+		// Pad the big integer representation with leading zeros to the given size.
+		buf := make([]byte, size-len(bigIntBytes), size)
+		return append(buf, bigIntBytes...), nil
+	}
+	// Remove the leading len(bigIntValue)-size bytes. Fail if any is not zero.
+	for i := 0; i < len(bigIntBytes)-size; i++ {
+		if bigIntBytes[i] != 0 {
+			return nil, fmt.Errorf("big int has invalid size: %v, want %v", len(bigIntBytes)-i, size)
+		}
+	}
+	return bigIntBytes[len(bigIntBytes)-size:], nil
 }
 
 func publicKeyToProtoPublicKey(publicKey *PublicKey) (*eciespb.EciesAeadHkdfPublicKey, error) {
@@ -195,11 +204,11 @@ func publicKeyToProtoPublicKey(publicKey *PublicKey) (*eciespb.EciesAeadHkdfPubl
 			return nil, fmt.Errorf("public key has invalid 1st byte: got %x, want %x", publicKey.PublicKeyBytes()[0], 0x04)
 		}
 		xy := publicKey.PublicKeyBytes()[1:]
-		protoPublicKey.X, err = padBigIntBytesToFixedSizeBuffer(xy[:coordinateSize], coordinateSize+1)
+		protoPublicKey.X, err = bigIntBytesToFixedSizeBuffer(xy[:coordinateSize], coordinateSize+1)
 		if err != nil {
 			return nil, err
 		}
-		protoPublicKey.Y, err = padBigIntBytesToFixedSizeBuffer(xy[coordinateSize:], coordinateSize+1)
+		protoPublicKey.Y, err = bigIntBytesToFixedSizeBuffer(xy[coordinateSize:], coordinateSize+1)
 		if err != nil {
 			return nil, err
 		}
@@ -289,25 +298,6 @@ func variantFromProto(outputPrefixType tinkpb.OutputPrefixType) (Variant, error)
 	default:
 		return VariantUnknown, fmt.Errorf("unknown output prefix: %v", outputPrefixType)
 	}
-}
-
-// removeLeftPaddingFromBigInt removes the leading zeros from the
-// given big integer representation.
-//
-// If bigIntValue is smaller than the given size, it is returned as is.
-// If the bytes representation of the big integer is longer than size, an error
-// is returned.
-func removeLeftPaddingFromBigInt(bigIntValue []byte, size int) ([]byte, error) {
-	if len(bigIntValue) <= size {
-		return bigIntValue, nil
-	}
-	// Remove the leading len(bigIntValue)-size bytes. Fail if any is not zero.
-	for i := 0; i < len(bigIntValue)-size; i++ {
-		if bigIntValue[i] != 0 {
-			return nil, fmt.Errorf("big int has invalid size: %v, want %v", len(bigIntValue)-i, size)
-		}
-	}
-	return bigIntValue[len(bigIntValue)-size:], nil
 }
 
 func pointFormatFromProtoPointFormat(pointFormat commonpb.EcPointFormat) (PointFormat, error) {
@@ -400,21 +390,17 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 		// This is to support the case where the curve size in bytes + 1 is the
 		// length of the coordinate. This happens when Tink adds an extra leading
 		// 0x00 byte (see b/264525021).
-		x, err := removeLeftPaddingFromBigInt(protoECIESKey.GetX(), coordinateSize)
+		x, err := bigIntBytesToFixedSizeBuffer(protoECIESKey.GetX(), coordinateSize)
 		if err != nil {
 			return nil, err
 		}
-		y, err := removeLeftPaddingFromBigInt(protoECIESKey.GetY(), coordinateSize)
+		y, err := bigIntBytesToFixedSizeBuffer(protoECIESKey.GetY(), coordinateSize)
 		if err != nil {
 			return nil, err
 		}
 		publicKeyBytes = slices.Concat([]byte{0x04}, x, y)
 	}
-	publicKey, err := NewPublicKey(publicKeyBytes, keyID, params)
-	if err != nil {
-		return nil, err
-	}
-	return publicKey, nil
+	return NewPublicKey(publicKeyBytes, keyID, params)
 }
 
 type privateKeySerializer struct{}
@@ -439,10 +425,23 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 		return nil, err
 	}
 
+	privateKeyValue := eciesPrivateKey.PrivateKeyBytes().Data(insecuresecretdataaccess.Token{})
+	if eciesPrivateKey.Parameters().(*Parameters).CurveType() != X25519 {
+		// This must be padded with at least one leading zero (see b/264525021).
+		coordinateSize, err := coordinateSizeForCurve(eciesPrivateKey.Parameters().(*Parameters).CurveType())
+		if err != nil {
+			return nil, err
+		}
+		privateKeyValue, err = bigIntBytesToFixedSizeBuffer(eciesPrivateKey.PrivateKeyBytes().Data(insecuresecretdataaccess.Token{}), coordinateSize+1)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	protoPrivateKey := &eciespb.EciesAeadHkdfPrivateKey{
 		Version:   0,
 		PublicKey: protoPublicKey,
-		KeyValue:  eciesPrivateKey.PrivateKeyBytes().Data(insecuresecretdataaccess.Token{}),
+		KeyValue:  privateKeyValue,
 	}
 	serializedECIESPrivKey, err := proto.Marshal(protoPrivateKey)
 	if err != nil {
@@ -454,7 +453,7 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 		return nil, err
 	}
 
-	// idRequirement is zero if the key doesn't have a key requirement.
+	// idRequirement is zero if the key doesn't have a key ID requirement.
 	idRequirement, _ := eciesPrivateKey.IDRequirement()
 	keyData := &tinkpb.KeyData{
 		TypeUrl:         privateKeyTypeURL,

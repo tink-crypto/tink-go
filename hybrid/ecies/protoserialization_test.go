@@ -19,6 +19,7 @@ import (
 	"crypto/ecdh"
 	"crypto/rand"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -101,7 +102,6 @@ type protoSerializationTestCase struct {
 	publicKeySerialization  *protoserialization.KeySerialization
 	privateKey              *ecies.PrivateKey
 	privateKeySerialization *protoserialization.KeySerialization
-	noLeadingZeroes         bool
 }
 
 func mustCreatePrivateKey(t *testing.T, privateKeyBytes []byte, idRequirement uint32, params *ecies.Parameters) *ecies.PrivateKey {
@@ -133,9 +133,10 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 	p256PublicKeyBytes := mustHexDecode(t, p256SHA256PublicKeyBytesHex)
 	p256PublicKeyX := make([]byte, 33)
 	p256PublicKeyY := make([]byte, 33)
+	p256PrivateKeyBytes := make([]byte, 33)
 	copy(p256PublicKeyX[1:], p256PublicKeyBytes[1:33])
 	copy(p256PublicKeyY[1:], p256PublicKeyBytes[33:])
-	p256PrivateKeyBytes := mustHexDecode(t, p256SHA256PrivateKeyBytesHex)
+	copy(p256PrivateKeyBytes[1:], mustHexDecode(t, p256SHA256PrivateKeyBytesHex))
 
 	p384PrivKey, err := ecdh.P384().GenerateKey(rand.Reader)
 	if err != nil {
@@ -144,16 +145,18 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 	p384PublicKeyBytes := p384PrivKey.PublicKey().Bytes()
 	p384PublicKeyX := make([]byte, 49)
 	p384PublicKeyY := make([]byte, 49)
+	p384PrivateKeyBytes := make([]byte, 49)
 	copy(p384PublicKeyX[1:], p384PublicKeyBytes[1:49])
 	copy(p384PublicKeyY[1:], p384PublicKeyBytes[49:])
-	p384PrivateKeyBytes := p384PrivKey.Bytes()
+	copy(p384PrivateKeyBytes[1:], p384PrivKey.Bytes())
 
 	p521PublicKeyBytes := mustHexDecode(t, p521SHA512PublicKeyBytesHex)
 	p521PublicKeyX := make([]byte, 67)
 	p521PublicKeyY := make([]byte, 67)
+	p521PrivateKeyBytes := make([]byte, 67)
 	copy(p521PublicKeyX[1:], p521PublicKeyBytes[1:67])
 	copy(p521PublicKeyY[1:], p521PublicKeyBytes[67:])
-	p521PrivateKeyBytes := mustHexDecode(t, p521SHA512PrivateKeyBytesHex)
+	copy(p521PrivateKeyBytes[1:], mustHexDecode(t, p521SHA512PrivateKeyBytesHex))
 
 	testCases := []protoSerializationTestCase{}
 
@@ -224,7 +227,7 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 								X: nistCurve.x,
 								Y: nistCurve.y,
 							}, variantAndPrefix.prefix, idRequirement),
-						privateKey: mustCreatePrivateKey(t, nistCurve.privateKeyBytes, idRequirement, mustCreateParameters(t, ecies.ParametersOpts{
+						privateKey: mustCreatePrivateKey(t, nistCurve.privateKeyBytes[1:], idRequirement, mustCreateParameters(t, ecies.ParametersOpts{
 							CurveType:            nistCurve.enumCurveType,
 							HashType:             hashType.enumHashType,
 							NISTCurvePointFormat: pointFormat.enumPointFormat,
@@ -315,10 +318,6 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 
 func TestSerializePublicKey(t *testing.T) {
 	for _, tc := range mustCreateTestCases(t) {
-		if tc.noLeadingZeroes {
-			// Produced serialization always has leading zeroes.
-			continue
-		}
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := protoserialization.SerializeKey(tc.publicKey)
 			if err != nil {
@@ -378,6 +377,104 @@ func TestParsePublicKeyParsesDEMWithAnyOutputPrefixType(t *testing.T) {
 		if diff := cmp.Diff(got, want); diff != "" {
 			t.Errorf("protoserialization.ParseKey(%v) returned unexpected diff (-want +got):\n%s", publicKeySerialization, diff)
 		}
+	}
+}
+
+func TestParsePublicKeyToleratesNoPadding(t *testing.T) {
+	demParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 16,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	// P521 point with a Y coordinate of 65 bytes.
+	// Taken from
+	// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/ecdsa_secp521r1_sha3_512_test.json#L3093.
+	pubKeyXP521Hex65Bytes := "01f974fbc98b55c4d39797fe6ff8891eab2aa541e8767a1b9e9eaef1f94895cdf6373c90ccb3643d1b2ef3154b126de937e4343f2409b191c262e3ac1e2577606e58"
+	pubKeyYP521Hex65Bytes := "6ed880d925e876beba3102432752ce237b8682c65ceb59902fd6dc7b6f8c728e5078e8676912ae822fda39cb62023fa4fd85bab6d32f3857914aae2d0b7e04e958"
+	pubKeyP521Hex65BytesCompressed := "0401f974fbc98b55c4d39797fe6ff8891eab2aa541e8767a1b9e9eaef1f94895cdf6373c90ccb3643d1b2ef3154b126de937e4343f2409b191c262e3ac1e2577606e58006ed880d925e876beba3102432752ce237b8682c65ceb59902fd6dc7b6f8c728e5078e8676912ae822fda39cb62023fa4fd85bab6d32f3857914aae2d0b7e04e958"
+	x, y := mustHexDecode(t, pubKeyXP521Hex65Bytes), mustHexDecode(t, pubKeyYP521Hex65Bytes)
+	uncompressedPoint := mustHexDecode(t, pubKeyP521Hex65BytesCompressed)
+	publicKeySerialization := mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+		&eciespb.EciesAeadHkdfPublicKey{
+			Params: &eciespb.EciesAeadHkdfParams{
+				KemParams: &eciespb.EciesHkdfKemParams{
+					CurveType:    commonpb.EllipticCurveType_NIST_P521,
+					HkdfHashType: commonpb.HashType_SHA512,
+					HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+				},
+				DemParams: &eciespb.EciesAeadDemParams{
+					AeadDem: aead.AES128GCMKeyTemplate(),
+				},
+				EcPointFormat: commonpb.EcPointFormat_COMPRESSED,
+			},
+			X: x,
+			Y: y,
+		}, tinkpb.OutputPrefixType_TINK, 1234)
+	want := mustCreatePublicKey(t, uncompressedPoint, 1234, mustCreateParameters(t, ecies.ParametersOpts{
+		CurveType:            ecies.NISTP521,
+		HashType:             ecies.SHA512,
+		NISTCurvePointFormat: ecies.CompressedPointFormat,
+		DEMParameters:        demParams,
+		Variant:              ecies.VariantTink,
+		Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+	}))
+	got, err := protoserialization.ParseKey(publicKeySerialization)
+	if err != nil {
+		t.Fatalf("protoserialization.ParseKey(%v) err = %v, want nil", publicKeySerialization, err)
+	}
+	if diff := cmp.Diff(got, want); diff != "" {
+		t.Errorf("protoserialization.ParseKey(%v) returned unexpected diff (-want +got):\n%s", publicKeySerialization, diff)
+	}
+}
+
+func TestParsePublicKeyToleratesArbitraryPadding(t *testing.T) {
+	demParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 16,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	uncompressedPoint := mustHexDecode(t, p256SHA256PublicKeyBytesHex)
+	x := slices.Concat([]byte{0x00, 0x00, 0x00, 0x00, 0x00}, uncompressedPoint[1:33])
+	y := slices.Concat([]byte{0x00, 0x00, 0x00, 0x00, 0x00}, uncompressedPoint[33:])
+
+	publicKeySerialization := mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+		&eciespb.EciesAeadHkdfPublicKey{
+			Params: &eciespb.EciesAeadHkdfParams{
+				KemParams: &eciespb.EciesHkdfKemParams{
+					CurveType:    commonpb.EllipticCurveType_NIST_P256,
+					HkdfHashType: commonpb.HashType_SHA256,
+					HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+				},
+				DemParams: &eciespb.EciesAeadDemParams{
+					AeadDem: aead.AES128GCMKeyTemplate(),
+				},
+				EcPointFormat: commonpb.EcPointFormat_COMPRESSED,
+			},
+			X: x,
+			Y: y,
+		}, tinkpb.OutputPrefixType_TINK, 1234)
+	want := mustCreatePublicKey(t, uncompressedPoint, 1234, mustCreateParameters(t, ecies.ParametersOpts{
+		CurveType:            ecies.NISTP256,
+		HashType:             ecies.SHA256,
+		NISTCurvePointFormat: ecies.CompressedPointFormat,
+		DEMParameters:        demParams,
+		Variant:              ecies.VariantTink,
+		Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+	}))
+	got, err := protoserialization.ParseKey(publicKeySerialization)
+	if err != nil {
+		t.Fatalf("protoserialization.ParseKey(%v) err = %v, want nil", publicKeySerialization, err)
+	}
+	if diff := cmp.Diff(got, want); diff != "" {
+		t.Errorf("protoserialization.ParseKey(%v) returned unexpected diff (-want +got):\n%s", publicKeySerialization, diff)
 	}
 }
 
@@ -657,10 +754,6 @@ func TestParsePublicKeyFails(t *testing.T) {
 
 func TestSerializePrivateKey(t *testing.T) {
 	for _, tc := range mustCreateTestCases(t) {
-		if tc.noLeadingZeroes {
-			// Produced serialization always has leading zeroes.
-			continue
-		}
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := protoserialization.SerializeKey(tc.privateKey)
 			if err != nil {
