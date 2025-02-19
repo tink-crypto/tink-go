@@ -19,6 +19,7 @@ import (
 	"slices"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
@@ -26,7 +27,10 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-const publicKeyTypeURL = "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey"
+const (
+	publicKeyTypeURL  = "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey"
+	privateKeyTypeURL = "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPrivateKey"
+)
 
 func protoOutputPrefixTypeFromVariant(variant Variant) (tinkpb.OutputPrefixType, error) {
 	switch variant {
@@ -152,12 +156,12 @@ func padBigIntBytesToFixedSizeBuffer(bigIntBytes []byte, size int) ([]byte, erro
 	return append(buf, bigIntBytes...), nil
 }
 
-func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
-	eciesPublicKey, ok := key.(*PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("key is of type %T, want %T", key, (*PublicKey)(nil))
+func publicKeyToProtoPublicKey(publicKey *PublicKey) (*eciespb.EciesAeadHkdfPublicKey, error) {
+	if publicKey == nil {
+		return nil, fmt.Errorf("public key is nil")
 	}
-	eciesParams := eciesPublicKey.Parameters().(*Parameters)
+
+	eciesParams := publicKey.Parameters().(*Parameters)
 	// This is nil if PublicKey was created as a struct literal.
 	if eciesParams == nil {
 		return nil, fmt.Errorf("key has nil parameters")
@@ -182,13 +186,13 @@ func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.Key
 		if err != nil {
 			return nil, err
 		}
-		if len(eciesPublicKey.PublicKeyBytes()) != 2*coordinateSize+1 {
-			return nil, fmt.Errorf("public key point has invalid coordinate size: got %v, want %v", len(eciesPublicKey.PublicKeyBytes()), 2*coordinateSize+1)
+		if len(publicKey.PublicKeyBytes()) != 2*coordinateSize+1 {
+			return nil, fmt.Errorf("public key point has invalid coordinate size: got %v, want %v", len(publicKey.PublicKeyBytes()), 2*coordinateSize+1)
 		}
-		if eciesPublicKey.PublicKeyBytes()[0] != 0x04 {
-			return nil, fmt.Errorf("public key has invalid 1st byte: got %x, want %x", eciesPublicKey.PublicKeyBytes()[0], 0x04)
+		if publicKey.PublicKeyBytes()[0] != 0x04 {
+			return nil, fmt.Errorf("public key has invalid 1st byte: got %x, want %x", publicKey.PublicKeyBytes()[0], 0x04)
 		}
-		xy := eciesPublicKey.PublicKeyBytes()[1:]
+		xy := publicKey.PublicKeyBytes()[1:]
 		protoPublicKey.X, err = padBigIntBytesToFixedSizeBuffer(xy[:coordinateSize], coordinateSize+1)
 		if err != nil {
 			return nil, err
@@ -198,9 +202,22 @@ func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.Key
 			return nil, err
 		}
 	case X25519:
-		protoPublicKey.X = eciesPublicKey.PublicKeyBytes()
+		protoPublicKey.X = publicKey.PublicKeyBytes()
 	default:
 		return nil, fmt.Errorf("unsupported curve type: %v", eciesParams.CurveType())
+	}
+	return protoPublicKey, nil
+}
+
+func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	eciesPublicKey, ok := key.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T, want %T", key, (*PublicKey)(nil))
+	}
+
+	protoPublicKey, err := publicKeyToProtoPublicKey(eciesPublicKey)
+	if err != nil {
+		return nil, err
 	}
 
 	serializedECIESPubKey, err := proto.Marshal(protoPublicKey)
@@ -208,7 +225,7 @@ func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.Key
 		return nil, err
 	}
 
-	outputPrefixType, err := protoOutputPrefixTypeFromVariant(eciesParams.Variant())
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(eciesPublicKey.Parameters().(*Parameters).Variant())
 	if err != nil {
 		return nil, err
 	}
@@ -392,4 +409,51 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 		return nil, err
 	}
 	return publicKey, nil
+}
+
+type privateKeySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*privateKeySerializer)(nil)
+
+func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key is nil")
+	}
+	eciesPrivateKey, ok := key.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T, want %T", key, (*PrivateKey)(nil))
+	}
+
+	publicKey, err := eciesPrivateKey.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	protoPublicKey, err := publicKeyToProtoPublicKey(publicKey.(*PublicKey))
+	if err != nil {
+		return nil, err
+	}
+
+	protoPrivateKey := &eciespb.EciesAeadHkdfPrivateKey{
+		Version:   0,
+		PublicKey: protoPublicKey,
+		KeyValue:  eciesPrivateKey.PrivateKeyBytes().Data(insecuresecretdataaccess.Token{}),
+	}
+	serializedECIESPrivKey, err := proto.Marshal(protoPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(eciesPrivateKey.Parameters().(*Parameters).Variant())
+	if err != nil {
+		return nil, err
+	}
+
+	// idRequirement is zero if the key doesn't have a key requirement.
+	idRequirement, _ := eciesPrivateKey.IDRequirement()
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         privateKeyTypeURL,
+		Value:           serializedECIESPrivKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}
+	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
 }
