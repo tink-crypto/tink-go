@@ -22,6 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	eciespb "github.com/tink-crypto/tink-go/v2/proto/ecies_aead_hkdf_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -313,6 +314,84 @@ func pointFormatFromProtoPointFormat(pointFormat commonpb.EcPointFormat) (PointF
 	}
 }
 
+func parseParameters(protoParams *eciespb.EciesAeadHkdfParams, outputPrefixType tinkpb.OutputPrefixType) (*Parameters, error) {
+	curveType, err := curveTypeFromProto(protoParams.GetKemParams().GetCurveType())
+	if err != nil {
+		return nil, err
+	}
+	hashType, err := hashTypeFromProto(protoParams.GetKemParams().GetHkdfHashType())
+	if err != nil {
+		return nil, err
+	}
+	variant, err := variantFromProto(outputPrefixType)
+	if err != nil {
+		return nil, err
+	}
+	pointFormat, err := pointFormatFromProtoPointFormat(protoParams.GetEcPointFormat())
+	if err != nil {
+		return nil, err
+	}
+
+	// NOTE: Ignore the the output prefix type and use RAW for backward compatibility.
+	demTemplate := proto.Clone(protoParams.GetDemParams().GetAeadDem()).(*tinkpb.KeyTemplate)
+	demTemplate.OutputPrefixType = tinkpb.OutputPrefixType_RAW
+	demParams, err := protoserialization.ParseParameters(demTemplate)
+	if err != nil {
+		return nil, err
+	}
+	if curveType == X25519 {
+		if pointFormat != CompressedPointFormat {
+			return nil, fmt.Errorf("for X25519, point format must be COMPRESSED, got %v", pointFormat)
+		}
+		// Leave unspecified for X25519.
+		pointFormat = UnspecifiedPointFormat
+	}
+
+	return NewParameters(ParametersOpts{
+		CurveType:            curveType,
+		HashType:             hashType,
+		Variant:              variant,
+		NISTCurvePointFormat: pointFormat,
+		DEMParameters:        demParams,
+		Salt:                 protoParams.GetKemParams().GetHkdfSalt(),
+	})
+}
+
+func parsePublicKey(publicKey *eciespb.EciesAeadHkdfPublicKey, outputPrefixType tinkpb.OutputPrefixType, keyID uint32) (*PublicKey, error) {
+	if publicKey.GetVersion() != 0 {
+		return nil, fmt.Errorf("invalid key version: %v, want 0", publicKey.GetVersion())
+	}
+
+	params, err := parseParameters(publicKey.GetParams(), outputPrefixType)
+	if err != nil {
+		return nil, err
+	}
+
+	var publicKeyBytes []byte
+	if params.CurveType() == X25519 {
+		publicKeyBytes = publicKey.GetX()
+	} else {
+		coordinateSize, err := coordinateSizeForCurve(params.CurveType())
+		if err != nil {
+			return nil, err
+		}
+		// Tolerate arbitrary leading zeros in the coordinates.
+		// This is to support the case where the curve size in bytes + 1 is the
+		// length of the coordinate. This happens when Tink adds an extra leading
+		// 0x00 byte (see b/264525021).
+		x, err := bigIntBytesToFixedSizeBuffer(publicKey.GetX(), coordinateSize)
+		if err != nil {
+			return nil, err
+		}
+		y, err := bigIntBytesToFixedSizeBuffer(publicKey.GetY(), coordinateSize)
+		if err != nil {
+			return nil, err
+		}
+		publicKeyBytes = slices.Concat([]byte{0x04}, x, y)
+	}
+	return NewPublicKey(publicKeyBytes, keyID, params)
+}
+
 func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
 	if keySerialization == nil {
 		return nil, fmt.Errorf("key serialization is nil")
@@ -328,79 +407,10 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	if err := proto.Unmarshal(keyData.GetValue(), protoECIESKey); err != nil {
 		return nil, err
 	}
-	if protoECIESKey.GetVersion() != 0 {
-		return nil, fmt.Errorf("invalid key version: %v, want 0", protoECIESKey.GetVersion())
-	}
+
 	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
 	keyID, _ := keySerialization.IDRequirement()
-
-	curveType, err := curveTypeFromProto(protoECIESKey.GetParams().GetKemParams().GetCurveType())
-	if err != nil {
-		return nil, err
-	}
-	hashType, err := hashTypeFromProto(protoECIESKey.GetParams().GetKemParams().GetHkdfHashType())
-	if err != nil {
-		return nil, err
-	}
-	variant, err := variantFromProto(keySerialization.OutputPrefixType())
-	if err != nil {
-		return nil, err
-	}
-	pointFormat, err := pointFormatFromProtoPointFormat(protoECIESKey.GetParams().GetEcPointFormat())
-	if err != nil {
-		return nil, err
-	}
-
-	// NOTE: Ignore the the output prefix type and use RAW for backward compatibility.
-	demTemplate := proto.Clone(protoECIESKey.GetParams().GetDemParams().GetAeadDem()).(*tinkpb.KeyTemplate)
-	demTemplate.OutputPrefixType = tinkpb.OutputPrefixType_RAW
-	demParams, err := protoserialization.ParseParameters(demTemplate)
-	if err != nil {
-		return nil, err
-	}
-	if curveType == X25519 {
-		if pointFormat != CompressedPointFormat {
-			return nil, fmt.Errorf("for X25519, point format must be COMPRESSED, got %v", pointFormat)
-		}
-		// Leave unspecified for X25519.
-		pointFormat = UnspecifiedPointFormat
-	}
-
-	params, err := NewParameters(ParametersOpts{
-		CurveType:            curveType,
-		HashType:             hashType,
-		Variant:              variant,
-		NISTCurvePointFormat: pointFormat,
-		DEMParameters:        demParams,
-		Salt:                 protoECIESKey.GetParams().GetKemParams().GetHkdfSalt(),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var publicKeyBytes []byte
-	if curveType == X25519 {
-		publicKeyBytes = protoECIESKey.GetX()
-	} else {
-		coordinateSize, err := coordinateSizeForCurve(curveType)
-		if err != nil {
-			return nil, err
-		}
-		// Tolerate arbitrary leading zeros in the coordinates.
-		// This is to support the case where the curve size in bytes + 1 is the
-		// length of the coordinate. This happens when Tink adds an extra leading
-		// 0x00 byte (see b/264525021).
-		x, err := bigIntBytesToFixedSizeBuffer(protoECIESKey.GetX(), coordinateSize)
-		if err != nil {
-			return nil, err
-		}
-		y, err := bigIntBytesToFixedSizeBuffer(protoECIESKey.GetY(), coordinateSize)
-		if err != nil {
-			return nil, err
-		}
-		publicKeyBytes = slices.Concat([]byte{0x04}, x, y)
-	}
-	return NewPublicKey(publicKeyBytes, keyID, params)
+	return parsePublicKey(protoECIESKey, keySerialization.OutputPrefixType(), keyID)
 }
 
 type privateKeySerializer struct{}
@@ -461,4 +471,49 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 	}
 	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
+}
+
+type privateKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*privateKeyParser)(nil)
+
+func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	if keySerialization == nil {
+		return nil, fmt.Errorf("key serialization is nil")
+	}
+	keyData := keySerialization.KeyData()
+	if keyData.GetTypeUrl() != privateKeyTypeURL {
+		return nil, fmt.Errorf("invalid key type URL %v, want %v", keyData.GetTypeUrl(), privateKeyTypeURL)
+	}
+	if keyData.GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PRIVATE {
+		return nil, fmt.Errorf("invalid key material type: %v", keyData.GetKeyMaterialType())
+	}
+	protoECIESKey := new(eciespb.EciesAeadHkdfPrivateKey)
+	if err := proto.Unmarshal(keyData.GetValue(), protoECIESKey); err != nil {
+		return nil, err
+	}
+	if protoECIESKey.GetVersion() != 0 {
+		return nil, fmt.Errorf("invalid key version: %v, want 0", protoECIESKey.GetVersion())
+	}
+	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
+	keyID, _ := keySerialization.IDRequirement()
+
+	publicKey, err := parsePublicKey(protoECIESKey.GetPublicKey(), keySerialization.OutputPrefixType(), keyID)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKeyBytes := protoECIESKey.GetKeyValue()
+	if protoECIESKey.GetPublicKey().GetParams().GetKemParams().GetCurveType() != commonpb.EllipticCurveType_CURVE25519 {
+		// Tolerate arbitrary leading zeros in the private key.
+		coordinateSize, err := coordinateSizeForCurve(publicKey.Parameters().(*Parameters).CurveType())
+		if err != nil {
+			return nil, err
+		}
+		privateKeyBytes, err = bigIntBytesToFixedSizeBuffer(privateKeyBytes, coordinateSize)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return NewPrivateKeyFromPublicKey(secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}), publicKey)
 }

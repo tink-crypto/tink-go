@@ -791,3 +791,181 @@ func TestSerializePrivateKeyFails(t *testing.T) {
 		})
 	}
 }
+
+func TestParsePrivateKey(t *testing.T) {
+	for _, tc := range mustCreateTestCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseKey(tc.privateKeySerialization)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseKey(%v) err = %v, want nil", tc.privateKeySerialization, err)
+			}
+			if diff := cmp.Diff(got, tc.privateKey); diff != "" {
+				t.Errorf("protoserialization.ParseKey(%v) returned unexpected diff (-want +got):\n%s", tc.publicKey, diff)
+			}
+		})
+	}
+	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
+	x25519PrivateKeyBytes := mustHexDecode(t, x25519PrivateKeyBytesHex)
+	// Additional test case to make sure OutputPrefixType_LEGACY is parsed as VariantCrunchy.
+	privateKeySerialization := mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+		&eciespb.EciesAeadHkdfPrivateKey{
+			Version: 0,
+			PublicKey: &eciespb.EciesAeadHkdfPublicKey{
+				Params: &eciespb.EciesAeadHkdfParams{
+					KemParams: &eciespb.EciesHkdfKemParams{
+						CurveType:    commonpb.EllipticCurveType_CURVE25519,
+						HkdfHashType: commonpb.HashType_SHA256,
+						HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+					},
+					DemParams: &eciespb.EciesAeadDemParams{
+						AeadDem: aead.AES256GCMNoPrefixKeyTemplate(),
+					},
+					EcPointFormat: commonpb.EcPointFormat_COMPRESSED, // This is unspecified only for X25519, but always serialized as COMPRESSED.
+				},
+				X: x25519PublicKeyBytes,
+			},
+			KeyValue: x25519PrivateKeyBytes,
+		}, tinkpb.OutputPrefixType_LEGACY, 1234)
+	got, err := protoserialization.ParseKey(privateKeySerialization)
+	if err != nil {
+		t.Fatalf("protoserialization.ParseKey(%v) err = %v, want nil", privateKeySerialization, err)
+	}
+	if got.Parameters().(*ecies.Parameters).Variant() != ecies.VariantCrunchy {
+		t.Errorf("got.Parameters().(*ecies.Parameters).Variant() = %v, want %v", got.Parameters().(*ecies.Parameters).Variant(), ecies.VariantCrunchy)
+	}
+}
+
+func TestParsePrivateKeyFails(t *testing.T) {
+	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
+	x25519PrivateKeyBytes := mustHexDecode(t, x25519PrivateKeyBytesHex)
+
+	p256SHA256PublicKeyBytes := mustHexDecode(t, p256SHA256PublicKeyBytesHex)
+	p256SHA256PublicKeyX := make([]byte, 33)
+	p256SHA256PublicKeyY := make([]byte, 33)
+	copy(p256SHA256PublicKeyX[1:], p256SHA256PublicKeyBytes[1:33])
+	copy(p256SHA256PublicKeyY[1:], p256SHA256PublicKeyBytes[33:])
+	p256SHA256PrivateKeyBytes := mustHexDecode(t, p256SHA256PrivateKeyBytesHex)
+
+	for _, tc := range []struct {
+		name                    string
+		privateKeySerialization *protoserialization.KeySerialization
+	}{
+		{
+			name: "invalid proto key",
+			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+				&eciespb.EciesAeadHkdfPublicKey{
+					Params: &eciespb.EciesAeadHkdfParams{
+						KemParams: &eciespb.EciesHkdfKemParams{
+							CurveType:    commonpb.EllipticCurveType_NIST_P256,
+							HkdfHashType: commonpb.HashType_SHA256,
+							HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+						},
+						DemParams: &eciespb.EciesAeadDemParams{
+							AeadDem: aead.AES256GCMNoPrefixKeyTemplate(),
+						},
+						EcPointFormat: commonpb.EcPointFormat_COMPRESSED,
+					},
+					X: x25519PublicKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid public key",
+			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+				&eciespb.EciesAeadHkdfPrivateKey{
+					Version: 0,
+					PublicKey: &eciespb.EciesAeadHkdfPublicKey{
+						Params: &eciespb.EciesAeadHkdfParams{
+							KemParams: &eciespb.EciesHkdfKemParams{
+								CurveType:    commonpb.EllipticCurveType_NIST_P256,
+								HkdfHashType: commonpb.HashType_SHA256,
+								HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+							},
+							DemParams: &eciespb.EciesAeadDemParams{
+								AeadDem: aead.AES256GCMNoPrefixKeyTemplate(),
+							},
+							EcPointFormat: commonpb.EcPointFormat_COMPRESSED,
+						},
+						X: x25519PublicKeyBytes,
+					},
+					KeyValue: x25519PrivateKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid private key version",
+			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+				&eciespb.EciesAeadHkdfPrivateKey{
+					Version: 1,
+					PublicKey: &eciespb.EciesAeadHkdfPublicKey{
+						Params: &eciespb.EciesAeadHkdfParams{
+							KemParams: &eciespb.EciesHkdfKemParams{
+								CurveType:    commonpb.EllipticCurveType_CURVE25519,
+								HkdfHashType: commonpb.HashType_SHA256,
+								HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+							},
+							DemParams: &eciespb.EciesAeadDemParams{
+								AeadDem: aead.AES256GCMNoPrefixKeyTemplate(),
+							},
+							EcPointFormat: commonpb.EcPointFormat_COMPRESSED,
+						},
+						X: x25519PublicKeyBytes,
+					},
+					KeyValue: x25519PrivateKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid X25519 private key bytes",
+			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+				&eciespb.EciesAeadHkdfPrivateKey{
+					Version: 0,
+					PublicKey: &eciespb.EciesAeadHkdfPublicKey{
+						Params: &eciespb.EciesAeadHkdfParams{
+							KemParams: &eciespb.EciesHkdfKemParams{
+								CurveType:    commonpb.EllipticCurveType_CURVE25519,
+								HkdfHashType: commonpb.HashType_SHA256,
+								HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+							},
+							DemParams: &eciespb.EciesAeadDemParams{
+								AeadDem: aead.AES256GCMNoPrefixKeyTemplate(),
+							},
+							EcPointFormat: commonpb.EcPointFormat_COMPRESSED,
+						},
+						X: x25519PublicKeyBytes,
+					},
+					KeyValue: x25519PrivateKeyBytes[:len(x25519PrivateKeyBytes)-1], // Only checks the scalar length.
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid NIST private key bytes",
+			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+				&eciespb.EciesAeadHkdfPrivateKey{
+					Version: 0,
+					PublicKey: &eciespb.EciesAeadHkdfPublicKey{
+						Params: &eciespb.EciesAeadHkdfParams{
+							KemParams: &eciespb.EciesHkdfKemParams{
+								CurveType:    commonpb.EllipticCurveType_NIST_P256,
+								HkdfHashType: commonpb.HashType_SHA256,
+								HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+							},
+							DemParams: &eciespb.EciesAeadDemParams{
+								AeadDem: aead.AES256GCMNoPrefixKeyTemplate(),
+							},
+							EcPointFormat: commonpb.EcPointFormat_COMPRESSED,
+						},
+						X: p256SHA256PublicKeyX,
+						Y: p256SHA256PublicKeyY,
+					},
+					KeyValue: func() []byte {
+						key := slices.Clone(p256SHA256PrivateKeyBytes)
+						key[0] ^= 1
+						return key
+					}(),
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseKey(tc.privateKeySerialization); err == nil {
+				t.Errorf("protoserialization.ParseKey(%v) err = nil, want error", tc.privateKeySerialization)
+			}
+		})
+	}
+}
