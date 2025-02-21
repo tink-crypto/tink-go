@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package daead
+package aessiv
 
 import (
 	"errors"
@@ -30,23 +30,17 @@ import (
 )
 
 const (
-	aesSIVKeyVersion = 0
-	aesSIVTypeURL    = "type.googleapis.com/google.crypto.tink.AesSivKey"
+	keyVersion = 0
+	keyTypeURL = "type.googleapis.com/google.crypto.tink.AesSivKey"
 )
 
-var (
-	errInvalidAESSIVKeyFormat = errors.New("aes_siv_key_manager: invalid key format")
-	errInvalidAESSIVKeySize   = fmt.Errorf("aes_siv_key_manager: key size != %d", subtle.AESSIVKeySize)
-)
+// keyManager generates AES-SIV keys and produces instances of AES-SIV.
+type keyManager struct{}
 
-// aesSIVKeyManager generates AES-SIV keys and produces instances of AES-SIV.
-type aesSIVKeyManager struct{}
+var _ registry.KeyManager = (*keyManager)(nil)
 
-// Assert that aesSIVKeyManager implements the KeyManager interface.
-var _ registry.KeyManager = (*aesSIVKeyManager)(nil)
-
-// Primitive constructs an AES-SIV for the given serialized AesSivKey.
-func (km *aesSIVKeyManager) Primitive(serializedKey []byte) (any, error) {
+// Primitive constructs an AES-SIV for the given serialized [aspb.AesSivKey].
+func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
 		return nil, errors.New("aes_siv_key_manager: invalid key")
 	}
@@ -64,21 +58,21 @@ func (km *aesSIVKeyManager) Primitive(serializedKey []byte) (any, error) {
 	return ret, nil
 }
 
-// NewKey generates a new AesSivKey. serializedKeyFormat is optional because
-// there is only one valid key format.
-func (km *aesSIVKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+// NewKey generates a new [aspb.AesSivKey]. serializedKeyFormat is optional
+// because there is only one valid key format.
+func (km *keyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
 	// A nil serializedKeyFormat is acceptable. If specified, validate.
 	if serializedKeyFormat != nil {
 		keyFormat := new(aspb.AesSivKeyFormat)
 		if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
-			return nil, errInvalidAESSIVKeyFormat
+			return nil, fmt.Errorf("aes_siv_key_manager: %v", err)
 		}
 		if keyFormat.KeySize != subtle.AESSIVKeySize {
-			return nil, errInvalidAESSIVKeySize
+			return nil, fmt.Errorf("aes_siv_key_manager: key size != %d", subtle.AESSIVKeySize)
 		}
 	}
 	return &aspb.AesSivKey{
-		Version:  aesSIVKeyVersion,
+		Version:  keyVersion,
 		KeyValue: random.GetRandomBytes(subtle.AESSIVKeySize),
 	}, nil
 }
@@ -86,7 +80,7 @@ func (km *aesSIVKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, e
 // NewKeyData generates a new KeyData. serializedKeyFormat is optional because
 // there is only one valid key format. This should be used solely by the key
 // management API.
-func (km *aesSIVKeyManager) NewKeyData(serializedKeyFormat []byte) (*tpb.KeyData, error) {
+func (km *keyManager) NewKeyData(serializedKeyFormat []byte) (*tpb.KeyData, error) {
 	key, err := km.NewKey(serializedKeyFormat)
 	if err != nil {
 		return nil, err
@@ -96,38 +90,36 @@ func (km *aesSIVKeyManager) NewKeyData(serializedKeyFormat []byte) (*tpb.KeyData
 		return nil, fmt.Errorf("aes_siv_key_manager: %v", err)
 	}
 	return &tpb.KeyData{
-		TypeUrl:         aesSIVTypeURL,
+		TypeUrl:         keyTypeURL,
 		Value:           serializedKey,
 		KeyMaterialType: km.KeyMaterialType(),
 	}, nil
 }
 
 // DoesSupport checks whether this key manager supports the given key type.
-func (km *aesSIVKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == aesSIVTypeURL
+func (km *keyManager) DoesSupport(typeURL string) bool {
+	return typeURL == keyTypeURL
 }
 
 // TypeURL returns the type URL of keys managed by this key manager.
-func (km *aesSIVKeyManager) TypeURL() string {
-	return aesSIVTypeURL
-}
+func (km *keyManager) TypeURL() string { return keyTypeURL }
 
 // KeyMaterialType returns the key material type of this key manager.
-func (km *aesSIVKeyManager) KeyMaterialType() tpb.KeyData_KeyMaterialType {
-	return tpb.KeyData_SYMMETRIC
-}
+func (km *keyManager) KeyMaterialType() tpb.KeyData_KeyMaterialType { return tpb.KeyData_SYMMETRIC }
 
-// DeriveKey derives a new key from serializedKeyFormat and pseudorandomness.
+// DeriveKey derives a new [aspb.AesSivKey] from serializedKeyFormat and
+// pseudorandomness.
+//
 // Unlike NewKey, DeriveKey validates serializedKeyFormat.
-func (km *aesSIVKeyManager) DeriveKey(serializedKeyFormat []byte, pseudorandomness io.Reader) (proto.Message, error) {
+func (km *keyManager) DeriveKey(serializedKeyFormat []byte, pseudorandomness io.Reader) (proto.Message, error) {
 	keyFormat := new(aspb.AesSivKeyFormat)
 	if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
-		return nil, errInvalidAESSIVKeyFormat
+		return nil, fmt.Errorf("aes_siv_key_manager: %v", err)
 	}
 	if keyFormat.GetKeySize() != subtle.AESSIVKeySize {
-		return nil, errInvalidAESSIVKeySize
+		return nil, fmt.Errorf("aes_siv_key_manager: key size != %d", subtle.AESSIVKeySize)
 	}
-	if err := keyset.ValidateKeyVersion(keyFormat.GetVersion(), aesSIVKeyVersion); err != nil {
+	if err := keyset.ValidateKeyVersion(keyFormat.GetVersion(), keyVersion); err != nil {
 		return nil, fmt.Errorf("aes_siv_key_manager: invalid key version: %s", err)
 	}
 
@@ -136,20 +128,20 @@ func (km *aesSIVKeyManager) DeriveKey(serializedKeyFormat []byte, pseudorandomne
 		return nil, fmt.Errorf("aes_siv_key_manager: not enough pseudorandomness given")
 	}
 	return &aspb.AesSivKey{
-		Version:  aesSIVKeyVersion,
+		Version:  keyVersion,
 		KeyValue: keyValue,
 	}, nil
 }
 
 // validateKey validates the given AesSivKey.
-func (km *aesSIVKeyManager) validateKey(key *aspb.AesSivKey) error {
-	err := keyset.ValidateKeyVersion(key.Version, aesSIVKeyVersion)
+func (km *keyManager) validateKey(key *aspb.AesSivKey) error {
+	err := keyset.ValidateKeyVersion(key.Version, keyVersion)
 	if err != nil {
 		return fmt.Errorf("aes_siv_key_manager: %v", err)
 	}
 	keySize := uint32(len(key.KeyValue))
 	if keySize != subtle.AESSIVKeySize {
-		return errInvalidAESSIVKeySize
+		return fmt.Errorf("aes_siv_key_manager: key size != %d", subtle.AESSIVKeySize)
 	}
 	return nil
 }

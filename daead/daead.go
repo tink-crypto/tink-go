@@ -19,19 +19,5 @@
 package daead
 
 import (
-	"fmt"
-
-	_ "github.com/tink-crypto/tink-go/v2/daead/aessiv" // Register AES-SIV key and parameters serialization.
-
-	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	_ "github.com/tink-crypto/tink-go/v2/daead/aessiv" // Register AES-SIV key manager, key and parameters serialization.
 )
-
-func init() {
-	if err := registry.RegisterKeyManager(new(aesSIVKeyManager)); err != nil {
-		panic(fmt.Sprintf("daead.init() failed: %v", err))
-	}
-	if err := internalregistry.AllowKeyDerivation(aesSIVTypeURL); err != nil {
-		panic(fmt.Sprintf("daead.init() failed: %v", err))
-	}
-}

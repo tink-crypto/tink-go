@@ -33,7 +33,7 @@ func AESSIVKeyTemplate() *tinkpb.KeyTemplate {
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key format: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          aesSIVTypeURL,
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.AesSivKey",
 		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 		Value:            serializedFormat,
 	}

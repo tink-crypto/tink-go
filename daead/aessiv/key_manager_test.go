@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package daead_test
+package aessiv_test
 
 import (
 	"bytes"
@@ -32,7 +32,7 @@ import (
 	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func TestAESSIVPrimitive(t *testing.T) {
+func TestKeyManagerPrimitive(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
 		t.Fatalf("cannot obtain AESSIV key manager: %s", err)
@@ -58,7 +58,7 @@ func TestAESSIVPrimitive(t *testing.T) {
 	}
 }
 
-func TestAESSIVPrimitiveWithInvalidKeys(t *testing.T) {
+func TestKeyManagerPrimitiveWithInvalidKeys(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AESSIV key manager: %s", err)
@@ -98,7 +98,7 @@ func TestAESSIVPrimitiveWithInvalidKeys(t *testing.T) {
 	}
 }
 
-func TestAESSIVNewKey(t *testing.T) {
+func TestKeyManagerNewKey(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AESSIV key manager: %s", err)
@@ -116,7 +116,7 @@ func TestAESSIVNewKey(t *testing.T) {
 	}
 }
 
-func TestAESSIVNewKeyData(t *testing.T) {
+func TestKeyManagerNewKeyData(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AESSIV key manager: %s", err)
@@ -140,7 +140,7 @@ func TestAESSIVNewKeyData(t *testing.T) {
 	}
 }
 
-func TestAESSIVNewKeyInvalid(t *testing.T) {
+func TestKeyManagerNewKeyInvalid(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
 		t.Errorf("registry.GetKeyManager(%q) err = %v, want nil", testutil.AESSIVTypeURL, err)
@@ -179,7 +179,7 @@ func TestAESSIVNewKeyInvalid(t *testing.T) {
 	}
 }
 
-func TestAESSIVDoesSupport(t *testing.T) {
+func TestKeyManagerDoesSupport(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AESSIV key manager: %s", err)
@@ -192,7 +192,7 @@ func TestAESSIVDoesSupport(t *testing.T) {
 	}
 }
 
-func TestAESSIVTypeURL(t *testing.T) {
+func TestKeyManagerTypeURL(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AESSIV key manager: %s", err)
@@ -202,7 +202,7 @@ func TestAESSIVTypeURL(t *testing.T) {
 	}
 }
 
-func TestAESSIVKeyMaterialType(t *testing.T) {
+func TestKeyManagerKeyMaterialType(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.AESSIVTypeURL, err)
@@ -216,7 +216,7 @@ func TestAESSIVKeyMaterialType(t *testing.T) {
 	}
 }
 
-func TestAESSIVDeriveKey(t *testing.T) {
+func TestKeyManagerDeriveKey(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.AESSIVTypeURL, err)
@@ -248,7 +248,7 @@ func TestAESSIVDeriveKey(t *testing.T) {
 	}
 }
 
-func TestAESSIVDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.AESSIVTypeURL, err)
@@ -295,7 +295,7 @@ func TestAESSIVDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	}
 }
 
-func TestAESSIVDeriveKeyFailsWithMalformedKeyFormats(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithMalformedKeyFormats(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.AESSIVTypeURL, err)
@@ -332,7 +332,7 @@ func TestAESSIVDeriveKeyFailsWithMalformedKeyFormats(t *testing.T) {
 	}
 }
 
-func TestAESSIVDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.AESSIVTypeURL, err)
