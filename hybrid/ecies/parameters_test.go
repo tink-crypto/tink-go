@@ -21,8 +21,8 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
-	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
+	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
 	"github.com/tink-crypto/tink-go/v2/key"
 )
@@ -46,9 +46,9 @@ func mustCreateSupportedDEMPArams(t *testing.T) map[string]key.Parameters {
 	if err != nil {
 		t.Fatalf("failed to create AES256-GCM parameters: %v", err)
 	}
-	aes256GCMSIVParams, err := aesgcmsiv.NewParameters(32, aesgcmsiv.VariantNoPrefix)
+	aes256SIVParams, err := aessiv.NewParameters(64, aessiv.VariantNoPrefix)
 	if err != nil {
-		t.Fatalf("failed to create AES-GCM-SIV parameters: %v", err)
+		t.Fatalf("failed to create AES-SIV parameters: %v", err)
 	}
 	xchacha20poly1305Params, err := xchacha20poly1305.NewParameters(xchacha20poly1305.VariantNoPrefix)
 	if err != nil {
@@ -79,7 +79,7 @@ func mustCreateSupportedDEMPArams(t *testing.T) map[string]key.Parameters {
 	return map[string]key.Parameters{
 		"AES128-GCM-NoPrefix":             aes128GCMParams,
 		"AES256-GCM-NoPrefix":             aes256GCMParams,
-		"AES256-GCM-SIV-NoPrefix":         aes256GCMSIVParams,
+		"AES256-SIV-NoPrefix":             aes256SIVParams,
 		"XChaCha20Poly1305-NoPrefix":      xchacha20poly1305Params,
 		"AES128-CTR-HMAC-SHA256-NoPrefix": aes128CTRHMACSHA256Params,
 		"AES256-CTR-HMAC-SHA256-NoPrefix": aes256CTRHMACSHA256Params,
@@ -183,7 +183,7 @@ func testCases(t *testing.T) []testCase {
 	demParams := mustCreateSupportedDEMPArams(t)
 	var testCases []testCase
 	for _, hashType := range []ecies.HashType{ecies.SHA256, ecies.SHA384, ecies.SHA512} {
-		for _, demID := range []string{"AES128-GCM-NoPrefix", "AES256-GCM-NoPrefix", "AES256-GCM-SIV-NoPrefix", "XChaCha20Poly1305-NoPrefix", "AES128-CTR-HMAC-SHA256-NoPrefix", "AES256-CTR-HMAC-SHA256-NoPrefix"} {
+		for _, demID := range []string{"AES128-GCM-NoPrefix", "AES256-GCM-NoPrefix", "AES256-SIV-NoPrefix", "XChaCha20Poly1305-NoPrefix", "AES128-CTR-HMAC-SHA256-NoPrefix", "AES256-CTR-HMAC-SHA256-NoPrefix"} {
 			for _, variant := range []ecies.Variant{ecies.VariantTink, ecies.VariantNoPrefix, ecies.VariantCrunchy} {
 				for _, salt := range [][]byte{nil, []byte("salt")} {
 					for _, curveType := range []ecies.CurveType{ecies.NISTP256, ecies.NISTP384, ecies.NISTP521} {
@@ -268,9 +268,9 @@ func TestParametersNotEqual(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
-	aesGCMSIVDEMParams, err := aesgcmsiv.NewParameters(32, aesgcmsiv.VariantNoPrefix)
+	aesGCMSIVDEMParams, err := aessiv.NewParameters(64, aessiv.VariantNoPrefix)
 	if err != nil {
-		t.Fatalf("aesgcmsiv.NewParameters() err = %v, want nil", err)
+		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
 	}
 
 	type paramsTestCase struct {

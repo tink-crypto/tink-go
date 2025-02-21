@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
-	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -384,9 +384,9 @@ func TestPublicKeyNotEqual(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
-	aesGCMSIVDEMParams, err := aesgcmsiv.NewParameters(32, aesgcmsiv.VariantNoPrefix)
+	aesSIVDEMParams, err := aessiv.NewParameters(64, aessiv.VariantNoPrefix)
 	if err != nil {
-		t.Fatalf("aesgcmsiv.NewParameters() err = %v, want nil", err)
+		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
 	}
 
 	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
@@ -423,7 +423,7 @@ func TestPublicKeyNotEqual(t *testing.T) {
 					CurveType:            ecies.X25519,
 					HashType:             ecies.SHA256,
 					NISTCurvePointFormat: ecies.UnspecifiedPointFormat,
-					DEMParameters:        aesGCMSIVDEMParams,
+					DEMParameters:        aesSIVDEMParams,
 					Variant:              ecies.VariantTink,
 				}),
 				publicKeyBytes: x25519PublicKeyBytes,
@@ -712,9 +712,9 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
-	aesGCMSIVDEMParams, err := aesgcmsiv.NewParameters(32, aesgcmsiv.VariantNoPrefix)
+	aesSIVDEMParams, err := aessiv.NewParameters(64, aessiv.VariantNoPrefix)
 	if err != nil {
-		t.Fatalf("aesgcmsiv.NewParameters() err = %v, want nil", err)
+		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
 	}
 
 	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
@@ -753,7 +753,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					CurveType:            ecies.X25519,
 					HashType:             ecies.SHA256,
 					NISTCurvePointFormat: ecies.UnspecifiedPointFormat,
-					DEMParameters:        aesGCMSIVDEMParams,
+					DEMParameters:        aesSIVDEMParams,
 					Variant:              ecies.VariantTink,
 				})),
 				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),

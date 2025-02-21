@@ -20,8 +20,8 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
-	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
+	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/key"
 )
 
@@ -191,9 +191,9 @@ func mustCreateAllowedDEMParameters() []key.Parameters {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create AES256-GCM parameters: %v", err))
 	}
-	aes256GCMSIVParams, err := aesgcmsiv.NewParameters(32, aesgcmsiv.VariantNoPrefix)
+	aes256SIVParams, err := aessiv.NewParameters(64, aessiv.VariantNoPrefix)
 	if err != nil {
-		panic(fmt.Sprintf("failed to create AES-GCM-SIV parameters: %v", err))
+		panic(fmt.Sprintf("failed to create AES-SIV parameters: %v", err))
 	}
 	xchacha20poly1305Params, err := xchacha20poly1305.NewParameters(xchacha20poly1305.VariantNoPrefix)
 	if err != nil {
@@ -224,7 +224,7 @@ func mustCreateAllowedDEMParameters() []key.Parameters {
 	return []key.Parameters{
 		aes128GCMParams,
 		aes256GCMParams,
-		aes256GCMSIVParams,
+		aes256SIVParams,
 		xchacha20poly1305Params,
 		aes128CTRHMACSHA256Params,
 		aes256CTRHMACSHA256Params,
