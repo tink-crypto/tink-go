@@ -15,11 +15,13 @@
 // Package daead provides implementations of the DeterministicAEAD primitive.
 //
 // Unlike AEAD, implementations of this interface are not semantically secure, because
-// encrypting the same plaintex always yields the same ciphertext.
+// encrypting the same plaintext always yields the same ciphertext.
 package daead
 
 import (
 	"fmt"
+
+	_ "github.com/tink-crypto/tink-go/v2/daead/aessiv" // Register AES-SIV key and parameters serialization.
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"

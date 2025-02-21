@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package aessiv defines AES-SIV parameters and keys (RFC 5297).
 package aessiv
 
 import (
