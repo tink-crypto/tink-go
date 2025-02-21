@@ -16,6 +16,7 @@ package daead
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -36,26 +37,93 @@ func New(handle *keyset.Handle) (tink.DeterministicAEAD, error) {
 	return newWrappedDeterministicAEAD(ps)
 }
 
-// wrappedDeterministicAEAD is a DeterministicAEAD implementation that uses an underlying primitive set
-// for deterministic encryption and decryption.
-type wrappedDeterministicAEAD struct {
-	ps        *primitiveset.PrimitiveSet[tink.DeterministicAEAD]
+type daeadAndKeyID struct {
+	primitive tink.DeterministicAEAD
+	keyID     uint32
+}
+
+func (a *daeadAndKeyID) EncryptDeterministically(plaintext, associatedData []byte) ([]byte, error) {
+	return a.primitive.EncryptDeterministically(plaintext, associatedData)
+}
+
+func (a *daeadAndKeyID) DecryptDeterministically(ciphertext, associatedData []byte) ([]byte, error) {
+	return a.primitive.DecryptDeterministically(ciphertext, associatedData)
+}
+
+// fullDAEADPrimitiveAdapter is an adapter that turns a non-full [tink.DAEAD]
+// primitive into a full [tink.DAEAD] primitive.
+type fullDAEADPrimitiveAdapter struct {
+	primitive tink.DeterministicAEAD
+	prefix    []byte
+}
+
+var _ tink.DeterministicAEAD = (*fullDAEADPrimitiveAdapter)(nil)
+
+func (a *fullDAEADPrimitiveAdapter) EncryptDeterministically(plaintext, associatedData []byte) ([]byte, error) {
+	ct, err := a.primitive.EncryptDeterministically(plaintext, associatedData)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Concat(a.prefix, ct), nil
+}
+
+func (a *fullDAEADPrimitiveAdapter) DecryptDeterministically(ciphertext, associatedData []byte) ([]byte, error) {
+	return a.primitive.DecryptDeterministically(ciphertext[len(a.prefix):], associatedData)
+}
+
+func extractFullDAEAD(entry *primitiveset.Entry[tink.DeterministicAEAD]) (*daeadAndKeyID, error) {
+	if entry.FullPrimitive != nil {
+		return &daeadAndKeyID{
+			primitive: entry.FullPrimitive,
+			keyID:     entry.KeyID,
+		}, nil
+	}
+	return &daeadAndKeyID{
+		primitive: &fullDAEADPrimitiveAdapter{
+			primitive: entry.Primitive,
+			prefix:    []byte(entry.Prefix),
+		},
+		keyID: entry.KeyID,
+	}, nil
+}
+
+// wrappedDAEAD is a DeterministicAEAD implementation that uses an underlying
+// primitive set for deterministic encryption and decryption.
+type wrappedDAEAD struct {
+	primary    daeadAndKeyID
+	primitives map[string][]daeadAndKeyID
+
 	encLogger monitoring.Logger
 	decLogger monitoring.Logger
 }
 
-// Asserts that wrappedDeterministicAEAD implements the DeterministicAEAD interface.
-var _ tink.DeterministicAEAD = (*wrappedDeterministicAEAD)(nil)
+var _ tink.DeterministicAEAD = (*wrappedDAEAD)(nil)
 
-func newWrappedDeterministicAEAD(ps *primitiveset.PrimitiveSet[tink.DeterministicAEAD]) (*wrappedDeterministicAEAD, error) {
+func newWrappedDeterministicAEAD(ps *primitiveset.PrimitiveSet[tink.DeterministicAEAD]) (*wrappedDAEAD, error) {
+	primary, err := extractFullDAEAD(ps.Primary)
+	if err != nil {
+		return nil, err
+	}
+	primitives := make(map[string][]daeadAndKeyID)
+	for _, entries := range ps.Entries {
+		for _, entry := range entries {
+			p, err := extractFullDAEAD(entry)
+			if err != nil {
+				return nil, err
+			}
+			primitives[entry.Prefix] = append(primitives[entry.Prefix], *p)
+		}
+	}
+
 	encLogger, decLogger, err := createLoggers(ps)
 	if err != nil {
 		return nil, err
 	}
-	return &wrappedDeterministicAEAD{
-		ps:        ps,
-		encLogger: encLogger,
-		decLogger: decLogger,
+	return &wrappedDAEAD{
+		primary:    *primary,
+		primitives: primitives,
+		encLogger:  encLogger,
+		decLogger:  decLogger,
 	}, nil
 }
 
@@ -89,61 +157,48 @@ func createLoggers(ps *primitiveset.PrimitiveSet[tink.DeterministicAEAD]) (monit
 
 // EncryptDeterministically deterministically encrypts plaintext with additionalData as additional authenticated data.
 // It returns the concatenation of the primary's identifier and the ciphertext.
-func (d *wrappedDeterministicAEAD) EncryptDeterministically(pt, aad []byte) ([]byte, error) {
-	primary := d.ps.Primary
-	p, ok := (primary.Primitive).(tink.DeterministicAEAD)
-	if !ok {
-		return nil, fmt.Errorf("daead_factory: not a DeterministicAEAD primitive")
-	}
-
-	ct, err := p.EncryptDeterministically(pt, aad)
+func (d *wrappedDAEAD) EncryptDeterministically(pt, aad []byte) ([]byte, error) {
+	ct, err := d.primary.EncryptDeterministically(pt, aad)
 	if err != nil {
 		d.encLogger.LogFailure()
 		return nil, err
 	}
-	d.encLogger.Log(primary.KeyID, len(pt))
-	if len(primary.Prefix) == 0 {
-		return ct, nil
-	}
-	output := make([]byte, 0, len(primary.Prefix)+len(ct))
-	output = append(output, primary.Prefix...)
-	output = append(output, ct...)
-	return output, nil
+	d.encLogger.Log(d.primary.keyID, len(pt))
+	return ct, nil
 }
 
 // DecryptDeterministically deterministically decrypts ciphertext with additionalData as
 // additional authenticated data. It returns the corresponding plaintext if the
 // ciphertext is authenticated.
-func (d *wrappedDeterministicAEAD) DecryptDeterministically(ct, aad []byte) ([]byte, error) {
-	// try non-raw keys
+func (d *wrappedDAEAD) DecryptDeterministically(ct, aad []byte) ([]byte, error) {
+	// Try non-raw keys
 	prefixSize := cryptofmt.NonRawPrefixSize
 	if len(ct) > prefixSize {
 		prefix := ct[:prefixSize]
-		ctNoPrefix := ct[prefixSize:]
-		entries, err := d.ps.EntriesForPrefix(string(prefix))
-		if err == nil {
-			for i := 0; i < len(entries); i++ {
-				pt, err := entries[i].Primitive.DecryptDeterministically(ctNoPrefix, aad)
+		primitivesForPrefix, ok := d.primitives[string(prefix)]
+		if ok {
+			for _, primitive := range primitivesForPrefix {
+				pt, err := primitive.DecryptDeterministically(ct, aad)
 				if err == nil {
-					d.decLogger.Log(entries[i].KeyID, len(ctNoPrefix))
+					numBytes := len(ct[prefixSize:])
+					d.decLogger.Log(primitive.keyID, numBytes)
 					return pt, nil
 				}
 			}
 		}
 	}
-
-	// try raw keys
-	entries, err := d.ps.RawEntries()
-	if err == nil {
-		for i := 0; i < len(entries); i++ {
-			pt, err := entries[i].Primitive.DecryptDeterministically(ct, aad)
+	// Try raw keys.
+	rawPrimitives, ok := d.primitives[cryptofmt.RawPrefix]
+	if ok {
+		for _, primitive := range rawPrimitives {
+			pt, err := primitive.DecryptDeterministically(ct, aad)
 			if err == nil {
-				d.decLogger.Log(entries[i].KeyID, len(ct))
+				d.decLogger.Log(primitive.keyID, len(ct))
 				return pt, nil
 			}
 		}
 	}
-	// nothing worked
+	// Nothing worked.
 	d.decLogger.LogFailure()
 	return nil, fmt.Errorf("daead_factory: decryption failed")
 }

@@ -17,17 +17,22 @@ package daead_test
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/daead"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/signature"
@@ -662,5 +667,202 @@ func TestPrimitiveFactoryEncryptDecryptWithoutAnnotationsDoesNotMonitor(t *testi
 	got := client.Events()
 	if len(got) != 0 {
 		t.Errorf("len(client.Events()) = %d, want 0", len(got))
+	}
+}
+
+const (
+	stubKeyURL        = "type.googleapis.com/google.crypto.tink.SomeKey"
+	fullDAEADPrefix   = "full_dead_prefix"
+	legacyDAEADPrefix = "legacy_dead_prefix"
+)
+
+type stubFullDEAD struct{}
+
+var _ tink.DeterministicAEAD = (*stubFullDEAD)(nil)
+
+func (s *stubFullDEAD) EncryptDeterministically(pt, ad []byte) ([]byte, error) {
+	return slices.Concat([]byte(fullDAEADPrefix), pt), nil
+}
+
+func (s *stubFullDEAD) DecryptDeterministically(ct, ad []byte) ([]byte, error) {
+	return ct[len(fullDAEADPrefix):], nil
+}
+
+type stubParams struct{}
+
+var _ key.Parameters = (*stubParams)(nil)
+
+func (p *stubParams) Equal(_ key.Parameters) bool { return true }
+func (p *stubParams) HasIDRequirement() bool      { return true }
+
+type stubKey struct {
+	prefixType   tinkpb.OutputPrefixType
+	idRequrement uint32
+}
+
+var _ key.Key = (*stubKey)(nil)
+
+func (p *stubKey) Equal(_ key.Key) bool          { return true }
+func (p *stubKey) Parameters() key.Parameters    { return &stubParams{} }
+func (p *stubKey) IDRequirement() (uint32, bool) { return p.idRequrement, p.HasIDRequirement() }
+func (p *stubKey) HasIDRequirement() bool        { return p.prefixType != tinkpb.OutputPrefixType_RAW }
+
+type stubKeySerialization struct{}
+
+var _ protoserialization.KeySerializer = (*stubKeySerialization)(nil)
+
+func (s *stubKeySerialization) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	return protoserialization.NewKeySerialization(
+		&tinkpb.KeyData{
+			TypeUrl:         stubKeyURL,
+			Value:           []byte("serialized_key"),
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+		},
+		key.(*stubKey).prefixType,
+		key.(*stubKey).idRequrement,
+	)
+}
+
+type stubKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*stubKeyParser)(nil)
+
+func (s *stubKeyParser) ParseKey(serialization *protoserialization.KeySerialization) (key.Key, error) {
+	idRequirement, _ := serialization.IDRequirement()
+	return &stubKey{serialization.OutputPrefixType(), idRequirement}, nil
+}
+
+func mustCreateKeyset(t *testing.T, key key.Key) *keyset.Handle {
+	t.Helper()
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(key)
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	return handle
+}
+
+func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
+	defer registryconfig.UnregisterPrimitiveConstructor[*stubKey]()
+	defer protoserialization.UnregisterKeyParser(stubKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubKeyURL, &stubKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKey](&stubKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	// Register a primitive constructor to make sure that the factory uses the
+	// full primitive.
+	primitiveConstructor := func(key key.Key) (any, error) { return &stubFullDEAD{}, nil }
+	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](primitiveConstructor); err != nil {
+		t.Fatalf("registryconfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+
+	handle := mustCreateKeyset(t, &stubKey{
+		tinkpb.OutputPrefixType_TINK,
+		0x1234,
+	})
+	encrypter, err := daead.New(handle)
+	if err != nil {
+		t.Fatalf("daead.New() err = %v, want nil", err)
+	}
+	data := []byte("data")
+	ad := []byte("ad")
+	ciphertext, err := encrypter.EncryptDeterministically(data, ad)
+	if err != nil {
+		t.Fatalf("encrypter.Sign() err = %v, want nil", err)
+	}
+	if !bytes.Equal(ciphertext, slices.Concat([]byte(fullDAEADPrefix), data)) {
+		t.Errorf("ciphertext = %q, want: %q", ciphertext, data)
+	}
+}
+
+type stubLegacyDEAD struct{}
+
+var _ tink.DeterministicAEAD = (*stubLegacyDEAD)(nil)
+
+func (s *stubLegacyDEAD) EncryptDeterministically(pt, ad []byte) ([]byte, error) {
+	return slices.Concat([]byte(legacyDAEADPrefix), pt), nil
+}
+
+func (s *stubLegacyDEAD) DecryptDeterministically(ct, ad []byte) ([]byte, error) {
+	return ct[len(legacyDAEADPrefix):], nil
+}
+
+type stubKeyManager struct{}
+
+var _ registry.KeyManager = (*stubKeyManager)(nil)
+
+func (km *stubKeyManager) NewKey(_ []byte) (proto.Message, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubKeyManager) DoesSupport(keyURL string) bool  { return keyURL == stubKeyURL }
+func (km *stubKeyManager) TypeURL() string                 { return stubKeyURL }
+func (km *stubKeyManager) Primitive(_ []byte) (any, error) { return &stubLegacyDEAD{}, nil }
+
+func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubKeyURL, &stubKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKey](&stubKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := registry.RegisterKeyManager(&stubKeyManager{}); err != nil {
+		t.Fatalf("registry.RegisterKeyManager() err = %v, want nil", err)
+	}
+
+	data := []byte("data")
+	legacyPrefix := []byte(legacyDAEADPrefix)
+	for _, tc := range []struct {
+		name           string
+		handle         *keyset.Handle
+		wantCiphertext []byte
+	}{
+		{
+			name:           "TINK",
+			handle:         mustCreateKeyset(t, &stubKey{tinkpb.OutputPrefixType_TINK, 0x1234}),
+			wantCiphertext: slices.Concat([]byte{cryptofmt.TinkStartByte, 0x00, 0x00, 0x12, 0x34}, legacyPrefix, data),
+		},
+		{
+			name:           "CRUNCHY",
+			handle:         mustCreateKeyset(t, &stubKey{tinkpb.OutputPrefixType_CRUNCHY, 0x1234}),
+			wantCiphertext: slices.Concat([]byte{cryptofmt.LegacyStartByte, 0x00, 0x00, 0x12, 0x34}, legacyPrefix, data),
+		},
+		{
+			name:           "RAW",
+			handle:         mustCreateKeyset(t, &stubKey{tinkpb.OutputPrefixType_RAW, 0}),
+			wantCiphertext: slices.Concat(legacyPrefix, data),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a keyset with a single key.
+			encrypter, err := daead.New(tc.handle)
+			if err != nil {
+				t.Fatalf("daead.New() err = %v, want nil", err)
+			}
+			ad := []byte("ad")
+			ciphertext, err := encrypter.EncryptDeterministically(data, ad)
+			if err != nil {
+				t.Fatalf("encrypter.Sign() err = %v, want nil", err)
+			}
+			if got, want := ciphertext, tc.wantCiphertext; !bytes.Equal(got, want) {
+				t.Errorf("ciphertext = %q, want: %q", got, want)
+			}
+		})
 	}
 }
