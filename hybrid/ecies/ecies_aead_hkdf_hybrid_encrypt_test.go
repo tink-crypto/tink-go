@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hybrid
+package ecies_test
 
 import (
 	"bytes"
@@ -20,6 +20,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/daead"
+	"github.com/tink-crypto/tink-go/v2/hybrid/internal/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -38,7 +39,7 @@ func basicMultipleEncrypts(t *testing.T, c string, k *tinkpb.KeyTemplate) {
 	salt := []byte("some salt")
 	pt := random.GetRandomBytes(20)
 	context := []byte("context info")
-	rDem, err := newRegisterECIESAEADHKDFDemHelper(k)
+	rDem, err := ecies.NewDEMHelper(k)
 	if err != nil {
 		t.Fatalf("error generating a DEM helper :%s", err)
 	}

@@ -32,6 +32,7 @@ package ecies
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
 
@@ -46,6 +47,12 @@ func init() {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterKeyParser(privateKeyTypeURL, &privateKeyParser{}); err != nil {
+		panic(fmt.Sprintf("ecies.init() failed: %v", err))
+	}
+	if err := registry.RegisterKeyManager(new(privateKeyKeyManager)); err != nil {
+		panic(fmt.Sprintf("ecies.init() failed: %v", err))
+	}
+	if err := registry.RegisterKeyManager(new(publicKeyKeyManager)); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
 }

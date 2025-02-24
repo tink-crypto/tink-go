@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hybrid
+package ecies_test
 
 import (
 	"bytes"
@@ -20,11 +20,18 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/daead"
+	"github.com/tink-crypto/tink-go/v2/hybrid/internal/ecies"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+)
+
+const (
+	aesGCMTypeURL         = "type.googleapis.com/google.crypto.tink.AesGcmKey"
+	aesCTRHMACAEADTypeURL = "type.googleapis.com/google.crypto.tink.AesCtrHmacAeadKey"
+	aesSIVTypeURL         = "type.googleapis.com/google.crypto.tink.AesSivKey"
 )
 
 type eciesAEADHKDFDEMHelperTestCase struct {
@@ -72,9 +79,9 @@ func TestECIESAEADHKDFDEMHelper_AEADKeyTemplates(t *testing.T) {
 
 	for _, tc := range eciesAEADHKDFDEMHelperSupportedAEADs {
 		t.Run(tc.name, func(t *testing.T) {
-			dem, err := newRegisterECIESAEADHKDFDemHelper(tc.template)
+			dem, err := ecies.NewDEMHelper(tc.template)
 			if err != nil {
-				t.Fatalf("newRegisterECIESAEADHKDFDEMHelper(tc.template) err = %s, want nil", err)
+				t.Fatalf("ecies.NewDEMHelper(tc.template) err = %s, want nil", err)
 			}
 
 			sk := random.GetRandomBytes(dem.GetSymmetricKeySize())
@@ -111,9 +118,9 @@ func TestECIESAEADHKDFDEMHelper_DAEADKeyTemplates(t *testing.T) {
 
 	for _, tc := range eciesAEADHKDFDEMHelperSupportedDAEADs {
 		t.Run(tc.name, func(t *testing.T) {
-			dem, err := newRegisterECIESAEADHKDFDemHelper(tc.template)
+			dem, err := ecies.NewDEMHelper(tc.template)
 			if err != nil {
-				t.Fatalf("newRegisterECIESAEADHKDFDEMHelper(tc.template) err = %s, want nil", err)
+				t.Fatalf("ecies.NewDEMHelper(tc.template) err = %s, want nil", err)
 			}
 
 			sk := random.GetRandomBytes(dem.GetSymmetricKeySize())
@@ -151,9 +158,9 @@ func TestECIESAEADHKDFDEMHelper_KeySizes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			dem, err := newRegisterECIESAEADHKDFDemHelper(tc.template)
+			dem, err := ecies.NewDEMHelper(tc.template)
 			if err != nil {
-				t.Fatalf("newRegisterECIESAEADHKDFDemHelper(tc.template): %s", err)
+				t.Fatalf("ecies.NewDEMHelper(tc.template): %s", err)
 			}
 			if dem.GetSymmetricKeySize() != tc.keySize {
 				t.Errorf("dem.GetSymmetricKeySize() = %d, want: %d", dem.GetSymmetricKeySize(), tc.keySize)
@@ -205,8 +212,8 @@ func TestECIESAEADHKDFDEMHelper_UnsupportedKeyTemplates(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := newRegisterECIESAEADHKDFDemHelper(tc.template); err == nil {
-				t.Errorf("newRegisterECIESAEADHKDFDemHelper() err = nil, want non-nil")
+			if _, err := ecies.NewDEMHelper(tc.template); err == nil {
+				t.Errorf("ecies.NewDEMHelper() err = nil, want non-nil")
 			}
 		})
 	}

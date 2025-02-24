@@ -238,7 +238,7 @@ func isAllowedDEMParameters(demParameters key.Parameters) error {
 		}
 	}
 	// TODO: b/388807656 - Include supported DEM parameters in error message.
-	return fmt.Errorf("unsupported DEM parameters %v", demParameters)
+	return fmt.Errorf("unsupported DEM parameters %s", demParameters)
 }
 
 func isNISTCurve(curveType CurveType) bool {

@@ -57,7 +57,7 @@ func TestHybridFactoryTest(t *testing.T) {
 	}
 
 	primaryPrivKey := testutil.NewKey(
-		testutil.NewKeyData(eciesAEADHKDFPrivateKeyTypeURL, sPrimaryPriv, tinkpb.KeyData_ASYMMETRIC_PRIVATE),
+		testutil.NewKeyData(testutil.EciesAeadHkdfPrivateKeyTypeURL, sPrimaryPriv, tinkpb.KeyData_ASYMMETRIC_PRIVATE),
 		tinkpb.KeyStatusType_ENABLED, 8, tinkpb.OutputPrefixType_RAW)
 
 	rawPrivProto, err := testutil.GenerateECIESAEADHKDFPrivateKey(c, ht, rawPtFmt, rawDek, rawSalt)
@@ -69,7 +69,7 @@ func TestHybridFactoryTest(t *testing.T) {
 		t.Fatalf("proto.Marshal(rawPrivProto) err = %v, want nil", err)
 	}
 	rawPrivKey := testutil.NewKey(
-		testutil.NewKeyData(eciesAEADHKDFPrivateKeyTypeURL, sRawPriv, tinkpb.KeyData_ASYMMETRIC_PRIVATE),
+		testutil.NewKeyData(testutil.EciesAeadHkdfPrivateKeyTypeURL, sRawPriv, tinkpb.KeyData_ASYMMETRIC_PRIVATE),
 		tinkpb.KeyStatusType_ENABLED, 11, tinkpb.OutputPrefixType_RAW)
 
 	privKeys := []*tinkpb.Keyset_Key{primaryPrivKey, rawPrivKey}

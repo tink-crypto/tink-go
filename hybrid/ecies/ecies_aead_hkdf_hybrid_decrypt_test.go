@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hybrid
+package ecies_test
 
 import (
 	"bytes"
@@ -21,6 +21,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/daead"
+	"github.com/tink-crypto/tink-go/v2/hybrid/internal/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
@@ -40,7 +41,7 @@ func modifyDecrypt(t *testing.T, c string, k *tinkpb.KeyTemplate) {
 	salt := random.GetRandomBytes(8)
 	pt := random.GetRandomBytes(4)
 	context := random.GetRandomBytes(4)
-	rDem, err := newRegisterECIESAEADHKDFDemHelper(k)
+	rDem, err := ecies.NewDEMHelper(k)
 	if err != nil {
 		t.Fatalf("error generating a DEM helper :%s", err)
 	}
@@ -169,7 +170,7 @@ func TestECAESSIVTestVectors(t *testing.T) {
 			}
 			pvt := subtle.GetECPrivateKey(curve, key)
 			var salt []byte
-			helper, err := newRegisterECIESAEADHKDFDemHelper(daead.AESSIVKeyTemplate())
+			helper, err := ecies.NewDEMHelper(daead.AESSIVKeyTemplate())
 			if err != nil {
 				t.Fatalf("error generating a DEM helper :%s", err)
 			}

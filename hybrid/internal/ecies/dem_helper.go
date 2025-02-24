@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hybrid
+package ecies
 
 import (
 	"errors"
@@ -35,19 +35,19 @@ const (
 	aesSIVTypeURL         = "type.googleapis.com/google.crypto.tink.AesSivKey"
 )
 
-// eciesAEADHKDFDEMHelper generates AEAD or DeterministicAEAD primitives for the specified KeyTemplate and key material.
+// DEMHelper generates AEAD or DeterministicAEAD primitives for the specified KeyTemplate and key material.
 // in order to implement the EciesAEADHKDFDEMHelper interface.
-type eciesAEADHKDFDEMHelper struct {
+type DEMHelper struct {
 	demKeyURL        string
 	keyData          []byte
 	symmetricKeySize uint32
 	aesCTRSize       uint32
 }
 
-var _ subtle.EciesAEADHKDFDEMHelper = (*eciesAEADHKDFDEMHelper)(nil)
+var _ subtle.EciesAEADHKDFDEMHelper = (*DEMHelper)(nil)
 
-// newRegisterECIESAEADHKDFDemHelper initializes and returns a RegisterECIESAEADHKDFDemHelper
-func newRegisterECIESAEADHKDFDemHelper(k *tinkpb.KeyTemplate) (*eciesAEADHKDFDEMHelper, error) {
+// NewDEMHelper initializes and returns a RegisterECIESAEADHKDFDemHelper
+func NewDEMHelper(k *tinkpb.KeyTemplate) (*DEMHelper, error) {
 	var len uint32
 	var aesCTRSize uint32
 	var keyFormat []byte
@@ -106,7 +106,7 @@ func newRegisterECIESAEADHKDFDemHelper(k *tinkpb.KeyTemplate) (*eciesAEADHKDFDEM
 		return nil, fmt.Errorf("failed to serialize key, error: %v", err)
 	}
 
-	return &eciesAEADHKDFDEMHelper{
+	return &DEMHelper{
 		demKeyURL:        k.TypeUrl,
 		keyData:          sk,
 		symmetricKeySize: len,
@@ -115,13 +115,12 @@ func newRegisterECIESAEADHKDFDemHelper(k *tinkpb.KeyTemplate) (*eciesAEADHKDFDEM
 }
 
 // GetSymmetricKeySize returns the symmetric key size
-func (r *eciesAEADHKDFDEMHelper) GetSymmetricKeySize() uint32 {
+func (r *DEMHelper) GetSymmetricKeySize() uint32 {
 	return r.symmetricKeySize
-
 }
 
 // GetAEADOrDAEAD returns the AEAD or deterministic AEAD primitive from the DEM
-func (r *eciesAEADHKDFDEMHelper) GetAEADOrDAEAD(symmetricKeyValue []byte) (any, error) {
+func (r *DEMHelper) GetAEADOrDAEAD(symmetricKeyValue []byte) (any, error) {
 	var sk []byte
 	if uint32(len(symmetricKeyValue)) != r.GetSymmetricKeySize() {
 		return nil, errors.New("symmetric key has incorrect length")

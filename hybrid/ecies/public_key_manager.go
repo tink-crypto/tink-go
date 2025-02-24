@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hybrid
+package ecies
 
 import (
 	"errors"
@@ -21,40 +21,33 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/hybrid/internal/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	eahpb "github.com/tink-crypto/tink-go/v2/proto/ecies_aead_hkdf_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-const (
-	eciesAEADHKDFPublicKeyKeyVersion = 0
+const publicKeyVersion = 0
 
-	eciesAEADHKDFPublicKeyTypeURL = "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey"
-)
-
-// common errors
-var errInvalidECIESAEADHKDFPublicKeyKey = fmt.Errorf("ecies_aead_hkdf_public_key_manager: invalid key")
-var errInvalidECIESAEADHKDFPublicKeyKeyFormat = fmt.Errorf("ecies_aead_hkdf_public_key_manager: invalid key format")
-
-// eciesAEADHKDFPublicKeyKeyManager is an implementation of KeyManager interface.
+// publicKeyKeyManager is an implementation of KeyManager interface.
 // It generates new ECIESAEADHKDFPublicKeyKey keys and produces new instances of ECIESAEADHKDFPublicKey subtle.
-type eciesAEADHKDFPublicKeyKeyManager struct{}
+type publicKeyKeyManager struct{}
 
-// Assert that eciesAEADHKDFPublicKeyKeyManager implements the KeyManager interface.
-var _ registry.KeyManager = (*eciesAEADHKDFPublicKeyKeyManager)(nil)
+// Assert that publicKeyKeyManager implements the KeyManager interface.
+var _ registry.KeyManager = (*publicKeyKeyManager)(nil)
 
 // Primitive creates an ECIESAEADHKDFPublicKey subtle for the given serialized ECIESAEADHKDFPublicKey proto.
-func (km *eciesAEADHKDFPublicKeyKeyManager) Primitive(serializedKey []byte) (any, error) {
+func (km *publicKeyKeyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
-		return nil, errInvalidECIESAEADHKDFPublicKeyKey
+		return nil, fmt.Errorf("ecies_aead_hkdf_public_key_manager: empty key")
 	}
 	key := new(eahpb.EciesAeadHkdfPublicKey)
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidECIESAEADHKDFPublicKeyKey
+		return nil, fmt.Errorf("ecies_aead_hkdf_public_key_manager: %v", err)
 	}
 	if err := km.validateKey(key); err != nil {
-		return nil, errInvalidECIESAEADHKDFPublicKeyKey
+		return nil, fmt.Errorf("ecies_aead_hkdf_public_key_manager: %v", err)
 	}
 	params := key.GetParams()
 	curve, err := subtle.GetCurve(params.GetKemParams().GetCurveType().String())
@@ -68,7 +61,7 @@ func (km *eciesAEADHKDFPublicKeyKeyManager) Primitive(serializedKey []byte) (any
 			Y: new(big.Int).SetBytes(key.GetY()),
 		},
 	}
-	rDem, err := newRegisterECIESAEADHKDFDemHelper(params.GetDemParams().GetAeadDem())
+	rDem, err := ecies.NewDEMHelper(params.GetDemParams().GetAeadDem())
 	if err != nil {
 		return nil, err
 	}
@@ -80,29 +73,27 @@ func (km *eciesAEADHKDFPublicKeyKeyManager) Primitive(serializedKey []byte) (any
 }
 
 // DoesSupport indicates if this key manager supports the given key type.
-func (km *eciesAEADHKDFPublicKeyKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == eciesAEADHKDFPublicKeyTypeURL
+func (km *publicKeyKeyManager) DoesSupport(typeURL string) bool {
+	return typeURL == publicKeyTypeURL
 }
 
 // TypeURL returns the key type of keys managed by this key manager.
-func (km *eciesAEADHKDFPublicKeyKeyManager) TypeURL() string {
-	return eciesAEADHKDFPublicKeyTypeURL
-}
+func (km *publicKeyKeyManager) TypeURL() string { return publicKeyTypeURL }
 
 // validateKey validates the given ECDSAPrivateKey.
-func (km *eciesAEADHKDFPublicKeyKeyManager) validateKey(key *eahpb.EciesAeadHkdfPublicKey) error {
-	if err := keyset.ValidateKeyVersion(key.GetVersion(), eciesAEADHKDFPublicKeyKeyVersion); err != nil {
+func (km *publicKeyKeyManager) validateKey(key *eahpb.EciesAeadHkdfPublicKey) error {
+	if err := keyset.ValidateKeyVersion(key.GetVersion(), publicKeyVersion); err != nil {
 		return fmt.Errorf("ecies_aead_hkdf_public_key_manager: invalid key: %s", err)
 	}
 	return checkECIESAEADHKDFParams(key.Params)
 }
 
 // NewKey is not implemented for public key manager.
-func (km *eciesAEADHKDFPublicKeyKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
-	return nil, errors.New("public key manager does not implement NewKey")
+func (km *publicKeyKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+	return nil, errors.New("ecies_aead_hkdf_public_key_manager: public key manager does not implement NewKey")
 }
 
 // NewKeyData is not implemented for public key manager.
-func (km *eciesAEADHKDFPublicKeyKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
-	return nil, errors.New("public key manager does not implement NewKeyData")
+func (km *publicKeyKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+	return nil, errors.New("ecies_aead_hkdf_public_key_manager: public key manager does not implement NewKeyData")
 }

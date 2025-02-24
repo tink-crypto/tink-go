@@ -17,8 +17,8 @@
 // The functionality of Hybrid Encryption is represented as a pair of
 // interfaces:
 //
-//  * HybridEncrypt for encryption of data
-//  * HybridDecrypt for decryption of data
+//   - HybridEncrypt for encryption of data
+//   - HybridDecrypt for decryption of data
 //
 // Implementations of these interfaces are secure against adaptive chosen
 // ciphertext attacks. In addition to plaintext the encryption takes an extra
@@ -32,6 +32,7 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	_ "github.com/tink-crypto/tink-go/v2/hybrid/ecies" // Register ECIES AEAD HKDF key managers and proto serialization.
 )
 
 func init() {
@@ -39,13 +40,6 @@ func init() {
 		panic(fmt.Sprintf("hybrid.init() failed: %v", err))
 	}
 	if err := registry.RegisterKeyManager(new(hpkePrivateKeyManager)); err != nil {
-		panic(fmt.Sprintf("hybrid.init() failed: %v", err))
-	}
-
-	if err := registry.RegisterKeyManager(new(eciesAEADHKDFPrivateKeyKeyManager)); err != nil {
-		panic(fmt.Sprintf("hybrid.init() failed: %v", err))
-	}
-	if err := registry.RegisterKeyManager(new(eciesAEADHKDFPublicKeyKeyManager)); err != nil {
 		panic(fmt.Sprintf("hybrid.init() failed: %v", err))
 	}
 }

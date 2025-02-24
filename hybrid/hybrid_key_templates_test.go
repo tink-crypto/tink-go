@@ -25,6 +25,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/hybrid"
 	"github.com/tink-crypto/tink-go/v2/internal/tinkerror"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	eciespb "github.com/tink-crypto/tink-go/v2/proto/ecies_aead_hkdf_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -49,7 +50,7 @@ func createECIESKeyTemplate(curveType commonpb.EllipticCurveType, hashType commo
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key format: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          eciesAEADHKDFPrivateKeyTypeURL,
+		TypeUrl:          testutil.EciesAeadHkdfPrivateKeyTypeURL,
 		Value:            serializedFormat,
 		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 	}

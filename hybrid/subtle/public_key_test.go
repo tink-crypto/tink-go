@@ -130,25 +130,16 @@ func TestSerializePrimaryPublicKeyInvalidKeyFails(t *testing.T) {
 		t.Fatalf("SerializePrimaryPublicKey(%v, %v) err = %v, want nil", pubHandle, keyTemplate, err)
 	}
 	typeURL := "type.googleapis.com/google.crypto.tink.HpkePublicKey"
-	validKD, err := keyDataFromBytes(t, pubKeyBytes, hpkepb.HpkeAead_CHACHA20_POLY1305, typeURL)
-	if err != nil {
-		t.Fatalf("keyDataFromBytes(%v, %v, %v) err = %v, want nil", pubKeyBytes, hpkepb.HpkeAead_CHACHA20_POLY1305, typeURL, err)
-	}
+	validKD := mustCreateKeyDataFromBytes(t, pubKeyBytes, hpkepb.HpkeAead_CHACHA20_POLY1305, typeURL)
 
 	// Build key data with invalid type URL.
-	invalidTypeURL := "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey"
-	invalidTypeURLKD, err := keyDataFromBytes(t, pubKeyBytes, hpkepb.HpkeAead_CHACHA20_POLY1305, invalidTypeURL)
-	if err != nil {
-		t.Fatalf("keyDataFromBytes(%v, %v, %v) err = %v, want nil", pubKeyBytes, hpkepb.HpkeAead_CHACHA20_POLY1305, invalidTypeURL, err)
-	}
+	invalidTypeURL := "type.googleapis.com/google.crypto.tink.InvalidTypeURL"
+	invalidTypeURLKD := mustCreateKeyDataFromBytes(t, pubKeyBytes, hpkepb.HpkeAead_CHACHA20_POLY1305, invalidTypeURL)
 
 	// Build key data with invalid HPKE params.
 	randomPubKeyBytes := random.GetRandomBytes(32)
 	invalidAEAD := hpkepb.HpkeAead_AES_128_GCM
-	invalidParamsKD, err := keyDataFromBytes(t, randomPubKeyBytes, invalidAEAD, typeURL)
-	if err != nil {
-		t.Fatalf("keyDataFromBytes(%v, %v, %v) err = %v, want nil", randomPubKeyBytes, invalidAEAD, typeURL, err)
-	}
+	invalidParamsKD := mustCreateKeyDataFromBytes(t, randomPubKeyBytes, invalidAEAD, typeURL)
 
 	tests := []struct {
 		name         string
@@ -233,7 +224,7 @@ func TestKeysetHandleFromSerializedPublicKeyInvalidTemplateFails(t *testing.T) {
 	}
 }
 
-func keyDataFromBytes(t *testing.T, pubKeyBytes []byte, aeadID hpkepb.HpkeAead, typeURL string) (*tinkpb.KeyData, error) {
+func mustCreateKeyDataFromBytes(t *testing.T, pubKeyBytes []byte, aeadID hpkepb.HpkeAead, typeURL string) *tinkpb.KeyData {
 	t.Helper()
 
 	pubKey := &hpkepb.HpkePublicKey{
@@ -248,8 +239,7 @@ func keyDataFromBytes(t *testing.T, pubKeyBytes []byte, aeadID hpkepb.HpkeAead, 
 
 	serializedPubKey, err := proto.Marshal(pubKey)
 	if err != nil {
-		return nil, err
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", pubKey, err)
 	}
-
-	return testutil.NewKeyData(typeURL, serializedPubKey, tinkpb.KeyData_ASYMMETRIC_PUBLIC), nil
+	return testutil.NewKeyData(typeURL, serializedPubKey, tinkpb.KeyData_ASYMMETRIC_PUBLIC)
 }

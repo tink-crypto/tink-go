@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hybrid_test
+package ecies_test
 
 import (
 	"testing"
@@ -23,10 +23,15 @@ import (
 	eahpb "github.com/tink-crypto/tink-go/v2/proto/ecies_aead_hkdf_go_proto"
 )
 
-func TestECIESAEADHKDFPublicKeyManagerPrimitive(t *testing.T) {
-	km, err := registry.GetKeyManager(eciesAEADHKDFPublicKeyTypeURL)
+const (
+	publicKeyTypeURL = "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPublicKey"
+	publicKeyVersion = 0
+)
+
+func TestPublicKeyManagerPrimitive(t *testing.T) {
+	km, err := registry.GetKeyManager(publicKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", eciesAEADHKDFPrivateKeyTypeURL, err)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", publicKeyTypeURL, err)
 	}
 	serializedPublicKey := mustMarshal(t, makeValidECIESAEADHKDFPublicKey(t))
 
@@ -39,10 +44,10 @@ func TestECIESAEADHKDFPublicKeyManagerPrimitive(t *testing.T) {
 	}
 }
 
-func TestECIESAEADHKDFPublicKeyManagerPrimitiveErrors(t *testing.T) {
-	km, err := registry.GetKeyManager(eciesAEADHKDFPublicKeyTypeURL)
+func TestPublicKeyManagerPrimitiveErrors(t *testing.T) {
+	km, err := registry.GetKeyManager(publicKeyTypeURL)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", eciesAEADHKDFPrivateKeyTypeURL, err)
+		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", publicKeyTypeURL, err)
 	}
 
 	testCases := []struct {
@@ -57,7 +62,7 @@ func TestECIESAEADHKDFPublicKeyManagerPrimitiveErrors(t *testing.T) {
 			name: "invalid_version",
 			key: func() []byte {
 				k := makeValidECIESAEADHKDFPublicKey(t)
-				k.Version = eciesAEADHKDFPublicKeyKeyVersion + 1
+				k.Version = publicKeyVersion + 1
 				return mustMarshal(t, k)
 			}(),
 		},

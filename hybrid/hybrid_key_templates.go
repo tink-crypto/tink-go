@@ -256,7 +256,7 @@ func createECIESAEADHKDFKeyTemplate(c commonpb.EllipticCurveType, ht commonpb.Ha
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key format: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          eciesAEADHKDFPrivateKeyTypeURL,
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPrivateKey",
 		Value:            serializedFormat,
 		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 	}
