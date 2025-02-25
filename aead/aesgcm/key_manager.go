@@ -60,11 +60,11 @@ func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
 	}
 	aesGCMKey, ok := key.(*Key)
 	if !ok {
-		return nil, fmt.Errorf("xaesgcm_key_manager: invalid key type: got %T, want %T", key, (*Key)(nil))
+		return nil, fmt.Errorf("aesgcm_key_manager: invalid key type: got %T, want %T", key, (*Key)(nil))
 	}
 	ret, err := NewAEAD(aesGCMKey)
 	if err != nil {
-		return nil, fmt.Errorf("xaesgcm_key_manager: %v", err)
+		return nil, fmt.Errorf("aesgcm_key_manager: %v", err)
 	}
 	return ret, nil
 }
