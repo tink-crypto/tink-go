@@ -15,18 +15,19 @@
 package aessiv
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/daead/subtle"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 
 	aspb "github.com/tink-crypto/tink-go/v2/proto/aes_siv_go_proto"
-	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 const (
@@ -42,18 +43,29 @@ var _ registry.KeyManager = (*keyManager)(nil)
 // Primitive constructs an AES-SIV for the given serialized [aspb.AesSivKey].
 func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
-		return nil, errors.New("aes_siv_key_manager: invalid key")
+		return nil, fmt.Errorf("aes_siv_key_manager: empty key")
 	}
-	key := new(aspb.AesSivKey)
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, err
-	}
-	if err := km.validateKey(key); err != nil {
-		return nil, err
-	}
-	ret, err := subtle.NewAESSIV(key.KeyValue)
+	// This method returns a primitive without prefix, thus we set the output
+	// prefix type to RAW.
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         typeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}, tinkpb.OutputPrefixType_RAW, 0)
 	if err != nil {
-		return nil, fmt.Errorf("aes_siv_key_manager: cannot create new primitive: %v", err)
+		return nil, err
+	}
+	key, err := protoserialization.ParseKey(keySerialization)
+	if err != nil {
+		return nil, err
+	}
+	aesSIVKey, ok := key.(*Key)
+	if !ok {
+		return nil, fmt.Errorf("aes_siv_key_manager: invalid key type: got %T, want %T", key, (*Key)(nil))
+	}
+	ret, err := NewDeterministicAEAD(aesSIVKey, internalapi.Token{})
+	if err != nil {
+		return nil, fmt.Errorf("aes_siv_key_manager: %v", err)
 	}
 	return ret, nil
 }
@@ -80,7 +92,7 @@ func (km *keyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) 
 // NewKeyData generates a new KeyData. serializedKeyFormat is optional because
 // there is only one valid key format. This should be used solely by the key
 // management API.
-func (km *keyManager) NewKeyData(serializedKeyFormat []byte) (*tpb.KeyData, error) {
+func (km *keyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
 	key, err := km.NewKey(serializedKeyFormat)
 	if err != nil {
 		return nil, err
@@ -89,7 +101,7 @@ func (km *keyManager) NewKeyData(serializedKeyFormat []byte) (*tpb.KeyData, erro
 	if err != nil {
 		return nil, fmt.Errorf("aes_siv_key_manager: %v", err)
 	}
-	return &tpb.KeyData{
+	return &tinkpb.KeyData{
 		TypeUrl:         keyTypeURL,
 		Value:           serializedKey,
 		KeyMaterialType: km.KeyMaterialType(),
@@ -105,7 +117,9 @@ func (km *keyManager) DoesSupport(typeURL string) bool {
 func (km *keyManager) TypeURL() string { return keyTypeURL }
 
 // KeyMaterialType returns the key material type of this key manager.
-func (km *keyManager) KeyMaterialType() tpb.KeyData_KeyMaterialType { return tpb.KeyData_SYMMETRIC }
+func (km *keyManager) KeyMaterialType() tinkpb.KeyData_KeyMaterialType {
+	return tinkpb.KeyData_SYMMETRIC
+}
 
 // DeriveKey derives a new [aspb.AesSivKey] from serializedKeyFormat and
 // pseudorandomness.

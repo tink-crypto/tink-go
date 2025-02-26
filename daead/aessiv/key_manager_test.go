@@ -26,6 +26,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 
 	"github.com/tink-crypto/tink-go/v2/daead/subtle"
 	aspb "github.com/tink-crypto/tink-go/v2/proto/aes_siv_go_proto"
@@ -53,8 +54,20 @@ func TestKeyManagerPrimitive(t *testing.T) {
 	if err != nil {
 		t.Errorf("km.Primitive(%v) = %v; want nil", serializedKey, err)
 	}
-	if err := validateAESSIVPrimitive(p, key); err != nil {
-		t.Errorf("validateAESSIVPrimitive(p, key) = %v; want nil", err)
+
+	keyManagerPrimitive, ok := p.(tink.DeterministicAEAD)
+	if !ok {
+		t.Errorf("Primitive() = %T, want tink.AEAD", p)
+	}
+	expectedPrimitive, err := subtle.NewAESSIV(key.GetKeyValue())
+	if err != nil {
+		t.Errorf("subtle.NewAESSIV() err = %q, want nil", err)
+	}
+	if err := encryptDecrypt(keyManagerPrimitive, expectedPrimitive); err != nil {
+		t.Errorf("encryptDecrypt(keyManagerPrimitive, expectedPrimitive) err = %v, want nil", err)
+	}
+	if err := encryptDecrypt(expectedPrimitive, keyManagerPrimitive); err != nil {
+		t.Errorf("encryptDecrypt(expectedPrimitive, keyManagerPrimitive) err = %v, want nil", err)
 	}
 }
 
@@ -362,25 +375,6 @@ func TestKeyManagerDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
 	}
 }
 
-func validateAESSIVPrimitive(p any, key *aspb.AesSivKey) error {
-	cipher := p.(*subtle.AESSIV)
-	// try to encrypt and decrypt
-	pt := random.GetRandomBytes(32)
-	aad := random.GetRandomBytes(32)
-	ct, err := cipher.EncryptDeterministically(pt, aad)
-	if err != nil {
-		return fmt.Errorf("encryption failed")
-	}
-	decrypted, err := cipher.DecryptDeterministically(ct, aad)
-	if err != nil {
-		return fmt.Errorf("decryption failed")
-	}
-	if !bytes.Equal(decrypted, pt) {
-		return fmt.Errorf("decryption failed")
-	}
-	return nil
-}
-
 func validateAESSIVKey(key *aspb.AesSivKey) error {
 	if key.Version != testutil.AESSIVKeyVersion {
 		return fmt.Errorf("incorrect key version: keyVersion != %d", testutil.AESSIVKeyVersion)
@@ -394,5 +388,23 @@ func validateAESSIVKey(key *aspb.AesSivKey) error {
 	if err != nil {
 		return fmt.Errorf("invalid key: %v", key.KeyValue)
 	}
-	return validateAESSIVPrimitive(p, key)
+	return encryptDecrypt(p, p)
+}
+
+func encryptDecrypt(encryptor, decryptor tink.DeterministicAEAD) error {
+	// Try to encrypt and decrypt random data.
+	plaintext := random.GetRandomBytes(32)
+	associatedData := random.GetRandomBytes(32)
+	ciphertext, err := encryptor.EncryptDeterministically(plaintext, associatedData)
+	if err != nil {
+		return fmt.Errorf("encryptor.EncryptDeterministically() err = %v, want nil", err)
+	}
+	decrypted, err := decryptor.DecryptDeterministically(ciphertext, associatedData)
+	if err != nil {
+		return fmt.Errorf("decryptor.DecryptDeterministically() err = %v, want nil", err)
+	}
+	if !bytes.Equal(decrypted, plaintext) {
+		return fmt.Errorf("decryptor.DecryptDeterministically() = %v, want %v", decrypted, plaintext)
+	}
+	return nil
 }
