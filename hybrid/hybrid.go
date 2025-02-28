@@ -29,17 +29,6 @@
 package hybrid
 
 import (
-	"fmt"
-
-	"github.com/tink-crypto/tink-go/v2/core/registry"
 	_ "github.com/tink-crypto/tink-go/v2/hybrid/ecies" // Register ECIES AEAD HKDF key managers and proto serialization.
+	_ "github.com/tink-crypto/tink-go/v2/hybrid/hpke"   // Register HPKE key managers.
 )
-
-func init() {
-	if err := registry.RegisterKeyManager(new(hpkePublicKeyManager)); err != nil {
-		panic(fmt.Sprintf("hybrid.init() failed: %v", err))
-	}
-	if err := registry.RegisterKeyManager(new(hpkePrivateKeyManager)); err != nil {
-		panic(fmt.Sprintf("hybrid.init() failed: %v", err))
-	}
-}

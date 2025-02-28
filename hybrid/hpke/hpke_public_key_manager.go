@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hybrid
+package hpke
 
 import (
-	"errors"
+	"fmt"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
@@ -26,55 +26,47 @@ import (
 )
 
 const (
-	// maxSupportedHPKEPublicKeyVersion is the max supported public key version.
+	// publicKeyVersion is the max supported public key version.
 	// It must be incremented when support for new versions are implemented.
-	maxSupportedHPKEPublicKeyVersion = 0
-	hpkePublicKeyTypeURL             = "type.googleapis.com/google.crypto.tink.HpkePublicKey"
+	publicKeyVersion = 0
+	publicKeyTypeURL = "type.googleapis.com/google.crypto.tink.HpkePublicKey"
 )
 
-var (
-	errInvalidHPKEParams    = errors.New("invalid HPKE parameters")
-	errInvalidHPKEPublicKey = errors.New("invalid HPKE public key")
-	errNotSupportedOnHPKE   = errors.New("not supported on HPKE public key manager")
-)
+// publicKeyManager implements the KeyManager interface for HybridEncrypt.
+type publicKeyManager struct{}
 
-// hpkePublicKeyManager implements the KeyManager interface for HybridEncrypt.
-type hpkePublicKeyManager struct{}
+var _ registry.KeyManager = (*publicKeyManager)(nil)
 
-var _ registry.KeyManager = (*hpkePublicKeyManager)(nil)
-
-func (p *hpkePublicKeyManager) Primitive(serializedKey []byte) (any, error) {
+func (p *publicKeyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
-		return nil, errInvalidHPKEPublicKey
+		return nil, fmt.Errorf("hpke_public_key_manager: empty key size")
 	}
 	key := new(hpkepb.HpkePublicKey)
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidHPKEPublicKey
+		return nil, fmt.Errorf("hpke_public_key_manager: %v", err)
 	}
 	if err := validatePublicKey(key); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hpke_public_key_manager: %v", err)
 	}
 	return hpke.NewEncrypt(key)
 }
 
-func (p *hpkePublicKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == hpkePublicKeyTypeURL
+func (p *publicKeyManager) DoesSupport(typeURL string) bool {
+	return typeURL == publicKeyTypeURL
 }
 
-func (p *hpkePublicKeyManager) TypeURL() string {
-	return hpkePublicKeyTypeURL
+func (p *publicKeyManager) TypeURL() string { return publicKeyTypeURL }
+
+func (p *publicKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+	return nil, fmt.Errorf("hpke_public_key_manager: NewKey is not supported")
 }
 
-func (p *hpkePublicKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
-	return nil, errNotSupportedOnHPKE
-}
-
-func (p *hpkePublicKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
-	return nil, errNotSupportedOnHPKE
+func (p *publicKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+	return nil, fmt.Errorf("hpke_public_key_manager: NewKeyData is not supported")
 }
 
 func validatePublicKey(key *hpkepb.HpkePublicKey) error {
-	if err := keyset.ValidateKeyVersion(key.GetVersion(), maxSupportedHPKEPublicKeyVersion); err != nil {
+	if err := keyset.ValidateKeyVersion(key.GetVersion(), publicKeyVersion); err != nil {
 		return err
 	}
 	if err := hpke.ValidatePublicKeyLength(key); err != nil {
@@ -90,21 +82,21 @@ func validateParams(params *hpkepb.HpkeParams) error {
 	case hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512:
 	case hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256:
 	default:
-		return errInvalidHPKEParams
+		return fmt.Errorf("invalid KEM %v", params.GetKem())
 	}
 	switch params.GetKdf() {
 	case hpkepb.HpkeKdf_HKDF_SHA256:
 	case hpkepb.HpkeKdf_HKDF_SHA384:
 	case hpkepb.HpkeKdf_HKDF_SHA512:
 	default:
-		return errInvalidHPKEParams
+		return fmt.Errorf("invalid KDF %v", params.GetKdf())
 	}
 	switch params.GetAead() {
 	case hpkepb.HpkeAead_AES_128_GCM:
 	case hpkepb.HpkeAead_AES_256_GCM:
 	case hpkepb.HpkeAead_CHACHA20_POLY1305:
 	default:
-		return errInvalidHPKEParams
+		return fmt.Errorf("invalid AEAD %v", params.GetAead())
 	}
 	return nil
 }

@@ -204,7 +204,7 @@ func createHPKEKeyTemplate(kem hpkepb.HpkeKem, kdf hpkepb.HpkeKdf, aead hpkepb.H
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key format: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          hpkePrivateKeyTypeURL,
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.HpkePrivateKey",
 		Value:            serializedFormat,
 		OutputPrefixType: outputPrefixType,
 	}

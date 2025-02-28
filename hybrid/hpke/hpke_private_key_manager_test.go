@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hybrid
+package hpke_test
 
 import (
 	"bytes"
@@ -22,16 +22,22 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	_ "github.com/tink-crypto/tink-go/v2/hybrid/hpke" // Import to register the HPKE key managers.
 	"github.com/tink-crypto/tink-go/v2/hybrid/internal/hpke"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
+const (
+	privateKeyVersion = 0
+	privateKeyTypeURL = "type.googleapis.com/google.crypto.tink.HpkePrivateKey"
+)
+
 func TestPrivateKeyManagerPrimitiveRejectsInvalidPrivateKeyVersion(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 	params := &hpkepb.HpkeParams{
 		Kem:  hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
@@ -39,7 +45,7 @@ func TestPrivateKeyManagerPrimitiveRejectsInvalidPrivateKeyVersion(t *testing.T)
 		Aead: hpkepb.HpkeAead_AES_256_GCM,
 	}
 	_, privKey := pubPrivKeys(t, params)
-	privKey.Version = maxSupportedHPKEPrivateKeyVersion + 1
+	privKey.Version = privateKeyVersion + 1
 	serializedPrivKey, err := proto.Marshal(privKey)
 	if err != nil {
 		t.Fatal(err)
@@ -50,9 +56,9 @@ func TestPrivateKeyManagerPrimitiveRejectsInvalidPrivateKeyVersion(t *testing.T)
 }
 
 func TestPrivateKeyManagerPrimitiveRejectsInvalidPublicKeyVersion(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 	params := &hpkepb.HpkeParams{
 		Kem:  hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
@@ -60,7 +66,7 @@ func TestPrivateKeyManagerPrimitiveRejectsInvalidPublicKeyVersion(t *testing.T) 
 		Aead: hpkepb.HpkeAead_AES_256_GCM,
 	}
 	_, privKey := pubPrivKeys(t, params)
-	privKey.GetPublicKey().Version = maxSupportedHPKEPublicKeyVersion + 1
+	privKey.GetPublicKey().Version = publicKeyVersion + 1
 	serializedPrivKey, err := proto.Marshal(privKey)
 	if err != nil {
 		t.Fatal(err)
@@ -71,9 +77,9 @@ func TestPrivateKeyManagerPrimitiveRejectsInvalidPublicKeyVersion(t *testing.T) 
 }
 
 func TestPrivateKeyManagerPrimitiveRejectsInvalidParams(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 
 	tests := []struct {
@@ -117,9 +123,9 @@ func TestPrivateKeyManagerPrimitiveRejectsInvalidParams(t *testing.T) {
 }
 
 func TestPrivateKeyManagerPrimitiveRejectsMissingParams(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 	_, serializedPrivKey := serializedPubPrivKeys(t, nil)
 	if _, err := km.Primitive(serializedPrivKey); err == nil {
@@ -128,9 +134,9 @@ func TestPrivateKeyManagerPrimitiveRejectsMissingParams(t *testing.T) {
 }
 
 func TestPrivateKeyManagerPrimitiveRejectsNilKey(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 	if _, err := km.Primitive(nil); err == nil {
 		t.Error("Primitive() err = nil, want error")
@@ -138,9 +144,9 @@ func TestPrivateKeyManagerPrimitiveRejectsNilKey(t *testing.T) {
 }
 
 func TestPrivateKeyManagerPrimitiveEncryptDecrypt(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 	pt := random.GetRandomBytes(200)
 	ctxInfo := random.GetRandomBytes(100)
@@ -185,9 +191,9 @@ func TestPrivateKeyManagerPrimitiveEncryptDecrypt(t *testing.T) {
 }
 
 func TestPrivateKeyManagerNewKeyRejectsNilKeyFormat(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 	if _, err := km.NewKey(nil); err == nil {
 		t.Error("NewKey() err = nil, want error")
@@ -195,9 +201,9 @@ func TestPrivateKeyManagerNewKeyRejectsNilKeyFormat(t *testing.T) {
 }
 
 func TestPrivateKeyManagerNewKeyRejectsInvalidKeyFormat(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 	serializedKeyFormatUnknownKEM, err := proto.Marshal(
 		&hpkepb.HpkeParams{
@@ -246,9 +252,9 @@ func TestPrivateKeyManagerNewKeyRejectsInvalidKeyFormat(t *testing.T) {
 }
 
 func TestPrivateKeyManagerNewKeyEncryptDecrypt(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 
 	wantPT := random.GetRandomBytes(200)
@@ -329,9 +335,9 @@ func TestPrivateKeyManagerNewKeyEncryptDecrypt(t *testing.T) {
 }
 
 func TestPrivateKeyManagerNewKeyDataRejectsNilKeyFormat(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 	if _, err := km.NewKeyData(nil); err == nil {
 		t.Error("NewKey() err = nil, want error")
@@ -339,9 +345,9 @@ func TestPrivateKeyManagerNewKeyDataRejectsNilKeyFormat(t *testing.T) {
 }
 
 func TestPrivateKeyManagerNewKeyData(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 
 	for _, aeadID := range hpkeAEADs {
@@ -361,7 +367,7 @@ func TestPrivateKeyManagerNewKeyData(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewKeyData() err = %v, want nil", err)
 		}
-		if got, want := keyData.GetTypeUrl(), hpkePrivateKeyTypeURL; got != want {
+		if got, want := keyData.GetTypeUrl(), privateKeyTypeURL; got != want {
 			t.Errorf("type URL = %q, want %q", got, want)
 		}
 		if got, want := keyData.GetKeyMaterialType(), tinkpb.KeyData_ASYMMETRIC_PRIVATE; got != want {
@@ -393,9 +399,9 @@ func TestPrivateKeyManagerNewKeyData(t *testing.T) {
 }
 
 func TestPrivateKeyManagerPublicKeyDataRejectsInvalidPrivateKeyVersion(t *testing.T) {
-	k, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	k, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 	km, ok := k.(registry.PrivateKeyManager)
 	if !ok {
@@ -407,7 +413,7 @@ func TestPrivateKeyManagerPublicKeyDataRejectsInvalidPrivateKeyVersion(t *testin
 		Aead: hpkepb.HpkeAead_AES_256_GCM,
 	}
 	_, privKey := pubPrivKeys(t, params)
-	privKey.Version = maxSupportedHPKEPrivateKeyVersion + 1
+	privKey.Version = privateKeyVersion + 1
 	serializedPrivKey, err := proto.Marshal(privKey)
 	if err != nil {
 		t.Fatal(err)
@@ -418,9 +424,9 @@ func TestPrivateKeyManagerPublicKeyDataRejectsInvalidPrivateKeyVersion(t *testin
 }
 
 func TestPrivateKeyManagerPublicKeyDataRejectsInvalidPublicKeyVersion(t *testing.T) {
-	k, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	k, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 	km, ok := k.(registry.PrivateKeyManager)
 	if !ok {
@@ -432,7 +438,7 @@ func TestPrivateKeyManagerPublicKeyDataRejectsInvalidPublicKeyVersion(t *testing
 		Aead: hpkepb.HpkeAead_AES_256_GCM,
 	}
 	_, privKey := pubPrivKeys(t, params)
-	privKey.GetPublicKey().Version = maxSupportedHPKEPublicKeyVersion + 1
+	privKey.GetPublicKey().Version = publicKeyVersion + 1
 	serializedPrivKey, err := proto.Marshal(privKey)
 	if err != nil {
 		t.Fatal(err)
@@ -443,9 +449,9 @@ func TestPrivateKeyManagerPublicKeyDataRejectsInvalidPublicKeyVersion(t *testing
 }
 
 func TestPrivateKeyManagerPublicKeyDataRejectsNilKey(t *testing.T) {
-	k, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	k, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 	km, ok := k.(registry.PrivateKeyManager)
 	if !ok {
@@ -457,9 +463,9 @@ func TestPrivateKeyManagerPublicKeyDataRejectsNilKey(t *testing.T) {
 }
 
 func TestPrivateKeyManagerPublicKeyData(t *testing.T) {
-	k, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	k, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
 	km, ok := k.(registry.PrivateKeyManager)
 	if !ok {
@@ -486,7 +492,7 @@ func TestPrivateKeyManagerPublicKeyData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PublicKeyData() err = %v, want nil", err)
 	}
-	if got, want := pubKey.GetTypeUrl(), hpkePublicKeyTypeURL; got != want {
+	if got, want := pubKey.GetTypeUrl(), publicKeyTypeURL; got != want {
 		t.Errorf("type URL = %q, want %q", got, want)
 	}
 	if !bytes.Equal(pubKey.GetValue(), serializedPubKey) {
@@ -498,12 +504,12 @@ func TestPrivateKeyManagerPublicKeyData(t *testing.T) {
 }
 
 func TestPrivateKeyManagerDoesSupport(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
-	if !km.DoesSupport(hpkePrivateKeyTypeURL) {
-		t.Errorf("DoesSupport(%q) = false, want true", hpkePrivateKeyTypeURL)
+	if !km.DoesSupport(privateKeyTypeURL) {
+		t.Errorf("DoesSupport(%q) = false, want true", privateKeyTypeURL)
 	}
 	unsupportedKeyTypeURL := "unsupported.key.type"
 	if km.DoesSupport(unsupportedKeyTypeURL) {
@@ -512,11 +518,11 @@ func TestPrivateKeyManagerDoesSupport(t *testing.T) {
 }
 
 func TestPrivateKeyManagerTypeURL(t *testing.T) {
-	km, err := registry.GetKeyManager(hpkePrivateKeyTypeURL)
+	km, err := registry.GetKeyManager(privateKeyTypeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", hpkePrivateKeyTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", privateKeyTypeURL, err)
 	}
-	if km.TypeURL() != hpkePrivateKeyTypeURL {
-		t.Errorf("TypeURL = %q, want %q", km.TypeURL(), hpkePrivateKeyTypeURL)
+	if km.TypeURL() != privateKeyTypeURL {
+		t.Errorf("TypeURL = %q, want %q", km.TypeURL(), privateKeyTypeURL)
 	}
 }
