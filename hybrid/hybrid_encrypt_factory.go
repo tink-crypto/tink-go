@@ -16,6 +16,7 @@ package hybrid
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
@@ -32,17 +33,48 @@ func NewHybridEncrypt(handle *keyset.Handle) (tink.HybridEncrypt, error) {
 	if err != nil {
 		return nil, fmt.Errorf("hybrid_factory: cannot obtain primitive set: %s", err)
 	}
-	return newEncryptPrimitiveSet(ps)
+	return newWrappedHybridEncrypt(ps)
+}
+
+// fullHybridEncryptAdapter is an [tink.HybridEncrypt] implementation that
+// makes a given RAW [tink.HybridEncrypt] a full primitive prepending the
+// prefix the resulting ciphertext.
+type fullHybridEncryptAdapter struct {
+	rawHybridEncrypt tink.HybridEncrypt
+	prefix           []byte
+}
+
+var _ tink.HybridEncrypt = (*fullHybridEncryptAdapter)(nil)
+
+func (e *fullHybridEncryptAdapter) Encrypt(plaintext, contextInfo []byte) ([]byte, error) {
+	ct, err := e.rawHybridEncrypt.Encrypt(plaintext, contextInfo)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Concat(e.prefix, ct), nil
 }
 
 // encryptPrimitiveSet is an HybridEncrypt implementation that uses the underlying primitive set for encryption.
 type wrappedHybridEncrypt struct {
-	ps     *primitiveset.PrimitiveSet[tink.HybridEncrypt]
-	logger monitoring.Logger
+	fullPrimitive tink.HybridEncrypt
+	logger        monitoring.Logger
+	keyID         uint32
 }
 
 // compile time assertion that wrappedHybridEncrypt implements the HybridEncrypt interface.
 var _ tink.HybridEncrypt = (*wrappedHybridEncrypt)(nil)
+
+// Encrypt encrypts the given plaintext binding contextInfo to the resulting ciphertext.
+// It returns the concatenation of the primary's identifier and the ciphertext.
+func (a *wrappedHybridEncrypt) Encrypt(plaintext, contextInfo []byte) ([]byte, error) {
+	ct, err := a.fullPrimitive.Encrypt(plaintext, contextInfo)
+	if err != nil {
+		a.logger.LogFailure()
+		return nil, err
+	}
+	a.logger.Log(a.keyID, len(plaintext))
+	return ct, nil
+}
 
 func isAEAD(p any) bool {
 	if p == nil {
@@ -52,7 +84,7 @@ func isAEAD(p any) bool {
 	return ok
 }
 
-func newEncryptPrimitiveSet(ps *primitiveset.PrimitiveSet[tink.HybridEncrypt]) (*wrappedHybridEncrypt, error) {
+func newWrappedHybridEncrypt(ps *primitiveset.PrimitiveSet[tink.HybridEncrypt]) (*wrappedHybridEncrypt, error) {
 	// Make sure the primitives do not implement tink.AEAD.
 	if isAEAD(ps.Primary.Primitive) || isAEAD(ps.Primary.FullPrimitive) {
 		return nil, fmt.Errorf("hybrid_factory: primary primitive must NOT implement tink.AEAD")
@@ -64,13 +96,23 @@ func newEncryptPrimitiveSet(ps *primitiveset.PrimitiveSet[tink.HybridEncrypt]) (
 			}
 		}
 	}
+
+	primitive := ps.Primary.FullPrimitive
+	if primitive == nil {
+		primitive = &fullHybridEncryptAdapter{
+			rawHybridEncrypt: ps.Primary.Primitive,
+			prefix:           []byte(ps.Primary.Prefix),
+		}
+	}
+
 	logger, err := createEncryptLogger(ps)
 	if err != nil {
 		return nil, err
 	}
 	return &wrappedHybridEncrypt{
-		ps:     ps,
-		logger: logger,
+		fullPrimitive: primitive,
+		logger:        logger,
+		keyID:         ps.Primary.KeyID,
 	}, nil
 }
 
@@ -87,23 +129,4 @@ func createEncryptLogger(ps *primitiveset.PrimitiveSet[tink.HybridEncrypt]) (mon
 		Primitive:   "hybrid_encrypt",
 		APIFunction: "encrypt",
 	})
-}
-
-// Encrypt encrypts the given plaintext binding contextInfo to the resulting ciphertext.
-// It returns the concatenation of the primary's identifier and the ciphertext.
-func (a *wrappedHybridEncrypt) Encrypt(plaintext, contextInfo []byte) ([]byte, error) {
-	primary := a.ps.Primary
-	ct, err := primary.Primitive.Encrypt(plaintext, contextInfo)
-	if err != nil {
-		a.logger.LogFailure()
-		return nil, err
-	}
-	a.logger.Log(primary.KeyID, len(plaintext))
-	if len(primary.Prefix) == 0 {
-		return ct, nil
-	}
-	output := make([]byte, 0, len(primary.Prefix)+len(ct))
-	output = append(output, primary.Prefix...)
-	output = append(output, ct...)
-	return output, nil
 }
