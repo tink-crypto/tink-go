@@ -59,4 +59,7 @@ func init() {
 	if err := registryconfig.RegisterPrimitiveConstructor[*PublicKey](hybridEncryptConstructor); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
+	if err := registryconfig.RegisterPrimitiveConstructor[*PrivateKey](hybridDecryptConstructor); err != nil {
+		panic(fmt.Sprintf("ecies.init() failed: %v", err))
+	}
 }

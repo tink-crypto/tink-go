@@ -20,6 +20,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -57,4 +58,12 @@ func (e *hybridDecrypt) Decrypt(ciphertext, contextInfo []byte) ([]byte, error) 
 		return nil, fmt.Errorf("ciphertext does not start with the expected prefix")
 	}
 	return e.rawHybridDecrypt.Decrypt(ciphertext[len(e.prefix):], contextInfo)
+}
+
+func hybridDecryptConstructor(k key.Key) (any, error) {
+	that, ok := k.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type, got %T, want %T", k, (*PrivateKey)(nil))
+	}
+	return NewHybridDecrypt(that, internalapi.Token{})
 }
