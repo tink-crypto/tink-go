@@ -15,6 +15,7 @@
 package hybrid
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
@@ -36,11 +37,42 @@ func NewHybridDecrypt(handle *keyset.Handle) (tink.HybridDecrypt, error) {
 	return newWrappedHybridDecrypt(ps)
 }
 
+type fullHybridDecryptAdapter struct {
+	rawHybridDecrypt tink.HybridDecrypt
+	prefix           []byte
+}
+
+var _ tink.HybridDecrypt = (*fullHybridDecryptAdapter)(nil)
+
+func (d *fullHybridDecryptAdapter) Decrypt(ciphertext, contextInfo []byte) ([]byte, error) {
+	// This is called by `wrappedHybridDecrypt.Decrypt`, which selects the
+	// correct decrypter based on the prefix; if the prefix is not correct,
+	// this is a bug.
+	if len(ciphertext) < len(d.prefix) {
+		return nil, fmt.Errorf("ciphertext too short")
+	}
+	if !bytes.Equal(d.prefix, ciphertext[:len(d.prefix)]) {
+		return nil, fmt.Errorf("ciphertext does not start with the expected prefix %x", d.prefix)
+	}
+	return d.rawHybridDecrypt.Decrypt(ciphertext[len(d.prefix):], contextInfo)
+}
+
+type decrypterAndID struct {
+	decrypter tink.HybridDecrypt
+	keyID     uint32
+}
+
+var _ tink.HybridDecrypt = (*decrypterAndID)(nil)
+
+func (d *decrypterAndID) Decrypt(ciphertext, contextInfo []byte) ([]byte, error) {
+	return d.decrypter.Decrypt(ciphertext, contextInfo)
+}
+
 // wrappedHybridDecrypt is an HybridDecrypt implementation that uses the underlying primitive set
 // for decryption.
 type wrappedHybridDecrypt struct {
-	ps     *primitiveset.PrimitiveSet[tink.HybridDecrypt]
-	logger monitoring.Logger
+	decrypters map[string][]decrypterAndID
+	logger     monitoring.Logger
 }
 
 // compile time assertion that wrappedHybridDecrypt implements the HybridDecrypt interface.
@@ -48,6 +80,8 @@ var _ tink.HybridDecrypt = (*wrappedHybridDecrypt)(nil)
 
 func newWrappedHybridDecrypt(ps *primitiveset.PrimitiveSet[tink.HybridDecrypt]) (*wrappedHybridDecrypt, error) {
 	// Make sure the primitives do not implement tink.AEAD.
+	decrypters := make(map[string][]decrypterAndID)
+
 	if isAEAD(ps.Primary.Primitive) || isAEAD(ps.Primary.FullPrimitive) {
 		return nil, fmt.Errorf("hybrid_factory: primary primitive must NOT implement tink.AEAD")
 	}
@@ -56,6 +90,17 @@ func newWrappedHybridDecrypt(ps *primitiveset.PrimitiveSet[tink.HybridDecrypt]) 
 			if isAEAD(p.Primitive) || isAEAD(p.FullPrimitive) {
 				return nil, fmt.Errorf("hybrid_factory: primitive must NOT implement tink.AEAD")
 			}
+			fullPrimitive := p.FullPrimitive
+			if fullPrimitive == nil {
+				fullPrimitive = &fullHybridDecryptAdapter{
+					rawHybridDecrypt: p.Primitive,
+					prefix:           []byte(p.Prefix),
+				}
+			}
+			decrypters[p.Prefix] = append(decrypters[p.Prefix], decrypterAndID{
+				decrypter: fullPrimitive,
+				keyID:     p.KeyID,
+			})
 		}
 	}
 	logger, err := createDecryptLogger(ps)
@@ -63,8 +108,8 @@ func newWrappedHybridDecrypt(ps *primitiveset.PrimitiveSet[tink.HybridDecrypt]) 
 		return nil, err
 	}
 	return &wrappedHybridDecrypt{
-		ps:     ps,
-		logger: logger,
+		decrypters: decrypters,
+		logger:     logger,
 	}, nil
 }
 
@@ -86,35 +131,33 @@ func createDecryptLogger(ps *primitiveset.PrimitiveSet[tink.HybridDecrypt]) (mon
 // Decrypt decrypts the given ciphertext, verifying the integrity of contextInfo.
 // It returns the corresponding plaintext if the ciphertext is authenticated.
 func (a *wrappedHybridDecrypt) Decrypt(ciphertext, contextInfo []byte) ([]byte, error) {
-	// try non-raw keys
+	// Try non-raw keys.
 	prefixSize := cryptofmt.NonRawPrefixSize
 	if len(ciphertext) > prefixSize {
 		prefix := ciphertext[:prefixSize]
-		ctNoPrefix := ciphertext[prefixSize:]
-		entries, err := a.ps.EntriesForPrefix(string(prefix))
-		if err == nil {
-			for i := 0; i < len(entries); i++ {
-				pt, err := entries[i].Primitive.Decrypt(ctNoPrefix, contextInfo)
+		decryptersForPrefix, found := a.decrypters[string(prefix)]
+		if found {
+			for _, verifier := range decryptersForPrefix {
+				pt, err := verifier.Decrypt(ciphertext, contextInfo)
 				if err == nil {
-					a.logger.Log(entries[i].KeyID, len(ctNoPrefix))
+					a.logger.Log(verifier.keyID, len(ciphertext[len(prefix):]))
 					return pt, nil
 				}
 			}
 		}
 	}
-	// try raw keys
-	entries, err := a.ps.RawEntries()
-	if err == nil {
-		for i := 0; i < len(entries); i++ {
-			pt, err := entries[i].Primitive.Decrypt(ciphertext, contextInfo)
+	// Try raw keys.
+	rawDecrypters, found := a.decrypters[cryptofmt.RawPrefix]
+	if found {
+		for _, decrypter := range rawDecrypters {
+			pt, err := decrypter.Decrypt(ciphertext, contextInfo)
 			if err == nil {
-				a.logger.Log(entries[i].KeyID, len(ciphertext))
+				a.logger.Log(decrypter.keyID, len(ciphertext))
 				return pt, nil
 			}
 		}
 	}
-
-	// nothing worked
+	// Nothing worked.
 	a.logger.LogFailure()
 	return nil, fmt.Errorf("hybrid_factory: decryption failed")
 }

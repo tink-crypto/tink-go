@@ -709,12 +709,15 @@ func TestDecryptFactoryFailsOnAEADHandle(t *testing.T) {
 	}
 }
 
-const stubKeyURL = "type.googleapis.com/google.crypto.tink.SomeKey"
+const stubPublicKeyURL = "type.googleapis.com/google.crypto.tink.SomePublicKey"
+const stubPrivateKeyURL = "type.googleapis.com/google.crypto.tink.SomePrivateKey"
+
+var stubPrefix = []byte{0x01, 0x01, 0x02, 0x03, 0x04}
 
 type stubFullHybridEncrypt struct{}
 
 func (s *stubFullHybridEncrypt) Encrypt(data []byte, contextInfo []byte) ([]byte, error) {
-	return slices.Concat([]byte("full_encrypter_prefix"), data, contextInfo), nil
+	return slices.Concat(stubPrefix, data, contextInfo), nil
 }
 
 type stubParams struct{}
@@ -743,9 +746,9 @@ var _ protoserialization.KeySerializer = (*stubPublicKeySerialization)(nil)
 func (s *stubPublicKeySerialization) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
 	return protoserialization.NewKeySerialization(
 		&tinkpb.KeyData{
-			TypeUrl:         stubKeyURL,
-			Value:           []byte("serialized_key"),
-			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			TypeUrl:         stubPublicKeyURL,
+			Value:           []byte("serialized_public_key"),
+			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 		},
 		key.(*stubPublicKey).prefixType,
 		key.(*stubPublicKey).idRequirement,
@@ -761,15 +764,75 @@ func (s *stubPublicKeyParser) ParseKey(serialization *protoserialization.KeySeri
 	return &stubPublicKey{serialization.OutputPrefixType(), idRequirement}, nil
 }
 
-func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
-	defer registryconfig.UnregisterPrimitiveConstructor[*stubPublicKey]()
-	defer protoserialization.UnregisterKeyParser(stubKeyURL)
-	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
+type stubFullHybridDecrypt struct{}
 
-	if err := protoserialization.RegisterKeyParser(stubKeyURL, &stubPublicKeyParser{}); err != nil {
+func (s *stubFullHybridDecrypt) Decrypt(ct []byte, contextInfo []byte) ([]byte, error) {
+	if !bytes.HasPrefix(ct, stubPrefix) {
+		return nil, fmt.Errorf("invalid prefix")
+	}
+	if !bytes.HasSuffix(ct, contextInfo) {
+		return nil, fmt.Errorf("invalid contextInfo")
+	}
+	return bytes.TrimSuffix(bytes.TrimPrefix(ct, stubPrefix), contextInfo), nil
+}
+
+type stubPrivateKey struct {
+	publicKey *stubPublicKey
+}
+
+var _ key.Key = (*stubPrivateKey)(nil)
+
+func (p *stubPrivateKey) Equal(_ key.Key) bool          { return true }
+func (p *stubPrivateKey) Parameters() key.Parameters    { return &stubParams{} }
+func (p *stubPrivateKey) IDRequirement() (uint32, bool) { return p.publicKey.IDRequirement() }
+func (p *stubPrivateKey) HasIDRequirement() bool        { return p.publicKey.HasIDRequirement() }
+func (p *stubPrivateKey) PublicKey() (key.Key, error)   { return p.publicKey, nil }
+
+type stubPrivateKeySerialization struct{}
+
+var _ protoserialization.KeySerializer = (*stubPrivateKeySerialization)(nil)
+
+func (s *stubPrivateKeySerialization) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	return protoserialization.NewKeySerialization(
+		&tinkpb.KeyData{
+			TypeUrl:         stubPrivateKeyURL,
+			Value:           []byte("serialized_private_key"),
+			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+		},
+		key.(*stubPrivateKey).publicKey.prefixType,
+		key.(*stubPrivateKey).publicKey.idRequirement,
+	)
+}
+
+type stubPrivateKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*stubPrivateKeyParser)(nil)
+
+func (s *stubPrivateKeyParser) ParseKey(serialization *protoserialization.KeySerialization) (key.Key, error) {
+	idRequirement, _ := serialization.IDRequirement()
+	return &stubPrivateKey{
+		publicKey: &stubPublicKey{serialization.OutputPrefixType(), idRequirement},
+	}, nil
+}
+
+func TestPrimitivesFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
+	defer registryconfig.UnregisterPrimitiveConstructor[*stubPublicKey]()
+	defer registryconfig.UnregisterPrimitiveConstructor[*stubPrivateKey]()
+	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
+	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubPublicKeyURL, &stubPublicKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(stubPrivateKeyURL, &stubPrivateKeyParser{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
 	}
 	if err := protoserialization.RegisterKeySerializer[*stubPublicKey](&stubPublicKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
 	}
 	// Register a primitive constructor to make sure that the factory uses the
@@ -778,11 +841,17 @@ func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 	if err := registryconfig.RegisterPrimitiveConstructor[*stubPublicKey](primitiveConstructor); err != nil {
 		t.Fatalf("registryconfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
+	decryptPrimitiveConstructor := func(key key.Key) (any, error) { return &stubFullHybridDecrypt{}, nil }
+	if err := registryconfig.RegisterPrimitiveConstructor[*stubPrivateKey](decryptPrimitiveConstructor); err != nil {
+		t.Fatalf("registryconfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
 
 	km := keyset.NewManager()
-	keyID, err := km.AddKey(&stubPublicKey{
-		tinkpb.OutputPrefixType_TINK,
-		0x1234,
+	keyID, err := km.AddKey(&stubPrivateKey{
+		publicKey: &stubPublicKey{
+			tinkpb.OutputPrefixType_TINK,
+			0x01020304,
+		},
 	})
 	if err != nil {
 		t.Fatalf("km.AddKey() err = %v, want nil", err)
@@ -795,7 +864,12 @@ func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 		t.Fatalf("km.Handle() err = %v, want nil", err)
 	}
 
-	encrypter, err := hybrid.NewHybridEncrypt(handle)
+	publicHandle, err := handle.Public()
+	if err != nil {
+		t.Fatalf("handle.Public() err = %v, want nil", err)
+	}
+
+	encrypter, err := hybrid.NewHybridEncrypt(publicHandle)
 	if err != nil {
 		t.Fatalf("hybrid.NewHybridEncrypt() err = %v, want nil", err)
 	}
@@ -805,72 +879,139 @@ func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encrypter.Encrypt() err = %v, want nil", err)
 	}
-	if !bytes.Equal(ciphertext, slices.Concat([]byte("full_encrypter_prefix"), data, contextInfo)) {
+	if !bytes.Equal(ciphertext, slices.Concat(stubPrefix, data, contextInfo)) {
 		t.Errorf("ciphertext = %q, want: %q", ciphertext, data)
+	}
+
+	decrypter, err := hybrid.NewHybridDecrypt(handle)
+	if err != nil {
+		t.Fatalf("hybrid.NewHybridDecrypt() err = %v, want nil", err)
+	}
+
+	plaintext, err := decrypter.Decrypt(ciphertext, contextInfo)
+	if err != nil {
+		t.Fatalf("decrypter.Decrypt() err = %v, want nil", err)
+	}
+	if !bytes.Equal(plaintext, data) {
+		t.Errorf("plaintext = %q, want: %q", plaintext, data)
 	}
 }
 
 type stubLegacyHybridEncrypt struct{}
 
 func (s *stubLegacyHybridEncrypt) Encrypt(data, contextInfo []byte) ([]byte, error) {
-	return slices.Concat([]byte("legacy_encrypter_prefix"), data, contextInfo), nil
+	return slices.Concat([]byte("legacy_primitive"), data, contextInfo), nil
 }
 
-type stubKeyManager struct{}
+type stubLegacyHybridDecrypt struct{}
 
-var _ registry.KeyManager = (*stubKeyManager)(nil)
+func (s *stubLegacyHybridDecrypt) Decrypt(ct, contextInfo []byte) ([]byte, error) {
+	return bytes.TrimSuffix(bytes.TrimPrefix(ct, []byte("legacy_primitive")), contextInfo), nil
+}
 
-func (km *stubKeyManager) NewKey(_ []byte) (proto.Message, error) {
+type stubPublicKeyManager struct{}
+
+var _ registry.KeyManager = (*stubPublicKeyManager)(nil)
+
+func (km *stubPublicKeyManager) NewKey(_ []byte) (proto.Message, error) {
 	return nil, fmt.Errorf("not implemented")
 }
-func (km *stubKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) {
+func (km *stubPublicKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) {
 	return nil, fmt.Errorf("not implemented")
 }
-func (km *stubKeyManager) DoesSupport(keyURL string) bool  { return keyURL == stubKeyURL }
-func (km *stubKeyManager) TypeURL() string                 { return stubKeyURL }
-func (km *stubKeyManager) Primitive(_ []byte) (any, error) { return &stubLegacyHybridEncrypt{}, nil }
+func (km *stubPublicKeyManager) DoesSupport(keyURL string) bool { return keyURL == stubPublicKeyURL }
+func (km *stubPublicKeyManager) TypeURL() string                { return stubPublicKeyURL }
+func (km *stubPublicKeyManager) Primitive(_ []byte) (any, error) {
+	return &stubLegacyHybridEncrypt{}, nil
+}
+
+type stubPrivateKeyManager struct{}
+
+var _ registry.KeyManager = (*stubPrivateKeyManager)(nil)
+
+func (km *stubPrivateKeyManager) NewKey(_ []byte) (proto.Message, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubPrivateKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubPrivateKeyManager) DoesSupport(keyURL string) bool { return keyURL == stubPrivateKeyURL }
+func (km *stubPrivateKeyManager) TypeURL() string                { return stubPrivateKeyURL }
+func (km *stubPrivateKeyManager) Primitive(_ []byte) (any, error) {
+	return &stubLegacyHybridDecrypt{}, nil
+}
 
 func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
-	defer protoserialization.UnregisterKeyParser(stubKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
+	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
 
-	if err := protoserialization.RegisterKeyParser(stubKeyURL, &stubPublicKeyParser{}); err != nil {
+	if err := protoserialization.RegisterKeyParser(stubPublicKeyURL, &stubPublicKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(stubPrivateKeyURL, &stubPrivateKeyParser{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
 	}
 	if err := protoserialization.RegisterKeySerializer[*stubPublicKey](&stubPublicKeySerialization{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
 	}
-
-	if err := registry.RegisterKeyManager(&stubKeyManager{}); err != nil {
+	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := registry.RegisterKeyManager(&stubPublicKeyManager{}); err != nil {
+		t.Fatalf("registry.RegisterKeyManager() err = %v, want nil", err)
+	}
+	if err := registry.RegisterKeyManager(&stubPrivateKeyManager{}); err != nil {
 		t.Fatalf("registry.RegisterKeyManager() err = %v, want nil", err)
 	}
 
 	data := []byte("data")
 	contextInfo := []byte("contextInfo")
-	legacyPrefix := []byte("legacy_encrypter_prefix")
+	legacyPrefix := []byte("legacy_primitive")
 	for _, tc := range []struct {
 		name           string
-		key            *stubPublicKey
+		key            *stubPrivateKey
 		wantCiphertext []byte
 	}{
 		{
-			name:           "TINK",
-			key:            &stubPublicKey{tinkpb.OutputPrefixType_TINK, 0x1234},
-			wantCiphertext: slices.Concat([]byte{cryptofmt.TinkStartByte, 0x00, 0x00, 0x12, 0x34}, legacyPrefix, data, contextInfo),
+			name: "TINK",
+			key: &stubPrivateKey{
+				publicKey: &stubPublicKey{
+					prefixType:    tinkpb.OutputPrefixType_TINK,
+					idRequirement: 0x01020304,
+				},
+			},
+			wantCiphertext: slices.Concat([]byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04}, legacyPrefix, data, contextInfo),
 		},
 		{
-			name:           "LEGACY",
-			key:            &stubPublicKey{tinkpb.OutputPrefixType_LEGACY, 0x1234},
-			wantCiphertext: slices.Concat([]byte{cryptofmt.LegacyStartByte, 0x00, 0x00, 0x12, 0x34}, legacyPrefix, data, contextInfo),
+			name: "LEGACY",
+			key: &stubPrivateKey{
+				publicKey: &stubPublicKey{
+					prefixType:    tinkpb.OutputPrefixType_LEGACY,
+					idRequirement: 0x01020304,
+				},
+			},
+			wantCiphertext: slices.Concat([]byte{cryptofmt.LegacyStartByte, 0x01, 0x02, 0x03, 0x04}, legacyPrefix, data, contextInfo),
 		},
 		{
-			name:           "CRUNCHY",
-			key:            &stubPublicKey{tinkpb.OutputPrefixType_CRUNCHY, 0x1234},
-			wantCiphertext: slices.Concat([]byte{cryptofmt.LegacyStartByte, 0x00, 0x00, 0x12, 0x34}, legacyPrefix, data, contextInfo),
+			name: "CRUNCHY",
+			key: &stubPrivateKey{
+				publicKey: &stubPublicKey{
+					prefixType:    tinkpb.OutputPrefixType_CRUNCHY,
+					idRequirement: 0x01020304,
+				},
+			},
+			wantCiphertext: slices.Concat([]byte{cryptofmt.LegacyStartByte, 0x01, 0x02, 0x03, 0x04}, legacyPrefix, data, contextInfo),
 		},
 		{
-			name:           "RAW",
-			key:            &stubPublicKey{tinkpb.OutputPrefixType_RAW, 0},
+			name: "RAW",
+			key: &stubPrivateKey{
+				publicKey: &stubPublicKey{
+					prefixType:    tinkpb.OutputPrefixType_RAW,
+					idRequirement: 0,
+				},
+			},
 			wantCiphertext: slices.Concat(legacyPrefix, data, contextInfo),
 		},
 	} {
@@ -889,7 +1030,12 @@ func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
 				t.Fatalf("km.Handle() err = %v, want nil", err)
 			}
 
-			encrypter, err := hybrid.NewHybridEncrypt(handle)
+			publicHandle, err := handle.Public()
+			if err != nil {
+				t.Fatalf("handle.Public() err = %v, want nil", err)
+			}
+
+			encrypter, err := hybrid.NewHybridEncrypt(publicHandle)
 			if err != nil {
 				t.Fatalf("hybrid.NewHybridEncrypt() err = %v, want nil", err)
 			}
@@ -897,12 +1043,21 @@ func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
 			if err != nil {
 				t.Fatalf("encrypter.Encrypt() err = %v, want nil", err)
 			}
-
-			fmt.Printf("%x\n", ciphertext)
-			fmt.Printf("%x\n", tc.wantCiphertext)
-
 			if got, want := ciphertext, tc.wantCiphertext; !bytes.Equal(want, got) {
 				t.Errorf("ciphertext = %q, want: %q", got, want)
+			}
+
+			decrypter, err := hybrid.NewHybridDecrypt(handle)
+			if err != nil {
+				t.Fatalf("hybrid.NewHybridDecrypt() err = %v, want nil", err)
+			}
+
+			plaintext, err := decrypter.Decrypt(ciphertext, contextInfo)
+			if err != nil {
+				t.Fatalf("decrypter.Decrypt() err = %v, want nil", err)
+			}
+			if got, want := plaintext, data; !bytes.Equal(got, want) {
+				t.Errorf("plaintext = %q, want: %q", got, want)
 			}
 		})
 	}
