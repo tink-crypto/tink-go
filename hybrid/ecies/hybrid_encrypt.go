@@ -15,10 +15,12 @@
 package ecies
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -54,4 +56,12 @@ func (e *hybridEncrypt) Encrypt(plaintext, contextInfo []byte) ([]byte, error) {
 		return nil, err
 	}
 	return slices.Concat(e.prefix, rawCiphertext), nil
+}
+
+func hybridEncryptConstructor(k key.Key) (any, error) {
+	that, ok := k.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type, got %T, want %T", k, (*PublicKey)(nil))
+	}
+	return NewHybridEncrypt(that, internalapi.Token{})
 }

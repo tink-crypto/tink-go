@@ -389,7 +389,6 @@ func TestEncryptDecrypt(t *testing.T) {
 					t.Errorf("decrypter.Decrypt() returned unexpected diff (-want +got):\n%s", diff)
 				}
 			}
-
 		})
 	}
 }
@@ -558,5 +557,4 @@ func TestDecryptFails(t *testing.T) {
 			}
 		})
 	}
-
 }
