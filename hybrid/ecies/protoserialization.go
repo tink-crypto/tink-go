@@ -332,6 +332,12 @@ func parseParameters(protoParams *eciespb.EciesAeadHkdfParams, outputPrefixType 
 		return nil, err
 	}
 
+	if protoParams.GetDemParams() == nil {
+		return nil, fmt.Errorf("nil DEM params")
+	}
+	if protoParams.GetDemParams().GetAeadDem() == nil {
+		return nil, fmt.Errorf("nil AEAD DEM")
+	}
 	// NOTE: Ignore the the output prefix type and use RAW for backward compatibility.
 	demTemplate := proto.Clone(protoParams.GetDemParams().GetAeadDem()).(*tinkpb.KeyTemplate)
 	demTemplate.OutputPrefixType = tinkpb.OutputPrefixType_RAW
