@@ -16,7 +16,14 @@
 package mldsa
 
 import (
+	"bytes"
+	"fmt"
 	"math/bits"
+	"slices"
+
+	"crypto/rand"
+
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -124,4 +131,197 @@ type secretKey struct {
 	t0  vector
 	// Corresponding parameters.
 	par *params
+}
+
+// Algorithm 32 (ExpandA)
+func (par *params) expandA(rho [32]byte) matrixNTT {
+	res := makeZeroMatrixNTT(par.k, par.l)
+	var rhop [32 + 2]byte
+	copy(rhop[:], rho[:])
+	for r := range par.k {
+		rhop[len(rho)+1] = byte(r)
+		for s := range par.l {
+			rhop[len(rho)] = byte(s)
+			res[r][s] = rejectNTTPoly(rhop)
+		}
+	}
+	return res
+}
+
+// Algorithm 33 (ExpandS)
+func (par *params) expandS(rho [64]byte) (vector, vector) {
+	res1 := makeZeroVector(par.l)
+	res2 := makeZeroVector(par.k)
+	var rhop [64 + 2]byte
+	copy(rhop[:], rho[:])
+	for i := range par.l {
+		rhop[len(rho)] = byte(i)
+		rhop[len(rho)+1] = byte(0)
+		res1[i] = par.rejectBoundedPoly(rhop)
+	}
+	for i := range par.k {
+		rhop[len(rho)] = byte(i + par.l)
+		rhop[len(rho)+1] = byte(0)
+		res2[i] = par.rejectBoundedPoly(rhop)
+	}
+	return res1, res2
+}
+
+// Algorithm 34 (ExpandMask)
+func (par *params) expandMask(rho [64]byte, mu int) vector {
+	res := makeZeroVector(par.l)
+	var rhop [64 + 2]byte
+	copy(rhop[:], rho[:])
+	for i := range par.l {
+		rhop[len(rho)] = byte((mu + i) & 0xFF)
+		rhop[len(rho)+1] = byte((mu + i) >> 8)
+		v := make([]byte, 32*(par.log2Gamma1+1))
+		sha3.ShakeSum256(v, rhop[:])
+		res[i] = bitUnpackPoly(v, rZq(1<<par.log2Gamma1), par.log2Gamma1+1)
+	}
+	return res
+}
+
+// Algorithm 6 (KeyGen_internal)
+func (par *params) keyGenInternal(seed [32]byte) (*publicKey, *secretKey) {
+	H := sha3.NewShake256()
+	H.Write(append(seed[:], byte(par.k), byte(par.l)))
+	var rho [32]byte
+	H.Read(rho[:])
+	var rhop [64]byte
+	H.Read(rhop[:])
+	var K [32]byte
+	H.Read(K[:])
+	Ah := par.expandA(rho)
+	s1, s2 := par.expandS(rhop)
+	t := Ah.mul(s1.ntt()).intt().add(s2)
+	t1, t0 := t.power2Round()
+	pk := &publicKey{rho, t1, [64]byte{}, par}
+	sha3.ShakeSum256(pk.tr[:], pk.Encode())
+	return pk, &secretKey{rho, K, pk.tr, s1, s2, t0, par}
+}
+
+func (sk *secretKey) signInternalWithMu(mu [64]byte, rnd [32]byte) []byte {
+	par := sk.par
+	beta := uint32(par.tau * par.eta)
+	s1h := sk.s1.ntt()
+	s2h := sk.s2.ntt()
+	t0h := sk.t0.ntt()
+	Ah := par.expandA(sk.rho)
+	var rhopp [64]byte
+	sha3.ShakeSum256(rhopp[:], slices.Concat(sk.kK[:], rnd[:], mu[:]))
+	for kappa := 0; ; kappa += par.l {
+		y := par.expandMask(rhopp, kappa)
+		w := Ah.mul(y.ntt()).intt()
+		w1 := w.highBits(par.gamma2)
+		ct := make([]byte, par.lambda/4)
+		sha3.ShakeSum256(ct, slices.Concat(mu[:], par.w1Encode(w1)))
+		c := par.sampleInBall(ct)
+		ch := c.ntt()
+		cs1 := ch.scalarMul(s1h).intt()
+		cs2 := ch.scalarMul(s2h).intt()
+		z := y.add(cs1)
+		r0 := w.sub(cs2).lowBits(par.gamma2)
+		if z.infinityNorm() < (1<<par.log2Gamma1)-beta && r0.infinityNorm() < par.gamma2-beta {
+			ct0 := ch.scalarMul(t0h).intt()
+			h := ct0.neg().makeHint(par.gamma2, w.sub(cs2).add(ct0))
+			if ct0.infinityNorm() < par.gamma2 && h.numOnes() <= par.omega {
+				return par.sigEncode(ct, z, h)
+			}
+		}
+	}
+}
+
+func (pk *publicKey) verifyInternalWithMu(mu [64]byte, sigma []byte) error {
+	par := pk.par
+	ct, z, h, err := par.sigDecode(sigma)
+	if err != nil {
+		return err
+	}
+	Ah := par.expandA(pk.rho)
+	c := par.sampleInBall(ct)
+	Azh := Ah.mul(z.ntt())
+	t1sh := pk.t1.scalePower2().ntt()
+	wp := Azh.sub(c.ntt().scalarMul(t1sh)).intt()
+	w1p := wp.useHint(par.gamma2, h)
+	ctp := make([]byte, par.lambda/4)
+	sha3.ShakeSum256(ctp, slices.Concat(mu[:], par.w1Encode(w1p)))
+	beta := uint32(par.tau * par.eta)
+	if !(z.infinityNorm() < (1<<par.log2Gamma1)-beta && bytes.Compare(ct, ctp) == 0) {
+		return fmt.Errorf("invalid signature")
+	}
+	return nil
+}
+
+// Algorithm 7 (Sign_internal)
+func (sk *secretKey) signInternal(Mp []byte, rnd [32]byte) []byte {
+	var mu [64]byte
+	sha3.ShakeSum256(mu[:], slices.Concat(sk.tr[:], Mp))
+	return sk.signInternalWithMu(mu, rnd)
+}
+
+// Algorithm 8 (Verify_internal)
+func (pk *publicKey) verifyInternal(Mp []byte, sigma []byte) error {
+	var mu [64]byte
+	sha3.ShakeSum256(mu[:], slices.Concat(pk.tr[:], Mp))
+	return pk.verifyInternalWithMu(mu, sigma)
+}
+
+// KeyGen generates a new public and secret key. This is Algorithm 1 (KeyGen) of the ML-DSA specification.
+func (par *params) KeyGen() (*publicKey, *secretKey) {
+	var seed [32]byte
+	rand.Read(seed[:])
+	return par.keyGenInternal(seed)
+}
+
+// KeyGenFromSeed generates a public and secret key from a specified seed.
+func (par *params) KeyGenFromSeed(seed [32]byte) (*publicKey, *secretKey) {
+	return par.keyGenInternal(seed)
+}
+
+// SignWithMu signs with a precomputed mu.
+func (sk *secretKey) SignWithMu(mu [64]byte) []byte {
+	var rnd [32]byte
+	rand.Read(rnd[:])
+	return sk.signInternalWithMu(mu, rnd)
+}
+
+// SignDeterministicWithMu signs deterministically with a precomputed mu. It uses a fixed all zeroes randomness.
+func (sk *secretKey) SignDeterministicWithMu(mu [64]byte) []byte {
+	var zeroes [32]byte
+	return sk.signInternalWithMu(mu, zeroes)
+}
+
+// Sign is the standard signing function. This is Algorithm 2 (Sign) of the ML-DSA specification.
+func (sk *secretKey) Sign(M []byte, ctx []byte) ([]byte, error) {
+	if len(ctx) > 255 {
+		return nil, fmt.Errorf("context too long")
+	}
+	var rnd [32]byte
+	rand.Read(rnd[:])
+	return sk.signInternal(slices.Concat([]byte{0, byte(len(ctx))}, ctx, M), rnd), nil
+}
+
+// SignDeterministic signs deterministically. This is Algorithm 2 (Sign) of the ML-DSA specification with a fixed all zeroes randomness.
+func (sk *secretKey) SignDeterministic(M []byte, ctx []byte) ([]byte, error) {
+	if len(ctx) > 255 {
+		return nil, fmt.Errorf("context too long")
+	}
+	var zeroes [32]byte
+	return sk.signInternal(slices.Concat([]byte{0, byte(len(ctx))}, ctx, M), zeroes), nil
+}
+
+// VerifyWithMu verifies a signature with a precomputed mu.
+// Returns nil if the signature is valid for mu, otherwise returns an error.
+func (pk *publicKey) VerifyWithMu(mu [64]byte, sigma []byte) error {
+	return pk.verifyInternalWithMu(mu, sigma)
+}
+
+// Verify verifies a signature. This is Algorithm 3 (Verify) of the ML-DSA specification.
+// Returns nil if the signature is valid for the message and context, otherwise returns an error.
+func (pk *publicKey) Verify(M []byte, sigma []byte, ctx []byte) error {
+	if len(ctx) > 255 {
+		return fmt.Errorf("context too long")
+	}
+	return pk.verifyInternal(slices.Concat([]byte{0, byte(len(ctx))}, ctx, M), sigma)
 }

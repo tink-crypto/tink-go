@@ -15,6 +15,8 @@
 package mldsa
 
 import (
+	"bytes"
+	"crypto/rand"
 	mathrand "math/rand/v2"
 	"testing"
 )
@@ -158,6 +160,55 @@ func TestHintBitUnpackInvalidPaddingVectorFails(t *testing.T) {
 		_, err := par.par.hintBitUnpackVector(enc)
 		if err == nil {
 			t.Errorf("decodeVector(%v) succeeded, want error", par.name)
+		}
+	}
+}
+
+func comparePublicKey(u, v *publicKey) bool {
+	return bytes.Equal(u.rho[:], v.rho[:]) &&
+		compareVector(u.t1, v.t1) &&
+		bytes.Equal(u.tr[:], v.tr[:]) &&
+		u.par == v.par
+}
+
+func compareSecretKey(u, v *secretKey) bool {
+	return bytes.Equal(u.rho[:], v.rho[:]) &&
+		bytes.Equal(u.kK[:], v.kK[:]) &&
+		bytes.Equal(u.tr[:], v.tr[:]) &&
+		compareVector(u.s1, v.s1) &&
+		compareVector(u.s2, v.s2) &&
+		compareVector(u.t0, v.t0) &&
+		u.par == v.par
+}
+
+func TestKeyEncodeDecode(t *testing.T) {
+	pars := []struct {
+		name string
+		par  *params
+	}{
+		{"MLDSA44", MLDSA44},
+		{"MLDSA65", MLDSA65},
+		{"MLDSA87", MLDSA87},
+	}
+	for _, par := range pars {
+		for j := 0; j < 100; j++ {
+			var seed [32]byte
+			rand.Read(seed[:])
+			pk, sk := par.par.KeyGen()
+			pkDec, err := par.par.DecodePublicKey(pk.Encode())
+			if err != nil {
+				t.Errorf("PkDecode(%v) failed: %v", par.name, err)
+			}
+			if !comparePublicKey(pk, pkDec) {
+				t.Errorf("PkDecode(%v) = %v, want %v", par.name, pkDec, pk)
+			}
+			skDec, err := par.par.DecodeSecretKey(sk.Encode())
+			if err != nil {
+				t.Errorf("SkDecode(%v) failed: %v", par.name, err)
+			}
+			if !compareSecretKey(sk, skDec) {
+				t.Errorf("SkDecode(%v) = %v, want %v", par.name, skDec, sk)
+			}
 		}
 	}
 }
