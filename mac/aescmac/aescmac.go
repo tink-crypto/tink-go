@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package mac provides implementations of the MAC primitive.
-//
-// MAC computes a tag for a given message that can be used to authenticate a
-// message.  MAC protects data integrity as well as provides for authenticity
-// of the message.
-package mac
+// Package aescmac provides the key manager for AES-CMAC.
+package aescmac
 
 import (
-	_ "github.com/tink-crypto/tink-go/v2/mac/aescmac" // register AES-CMAC key manager.
-	_ "github.com/tink-crypto/tink-go/v2/mac/hmac"       // register HMAC key manager.
+	"fmt"
+
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 )
+
+func init() {
+	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
+		panic(fmt.Sprintf("aescmac.init() failed: %v", err))
+	}
+}

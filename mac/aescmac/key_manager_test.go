@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package mac_test
+package aescmac_test
 
 import (
 	"encoding/hex"
@@ -28,7 +28,7 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func TestGetPrimitiveCMACBasic(t *testing.T) {
+func TestKeyManagerPrimitiveBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACTypeURL)
 	if err != nil {
 		t.Errorf("AESCMAC key manager not found: %s", err)
@@ -49,7 +49,7 @@ func TestGetPrimitiveCMACBasic(t *testing.T) {
 	}
 }
 
-func TestGetPrimitiveCMACWithInvalidInput(t *testing.T) {
+func TestKeyManagerPrimitiveWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AESCMAC key manager: %s", err)
@@ -74,7 +74,7 @@ func TestGetPrimitiveCMACWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestNewKeyCMACMultipleTimes(t *testing.T) {
+func TestKeyManagerNewKeyMultipleTimes(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AESCMAC key manager: %s", err)
@@ -108,7 +108,7 @@ func TestNewKeyCMACMultipleTimes(t *testing.T) {
 	}
 }
 
-func TestNewKeyCMACBasic(t *testing.T) {
+func TestKeyManagerNewKeyBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AESCMAC key manager: %s", err)
@@ -129,7 +129,7 @@ func TestNewKeyCMACBasic(t *testing.T) {
 	}
 }
 
-func TestNewKeyCMACWithInvalidInput(t *testing.T) {
+func TestKeyManagerNewKeyWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AESCMAC key manager: %s", err)
@@ -154,7 +154,7 @@ func TestNewKeyCMACWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestNewKeyDataCMACBasic(t *testing.T) {
+func TestKeyManagerNewKeyDataBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AESCMAC key manager: %s", err)
@@ -185,7 +185,7 @@ func TestNewKeyDataCMACBasic(t *testing.T) {
 	}
 }
 
-func TestNewKeyDataCMACWithInvalidInput(t *testing.T) {
+func TestKeyManagerNewKeyDataWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACTypeURL)
 	if err != nil {
 		t.Errorf("AESCMAC key manager not found: %s", err)
@@ -207,7 +207,7 @@ func TestNewKeyDataCMACWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestDoesSupportCMAC(t *testing.T) {
+func TestKeyManagerDoesSupport(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACTypeURL)
 	if err != nil {
 		t.Errorf("AESCMAC key manager not found: %s", err)
@@ -220,7 +220,7 @@ func TestDoesSupportCMAC(t *testing.T) {
 	}
 }
 
-func TestTypeURLCMAC(t *testing.T) {
+func TestKeyManagerTypeURL(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACTypeURL)
 	if err != nil {
 		t.Errorf("AESCMAC key manager not found: %s", err)

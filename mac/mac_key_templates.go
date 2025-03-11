@@ -81,7 +81,7 @@ func createHMACKeyTemplate(keySize, tagSize uint32, hashType commonpb.HashType) 
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key format: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          hmacTypeURL,
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.HmacKey",
 		Value:            serializedFormat,
 		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 	}
@@ -101,7 +101,7 @@ func createCMACKeyTemplate(keySize uint32, tagSize uint32) *tinkpb.KeyTemplate {
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key format: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          cmacTypeURL,
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCmacKey",
 		Value:            serializedFormat,
 		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 	}

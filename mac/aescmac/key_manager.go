@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package mac
+package aescmac
 
 import (
-	"errors"
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
@@ -27,24 +26,21 @@ import (
 )
 
 const (
-	cmacKeyVersion = 0
-	cmacTypeURL    = "type.googleapis.com/google.crypto.tink.AesCmacKey"
+	keyVersion = 0
+	typeURL    = "type.googleapis.com/google.crypto.tink.AesCmacKey"
 )
 
-var errInvalidCMACKey = errors.New("aes_cmac_key_manager: invalid key")
-var errInvalidCMACKeyFormat = errors.New("aes_cmac_key_manager: invalid key format")
-
-// cmacKeyManager generates new AES-CMAC keys and produces new instances of AES-CMAC.
-type aescmacKeyManager struct{}
+// keyManager generates new AES-CMAC keys and produces new instances of AES-CMAC.
+type keyManager struct{}
 
 // Primitive constructs a AES-CMAC instance for the given serialized CMACKey.
-func (km *aescmacKeyManager) Primitive(serializedKey []byte) (any, error) {
+func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
-		return nil, errInvalidCMACKey
+		return nil, fmt.Errorf("aes_cmac_key_manager: empty serialized key")
 	}
 	key := new(cmacpb.AesCmacKey)
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidCMACKey
+		return nil, fmt.Errorf("aes_cmac_key_manager: %v", err)
 	}
 	if err := km.validateKey(key); err != nil {
 		return nil, err
@@ -57,20 +53,20 @@ func (km *aescmacKeyManager) Primitive(serializedKey []byte) (any, error) {
 }
 
 // NewKey generates a new AesCmacKey according to specification in the given AesCmacKeyFormat.
-func (km *aescmacKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+func (km *keyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
 	if len(serializedKeyFormat) == 0 {
-		return nil, errInvalidCMACKeyFormat
+		return nil, fmt.Errorf("aes_cmac_key_manager: empty key format")
 	}
 	keyFormat := new(cmacpb.AesCmacKeyFormat)
 	if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
-		return nil, errInvalidCMACKeyFormat
+		return nil, fmt.Errorf("aes_cmac_key_manager: %v", err)
 	}
 	if err := km.validateKeyFormat(keyFormat); err != nil {
 		return nil, fmt.Errorf("aes_cmac_key_manager: invalid key format: %s", err)
 	}
 	keyValue := random.GetRandomBytes(keyFormat.KeySize)
 	return &cmacpb.AesCmacKey{
-		Version:  cmacKeyVersion,
+		Version:  keyVersion,
 		Params:   keyFormat.Params,
 		KeyValue: keyValue,
 	}, nil
@@ -78,37 +74,33 @@ func (km *aescmacKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, 
 
 // NewKeyData generates a new KeyData according to specification in the given
 // serialized AesCmacKeyFormat. This should be used solely by the key management API.
-func (km *aescmacKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+func (km *keyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
 	key, err := km.NewKey(serializedKeyFormat)
 	if err != nil {
 		return nil, err
 	}
 	serializedKey, err := proto.Marshal(key)
 	if err != nil {
-		return nil, errInvalidCMACKeyFormat
+		return nil, fmt.Errorf("aes_cmac_key_manager: %v", err)
 	}
 
 	return &tinkpb.KeyData{
-		TypeUrl:         cmacTypeURL,
+		TypeUrl:         typeURL,
 		Value:           serializedKey,
 		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 	}, nil
 }
 
 // DoesSupport checks whether this KeyManager supports the given key type.
-func (km *aescmacKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == cmacTypeURL
-}
+func (km *keyManager) DoesSupport(typeURL string) bool { return typeURL == km.TypeURL() }
 
 // TypeURL returns the type URL of keys managed by this KeyManager.
-func (km *aescmacKeyManager) TypeURL() string {
-	return cmacTypeURL
-}
+func (km *keyManager) TypeURL() string { return typeURL }
 
 // validateKey validates the given AesCmacKey. It only validates the version of the
 // key because other parameters will be validated in primitive construction.
-func (km *aescmacKeyManager) validateKey(key *cmacpb.AesCmacKey) error {
-	err := keyset.ValidateKeyVersion(key.Version, cmacKeyVersion)
+func (km *keyManager) validateKey(key *cmacpb.AesCmacKey) error {
+	err := keyset.ValidateKeyVersion(key.Version, keyVersion)
 	if err != nil {
 		return fmt.Errorf("aes_cmac_key_manager: invalid version: %s", err)
 	}
@@ -117,6 +109,6 @@ func (km *aescmacKeyManager) validateKey(key *cmacpb.AesCmacKey) error {
 }
 
 // validateKeyFormat validates the given AesCmacKeyFormat
-func (km *aescmacKeyManager) validateKeyFormat(format *cmacpb.AesCmacKeyFormat) error {
+func (km *keyManager) validateKeyFormat(format *cmacpb.AesCmacKeyFormat) error {
 	return subtle.ValidateCMACParams(format.KeySize, format.GetParams().GetTagSize())
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package mac_test
+package hmac_test
 
 import (
 	"bytes"
@@ -33,7 +33,7 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func TestGetPrimitiveWorks(t *testing.T) {
+func TestKeyManagerPrimitiveWorks(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Errorf("HMAC key manager not found: %s", err)
@@ -123,7 +123,7 @@ func TestGetPrimitiveWorks(t *testing.T) {
 	}
 }
 
-func TestGetPrimitiveWithInvalidInput(t *testing.T) {
+func TestKeyManagerPrimitiveWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain HMAC key manager: %s", err)
@@ -148,7 +148,7 @@ func TestGetPrimitiveWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestNewKeyMultipleTimes(t *testing.T) {
+func TestKeyManagerNewKeyMultipleTimes(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain HMAC key manager: %s", err)
@@ -182,7 +182,7 @@ func TestNewKeyMultipleTimes(t *testing.T) {
 	}
 }
 
-func TestNewKeyBasic(t *testing.T) {
+func TestKeyManagerNewKeyBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain HMAC key manager: %s", err)
@@ -210,7 +210,7 @@ func TestNewKeyBasic(t *testing.T) {
 	}
 }
 
-func TestNewKeyWithInvalidInput(t *testing.T) {
+func TestKeyManagerNewKeyWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain HMAC key manager: %s", err)
@@ -235,7 +235,7 @@ func TestNewKeyWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestNewKeyDataWorks(t *testing.T) {
+func TestKeyManagerNewKeyDataWorks(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain HMAC key manager: %s", err)
@@ -277,7 +277,7 @@ func TestNewKeyDataWorks(t *testing.T) {
 	}
 }
 
-func TestNewKeyDataWithInvalidInput(t *testing.T) {
+func TestKeyManagerNewKeyDataWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Errorf("HMAC key manager not found: %s", err)
@@ -299,7 +299,7 @@ func TestNewKeyDataWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestDoesSupport(t *testing.T) {
+func TestKeyManagerDoesSupport(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Errorf("HMAC key manager not found: %s", err)
@@ -312,7 +312,7 @@ func TestDoesSupport(t *testing.T) {
 	}
 }
 
-func TestTypeURL(t *testing.T) {
+func TestKeyManagerTypeURL(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Errorf("HMAC key manager not found: %s", err)
@@ -322,7 +322,7 @@ func TestTypeURL(t *testing.T) {
 	}
 }
 
-func TestHMACKeyMaterialType(t *testing.T) {
+func TestKeyManagerKeyMaterialType(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HMACTypeURL, err)
@@ -336,7 +336,7 @@ func TestHMACKeyMaterialType(t *testing.T) {
 	}
 }
 
-func TestHMACDeriveKey(t *testing.T) {
+func TestKeyManagerDeriveKey(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HMACTypeURL, err)
@@ -372,7 +372,7 @@ func TestHMACDeriveKey(t *testing.T) {
 	}
 }
 
-func TestHMACDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HMACTypeURL, err)
@@ -455,7 +455,7 @@ func TestHMACDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	}
 }
 
-func TestHMACDeriveKeyFailsWithMalformedKeyFormats(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithMalformedKeyFormats(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HMACTypeURL, err)
@@ -496,7 +496,7 @@ func TestHMACDeriveKeyFailsWithMalformedKeyFormats(t *testing.T) {
 	}
 }
 
-func TestHMACDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HMACTypeURL, err)
