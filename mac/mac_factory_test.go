@@ -17,6 +17,7 @@ package mac_test
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -27,7 +28,10 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac/internal/mactest"
 	"github.com/tink-crypto/tink-go/v2/mac"
@@ -658,5 +662,217 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsComputeVerifyLogs(t *testing.T
 	}
 	if !cmp.Equal(got, want) {
 		t.Errorf("got = %v, want = %v, with diff: %v", got, want, cmp.Diff(got, want))
+	}
+}
+
+const stubKeyURL = "type.googleapis.com/google.crypto.tink.SomeKey"
+
+var tinkPrefix = []byte{0x01, 0x01, 0x02, 0x03, 0x04}
+
+type stubFullMAC struct{}
+
+var _ (tink.MAC) = (*stubFullMAC)(nil)
+
+func (s *stubFullMAC) ComputeMAC(data []byte) ([]byte, error) {
+	return slices.Concat(tinkPrefix, []byte("_full_mac_"), data), nil
+}
+
+func (s *stubFullMAC) VerifyMAC(mac, data []byte) error {
+	if !bytes.Equal(mac, slices.Concat(tinkPrefix, []byte("_full_mac_"), data)) {
+		return fmt.Errorf("invalid mac")
+	}
+	return nil
+}
+
+type stubParams struct{}
+
+var _ key.Parameters = (*stubParams)(nil)
+
+func (p *stubParams) Equal(_ key.Parameters) bool { return true }
+func (p *stubParams) HasIDRequirement() bool      { return true }
+
+type stubKey struct {
+	prefixType    tinkpb.OutputPrefixType
+	idRequirement uint32
+}
+
+var _ key.Key = (*stubKey)(nil)
+
+func (p *stubKey) Equal(_ key.Key) bool          { return true }
+func (p *stubKey) Parameters() key.Parameters    { return &stubParams{} }
+func (p *stubKey) IDRequirement() (uint32, bool) { return p.idRequirement, p.HasIDRequirement() }
+func (p *stubKey) HasIDRequirement() bool        { return p.prefixType != tinkpb.OutputPrefixType_RAW }
+
+type stubKeySerialization struct{}
+
+var _ protoserialization.KeySerializer = (*stubKeySerialization)(nil)
+
+func (s *stubKeySerialization) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	return protoserialization.NewKeySerialization(
+		&tinkpb.KeyData{
+			TypeUrl:         stubKeyURL,
+			Value:           []byte("serialized_key"),
+			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+		},
+		key.(*stubKey).prefixType,
+		key.(*stubKey).idRequirement,
+	)
+}
+
+type stubKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*stubKeyParser)(nil)
+
+func (s *stubKeyParser) ParseKey(serialization *protoserialization.KeySerialization) (key.Key, error) {
+	idRequirement, _ := serialization.IDRequirement()
+	return &stubKey{serialization.OutputPrefixType(), idRequirement}, nil
+}
+
+func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
+	defer registryconfig.UnregisterPrimitiveConstructor[*stubKey]()
+	defer protoserialization.UnregisterKeyParser(stubKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubKeyURL, &stubKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKey](&stubKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	// Register a primitive constructor to make sure that the factory uses the
+	// full primitive.
+	primitiveConstructor := func(key key.Key) (any, error) { return &stubFullMAC{}, nil }
+	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](primitiveConstructor); err != nil {
+		t.Fatalf("registryconfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubKey{
+		prefixType:    tinkpb.OutputPrefixType_TINK,
+		idRequirement: 0x01020304,
+	})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	macer, err := mac.New(handle)
+	if err != nil {
+		t.Fatalf("mac.New() err = %v, want nil", err)
+	}
+	data := []byte("data")
+	m, err := macer.ComputeMAC(data)
+	if err != nil {
+		t.Fatalf("macer.ComputeMAC() err = %v, want nil", err)
+	}
+	if !bytes.Equal(m, slices.Concat(tinkPrefix, []byte("_full_mac_"), data)) {
+		t.Errorf("m = %q, want: %q", m, data)
+	}
+	if err := macer.VerifyMAC(m, data); err != nil {
+		t.Errorf("macer.VerifyMAC() err = %v, want nil", err)
+	}
+}
+
+type stubLegacyMAC struct{}
+
+func (s *stubLegacyMAC) ComputeMAC(data []byte) ([]byte, error) {
+	return slices.Concat([]byte("_legacy_mac_"), data), nil
+}
+
+func (s *stubLegacyMAC) VerifyMAC(mac, data []byte) error {
+	if !bytes.Equal(mac, slices.Concat([]byte("_legacy_mac_"), data)) {
+		return fmt.Errorf("invalid mac")
+	}
+	return nil
+}
+
+type stubKeyManager struct{}
+
+var _ registry.KeyManager = (*stubKeyManager)(nil)
+
+func (km *stubKeyManager) NewKey(_ []byte) (proto.Message, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubKeyManager) DoesSupport(keyURL string) bool  { return keyURL == stubKeyURL }
+func (km *stubKeyManager) TypeURL() string                 { return stubKeyURL }
+func (km *stubKeyManager) Primitive(_ []byte) (any, error) { return &stubLegacyMAC{}, nil }
+
+func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubKeyURL, &stubKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKey](&stubKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	if err := registry.RegisterKeyManager(&stubKeyManager{}); err != nil {
+		t.Fatalf("registry.RegisterKeyManager() err = %v, want nil", err)
+	}
+
+	data := []byte("data")
+	for _, tc := range []struct {
+		name    string
+		key     *stubKey
+		wantMAC []byte
+	}{
+		{
+			name:    "TINK",
+			key:     &stubKey{tinkpb.OutputPrefixType_TINK, 0x01020304},
+			wantMAC: slices.Concat([]byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04}, []byte("_legacy_mac_"), data),
+		},
+		{
+			name:    "LEGACY",
+			key:     &stubKey{tinkpb.OutputPrefixType_LEGACY, 0x01020304},
+			wantMAC: slices.Concat([]byte{cryptofmt.LegacyStartByte, 0x01, 0x02, 0x03, 0x04}, []byte("_legacy_mac_"), data, []byte{0x00}),
+		},
+		{
+			name:    "CRUNCHY",
+			key:     &stubKey{tinkpb.OutputPrefixType_CRUNCHY, 0x01020304},
+			wantMAC: slices.Concat([]byte{cryptofmt.LegacyStartByte, 0x01, 0x02, 0x03, 0x04}, []byte("_legacy_mac_"), data),
+		},
+		{
+			name:    "RAW",
+			key:     &stubKey{tinkpb.OutputPrefixType_RAW, 0},
+			wantMAC: slices.Concat([]byte("_legacy_mac_"), data),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a keyset with a single key.
+			km := keyset.NewManager()
+			keyID, err := km.AddKey(tc.key)
+			if err != nil {
+				t.Fatalf("km.AddKey() err = %v, want nil", err)
+			}
+			if err := km.SetPrimary(keyID); err != nil {
+				t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+			}
+			handle, err := km.Handle()
+			if err != nil {
+				t.Fatalf("km.Handle() err = %v, want nil", err)
+			}
+			macer, err := mac.New(handle)
+			if err != nil {
+				t.Fatalf("mac.New() err = %v, want nil", err)
+			}
+			m, err := macer.ComputeMAC(data)
+			if err != nil {
+				t.Fatalf("macer.ComputeMAC() err = %v, want nil", err)
+			}
+			if got, want := m, tc.wantMAC; !bytes.Equal(want, got) {
+				t.Errorf("m = %q, want: %q", got, want)
+			}
+		})
 	}
 }
