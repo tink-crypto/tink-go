@@ -154,15 +154,11 @@ func TestNewParameters(t *testing.T) {
 	}
 }
 
-func mustCreateParameters(t *testing.T, keySizeInBytes, tagSizeInBytes int, variant aescmac.Variant) *aescmac.Parameters {
+func mustCreateParameters(t *testing.T, paramsOpts aescmac.ParametersOpts) *aescmac.Parameters {
 	t.Helper()
-	params, err := aescmac.NewParameters(aescmac.ParametersOpts{
-		KeySizeInBytes: keySizeInBytes,
-		TagSizeInBytes: tagSizeInBytes,
-		Variant:        variant,
-	})
+	params, err := aescmac.NewParameters(paramsOpts)
 	if err != nil {
-		t.Fatalf("NewParameters(%d, %d, %v) err = %v, want nil", keySizeInBytes, tagSizeInBytes, variant, err)
+		t.Fatalf("NewParameters(%v) err = %v, want nil", paramsOpts, err)
 	}
 	return params
 }
@@ -175,18 +171,18 @@ func TestEqualFalseIfDifferent(t *testing.T) {
 	}{
 		{
 			name:    "different key size",
-			params1: mustCreateParameters(t, 16, 16, aescmac.VariantTink),
-			params2: mustCreateParameters(t, 32, 16, aescmac.VariantTink),
+			params1: mustCreateParameters(t, aescmac.ParametersOpts{KeySizeInBytes: 16, TagSizeInBytes: 16, Variant: aescmac.VariantTink}),
+			params2: mustCreateParameters(t, aescmac.ParametersOpts{KeySizeInBytes: 32, TagSizeInBytes: 16, Variant: aescmac.VariantTink}),
 		},
 		{
 			name:    "different tag size",
-			params1: mustCreateParameters(t, 16, 16, aescmac.VariantTink),
-			params2: mustCreateParameters(t, 16, 10, aescmac.VariantTink),
+			params1: mustCreateParameters(t, aescmac.ParametersOpts{KeySizeInBytes: 16, TagSizeInBytes: 16, Variant: aescmac.VariantTink}),
+			params2: mustCreateParameters(t, aescmac.ParametersOpts{KeySizeInBytes: 16, TagSizeInBytes: 10, Variant: aescmac.VariantTink}),
 		},
 		{
 			name:    "different variant",
-			params1: mustCreateParameters(t, 16, 16, aescmac.VariantTink),
-			params2: mustCreateParameters(t, 16, 16, aescmac.VariantCrunchy),
+			params1: mustCreateParameters(t, aescmac.ParametersOpts{KeySizeInBytes: 16, TagSizeInBytes: 16, Variant: aescmac.VariantTink}),
+			params2: mustCreateParameters(t, aescmac.ParametersOpts{KeySizeInBytes: 16, TagSizeInBytes: 16, Variant: aescmac.VariantCrunchy}),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
