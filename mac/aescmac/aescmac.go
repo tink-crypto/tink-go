@@ -19,10 +19,17 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
 
 func init() {
 	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
+		panic(fmt.Sprintf("aescmac.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*Key](new(keySerializer)); err != nil {
+		panic(fmt.Sprintf("aescmac.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(typeURL, new(keyParser)); err != nil {
 		panic(fmt.Sprintf("aescmac.init() failed: %v", err))
 	}
 }
