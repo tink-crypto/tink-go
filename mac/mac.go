@@ -20,6 +20,6 @@
 package mac
 
 import (
-	_ "github.com/tink-crypto/tink-go/v2/mac/aescmac" // register AES-CMAC key manager.
+	_ "github.com/tink-crypto/tink-go/v2/mac/aescmac" // register AES-CMAC key manager, key proto serialization/parsing and full MAC primitive.
 	_ "github.com/tink-crypto/tink-go/v2/mac/hmac"       // register HMAC key manager.
 )
