@@ -16,8 +16,6 @@ package hpke_test
 
 import (
 	"bytes"
-	"crypto/ecdh"
-	"crypto/rand"
 	"encoding/hex"
 	"slices"
 	"testing"
@@ -66,6 +64,13 @@ var (
 		"5ac98536d7b61a1af4b78e5b7f951c0900be863c403ce65c9bfcb9382657222d18c4"
 	p256SHA256PrivateKeyBytesHex = "4995788ef4b9d6132b249ce59a77281493eb39af373d236a1fe415cb0c2d7beb"
 
+	// From https://github.com/tink-crypto/tink-java/blob/v1.17.0/src/main/java/com/google/crypto/tink/hybrid/internal/testing/HpkeTestUtil.java#L60
+	p384PublicKeyBytesHex = "04" +
+		"9d92e0330dfc60ba8b2be32e10f7d2f8457678a112cafd4544b29b7e6addf0249968f54c732aa49bc4a38f467edb8424" +
+		"81a3a9c9e878b86755f018a8ec3c5e80921910af919b95f18976e35acc04efa2962e277a0b2c990ae92b62d6c75180ba"
+	p384PrivateKeyBytesHex = "670dc60402d8a4fe52f4e552d2b71f0f81bcf195d8a71a6c7d84efb4f0e4b4a5d0f6" +
+		"0a27c94caac46bdeeb79897a3ed9"
+
 	// From https://datatracker.ietf.org/doc/html/rfc9180#appendix-A.6
 	p521SHA512PublicKeyBytesHex = "040138b385ca16bb0d5fa0c0665fbbd7e69e3ee29f63991d3e9b5fa740aab8" +
 		"900aaeed46ed73a49055758425a0ce36507c54b29cc5b85a5cee6bae0cf1c21f2731" +
@@ -83,12 +88,8 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 	p256SHA256PublicKeyBytes := mustHexDecode(t, p256SHA256PublicKeyBytesHex)
 	p256SHA256PrivateKeyBytes := mustHexDecode(t, p256SHA256PrivateKeyBytesHex)
 
-	p384Key, err := ecdh.P384().GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatalf("ecdh.P384().GenerateKey() err = %v, want nil", err)
-	}
-	p384PublicKeyBytes := p384Key.PublicKey().Bytes()
-	p384PrivateKeyBytes := p384Key.Bytes()
+	p384PublicKeyBytes := mustHexDecode(t, p384PublicKeyBytesHex)
+	p384PrivateKeyBytes := mustHexDecode(t, p384PrivateKeyBytesHex)
 
 	p521SHA512PublicKeyBytes := mustHexDecode(t, p521SHA512PublicKeyBytesHex)
 	p521SHA512PrivateKeyBytes := mustHexDecode(t, p521SHA512PrivateKeyBytesHex)

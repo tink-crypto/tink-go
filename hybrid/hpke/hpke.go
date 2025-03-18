@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
 
 func init() {
@@ -27,5 +28,8 @@ func init() {
 	}
 	if err := registry.RegisterKeyManager(new(privateKeyManager)); err != nil {
 		panic(fmt.Sprintf("hpke.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*PublicKey](&publicKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
 }
