@@ -897,11 +897,11 @@ func TestPrimitives(t *testing.T) {
 	if len(primitives.EntriesInKeysetOrder) != 1 {
 		t.Fatalf("len(handle.Primitives(internalapi.Token{})) = %d, want 1", len(primitives.EntriesInKeysetOrder))
 	}
-	if primitives.Primary.Primitive == nil {
-		t.Fatalf("handle.Primitives(internalapi.Token{}).Primary.Primitive = nil, want instance of `stubPrimitive`")
+	if primitives.Primary.FullPrimitive == nil {
+		t.Fatalf("handle.Primitives(internalapi.Token{}).Primary.FullPrimitive = nil, want non-nil")
 	}
-	if _, ok := primitives.Primary.Primitive.(tink.MAC); !ok {
-		t.Fatalf("handle.Primitives(internalapi.Token{}).Primary.Primitive = %T, want instance of `tink.MAC`", primitives.Primary.FullPrimitive)
+	if _, ok := primitives.Primary.FullPrimitive.(tink.MAC); !ok {
+		t.Fatalf("handle.Primitives(internalapi.Token{}).Primary.Primitive = %T, want %T", primitives.Primary.FullPrimitive, (tink.MAC)(nil))
 	}
 }
 

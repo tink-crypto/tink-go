@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -90,4 +91,12 @@ func (k *Key) Equal(other key.Key) bool {
 	return ok && k.Parameters().Equal(that.Parameters()) &&
 		thisIDRequirement == thatIDRequirement &&
 		k.keyBytes.Equal(that.keyBytes)
+}
+
+func primitiveConstructor(k key.Key) (any, error) {
+	that, ok := k.(*Key)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T, want %T", k, (*Key)(nil))
+	}
+	return NewMAC(that, internalapi.Token{})
 }
