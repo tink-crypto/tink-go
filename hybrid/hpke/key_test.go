@@ -440,3 +440,271 @@ func TestPublicKeyNotEqual(t *testing.T) {
 		})
 	}
 }
+
+func mustCreatePublicKey(t *testing.T, publicKeyBytes []byte, idRequirement uint32, params *hpke.Parameters) *hpke.PublicKey {
+	t.Helper()
+	pk, err := hpke.NewPublicKey(publicKeyBytes, idRequirement, params)
+	if err != nil {
+		t.Fatalf("hpke.NewPublicKey() err = %v, want nil", err)
+	}
+	return pk
+}
+
+func TestNewPrivateKeyFromPublicKeyFailsWithInvalidValues(t *testing.T) {
+	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
+	// From https://datatracker.ietf.org/doc/html/rfc9180#appendix-A.2
+	x25519PrivateKeyBytes2 := mustHexDecode(t, "f4ec9b33b792c372c1d2c2063507b684ef925b8c75a42dbcbf57d63ccd381600")
+
+	p256SHA256PublicKeyBytes := mustHexDecode(t, p256SHA256PublicKeyBytesHex)
+
+	// From https://datatracker.ietf.org/doc/html/rfc9180#appendix-A.4
+	p256SHA512PrivateKeyBytes := mustHexDecode(t, "2292bf14bb6e15b8c81a0f45b7a6e93e32d830e48cca702e0affcfb4d07e1b5c")
+
+	for _, tc := range []struct {
+		name            string
+		publicKey       *hpke.PublicKey
+		privateKeybytes secretdata.Bytes
+	}{
+		{
+			name: "invalid X25519 private key bytes",
+			publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes, 0x123456, mustCreateParameters(t, hpke.ParametersOpts{
+				KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+				KDFID:   hpke.HKDFSHA256,
+				AEADID:  hpke.AES256GCM,
+				Variant: hpke.VariantTink,
+			})),
+			privateKeybytes: secretdata.NewBytesFromData([]byte("invalid"), insecuresecretdataaccess.Token{}),
+		},
+		{
+			name: "incompatible X25519 private key bytes",
+			publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes, 0x123456, mustCreateParameters(t, hpke.ParametersOpts{
+				KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+				KDFID:   hpke.HKDFSHA256,
+				AEADID:  hpke.AES256GCM,
+				Variant: hpke.VariantCrunchy,
+			})),
+			privateKeybytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes2, insecuresecretdataaccess.Token{}),
+		},
+		{
+			name: "invalid NIST private key bytes",
+			publicKey: mustCreatePublicKey(t, p256SHA256PublicKeyBytes, 0x123456, mustCreateParameters(t, hpke.ParametersOpts{
+				KEMID:   hpke.DHKEM_P256_HKDF_SHA256,
+				KDFID:   hpke.HKDFSHA256,
+				AEADID:  hpke.AES256GCM,
+				Variant: hpke.VariantTink,
+			})),
+			privateKeybytes: secretdata.NewBytesFromData([]byte("invalid"), insecuresecretdataaccess.Token{}),
+		},
+		{
+			name: "incompatible NIST private key bytes",
+			publicKey: mustCreatePublicKey(t, p256SHA256PublicKeyBytes, 0x123456, mustCreateParameters(t, hpke.ParametersOpts{
+				KEMID:   hpke.DHKEM_P256_HKDF_SHA256,
+				KDFID:   hpke.HKDFSHA256,
+				AEADID:  hpke.AES256GCM,
+				Variant: hpke.VariantCrunchy,
+			})),
+			privateKeybytes: secretdata.NewBytesFromData(p256SHA512PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := hpke.NewPrivateKeyFromPublicKey(tc.privateKeybytes, tc.publicKey)
+			if err == nil {
+				t.Errorf("hpke.NewPrivateKeyFromPublicKey(%v, %v) err = nil, want non-nil", tc.privateKeybytes, tc.publicKey)
+			}
+		})
+	}
+}
+
+func doTestPrivateKeyAccessors(t *testing.T, privateKey *hpke.PrivateKey, tc *keyTestCase, wantPublicKey *hpke.PublicKey) {
+	if got, want := privateKey.Parameters(), tc.params; !got.Equal(want) {
+		t.Errorf("privateKey.Parameters() = %v, want %v", got, want)
+	}
+	if got, want := privateKey.OutputPrefix(), tc.wantOutputPrefix; !bytes.Equal(got, want) {
+		t.Errorf("privateKey.OutputPrefix() = %v, want %v", got, want)
+	}
+	gotIDRequirement, gotRequired := privateKey.IDRequirement()
+	if got, want := gotRequired, tc.params.HasIDRequirement(); got != want {
+		t.Errorf("privateKey.IDRequirement() = %v, want %v", got, want)
+	}
+	if got, want := gotIDRequirement, tc.idRequirement; got != want {
+		t.Errorf("privateKey.IDRequirement() = %v, want %v", got, want)
+	}
+	if got, want := privateKey.PrivateKeyBytes(), tc.privateKeyBytes; !got.Equal(want) {
+		t.Errorf("privateKey.PrivateKeyBytes() = %v, want %v", got, want)
+	}
+	gotPublicKey, err := privateKey.PublicKey()
+	if err != nil {
+		t.Fatalf("privateKey.PublicKey() err = %v, want nil", err)
+	}
+	if got, want := gotPublicKey, wantPublicKey; !got.Equal(want) {
+		t.Errorf("privateKey.PublicKey() = %v, _, want %v", got, want)
+	}
+}
+
+func TestNewPrivateKeyFromPublicKey(t *testing.T) {
+	testCases := mustCreateKeyTestCases(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pubKey, err := hpke.NewPublicKey(tc.publicKeyBytes, tc.idRequirement, tc.params)
+			if err != nil {
+				t.Fatalf("hpke.NewPublicKey(%v, %v, %v) err = %v, want nil", tc.publicKeyBytes, tc.idRequirement, tc.params, err)
+			}
+			privKey, err := hpke.NewPrivateKeyFromPublicKey(tc.privateKeyBytes, pubKey)
+			if err != nil {
+				t.Fatalf("hpke.NewPrivateKeyFromPublicKey(%v, %v) err = %v, want nil", tc.privateKeyBytes, pubKey, err)
+			}
+
+			doTestPrivateKeyAccessors(t, privKey, &tc, pubKey)
+
+			otherPrivKeyFromPublicKey, err := hpke.NewPrivateKeyFromPublicKey(tc.privateKeyBytes, pubKey)
+			if err != nil {
+				t.Fatalf("hpke.NewPrivateKeyFromPublicKey(%v, %v) err = %v, want nil", tc.privateKeyBytes, pubKey, err)
+			}
+			if !otherPrivKeyFromPublicKey.Equal(privKey) {
+				t.Errorf("otherPrivKeyFromPublicKey.Equal(privKey) = false, want true")
+			}
+			// Check equivalence with NewPrivateKey.
+			otherPrivKey, err := hpke.NewPrivateKey(tc.privateKeyBytes, tc.idRequirement, tc.params)
+			if err != nil {
+				t.Fatalf("hpke.NewPrivateKey(%v, %v, %v) err = %v, want nil", tc.privateKeyBytes, tc.idRequirement, tc.params, err)
+			}
+			if !otherPrivKey.Equal(privKey) {
+				t.Errorf("otherPrivKey.Equal(privKey) = false, want true")
+			}
+		})
+	}
+}
+
+func TestNewPrivateKey(t *testing.T) {
+	testCases := mustCreateKeyTestCases(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pubKey, err := hpke.NewPublicKey(tc.publicKeyBytes, tc.idRequirement, tc.params)
+			if err != nil {
+				t.Fatalf("hpke.NewPublicKey(%v, %v, %v) err = %v, want nil", tc.publicKeyBytes, tc.idRequirement, tc.params, err)
+			}
+			privKey, err := hpke.NewPrivateKey(tc.privateKeyBytes, tc.idRequirement, tc.params)
+			if err != nil {
+				t.Fatalf("hpke.NewPrivateKey(%v, %v, %v) err = %v, want nil", tc.privateKeyBytes, tc.idRequirement, tc.params, err)
+			}
+
+			doTestPrivateKeyAccessors(t, privKey, &tc, pubKey)
+
+			otherPrivKey, err := hpke.NewPrivateKey(tc.privateKeyBytes, tc.idRequirement, tc.params)
+			if err != nil {
+				t.Fatalf("hpke.NewPrivateKey(%v, %v, %v) err = %v, want nil", tc.privateKeyBytes, tc.idRequirement, tc.params, err)
+			}
+			if !otherPrivKey.Equal(privKey) {
+				t.Errorf("otherPrivKey.Equal(privKey) = false, want true")
+			}
+			// Check equivalence with NewPrivateKeyFromPublicKey.
+			otherPrivKeyFromPublicKey, err := hpke.NewPrivateKeyFromPublicKey(tc.privateKeyBytes, pubKey)
+			if err != nil {
+				t.Fatalf("hpke.NewPrivateKeyFromPublicKey(%v, %v) err = %v, want nil", tc.privateKeyBytes, pubKey, err)
+			}
+			if !otherPrivKeyFromPublicKey.Equal(privKey) {
+				t.Errorf("otherPrivKeyFromPublicKey.Equal(privKey) = false, want true")
+			}
+		})
+	}
+}
+
+func TestPrivateKeyNotEqual(t *testing.T) {
+	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
+	x25519PrivateKeyBytes := mustHexDecode(t, x25519PrivateKeyBytesHex)
+	// From https://datatracker.ietf.org/doc/html/rfc9180#appendix-A.2
+	x25519PublicKeyBytes2 := mustHexDecode(t, "1afa08d3dec047a643885163f1180476fa7ddb54c6a8029ea33f95796bf2ac4a")
+	x25519PrivateKeyBytes2 := mustHexDecode(t, "f4ec9b33b792c372c1d2c2063507b684ef925b8c75a42dbcbf57d63ccd381600")
+
+	p256SHA256PublicKeyBytes := mustHexDecode(t, p256SHA256PublicKeyBytesHex)
+	p256SHA256PrivateKeyBytes := mustHexDecode(t, p256SHA256PrivateKeyBytesHex)
+
+	type keyTestCase struct {
+		publicKey       *hpke.PublicKey
+		privateKeyBytes secretdata.Bytes
+	}
+
+	for _, tc := range []struct {
+		name string
+		key1 keyTestCase
+		key2 keyTestCase
+	}{
+		{
+			name: "Different parameters",
+			key1: keyTestCase{
+				publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes, 0x01020304, mustCreateParameters(t, hpke.ParametersOpts{
+					KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+					KDFID:   hpke.HKDFSHA256,
+					AEADID:  hpke.AES256GCM,
+					Variant: hpke.VariantTink,
+				})),
+				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			},
+			key2: keyTestCase{
+				publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes, 0x01020304, mustCreateParameters(t, hpke.ParametersOpts{
+					KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+					KDFID:   hpke.HKDFSHA256,
+					AEADID:  hpke.AES128GCM,
+					Variant: hpke.VariantTink,
+				})),
+				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			},
+		},
+		{
+			name: "Different public key ID requirement",
+			key1: keyTestCase{
+				publicKey: mustCreatePublicKey(t, p256SHA256PublicKeyBytes, 0x01020304, mustCreateParameters(t, hpke.ParametersOpts{
+					KEMID:   hpke.DHKEM_P256_HKDF_SHA256,
+					KDFID:   hpke.HKDFSHA256,
+					AEADID:  hpke.AES256GCM,
+					Variant: hpke.VariantTink,
+				})),
+				privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			},
+			key2: keyTestCase{
+				publicKey: mustCreatePublicKey(t, p256SHA256PublicKeyBytes, 0x05060708, mustCreateParameters(t, hpke.ParametersOpts{
+					KEMID:   hpke.DHKEM_P256_HKDF_SHA256,
+					KDFID:   hpke.HKDFSHA256,
+					AEADID:  hpke.AES256GCM,
+					Variant: hpke.VariantTink,
+				})),
+				privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			},
+		},
+		{
+			name: "Different public and private key bytes",
+			key1: keyTestCase{
+				publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes, 0x01020304, mustCreateParameters(t, hpke.ParametersOpts{
+					KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+					KDFID:   hpke.HKDFSHA256,
+					AEADID:  hpke.AES256GCM,
+					Variant: hpke.VariantTink,
+				})),
+				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			},
+			key2: keyTestCase{
+				publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes2, 0x01020304, mustCreateParameters(t, hpke.ParametersOpts{
+					KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+					KDFID:   hpke.HKDFSHA256,
+					AEADID:  hpke.AES256GCM,
+					Variant: hpke.VariantTink,
+				})),
+				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes2, insecuresecretdataaccess.Token{}),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			privateKey1, err := hpke.NewPrivateKeyFromPublicKey(tc.key1.privateKeyBytes, tc.key1.publicKey)
+			if err != nil {
+				t.Fatalf("hpke.NewPrivateKeyFromPublicKey(%v, %v) err = %v, want nil", tc.key1.privateKeyBytes, tc.key1.publicKey, err)
+			}
+			privateKey2, err := hpke.NewPrivateKeyFromPublicKey(tc.key2.privateKeyBytes, tc.key2.publicKey)
+			if err != nil {
+				t.Fatalf("hpke.NewPrivateKeyFromPublicKey(%v, %v) err = %v, want nil", tc.key2.privateKeyBytes, tc.key2.publicKey, err)
+			}
+			if privateKey1.Equal(privateKey2) {
+				t.Errorf("privateKey1.Equal(privateKey2) = true, want false")
+			}
+		})
+	}
+}
