@@ -142,3 +142,56 @@ func (s *keyParser) ParseKey(keySerialization *protoserialization.KeySerializati
 	keyID, _ := keySerialization.IDRequirement()
 	return NewKey(keyMaterial, params, keyID)
 }
+
+type parametersSerializer struct{}
+
+var _ protoserialization.ParametersSerializer = (*parametersSerializer)(nil)
+
+func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.KeyTemplate, error) {
+	actualParameters, ok := parameters.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want *aescmac.Parameters", parameters)
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(actualParameters.Variant())
+	if err != nil {
+		return nil, err
+	}
+	format := &aescmacpb.AesCmacKeyFormat{
+		KeySize: uint32(actualParameters.KeySizeInBytes()),
+		Params: &aescmacpb.AesCmacParams{
+			TagSize: uint32(actualParameters.CryptographicTagSizeInBytes()),
+		},
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		return nil, err
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          typeURL,
+		OutputPrefixType: outputPrefixType,
+		Value:            serializedFormat,
+	}, nil
+}
+
+type parametersParser struct{}
+
+var _ protoserialization.ParametersParser = (*parametersParser)(nil)
+
+func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	if keyTemplate.GetTypeUrl() != typeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyTemplate.GetTypeUrl(), typeURL)
+	}
+	format := new(aescmacpb.AesCmacKeyFormat)
+	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
+		return nil, err
+	}
+	variant, err := variantFromProto(keyTemplate.GetOutputPrefixType())
+	if err != nil {
+		return nil, err
+	}
+	return NewParameters(ParametersOpts{
+		KeySizeInBytes: int(format.GetKeySize()),
+		TagSizeInBytes: int(format.GetParams().GetTagSize()),
+		Variant:        variant,
+	})
+}

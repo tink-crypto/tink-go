@@ -33,6 +33,12 @@ func init() {
 	if err := protoserialization.RegisterKeyParser(typeURL, new(keyParser)); err != nil {
 		panic(fmt.Sprintf("aescmac.init() failed: %v", err))
 	}
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](new(parametersSerializer)); err != nil {
+		panic(fmt.Sprintf("aescmac.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(typeURL, new(parametersParser)); err != nil {
+		panic(fmt.Sprintf("aescmac.init() failed: %v", err))
+	}
 	if err := registryconfig.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("aescmac.init() failed: %v", err))
 	}
