@@ -179,3 +179,136 @@ func TestSerializePublicKey(t *testing.T) {
 		})
 	}
 }
+
+func TestParsePublicKeyFails(t *testing.T) {
+	p256SHA256PublicKeyBytes := mustHexDecode(t, p256SHA256PublicKeyBytesHex)
+	for _, tc := range []struct {
+		name                   string
+		publicKeySerialization *protoserialization.KeySerialization
+	}{
+		{
+			name: "invalid key material type",
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePublicKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+				&hpkepb.HpkePublicKey{
+					Version: 0,
+					Params: &hpkepb.HpkeParams{
+						Kem:  hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+						Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+						Aead: hpkepb.HpkeAead_AES_256_GCM,
+					},
+					PublicKey: p256SHA256PublicKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid key version",
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+				&hpkepb.HpkePublicKey{
+					Version: 1,
+					Params: &hpkepb.HpkeParams{
+						Kem:  hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+						Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+						Aead: hpkepb.HpkeAead_AES_256_GCM,
+					},
+					PublicKey: p256SHA256PublicKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid NIST point for curve type",
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+				&hpkepb.HpkePublicKey{
+					Version: 0,
+					Params: &hpkepb.HpkeParams{
+						Kem:  hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384,
+						Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+						Aead: hpkepb.HpkeAead_AES_256_GCM,
+					},
+					PublicKey: p256SHA256PublicKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid KEM",
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+				&hpkepb.HpkePublicKey{
+					Version: 0,
+					Params: &hpkepb.HpkeParams{
+						Kem:  hpkepb.HpkeKem_KEM_UNKNOWN,
+						Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+						Aead: hpkepb.HpkeAead_AES_256_GCM,
+					},
+					PublicKey: p256SHA256PublicKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid KDF",
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+				&hpkepb.HpkePublicKey{
+					Version: 0,
+					Params: &hpkepb.HpkeParams{
+						Kem:  hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+						Kdf:  hpkepb.HpkeKdf_KDF_UNKNOWN,
+						Aead: hpkepb.HpkeAead_AES_256_GCM,
+					},
+					PublicKey: p256SHA256PublicKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid AEAD",
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+				&hpkepb.HpkePublicKey{
+					Version: 0,
+					Params: &hpkepb.HpkeParams{
+						Kem:  hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+						Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+						Aead: hpkepb.HpkeAead_AEAD_UNKNOWN,
+					},
+					PublicKey: p256SHA256PublicKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid public key value",
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+				&hpkepb.HpkePublicKey{
+					Version: 0,
+					Params: &hpkepb.HpkeParams{
+						Kem:  hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+						Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+						Aead: hpkepb.HpkeAead_AES_256_GCM,
+					},
+					PublicKey: []byte("invalid"),
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid prefix type",
+			publicKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+				&hpkepb.HpkePublicKey{
+					Version: 0,
+					Params: &hpkepb.HpkeParams{
+						Kem:  hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+						Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+						Aead: hpkepb.HpkeAead_AES_256_GCM,
+					},
+					PublicKey: p256SHA256PublicKeyBytes,
+				}, tinkpb.OutputPrefixType_UNKNOWN_PREFIX, 0),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseKey(tc.publicKeySerialization); err == nil {
+				t.Errorf("protoserialization.ParseKey(%v) err = nil, want error", tc.publicKeySerialization)
+			}
+		})
+	}
+}
+
+func TestParsePublicKey(t *testing.T) {
+	for _, tc := range mustCreateTestCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseKey(tc.publicKeySerialization)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseKey(%v) err = %v, want nil", tc.publicKeySerialization, err)
+			}
+			if diff := cmp.Diff(got, tc.publicKey); diff != "" {
+				t.Errorf("protoserialization.ParseKey(%v) returned unexpected diff (-want +got):\n%s", tc.publicKey, diff)
+			}
+		})
+	}
+}

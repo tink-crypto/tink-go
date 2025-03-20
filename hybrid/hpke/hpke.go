@@ -32,4 +32,7 @@ func init() {
 	if err := protoserialization.RegisterKeySerializer[*PublicKey](&publicKeySerializer{}); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
+	if err := protoserialization.RegisterKeyParser(publicKeyTypeURL, &publicKeyParser{}); err != nil {
+		panic(fmt.Sprintf("ecies.init() failed: %v", err))
+	}
 }
