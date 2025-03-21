@@ -19,6 +19,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/big"
+	"math/bits"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
@@ -44,17 +45,6 @@ func TestNewParametersInvalidValues(t *testing.T) {
 				SigHashType:     rsassapss.SHA256,
 				MGF1HashType:    rsassapss.SHA256,
 				PublicExponent:  f4 - 1,
-				SaltLengthBytes: 1,
-			},
-			variant: rsassapss.VariantTink,
-		},
-		{
-			name: "large public exponent",
-			parametersValues: rsassapss.ParametersValues{
-				ModulusSizeBits: 2048,
-				SigHashType:     rsassapss.SHA256,
-				MGF1HashType:    rsassapss.SHA256,
-				PublicExponent:  1 << 31,
 				SaltLengthBytes: 1,
 			},
 			variant: rsassapss.VariantTink,
@@ -141,6 +131,23 @@ func TestNewParametersInvalidValues(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := rsassapss.NewParameters(tc.parametersValues, tc.variant); err == nil {
 				t.Errorf("rsassapss.NewParameters(%v, %v) = nil, want error", tc.parametersValues, tc.variant)
+			}
+		})
+	}
+
+	// On 32 bit platforms, the public exponent cannot be larger than 1<<31.
+	if bits.UintSize == 64 {
+		expVal := 1 << (bits.UintSize/2 - 1)
+		t.Run("large public exponent", func(t *testing.T) {
+			values := rsassapss.ParametersValues{
+				ModulusSizeBits: 2048,
+				SigHashType:     rsassapss.SHA256,
+				MGF1HashType:    rsassapss.SHA256,
+				PublicExponent:  expVal,
+				SaltLengthBytes: 1,
+			}
+			if _, err := rsassapss.NewParameters(values, rsassapss.VariantTink); err == nil {
+				t.Errorf("rsassapss.NewParameters(%v, %v) = nil, want error", values, rsassapss.VariantTink)
 			}
 		})
 	}
