@@ -19,7 +19,9 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -292,6 +294,190 @@ func TestSerializeKey(t *testing.T) {
 			}
 			if !got.Equal(tc.keySerialization) {
 				t.Errorf("got.Equal(tc.wantKeySerialization) = false, want true")
+			}
+		})
+	}
+}
+
+func mustCreateKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixType, keySizeInBytes, tagSizeInBytes uint32) *tinkpb.KeyTemplate {
+	t.Helper()
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.HmacKey",
+		OutputPrefixType: outputPrefixType,
+		Value: mustMarshal(t, &hmacpb.HmacKeyFormat{
+			KeySize: keySizeInBytes,
+			Params: &hmacpb.HmacParams{
+				TagSize: tagSizeInBytes,
+			},
+		}),
+	}
+}
+
+type parametersSerializationTestCase struct {
+	name        string
+	parameters  *hmac.Parameters
+	keyTemplate *tinkpb.KeyTemplate
+}
+
+func mustCreateParametersTestParameters(t *testing.T) []parametersSerializationTestCase {
+	tcs := []parametersSerializationTestCase{}
+	for _, keySize := range []int{16, 32} {
+		for _, variantAndPrefix := range []struct {
+			variant          hmac.Variant
+			outputPrefixType tinkpb.OutputPrefixType
+		}{
+			{variant: hmac.VariantTink, outputPrefixType: tinkpb.OutputPrefixType_TINK},
+			{variant: hmac.VariantCrunchy, outputPrefixType: tinkpb.OutputPrefixType_CRUNCHY},
+			{variant: hmac.VariantLegacy, outputPrefixType: tinkpb.OutputPrefixType_LEGACY},
+			{variant: hmac.VariantNoPrefix, outputPrefixType: tinkpb.OutputPrefixType_RAW},
+		} {
+			for _, hash := range []struct {
+				hashType          hmac.HashType
+				protoHashType     commonpb.HashType
+				maxTagSizeInBytes int
+			}{
+				{hmac.SHA1, commonpb.HashType_SHA1, 20},
+				{hmac.SHA224, commonpb.HashType_SHA224, 28},
+				{hmac.SHA256, commonpb.HashType_SHA256, 32},
+				{hmac.SHA384, commonpb.HashType_SHA384, 48},
+				{hmac.SHA512, commonpb.HashType_SHA512, 64},
+			} {
+				tcs = append(tcs, parametersSerializationTestCase{
+					name: fmt.Sprintf("keySize=%d,hashType=%s,variant=%s", keySize*8, hash.hashType, variantAndPrefix.variant),
+					parameters: mustCreateParameters(t, hmac.ParametersOpts{
+						KeySizeInBytes: keySize,
+						TagSizeInBytes: hash.maxTagSizeInBytes,
+						Variant:        variantAndPrefix.variant,
+						HashType:       hash.hashType,
+					}),
+					keyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.HmacKey",
+						OutputPrefixType: variantAndPrefix.outputPrefixType,
+						Value: mustMarshal(t, &hmacpb.HmacKeyFormat{
+							KeySize: uint32(keySize),
+							Params: &hmacpb.HmacParams{
+								TagSize: uint32(hash.maxTagSizeInBytes),
+								Hash:    hash.protoHashType,
+							},
+						}),
+					},
+				})
+			}
+		}
+	}
+	return tcs
+}
+
+func TestSerializeParameters(t *testing.T) {
+	for _, tc := range mustCreateParametersTestParameters(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.SerializeParameters(tc.parameters)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeParameters(%v) err = %v, want nil", tc.parameters, err)
+			}
+			if diff := cmp.Diff(tc.keyTemplate, got, protocmp.Transform()); diff != "" {
+				t.Errorf("protoserialization.SerializeParameters(%v) returned unexpected diff (-want +got):\n%s", tc.parameters, diff)
+			}
+		})
+	}
+}
+
+func TestParseParameters(t *testing.T) {
+	for _, tc := range mustCreateParametersTestParameters(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseParameters(tc.keyTemplate)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseParameters(%v) err = %v, want nil", tc.keyTemplate, err)
+			}
+			if diff := cmp.Diff(tc.parameters, got); diff != "" {
+				t.Errorf("protoserialization.ParseParameters(%v) returned unexpected diff (-want +got):\n%s", tc.keyTemplate, diff)
+			}
+		})
+	}
+}
+
+func TestParseParametersFailsWithWrongKeyTemplate(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		keyTemplate *tinkpb.KeyTemplate
+	}{
+		{
+			name:        "empty",
+			keyTemplate: &tinkpb.KeyTemplate{},
+		},
+		{
+			name: "empty format",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.HmacKey",
+				Value:            mustMarshal(t, &hmacpb.HmacKeyFormat{}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "invalid format value",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.HmacKey",
+				Value:            []byte("invalid format"),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "invalid tag size",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.HmacKey",
+				Value: mustMarshal(t, &hmacpb.HmacKeyFormat{
+					KeySize: 16,
+					Params: &hmacpb.HmacParams{
+						TagSize: 2,
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "invalid key size",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.HmacKey",
+				Value: mustMarshal(t, &hmacpb.HmacKeyFormat{
+					KeySize: 10,
+					Params: &hmacpb.HmacParams{
+						TagSize: 16,
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "invalid hash type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.HmacKey",
+				Value: mustMarshal(t, &hmacpb.HmacKeyFormat{
+					KeySize: 16,
+					Params: &hmacpb.HmacParams{
+						TagSize: 16,
+						Hash:    commonpb.HashType_UNKNOWN_HASH,
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "unknown output prefix type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.HmacKey",
+				Value: mustMarshal(t, &hmacpb.HmacKeyFormat{
+					KeySize: 16,
+					Params: &hmacpb.HmacParams{
+						TagSize: 16,
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseParameters(tc.keyTemplate); err == nil {
+				t.Errorf("protoserialization.ParseParameters(%v) err = nil, want error", tc.keyTemplate)
 			}
 		})
 	}

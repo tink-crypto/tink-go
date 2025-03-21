@@ -37,6 +37,12 @@ func init() {
 	if err := protoserialization.RegisterKeySerializer[*Key](new(keySerializer)); err != nil {
 		panic(fmt.Sprintf("hmac.init() failed: %v", err))
 	}
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](new(parametersSerializer)); err != nil {
+		panic(fmt.Sprintf("hmac.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(typeURL, new(parametersParser)); err != nil {
+		panic(fmt.Sprintf("hmac.init() failed: %v", err))
+	}
 	if err := registryconfig.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("hmac.init() failed: %v", err))
 	}
