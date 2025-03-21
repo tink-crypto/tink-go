@@ -26,7 +26,8 @@ func TestCheckPlaintextSize(t *testing.T) {
 			t.Errorf("aead.CheckPlaintextSize(%v) err = %v, want nil", plaintextSize, err)
 		}
 	}
-	if err := aead.CheckPlaintextSize(1 << 60); err == nil {
-		t.Errorf("aead.CheckPlaintextSize(%v) err = nil, want error", 1<<60)
+	var largePlaintextSize uint64 = 1 << 60
+	if err := aead.CheckPlaintextSize(largePlaintextSize); err == nil {
+		t.Errorf("aead.CheckPlaintextSize(%v) err = nil, want error", largePlaintextSize)
 	}
 }
