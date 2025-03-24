@@ -18,8 +18,10 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -202,7 +204,7 @@ func protoOutputPrefixTypeToVariant(outputPrefixType tinkpb.OutputPrefixType) (V
 	}
 }
 
-func parsePublicKey(protoPublicKey *hpkepb.HpkePublicKey, outputPrefixType tinkpb.OutputPrefixType, keyID uint32) (key.Key, error) {
+func parsePublicKey(protoPublicKey *hpkepb.HpkePublicKey, outputPrefixType tinkpb.OutputPrefixType, keyID uint32) (*PublicKey, error) {
 	if protoPublicKey.GetVersion() != 0 {
 		return nil, fmt.Errorf("invalid key version: %v, want 0", protoPublicKey.GetVersion())
 	}
@@ -259,4 +261,84 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
 	keyID, _ := keySerialization.IDRequirement()
 	return parsePublicKey(protoPublicKey, keySerialization.OutputPrefixType(), keyID)
+}
+
+type privateKeySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*privateKeySerializer)(nil)
+
+func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key is nil")
+	}
+	hpkePrivateKey, ok := key.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T, want %T", key, (*PrivateKey)(nil))
+	}
+
+	publicKey, err := hpkePrivateKey.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	protoPublicKey, err := publicKeyToProto(publicKey.(*PublicKey))
+	if err != nil {
+		return nil, err
+	}
+
+	privateKeyValue := hpkePrivateKey.PrivateKeyBytes().Data(insecuresecretdataaccess.Token{})
+
+	protoPrivateKey := &hpkepb.HpkePrivateKey{
+		Version:    0,
+		PublicKey:  protoPublicKey,
+		PrivateKey: privateKeyValue,
+	}
+	serializedHPKEPrivKey, err := proto.Marshal(protoPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(hpkePrivateKey.Parameters().(*Parameters).Variant())
+	if err != nil {
+		return nil, err
+	}
+
+	// idRequirement is zero if the key doesn't have a key ID requirement.
+	idRequirement, _ := hpkePrivateKey.IDRequirement()
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         privateKeyTypeURL,
+		Value:           serializedHPKEPrivKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}
+	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
+}
+
+type privateKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*privateKeyParser)(nil)
+
+func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	if keySerialization == nil {
+		return nil, fmt.Errorf("key serialization is nil")
+	}
+	keyData := keySerialization.KeyData()
+	if keyData.GetTypeUrl() != privateKeyTypeURL {
+		return nil, fmt.Errorf("invalid key type URL %v, want %v", keyData.GetTypeUrl(), privateKeyTypeURL)
+	}
+	protoHPKEKey := new(hpkepb.HpkePrivateKey)
+	if err := proto.Unmarshal(keyData.GetValue(), protoHPKEKey); err != nil {
+		return nil, err
+	}
+	if protoHPKEKey.GetVersion() != 0 {
+		return nil, fmt.Errorf("invalid key version: %v, want 0", protoHPKEKey.GetVersion())
+	}
+	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
+	keyID, _ := keySerialization.IDRequirement()
+
+	publicKey, err := parsePublicKey(protoHPKEKey.GetPublicKey(), keySerialization.OutputPrefixType(), keyID)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKeyBytes := secretdata.NewBytesFromData(protoHPKEKey.GetPrivateKey(), insecuresecretdataaccess.Token{})
+	return NewPrivateKeyFromPublicKey(privateKeyBytes, publicKey)
 }

@@ -30,9 +30,15 @@ func init() {
 		panic(fmt.Sprintf("hpke.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterKeySerializer[*PublicKey](&publicKeySerializer{}); err != nil {
-		panic(fmt.Sprintf("ecies.init() failed: %v", err))
+		panic(fmt.Sprintf("hpke.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterKeyParser(publicKeyTypeURL, &publicKeyParser{}); err != nil {
-		panic(fmt.Sprintf("ecies.init() failed: %v", err))
+		panic(fmt.Sprintf("hpke.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*PrivateKey](&privateKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("hpke.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(privateKeyTypeURL, &privateKeyParser{}); err != nil {
+		panic(fmt.Sprintf("hpke.init() failed: %v", err))
 	}
 }

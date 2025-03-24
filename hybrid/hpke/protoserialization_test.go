@@ -16,13 +16,18 @@ package hpke_test
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
+	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid/hpke"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -68,9 +73,11 @@ func TestSerializePublicKeyFails(t *testing.T) {
 }
 
 type protoSerializationTestCase struct {
-	name                   string
-	publicKey              *hpke.PublicKey
-	publicKeySerialization *protoserialization.KeySerialization
+	name                    string
+	publicKey               *hpke.PublicKey
+	publicKeySerialization  *protoserialization.KeySerialization
+	privateKey              *hpke.PrivateKey
+	privateKeySerialization *protoserialization.KeySerialization
 }
 
 func mustCreateKeySerialization(t *testing.T, url string, keyMaterialType tinkpb.KeyData_KeyMaterialType, keyMessage proto.Message, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
@@ -91,13 +98,27 @@ func mustCreateKeySerialization(t *testing.T, url string, keyMaterialType tinkpb
 	return ks
 }
 
+func mustCreatePrivateKey(t *testing.T, privateKeyBytes []byte, publicKey *hpke.PublicKey) *hpke.PrivateKey {
+	t.Helper()
+	secretData := secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{})
+	pk, err := hpke.NewPrivateKeyFromPublicKey(secretData, publicKey)
+	if err != nil {
+		t.Fatalf("hpke.NewPrivateKeyFromPublicKey(%x, %v) err = %v, want nil", secretData, publicKey, err)
+	}
+	return pk
+}
+
 func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 	t.Helper()
 
 	p256PublicKeyBytes := mustHexDecode(t, p256SHA256PublicKeyBytesHex)
+	p256PrivateKeyBytes := mustHexDecode(t, p256SHA256PrivateKeyBytesHex)
 	p384PublicKeyBytes := mustHexDecode(t, p384PublicKeyBytesHex)
+	p384PrivateKeyBytes := mustHexDecode(t, p384PrivateKeyBytesHex)
 	p521PublicKeyBytes := mustHexDecode(t, p521SHA512PublicKeyBytesHex)
+	p521PrivateKeyBytes := mustHexDecode(t, p521SHA512PrivateKeyBytesHex)
 	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
+	x25519PrivateKeyBytes := mustHexDecode(t, x25519PrivateKeyBytesHex)
 
 	testCases := []protoSerializationTestCase{}
 	for _, aeadID := range []struct {
@@ -129,14 +150,15 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 					idRequirement = 0
 				}
 				for _, kemIDAndKeyBytes := range []struct {
-					enumKEMID      hpke.KEMID
-					protoKEMID     hpkepb.HpkeKem
-					publicKeyBytes []byte
+					enumKEMID       hpke.KEMID
+					protoKEMID      hpkepb.HpkeKem
+					publicKeyBytes  []byte
+					privateKeyBytes []byte
 				}{
-					{hpke.DHKEM_P256_HKDF_SHA256, hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256, p256PublicKeyBytes},
-					{hpke.DHKEM_P384_HKDF_SHA384, hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384, p384PublicKeyBytes},
-					{hpke.DHKEM_P521_HKDF_SHA512, hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512, p521PublicKeyBytes},
-					{hpke.DHKEM_X25519_HKDF_SHA256, hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256, x25519PublicKeyBytes},
+					{hpke.DHKEM_P256_HKDF_SHA256, hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256, p256PublicKeyBytes, p256PrivateKeyBytes},
+					{hpke.DHKEM_P384_HKDF_SHA384, hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384, p384PublicKeyBytes, p384PrivateKeyBytes},
+					{hpke.DHKEM_P521_HKDF_SHA512, hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512, p521PublicKeyBytes, p521PrivateKeyBytes},
+					{hpke.DHKEM_X25519_HKDF_SHA256, hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256, x25519PublicKeyBytes, x25519PrivateKeyBytes},
 				} {
 					publicKey := mustCreatePublicKey(t, kemIDAndKeyBytes.publicKeyBytes, idRequirement, mustCreateParameters(t, hpke.ParametersOpts{
 						KEMID:   kemIDAndKeyBytes.enumKEMID,
@@ -144,20 +166,30 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 						AEADID:  aeadID.enumAEADID,
 						Variant: variant.enumVariant,
 					}))
+					protoPublicKey := &hpkepb.HpkePublicKey{
+						Version: 0,
+						Params: &hpkepb.HpkeParams{
+							Kem:  kemIDAndKeyBytes.protoKEMID,
+							Kdf:  kdfID.protoKDFID,
+							Aead: aeadID.protoAEADID,
+						},
+						PublicKey: kemIDAndKeyBytes.publicKeyBytes,
+					}
 					publicKeySerialization := mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePublicKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
-						&hpkepb.HpkePublicKey{
-							Version: 0,
-							Params: &hpkepb.HpkeParams{
-								Kem:  kemIDAndKeyBytes.protoKEMID,
-								Kdf:  kdfID.protoKDFID,
-								Aead: aeadID.protoAEADID,
-							},
-							PublicKey: kemIDAndKeyBytes.publicKeyBytes,
+						protoPublicKey, variant.protoVariant, idRequirement)
+					privateKey := mustCreatePrivateKey(t, kemIDAndKeyBytes.privateKeyBytes, publicKey)
+					privateKeySerialization := mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+						&hpkepb.HpkePrivateKey{
+							Version:    0,
+							PublicKey:  protoPublicKey,
+							PrivateKey: kemIDAndKeyBytes.privateKeyBytes,
 						}, variant.protoVariant, idRequirement)
 					testCases = append(testCases, protoSerializationTestCase{
-						name:                   fmt.Sprintf("%s-%s-%s-%s", kemIDAndKeyBytes.enumKEMID, kdfID.enumKDFID, aeadID.enumAEADID, variant.enumVariant),
-						publicKey:              publicKey,
-						publicKeySerialization: publicKeySerialization,
+						name:                    fmt.Sprintf("%s-%s-%s-%s", kemIDAndKeyBytes.enumKEMID, kdfID.enumKDFID, aeadID.enumAEADID, variant.enumVariant),
+						publicKey:               publicKey,
+						publicKeySerialization:  publicKeySerialization,
+						privateKey:              privateKey,
+						privateKeySerialization: privateKeySerialization,
 					})
 				}
 			}
@@ -308,6 +340,168 @@ func TestParsePublicKey(t *testing.T) {
 			}
 			if diff := cmp.Diff(got, tc.publicKey); diff != "" {
 				t.Errorf("protoserialization.ParseKey(%v) returned unexpected diff (-want +got):\n%s", tc.publicKey, diff)
+			}
+		})
+	}
+}
+
+func TestSerializePrivateKey(t *testing.T) {
+	for _, tc := range mustCreateTestCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.SerializeKey(tc.privateKey)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeKey(%v) err = %v, want nil", tc.privateKey, err)
+			}
+			if diff := cmp.Diff(got, tc.privateKeySerialization, protocmp.Transform()); diff != "" {
+				t.Errorf("protoserialization.SerializeKey(%v) returned unexpected diff (-want +got):\n%s", tc.privateKey, diff)
+			}
+		})
+	}
+}
+
+func TestSerializePrivateKeyFails(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		privateKey key.Key
+	}{
+		{
+			name:       "nil key",
+			privateKey: nil,
+		},
+		{
+			name:       "invalid private key",
+			privateKey: &ecies.PrivateKey{},
+		},
+		{
+			name:       "incorrect key type",
+			privateKey: &testKey{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.SerializeKey(tc.privateKey); err == nil {
+				t.Errorf("protoserialization.SerializeKey(%v) err = nil, want non-nil", tc.privateKey)
+			}
+		})
+	}
+}
+
+func TestParsePrivateKey(t *testing.T) {
+	for _, tc := range mustCreateTestCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseKey(tc.privateKeySerialization)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseKey(%v) err = %v, want nil", tc.privateKeySerialization, err)
+			}
+			if diff := cmp.Diff(got, tc.privateKey); diff != "" {
+				t.Errorf("protoserialization.ParseKey(%v) returned unexpected diff (-want +got):\n%s", tc.publicKey, diff)
+			}
+		})
+	}
+}
+
+func TestParsePrivateKeyFails(t *testing.T) {
+	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
+	x25519PrivateKeyBytes := mustHexDecode(t, x25519PrivateKeyBytesHex)
+	p256SHA256PublicKeyBytes := mustHexDecode(t, p256SHA256PublicKeyBytesHex)
+	p256SHA256PrivateKeyBytes := mustHexDecode(t, p256SHA256PrivateKeyBytesHex)
+
+	for _, tc := range []struct {
+		name                    string
+		privateKeySerialization *protoserialization.KeySerialization
+	}{
+		{
+			name: "invalid proto private key",
+			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+				&hpkepb.HpkePrivateKey{
+					Version: 0,
+					PublicKey: &hpkepb.HpkePublicKey{
+						Version: 0,
+						Params: &hpkepb.HpkeParams{
+							Kem:  hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+							Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+							Aead: hpkepb.HpkeAead_AES_256_GCM,
+						},
+						PublicKey: p256SHA256PublicKeyBytes,
+					},
+					PrivateKey: x25519PrivateKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid public key",
+			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+				&hpkepb.HpkePrivateKey{
+					Version: 0,
+					PublicKey: &hpkepb.HpkePublicKey{
+						Version: 0,
+						Params: &hpkepb.HpkeParams{
+							Kem:  hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+							Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+							Aead: hpkepb.HpkeAead_AES_256_GCM,
+						},
+						PublicKey: x25519PublicKeyBytes,
+					},
+					PrivateKey: p256SHA256PrivateKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid private key version",
+			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+				&hpkepb.HpkePrivateKey{
+					Version: 1,
+					PublicKey: &hpkepb.HpkePublicKey{
+						Version: 0,
+						Params: &hpkepb.HpkeParams{
+							Kem:  hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+							Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+							Aead: hpkepb.HpkeAead_AES_256_GCM,
+						},
+						PublicKey: p256SHA256PublicKeyBytes,
+					},
+					PrivateKey: p256SHA256PrivateKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid X25519 private key bytes",
+			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+				&hpkepb.HpkePrivateKey{
+					Version: 0,
+					PublicKey: &hpkepb.HpkePublicKey{
+						Version: 0,
+						Params: &hpkepb.HpkeParams{
+							Kem:  hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+							Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+							Aead: hpkepb.HpkeAead_AES_256_GCM,
+						},
+						PublicKey: x25519PublicKeyBytes,
+					},
+					PrivateKey: x25519PrivateKeyBytes[:len(x25519PrivateKeyBytes)-1], // Only checks the scalar length.
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: "invalid NIST private key bytes",
+			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+				&hpkepb.HpkePrivateKey{
+					Version: 0,
+					PublicKey: &hpkepb.HpkePublicKey{
+						Version: 0,
+						Params: &hpkepb.HpkeParams{
+							Kem:  hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+							Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+							Aead: hpkepb.HpkeAead_AES_256_GCM,
+						},
+						PublicKey: p256SHA256PublicKeyBytes,
+					},
+					PrivateKey: func() []byte {
+						key := slices.Clone(p256SHA256PrivateKeyBytes)
+						key[0] ^= 1
+						return key
+					}(),
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseKey(tc.privateKeySerialization); err == nil {
+				t.Errorf("protoserialization.ParseKey(%v) err = nil, want error", tc.privateKeySerialization)
 			}
 		})
 	}
