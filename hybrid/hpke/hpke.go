@@ -20,6 +20,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 )
 
 func init() {
@@ -45,6 +46,12 @@ func init() {
 		panic(fmt.Sprintf("hpke.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterParametersParser(privateKeyTypeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("hpke.init() failed: %v", err))
+	}
+	if err := registryconfig.RegisterPrimitiveConstructor[*PublicKey](hybridEncryptConstructor); err != nil {
+		panic(fmt.Sprintf("hpke.init() failed: %v", err))
+	}
+	if err := registryconfig.RegisterPrimitiveConstructor[*PrivateKey](hybridDecryptConstructor); err != nil {
 		panic(fmt.Sprintf("hpke.init() failed: %v", err))
 	}
 }
