@@ -204,11 +204,7 @@ func protoOutputPrefixTypeToVariant(outputPrefixType tinkpb.OutputPrefixType) (V
 	}
 }
 
-func parsePublicKey(protoPublicKey *hpkepb.HpkePublicKey, outputPrefixType tinkpb.OutputPrefixType, keyID uint32) (*PublicKey, error) {
-	if protoPublicKey.GetVersion() != 0 {
-		return nil, fmt.Errorf("invalid key version: %v, want 0", protoPublicKey.GetVersion())
-	}
-	protoParameters := protoPublicKey.GetParams()
+func parseParameters(protoParameters *hpkepb.HpkeParams, outputPrefixType tinkpb.OutputPrefixType) (*Parameters, error) {
 	kemID, err := parseKEMID(protoParameters.GetKem())
 	if err != nil {
 		return nil, err
@@ -225,12 +221,19 @@ func parsePublicKey(protoPublicKey *hpkepb.HpkePublicKey, outputPrefixType tinkp
 	if err != nil {
 		return nil, err
 	}
-	params, err := NewParameters(ParametersOpts{
+	return NewParameters(ParametersOpts{
 		KEMID:   kemID,
 		AEADID:  aeadID,
 		KDFID:   kdfID,
 		Variant: variant,
 	})
+}
+
+func parsePublicKey(protoPublicKey *hpkepb.HpkePublicKey, outputPrefixType tinkpb.OutputPrefixType, keyID uint32) (*PublicKey, error) {
+	if protoPublicKey.GetVersion() != 0 {
+		return nil, fmt.Errorf("invalid key version: %v, want 0", protoPublicKey.GetVersion())
+	}
+	params, err := parseParameters(protoPublicKey.GetParams(), outputPrefixType)
 	if err != nil {
 		return nil, err
 	}
@@ -341,4 +344,52 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 
 	privateKeyBytes := secretdata.NewBytesFromData(protoHPKEKey.GetPrivateKey(), insecuresecretdataaccess.Token{})
 	return NewPrivateKeyFromPublicKey(privateKeyBytes, publicKey)
+}
+
+type parametersSerializer struct{}
+
+var _ protoserialization.ParametersSerializer = (*parametersSerializer)(nil)
+
+func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.KeyTemplate, error) {
+	actualParameters, ok := parameters.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", parameters, (*Parameters)(nil))
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(actualParameters.Variant())
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := parametersToProto(actualParameters)
+	if err != nil {
+		return nil, err
+	}
+
+	format := &hpkepb.HpkeKeyFormat{
+		Params: params,
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		return nil, err
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          privateKeyTypeURL,
+		OutputPrefixType: outputPrefixType,
+		Value:            serializedFormat,
+	}, nil
+}
+
+type parametersParser struct{}
+
+var _ protoserialization.ParametersParser = (*parametersParser)(nil)
+
+func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	if keyTemplate.GetTypeUrl() != privateKeyTypeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyTemplate.GetTypeUrl(), privateKeyTypeURL)
+	}
+	format := new(hpkepb.HpkeKeyFormat)
+	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
+		return nil, err
+	}
+	return parseParameters(format.GetParams(), keyTemplate.GetOutputPrefixType())
 }

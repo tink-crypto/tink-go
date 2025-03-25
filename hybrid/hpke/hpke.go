@@ -41,4 +41,10 @@ func init() {
 	if err := protoserialization.RegisterKeyParser(privateKeyTypeURL, &privateKeyParser{}); err != nil {
 		panic(fmt.Sprintf("hpke.init() failed: %v", err))
 	}
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
+		panic(fmt.Sprintf("hpke.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(privateKeyTypeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("hpke.init() failed: %v", err))
+	}
 }
