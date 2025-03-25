@@ -969,3 +969,175 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		})
 	}
 }
+
+type parametersSerializationTestCase struct {
+	name        string
+	parameters  *ecies.Parameters
+	keyTemplate *tinkpb.KeyTemplate
+}
+
+func mustCreateKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixType, curveType commonpb.EllipticCurveType, hashType commonpb.HashType, pointFormat commonpb.EcPointFormat) *tinkpb.KeyTemplate {
+	t.Helper()
+	format := &eciespb.EciesAeadHkdfKeyFormat{
+		Params: &eciespb.EciesAeadHkdfParams{
+			KemParams: &eciespb.EciesHkdfKemParams{
+				CurveType:    curveType,
+				HkdfHashType: hashType,
+				HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+			},
+			DemParams: &eciespb.EciesAeadDemParams{
+				AeadDem: aead.AES256GCMKeyTemplate(), // NOTE: serialization sets the output prefix type to TINK.
+			},
+			EcPointFormat: pointFormat,
+		},
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPrivateKey",
+		OutputPrefixType: outputPrefixType,
+		Value:            mustMarshal(t, format),
+	}
+}
+
+func mustCreateParametersTestParameters(t *testing.T) []parametersSerializationTestCase {
+	t.Helper()
+	demParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	tcs := []parametersSerializationTestCase{}
+
+	for _, hashType := range []struct {
+		enumHashType  ecies.HashType
+		protoHashType commonpb.HashType
+	}{
+		{ecies.SHA1, commonpb.HashType_SHA1},
+		{ecies.SHA224, commonpb.HashType_SHA224},
+		{ecies.SHA256, commonpb.HashType_SHA256},
+		{ecies.SHA384, commonpb.HashType_SHA384},
+		{ecies.SHA512, commonpb.HashType_SHA512},
+	} {
+		for _, variantAndPrefix := range []struct {
+			variant ecies.Variant
+			prefix  tinkpb.OutputPrefixType
+		}{
+			{ecies.VariantTink, tinkpb.OutputPrefixType_TINK},
+			{ecies.VariantCrunchy, tinkpb.OutputPrefixType_CRUNCHY},
+			{ecies.VariantNoPrefix, tinkpb.OutputPrefixType_RAW},
+		} {
+			tcs = append(tcs, parametersSerializationTestCase{
+				name: fmt.Sprintf("curveType=%v, hashType=%v, variant=%v, outputPrefixType=%v, pointFormat=%v", ecies.X25519, hashType.enumHashType, variantAndPrefix.variant, variantAndPrefix.prefix, ecies.CompressedPointFormat),
+				parameters: mustCreateParameters(t, ecies.ParametersOpts{
+					CurveType:            ecies.X25519,
+					HashType:             hashType.enumHashType,
+					Variant:              variantAndPrefix.variant,
+					NISTCurvePointFormat: ecies.UnspecifiedPointFormat,
+					DEMParameters:        demParams,
+					Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+				}),
+				keyTemplate: mustCreateKeyTemplate(t, variantAndPrefix.prefix, commonpb.EllipticCurveType_CURVE25519, hashType.protoHashType, commonpb.EcPointFormat_COMPRESSED),
+			})
+			for _, nistCurve := range []struct {
+				enumCurveType  ecies.CurveType
+				protoCurveType commonpb.EllipticCurveType
+			}{
+				{ecies.NISTP256, commonpb.EllipticCurveType_NIST_P256},
+				{ecies.NISTP384, commonpb.EllipticCurveType_NIST_P384},
+				{ecies.NISTP521, commonpb.EllipticCurveType_NIST_P521},
+			} {
+				for _, pointFormat := range []struct {
+					enumPointFormat  ecies.PointFormat
+					protoPointFormat commonpb.EcPointFormat
+				}{
+					{ecies.CompressedPointFormat, commonpb.EcPointFormat_COMPRESSED},
+					{ecies.UncompressedPointFormat, commonpb.EcPointFormat_UNCOMPRESSED},
+					{ecies.LegacyUncompressedPointFormat, commonpb.EcPointFormat_DO_NOT_USE_CRUNCHY_UNCOMPRESSED},
+				} {
+					tcs = append(tcs, parametersSerializationTestCase{
+						name: fmt.Sprintf("curveType=%v, hashType=%v, variant=%v, outputPrefixType=%v, pointFormat=%v", nistCurve.enumCurveType, hashType.enumHashType, variantAndPrefix.variant, variantAndPrefix.prefix, pointFormat.enumPointFormat),
+						parameters: mustCreateParameters(t, ecies.ParametersOpts{
+							CurveType:            nistCurve.enumCurveType,
+							HashType:             hashType.enumHashType,
+							Variant:              variantAndPrefix.variant,
+							NISTCurvePointFormat: pointFormat.enumPointFormat,
+							DEMParameters:        demParams,
+							Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+						}),
+						keyTemplate: mustCreateKeyTemplate(t, variantAndPrefix.prefix, nistCurve.protoCurveType, hashType.protoHashType, pointFormat.protoPointFormat),
+					})
+				}
+			}
+		}
+	}
+	return tcs
+}
+
+func TestParseParameters(t *testing.T) {
+	for _, tc := range mustCreateParametersTestParameters(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseParameters(tc.keyTemplate)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseParameters(%v) err = %v, want nil", tc.keyTemplate, err)
+			}
+			if diff := cmp.Diff(got, tc.parameters); diff != "" {
+				t.Errorf("protoserialization.ParseParameters(%v) returned unexpected diff (-want +got):\n%s", tc.parameters, diff)
+			}
+		})
+	}
+}
+
+func TestParseParametersFails(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		keyTemplate *tinkpb.KeyTemplate
+	}{
+		{
+			name:        "unknown output prefix type",
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_UNKNOWN_PREFIX, commonpb.EllipticCurveType_NIST_P256, commonpb.HashType_SHA256, commonpb.EcPointFormat_COMPRESSED),
+		},
+		{
+			name:        "unknown curve type",
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, commonpb.EllipticCurveType_UNKNOWN_CURVE, commonpb.HashType_SHA256, commonpb.EcPointFormat_COMPRESSED),
+		},
+		{
+			name:        "unknown hash",
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, commonpb.EllipticCurveType_NIST_P256, commonpb.HashType_UNKNOWN_HASH, commonpb.EcPointFormat_COMPRESSED),
+		},
+		{
+			name:        "unspecified point format with NIST curve",
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, commonpb.EllipticCurveType_NIST_P256, commonpb.HashType_SHA256, commonpb.EcPointFormat_UNKNOWN_FORMAT),
+		},
+		{
+			name:        "specified point format with X25519 curve",
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, commonpb.EllipticCurveType_CURVE25519, commonpb.HashType_SHA256, commonpb.EcPointFormat_UNCOMPRESSED),
+		},
+		{
+			name:        "unknwon point format with X25519 curve",
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, commonpb.EllipticCurveType_CURVE25519, commonpb.HashType_SHA256, commonpb.EcPointFormat_UNKNOWN_FORMAT),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseParameters(tc.keyTemplate); err == nil {
+				t.Errorf("protoserialization.ParseParameters(%v) err = nil, want non-nil", tc.keyTemplate)
+			}
+		})
+	}
+}
+
+func TestSerializeParameters(t *testing.T) {
+	for _, tc := range mustCreateParametersTestParameters(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.SerializeParameters(tc.parameters)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeParameters(%v) err = %v, want nil", tc.parameters, err)
+			}
+			if diff := cmp.Diff(got, tc.keyTemplate, protocmp.Transform()); diff != "" {
+				t.Errorf("protoserialization.SerializeParameters(%v) returned unexpected diff (-want +got):\n%s", tc.keyTemplate, diff)
+			}
+		})
+	}
+}

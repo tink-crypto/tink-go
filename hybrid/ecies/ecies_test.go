@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -83,5 +84,70 @@ func TestEncryptDecryptFromPublicAPI(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestEncryptDecryptFromWithKeysetFromParameters(t *testing.T) {
+	demParameters, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	params, err := ecies.NewParameters(ecies.ParametersOpts{
+		CurveType:            ecies.NISTP256,
+		HashType:             ecies.SHA256,
+		Variant:              ecies.VariantTink,
+		NISTCurvePointFormat: ecies.CompressedPointFormat,
+		DEMParameters:        demParameters,
+		Salt:                 []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+	})
+	if err != nil {
+		t.Fatalf("ecies.NewParameters() err = %v, want nil", err)
+	}
+
+	km := keyset.NewManager()
+	keyID, err := km.AddNewKeyFromParameters(params)
+	if err != nil {
+		t.Fatalf("km.AddNewKeyFromParameters() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	privateKeyHandle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	publicKeyHandle, err := privateKeyHandle.Public()
+	if err != nil {
+		t.Fatalf("privateKeyHandle.Public() err = %v, want nil", err)
+	}
+
+	encrypter, err := hybrid.NewHybridEncrypt(publicKeyHandle)
+	if err != nil {
+		t.Fatalf("hybrid.NewHybridEncrypt() err = %v, want nil", err)
+	}
+	decrypter, err := hybrid.NewHybridDecrypt(privateKeyHandle)
+	if err != nil {
+		t.Fatalf("hybrid.NewHybridDecrypt() err = %v, want nil", err)
+	}
+
+	plaintext := []byte("plaintext")
+	contextInfo := []byte("contextInfo")
+
+	ciphertext, err := encrypter.Encrypt(plaintext, contextInfo)
+	if err != nil {
+		t.Fatalf("encrypter.Encrypt() err = %v, want nil", err)
+	}
+	gotDecrypted, err := decrypter.Decrypt(ciphertext, contextInfo)
+	if err != nil {
+		t.Fatalf("decrypter.Decrypt() err = %v, want nil", err)
+	}
+	if diff := cmp.Diff(gotDecrypted, plaintext); diff != "" {
+		t.Errorf("decrypter.Decrypt() returned unexpected diff (-want +got):\n%s", diff)
 	}
 }

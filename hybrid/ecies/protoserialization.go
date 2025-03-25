@@ -523,3 +523,51 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 	}
 	return NewPrivateKeyFromPublicKey(secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}), publicKey)
 }
+
+type parametersSerializer struct{}
+
+var _ protoserialization.ParametersSerializer = (*parametersSerializer)(nil)
+
+func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.KeyTemplate, error) {
+	actualParameters, ok := parameters.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want *aesctrhmac.Parameters", parameters)
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(actualParameters.Variant())
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := createProtoECIESParams(actualParameters)
+	if err != nil {
+		return nil, err
+	}
+
+	format := &eciespb.EciesAeadHkdfKeyFormat{
+		Params: params,
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		return nil, err
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          privateKeyTypeURL,
+		OutputPrefixType: outputPrefixType,
+		Value:            serializedFormat,
+	}, nil
+}
+
+type parametersParser struct{}
+
+var _ protoserialization.ParametersParser = (*parametersParser)(nil)
+
+func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	if keyTemplate.GetTypeUrl() != privateKeyTypeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyTemplate.GetTypeUrl(), privateKeyTypeURL)
+	}
+	format := new(eciespb.EciesAeadHkdfKeyFormat)
+	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
+		return nil, err
+	}
+	return parseParameters(format.GetParams(), keyTemplate.GetOutputPrefixType())
+}
