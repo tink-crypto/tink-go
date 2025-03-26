@@ -1032,12 +1032,15 @@ func mustCreateKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixTyp
 	}
 }
 
-func TestSerializeParameters(t *testing.T) {
-	for _, tc := range []struct {
-		name            string
-		parameters      key.Parameters
-		wantKeyTemplate *tinkpb.KeyTemplate
-	}{
+type parametersParserTest struct {
+	name        string
+	parameters  key.Parameters
+	keyTemplate *tinkpb.KeyTemplate
+}
+
+func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
+	t.Helper()
+	return []parametersParserTest{
 		{
 			name: "2048-SHA256-VariantTink",
 			parameters: &Parameters{
@@ -1046,7 +1049,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 2048,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA256,
 				},
@@ -1062,7 +1065,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 2048,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA256,
 				},
@@ -1078,7 +1081,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 2048,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA256,
 				},
@@ -1094,7 +1097,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 2048,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA256,
 				},
@@ -1110,7 +1113,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 2048,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA384,
 				},
@@ -1126,7 +1129,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 2048,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA384,
 				},
@@ -1142,7 +1145,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 2048,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA384,
 				},
@@ -1158,7 +1161,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 2048,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA384,
 				},
@@ -1174,7 +1177,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 2048,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA512,
 				},
@@ -1190,7 +1193,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 2048,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA512,
 				},
@@ -1206,7 +1209,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 2048,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA512,
 				},
@@ -1222,7 +1225,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 2048,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA512,
 				},
@@ -1238,7 +1241,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 3072,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA256,
 				},
@@ -1254,7 +1257,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 3072,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA256,
 				},
@@ -1270,7 +1273,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 3072,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA256,
 				},
@@ -1286,7 +1289,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 3072,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA256,
 				},
@@ -1302,7 +1305,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 3072,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA384,
 				},
@@ -1318,7 +1321,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 3072,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA384,
 				},
@@ -1334,7 +1337,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 3072,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA384,
 				},
@@ -1350,7 +1353,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 3072,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA384,
 				},
@@ -1366,7 +1369,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 3072,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA512,
 				},
@@ -1382,7 +1385,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 3072,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA512,
 				},
@@ -1398,7 +1401,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 3072,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA512,
 				},
@@ -1414,7 +1417,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 3072,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA512,
 				},
@@ -1430,7 +1433,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 4096,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA256,
 				},
@@ -1446,7 +1449,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 4096,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA256,
 				},
@@ -1462,7 +1465,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 4096,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA256,
 				},
@@ -1478,7 +1481,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 4096,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA256,
 				},
@@ -1494,7 +1497,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 4096,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA384,
 				},
@@ -1510,7 +1513,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 4096,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA384,
 				},
@@ -1526,7 +1529,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 4096,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA384,
 				},
@@ -1542,7 +1545,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 4096,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA384,
 				},
@@ -1558,7 +1561,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 4096,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA512,
 				},
@@ -1574,7 +1577,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 4096,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA512,
 				},
@@ -1590,7 +1593,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 4096,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA512,
 				},
@@ -1606,7 +1609,7 @@ func TestSerializeParameters(t *testing.T) {
 				modulusSizeBits: 4096,
 				publicExponent:  f4,
 			},
-			wantKeyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
 				Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 					HashType: commonpb.HashType_SHA512,
 				},
@@ -1614,15 +1617,102 @@ func TestSerializeParameters(t *testing.T) {
 				PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
 			}),
 		},
+	}
+}
+
+func TestSerializeParameters(t *testing.T) {
+	for _, tc := range mustCreateParametersParserTests(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.SerializeParameters(tc.parameters)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeParameters(%v) err = %v, want nil", tc.parameters, err)
+			}
+			if diff := cmp.Diff(tc.keyTemplate, got, protocmp.Transform()); diff != "" {
+				t.Errorf("protoserialization.SerializeParameters(%v) returned unexpected diff (-want +got):\n%s", tc.parameters, diff)
+			}
+		})
+	}
+}
+
+func TestParseParameters(t *testing.T) {
+	for _, tc := range mustCreateParametersParserTests(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseParameters(tc.keyTemplate)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseParameters(%v) err = %v, want nil", tc.keyTemplate, err)
+			}
+			if diff := cmp.Diff(tc.parameters, got); diff != "" {
+				t.Errorf("protoserialization.ParseParameters(%v) returned unexpected diff (-want +got):\n%s", tc.keyTemplate, diff)
+			}
+		})
+	}
+}
+
+func TestParseParametersFails(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		keyTemplate *tinkpb.KeyTemplate
+	}{
+		{
+			name: "invalid output prefix type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
+				Value: mustMarshalProto(t, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+					Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+						HashType: commonpb.HashType_SHA256,
+					},
+					ModulusSizeInBits: 2048,
+					PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+				}),
+			},
+		},
+		{
+			name: "invalid hash type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshalProto(t, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+					Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+						HashType: commonpb.HashType_UNKNOWN_HASH,
+					},
+					ModulusSizeInBits: 2048,
+					PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+				}),
+			},
+		},
+		{
+			name: "invalid modulus size",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshalProto(t, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+					Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+						HashType: commonpb.HashType_SHA256,
+					},
+					ModulusSizeInBits: 1024,
+					PublicExponent:    new(big.Int).SetUint64(uint64(f4)).Bytes(),
+				}),
+			},
+		},
+		{
+			name: "invalid public exponent",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshalProto(t, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+					Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+						HashType: commonpb.HashType_SHA256,
+					},
+					ModulusSizeInBits: 2048,
+					PublicExponent:    new(big.Int).SetUint64(uint64(f4) - 1).Bytes(),
+				}),
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			serializer := &parametersSerializer{}
-			gotKeyTemplate, err := serializer.Serialize(tc.parameters)
-			if err != nil {
-				t.Errorf("serializer.Serialize(%v) err = %v, want nil", tc.parameters, err)
-			}
-			if diff := cmp.Diff(tc.wantKeyTemplate, gotKeyTemplate, protocmp.Transform()); diff != "" {
-				t.Errorf("serializer.Serialize(%v) returned unexpected diff (-want +got):\n%s", tc.parameters, diff)
+			if _, err := protoserialization.ParseParameters(tc.keyTemplate); err == nil {
+				t.Errorf("protoserialization.ParseParameters(%v) err = nil, want error", tc.keyTemplate)
 			}
 		})
 	}

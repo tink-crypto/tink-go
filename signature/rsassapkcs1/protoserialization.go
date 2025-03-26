@@ -143,6 +143,19 @@ func hashTypeFromProto(hashType commonpb.HashType) (HashType, error) {
 	}
 }
 
+func parseParameters(protoHashType commonpb.HashType, outputPrefixType tinkpb.OutputPrefixType, modulusSizeBits int, exponent *big.Int) (*Parameters, error) {
+	variant, err := variantFromProto(outputPrefixType)
+	if err != nil {
+		return nil, err
+	}
+	hashType, err := hashTypeFromProto(protoHashType)
+	if err != nil {
+		return nil, err
+	}
+	// Tolerate leading zeros in modulus encoding.
+	return NewParameters(modulusSizeBits, hashType, int(exponent.Int64()), variant)
+}
+
 func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
 	keyData := keySerialization.KeyData()
 	if keyData.GetTypeUrl() != verifierTypeURL {
@@ -158,21 +171,13 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	if protoKey.GetVersion() != publicKeyProtoVersion {
 		return nil, fmt.Errorf("public key has unsupported version: %v", protoKey.GetVersion())
 	}
-	variant, err := variantFromProto(keySerialization.OutputPrefixType())
-	if err != nil {
-		return nil, err
-	}
-	hashType, err := hashTypeFromProto(protoKey.GetParams().GetHashType())
-	if err != nil {
-		return nil, err
-	}
-	// Tolerate leading zeros in modulus encoding.
 	modulus := new(big.Int).SetBytes(protoKey.GetN())
 	exponent := new(big.Int).SetBytes(protoKey.GetE())
-	params, err := NewParameters(modulus.BitLen(), hashType, int(exponent.Int64()), variant)
+	params, err := parseParameters(protoKey.GetParams().GetHashType(), keySerialization.OutputPrefixType(), modulus.BitLen(), exponent)
 	if err != nil {
 		return nil, err
 	}
+
 	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
 	keyID, _ := keySerialization.IDRequirement()
 	return NewPublicKey(modulus.Bytes(), keyID, params)
@@ -339,4 +344,20 @@ func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.Key
 		OutputPrefixType: outputPrefixType,
 		Value:            serializedFormat,
 	}, nil
+}
+
+type parametersParser struct{}
+
+var _ protoserialization.ParametersParser = (*parametersParser)(nil)
+
+func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	if keyTemplate.GetTypeUrl() != signerTypeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyTemplate.GetTypeUrl(), signerTypeURL)
+	}
+	format := new(rsassapkcs1pb.RsaSsaPkcs1KeyFormat)
+	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
+		return nil, err
+	}
+	exponent := new(big.Int).SetBytes(format.GetPublicExponent())
+	return parseParameters(format.GetParams().GetHashType(), keyTemplate.GetOutputPrefixType(), int(format.GetModulusSizeInBits()), exponent)
 }
