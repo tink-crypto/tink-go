@@ -675,14 +675,14 @@ func TestSerializeParameters(t *testing.T) {
 		t.Fatalf("proto.Marshal(format) err = %v, want nil", err)
 	}
 	for _, tc := range []struct {
-		name            string
-		parameters      key.Parameters
-		wantKeyTemplate *tinkpb.KeyTemplate
+		name       string
+		parameters key.Parameters
+		want       *tinkpb.KeyTemplate
 	}{
 		{
 			name:       "parameters with TINK variant",
 			parameters: &Parameters{variant: VariantTink},
-			wantKeyTemplate: &tinkpb.KeyTemplate{
+			want: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 				Value:            serializedFormat,
@@ -691,7 +691,7 @@ func TestSerializeParameters(t *testing.T) {
 		{
 			name:       "parameters with CRUNCHY variant",
 			parameters: &Parameters{variant: VariantCrunchy},
-			wantKeyTemplate: &tinkpb.KeyTemplate{
+			want: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
 				Value:            serializedFormat,
@@ -700,7 +700,7 @@ func TestSerializeParameters(t *testing.T) {
 		{
 			name:       "parameters with LEGACY variant",
 			parameters: &Parameters{variant: VariantLegacy},
-			wantKeyTemplate: &tinkpb.KeyTemplate{
+			want: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_LEGACY,
 				Value:            serializedFormat,
@@ -709,7 +709,7 @@ func TestSerializeParameters(t *testing.T) {
 		{
 			name:       "parameters with NO_PREFIX variant",
 			parameters: &Parameters{variant: VariantNoPrefix},
-			wantKeyTemplate: &tinkpb.KeyTemplate{
+			want: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
 				Value:            serializedFormat,
@@ -717,13 +717,111 @@ func TestSerializeParameters(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			serializer := &parametersSerializer{}
-			gotKeyTemplate, err := serializer.Serialize(tc.parameters)
+			got, err := protoserialization.SerializeParameters(tc.parameters)
 			if err != nil {
-				t.Errorf("serializer.Serialize(%v) err = %v, want nil", tc.parameters, err)
+				t.Fatalf("protoserialization.SerializeParameters(%v) err = %v, want nil", tc.parameters, err)
 			}
-			if diff := cmp.Diff(tc.wantKeyTemplate, gotKeyTemplate, protocmp.Transform()); diff != "" {
-				t.Errorf("serializer.Serialize(%v) returned unexpected diff (-want +got):\n%s", tc.parameters, diff)
+			if diff := cmp.Diff(tc.want, got, protocmp.Transform()); diff != "" {
+				t.Errorf("protoserialization.SerializeParameters(%v) returned unexpected diff (-want +got):\n%s", tc.parameters, diff)
+			}
+		})
+	}
+}
+
+func TestParseParameters(t *testing.T) {
+	format := &ed25519pb.Ed25519KeyFormat{
+		Version: 0,
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		t.Fatalf("proto.Marshal(format) err = %v, want nil", err)
+	}
+	for _, tc := range []struct {
+		name     string
+		want     key.Parameters
+		template *tinkpb.KeyTemplate
+	}{
+		{
+			name: "parameters with TINK variant",
+			want: &Parameters{variant: VariantTink},
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value:            serializedFormat,
+			},
+		},
+		{
+			name: "parameters with CRUNCHY variant",
+			want: &Parameters{variant: VariantCrunchy},
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
+				Value:            serializedFormat,
+			},
+		},
+		{
+			name: "parameters with LEGACY variant",
+			want: &Parameters{variant: VariantLegacy},
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_LEGACY,
+				Value:            serializedFormat,
+			},
+		},
+		{
+			name: "parameters with NO_PREFIX variant",
+			want: &Parameters{variant: VariantNoPrefix},
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+				Value:            serializedFormat,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseParameters(tc.template)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseParameters(%v) err = %v, want nil", tc.template, err)
+			}
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("protoserialization.ParseParameters(%v) returned unexpected diff (-want +got):\n%s", tc.template, diff)
+			}
+		})
+	}
+}
+
+func TestParseParametersFails(t *testing.T) {
+	format := &ed25519pb.Ed25519KeyFormat{
+		Version: 0,
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		t.Fatalf("proto.Marshal(format) err = %v, want nil", err)
+	}
+	for _, tc := range []struct {
+		name     string
+		template *tinkpb.KeyTemplate
+	}{
+		{
+			name: "invalid output prefix type",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
+				Value:            serializedFormat,
+			},
+		},
+		{
+			name: "invalid value",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value:            []byte("invalid_value"),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseParameters(tc.template); err == nil {
+				t.Errorf("protoserialization.ParseParameters(%v) err = nil, want error", tc.template)
 			}
 		})
 	}

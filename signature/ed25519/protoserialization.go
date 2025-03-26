@@ -243,3 +243,27 @@ func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.Key
 		Value:            serializedFormat,
 	}, nil
 }
+
+type parametersParser struct{}
+
+var _ protoserialization.ParametersParser = (*parametersParser)(nil)
+
+func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	if keyTemplate.GetTypeUrl() != signerTypeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyTemplate.GetTypeUrl(), signerTypeURL)
+	}
+	format := new(ed25519pb.Ed25519KeyFormat)
+	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
+		return nil, err
+	}
+
+	variant, err := variantFromProto(keyTemplate.GetOutputPrefixType())
+	if err != nil {
+		return nil, err
+	}
+	params, err := NewParameters(variant)
+	if err != nil {
+		return nil, err
+	}
+	return &params, nil
+}

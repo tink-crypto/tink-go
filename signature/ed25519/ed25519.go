@@ -50,6 +50,9 @@ func init() {
 	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
 		panic(fmt.Sprintf("ed25519.init() failed: %v", err))
 	}
+	if err := protoserialization.RegisterParametersParser(signerTypeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("ed25519.init() failed: %v", err))
+	}
 	if err := registryconfig.RegisterPrimitiveConstructor[*PublicKey](verifierConstructor); err != nil {
 		panic(fmt.Sprintf("ed25519.init() failed: %v", err))
 	}
