@@ -314,27 +314,35 @@ func removeLeftPaddingFromBigInt(bigIntValue []byte, size int) ([]byte, error) {
 	return bigIntValue[len(bigIntValue)-size:], nil
 }
 
-func newPublicKeyFromProto(protoECDSAKey *ecdsapb.EcdsaPublicKey, outputPrefixType tinkpb.OutputPrefixType, keyID uint32) (*PublicKey, error) {
-	if protoECDSAKey.GetVersion() > verifierKeyVersion {
-		return nil, fmt.Errorf("public key has unsupported version: %v", protoECDSAKey.GetVersion())
+func parseParameters(protoParameters *ecdsapb.EcdsaParams, outputPrefixType tinkpb.OutputPrefixType) (*Parameters, error) {
+	curveType, err := curveTypeFromProto(protoParameters.GetCurve())
+	if err != nil {
+		return nil, err
+	}
+	hashType, err := hashTypeFromProto(protoParameters.GetHashType())
+	if err != nil {
+		return nil, err
+	}
+	signatureEncoding, err := signatureEncodingFromProto(protoParameters.GetEncoding())
+	if err != nil {
+		return nil, err
 	}
 	variant, err := variantFromProto(outputPrefixType)
 	if err != nil {
 		return nil, err
 	}
+	return NewParameters(curveType, hashType, signatureEncoding, variant)
+}
+
+func newPublicKeyFromProto(protoECDSAKey *ecdsapb.EcdsaPublicKey, outputPrefixType tinkpb.OutputPrefixType, keyID uint32) (*PublicKey, error) {
+	if protoECDSAKey.GetVersion() > verifierKeyVersion {
+		return nil, fmt.Errorf("public key has unsupported version: %v", protoECDSAKey.GetVersion())
+	}
+	params, err := parseParameters(protoECDSAKey.GetParams(), outputPrefixType)
+	if err != nil {
+		return nil, err
+	}
 	curveType, err := curveTypeFromProto(protoECDSAKey.GetParams().GetCurve())
-	if err != nil {
-		return nil, err
-	}
-	hashType, err := hashTypeFromProto(protoECDSAKey.GetParams().GetHashType())
-	if err != nil {
-		return nil, err
-	}
-	signatureEncoding, err := signatureEncodingFromProto(protoECDSAKey.GetParams().GetEncoding())
-	if err != nil {
-		return nil, err
-	}
-	params, err := NewParameters(curveType, hashType, signatureEncoding, variant)
 	if err != nil {
 		return nil, err
 	}
@@ -525,4 +533,19 @@ func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.Key
 		OutputPrefixType: outputPrefixType,
 		Value:            serializedFormat,
 	}, nil
+}
+
+type parametersParser struct{}
+
+var _ protoserialization.ParametersParser = (*parametersParser)(nil)
+
+func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	if keyTemplate.GetTypeUrl() != signerTypeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyTemplate.GetTypeUrl(), signerTypeURL)
+	}
+	format := new(ecdsapb.EcdsaKeyFormat)
+	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
+		return nil, err
+	}
+	return parseParameters(format.GetParams(), keyTemplate.GetOutputPrefixType())
 }
