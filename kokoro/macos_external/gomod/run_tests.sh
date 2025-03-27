@@ -29,9 +29,8 @@ source ./kokoro/testutils/install_go.sh
 
 echo "Using go binary from $(which go): $(go version)"
 
-readonly TINK_GO_MODULE_URL="github.com/tink-crypto/tink-go"
-readonly TINK_VERSION="$(cat ${TINK_GO_PROJECT_PATH}/tink/version.go \
-                        | grep 'Version =' \
-                        | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')"
-./kokoro/testutils/run_go_mod_tests.sh "${TINK_GO_MODULE_URL}" \
-  "${TINK_GO_PROJECT_PATH}" "${TINK_VERSION}" "main"
+(
+  set -x
+  go build -v ./...
+  go test -v ./...
+)
