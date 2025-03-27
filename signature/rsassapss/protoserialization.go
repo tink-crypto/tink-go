@@ -149,6 +149,29 @@ func hashTypeFromProto(hashType commonpb.HashType) (HashType, error) {
 	}
 }
 
+func parseParameters(protoHashType, protoMGF1HashType commonpb.HashType, outputPrefixType tinkpb.OutputPrefixType, modulusSizeBits int, exponent *big.Int, saltLength int) (*Parameters, error) {
+	hashType, err := hashTypeFromProto(protoHashType)
+	if err != nil {
+		return nil, err
+	}
+	mgf1HashType, err := hashTypeFromProto(protoMGF1HashType)
+	if err != nil {
+		return nil, err
+	}
+	variant, err := variantFromProto(outputPrefixType)
+	if err != nil {
+		return nil, err
+	}
+	// Tolerate leading zeros in modulus encoding.
+	return NewParameters(ParametersValues{
+		ModulusSizeBits: modulusSizeBits,
+		SigHashType:     hashType,
+		MGF1HashType:    mgf1HashType,
+		PublicExponent:  int(exponent.Int64()),
+		SaltLengthBytes: saltLength,
+	}, variant)
+}
+
 func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
 	keyData := keySerialization.KeyData()
 	if keyData.GetTypeUrl() != verifierTypeURL {
@@ -164,28 +187,13 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	if protoKey.GetVersion() != publicKeyProtoVersion {
 		return nil, fmt.Errorf("public key has unsupported version: %v", protoKey.GetVersion())
 	}
-	variant, err := variantFromProto(keySerialization.OutputPrefixType())
-	if err != nil {
-		return nil, err
-	}
-	sigHashType, err := hashTypeFromProto(protoKey.GetParams().GetSigHash())
-	if err != nil {
-		return nil, err
-	}
-	mgf1HashType, err := hashTypeFromProto(protoKey.GetParams().GetMgf1Hash())
-	if err != nil {
-		return nil, err
-	}
 	// Tolerate leading zeros in modulus encoding.
 	modulus := new(big.Int).SetBytes(protoKey.GetN())
 	exponent := new(big.Int).SetBytes(protoKey.GetE())
-	params, err := NewParameters(ParametersValues{
-		ModulusSizeBits: modulus.BitLen(),
-		SigHashType:     sigHashType,
-		MGF1HashType:    mgf1HashType,
-		PublicExponent:  int(exponent.Int64()),
-		SaltLengthBytes: int(protoKey.GetParams().GetSaltLength()),
-	}, variant)
+	signHash := protoKey.GetParams().GetSigHash()
+	mgf1Hash := protoKey.GetParams().GetMgf1Hash()
+	saltLength := int(protoKey.GetParams().GetSaltLength())
+	params, err := parseParameters(signHash, mgf1Hash, keySerialization.OutputPrefixType(), modulus.BitLen(), exponent, saltLength)
 	if err != nil {
 		return nil, err
 	}
@@ -377,4 +385,23 @@ func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.Key
 		OutputPrefixType: outputPrefixType,
 		Value:            serializedFormat,
 	}, nil
+}
+
+type parametersParser struct{}
+
+var _ protoserialization.ParametersParser = (*parametersParser)(nil)
+
+func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	if keyTemplate.GetTypeUrl() != signerTypeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyTemplate.GetTypeUrl(), signerTypeURL)
+	}
+	format := new(rsassapsspb.RsaSsaPssKeyFormat)
+	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
+		return nil, err
+	}
+	exponent := new(big.Int).SetBytes(format.GetPublicExponent())
+	signHash := format.GetParams().GetSigHash()
+	mgf1Hash := format.GetParams().GetMgf1Hash()
+	saltLength := int(format.GetParams().GetSaltLength())
+	return parseParameters(signHash, mgf1Hash, keyTemplate.GetOutputPrefixType(), int(format.GetModulusSizeInBits()), exponent, saltLength)
 }
