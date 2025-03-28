@@ -39,6 +39,14 @@ fi
 ./kokoro/testutils/run_command.sh "${RUN_COMMAND_ARGS[@]}" \
   ./kokoro/testutils/check_go_generated_files_up_to_date.sh .
 
+cat <<EOF > env_variables.txt
+GOARCH
+EOF
+
+RUN_COMMAND_ARGS+=( -e env_variables.txt )
+
+readonly RUN_COMMAND_ARGS
+
 cat <<EOF > _run_test.sh
 #!/bin/bash
 set -euo pipefail
@@ -55,6 +63,7 @@ trap cleanup EXIT
 
 cleanup() {
   rm -rf _run_test.sh
+  rm -rf env_variables.txt
 }
 
 ./kokoro/testutils/run_command.sh "${RUN_COMMAND_ARGS[@]}" \
