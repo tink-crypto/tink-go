@@ -70,7 +70,7 @@ func createHMACPRFKeyTemplate(keySize uint32, hashType commonpb.HashType) *tinkp
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key format: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          hmacprfTypeURL,
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.HmacPrfKey",
 		OutputPrefixType: tinkpb.OutputPrefixType_RAW,
 		Value:            serializedFormat,
 	}

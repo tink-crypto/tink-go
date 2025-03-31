@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package prf_test
+package hmac_test
 
 import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -33,60 +34,60 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func TestGetPrimitiveHMACBasic(t *testing.T) {
+func TestKeyManagerGetPrimitiveBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("HMAC PRF key manager not found: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	testKeys := genValidHMACPRFKeys()
 	for i := 0; i < len(testKeys); i++ {
 		serializedKey, err := proto.Marshal(testKeys[i])
 		if err != nil {
-			t.Errorf("proto.Marshal() err = %q, want nil", err)
+			t.Fatalf("proto.Marshal() err = %q, want nil", err)
 		}
 		p, err := km.Primitive(serializedKey)
 		if err != nil {
-			t.Errorf("unexpected error in test case %d: %s", i, err)
+			t.Fatalf("km.Primitive() err = %q, want nil in test case %d", err, i)
 		}
-		if err := validateHMACPRFPrimitive(p, testKeys[i]); err != nil {
+		if err := validatePrimitive(p, testKeys[i]); err != nil {
 			t.Errorf("%s", err)
 		}
 	}
 }
 
-func TestGetPrimitiveHMACWithInvalidInput(t *testing.T) {
+func TestKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain HMAC PRFkey manager: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	// invalid key
 	testKeys := genInvalidHMACPRFKeys()
 	for i := 0; i < len(testKeys); i++ {
 		serializedKey, err := proto.Marshal(testKeys[i])
 		if err != nil {
-			t.Errorf("proto.Marshal() err = %q, want nil", err)
+			t.Fatalf("proto.Marshal() err = %q, want nil", err)
 		}
 		if _, err := km.Primitive(serializedKey); err == nil {
-			t.Errorf("expect an error in test case %d", i)
+			t.Errorf("km.Primitive() err = nil, want non-nil in test case %d", i)
 		}
 	}
 	if _, err := km.Primitive(nil); err == nil {
-		t.Errorf("expect an error when input is nil")
+		t.Fatalf("km.Primitive() err = nil, want non-nil when input is nil")
 	}
 	// empty input
 	if _, err := km.Primitive([]byte{}); err == nil {
-		t.Errorf("expect an error when input is empty")
+		t.Errorf("km.Primitive() err = nil, want non-nil when input is empty")
 	}
 }
 
-func TestNewKeyHMACMultipleTimes(t *testing.T) {
+func TestKeyManagerNewKeyMultipleTimes(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain HMAC PRF key manager: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	serializedFormat, err := proto.Marshal(testutil.NewHMACPRFKeyFormat(commonpb.HashType_SHA256))
 	if err != nil {
-		t.Errorf("proto.Marshal() err = %q, want nil", err)
+		t.Fatalf("proto.Marshal() err = %q, want nil", err)
 	}
 	keys := make(map[string]bool)
 	nTest := 26
@@ -109,14 +110,14 @@ func TestNewKeyHMACMultipleTimes(t *testing.T) {
 		keys[string(serializedKey)] = true
 	}
 	if len(keys) != nTest*2 {
-		t.Errorf("key is repeated")
+		t.Errorf("km.NewKey() and km.NewKeyData() produced repeated keys")
 	}
 }
 
-func TestNewKeyHMACBasic(t *testing.T) {
+func TestKeyManagerNewKeyBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain HMAC PRF key manager: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	testFormats := genValidHMACPRFKeyFormats()
 	for i := 0; i < len(testFormats); i++ {
@@ -126,18 +127,18 @@ func TestNewKeyHMACBasic(t *testing.T) {
 		}
 		key, err := km.NewKey(serializedFormat)
 		if err != nil {
-			t.Errorf("unexpected error in test case %d: %s", i, err)
+			t.Fatalf("km.NewKey() err = %q, want nil in test case %d", err, i)
 		}
-		if err := validateHMACPRFKey(testFormats[i], key.(*hmacpb.HmacPrfKey)); err != nil {
+		if err := validateKey(testFormats[i], key.(*hmacpb.HmacPrfKey)); err != nil {
 			t.Errorf("%s", err)
 		}
 	}
 }
 
-func TestNewKeyHMACWithInvalidInput(t *testing.T) {
+func TestKeyManagerNewKeyWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain HMAC PRF key manager: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	// invalid key formats
 	testFormats := genInvalidHMACPRFKeyFormats()
@@ -147,22 +148,22 @@ func TestNewKeyHMACWithInvalidInput(t *testing.T) {
 			fmt.Println("Error!")
 		}
 		if _, err := km.NewKey(serializedFormat); err == nil {
-			t.Errorf("expect an error in test case %d: %s", i, err)
+			t.Errorf("km.NewKey() err = nil, want non-nil in test case %d", i)
 		}
 	}
 	if _, err := km.NewKey(nil); err == nil {
-		t.Errorf("expect an error when input is nil")
+		t.Errorf("km.NewKey() err = nil, want non-nil when input is nil")
 	}
 	// empty input
 	if _, err := km.NewKey([]byte{}); err == nil {
-		t.Errorf("expect an error when input is empty")
+		t.Errorf("km.NewKey() err = nil, want non-nil when input is empty")
 	}
 }
 
-func TestNewKeyDataHMACBasic(t *testing.T) {
+func TestKeyManagerNewKeyDataBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain HMAC PRF key manager: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	testFormats := genValidHMACPRFKeyFormats()
 	for i := 0; i < len(testFormats); i++ {
@@ -172,28 +173,28 @@ func TestNewKeyDataHMACBasic(t *testing.T) {
 		}
 		keyData, err := km.NewKeyData(serializedFormat)
 		if err != nil {
-			t.Errorf("unexpected error in test case %d: %s", i, err)
+			t.Fatalf("km.NewKeyData() err = %q, want nil in test case %d", err, i)
 		}
-		if keyData.TypeUrl != testutil.HMACPRFTypeURL {
-			t.Errorf("incorrect type url in test case %d", i)
+		if keyData.GetTypeUrl() != testutil.HMACPRFTypeURL {
+			t.Errorf("km.NewKeyData() returned incorrect type url in test case %d", i)
 		}
-		if keyData.KeyMaterialType != tinkpb.KeyData_SYMMETRIC {
-			t.Errorf("incorrect key material type in test case %d", i)
+		if keyData.GetKeyMaterialType() != tinkpb.KeyData_SYMMETRIC {
+			t.Errorf("km.NewKeyData() returned incorrect key material type in test case %d", i)
 		}
 		key := new(hmacpb.HmacPrfKey)
 		if err := proto.Unmarshal(keyData.Value, key); err != nil {
-			t.Errorf("invalid key value")
+			t.Fatalf("proto.Unmarshal() err = %q, want nil", err)
 		}
-		if err := validateHMACPRFKey(testFormats[i], key); err != nil {
-			t.Errorf("invalid key")
+		if err := validateKey(testFormats[i], key); err != nil {
+			t.Errorf("validateKey() err = %q, want nil", err)
 		}
 	}
 }
 
-func TestNewKeyDataHMACWithInvalidInput(t *testing.T) {
+func TestKeyManagerNewKeyDataWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("HMAC PRF key manager not found: %s", err)
+		t.Errorf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	// invalid key formats
 	testFormats := genInvalidHMACPRFKeyFormats()
@@ -203,60 +204,60 @@ func TestNewKeyDataHMACWithInvalidInput(t *testing.T) {
 			t.Fatalf("proto.Marshal() err = %q, want nil", err)
 		}
 		if _, err := km.NewKeyData(serializedFormat); err == nil {
-			t.Errorf("expect an error in test case %d", i)
+			t.Errorf("km.NewKeyData() err = nil, want non-nil in test case %d", i)
 		}
 	}
 	// nil input
 	if _, err := km.NewKeyData(nil); err == nil {
-		t.Errorf("expect an error when input is nil")
+		t.Errorf("km.NewKeyData() err = nil, want non-nil when input is nil")
 	}
 }
 
-func TestHMACDoesSupport(t *testing.T) {
+func TestKeyManagerDoesSupport(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("HMAC PRF key manager not found: %s", err)
+		t.Errorf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	if !km.DoesSupport(testutil.HMACPRFTypeURL) {
-		t.Errorf("HMACPRFKeyManager must support %s", testutil.HMACPRFTypeURL)
+		t.Errorf("km.DoesSupport() = false, want true")
 	}
 	if km.DoesSupport("some bad type") {
-		t.Errorf("HMACPRFKeyManager must support only %s", testutil.HMACPRFTypeURL)
+		t.Errorf("km.DoesSupport() = true, want false")
 	}
 }
 
-func TestHMACTypeURL(t *testing.T) {
+func TestKeyManagerTypeURL(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("HMAC PRF key manager not found: %s", err)
+		t.Errorf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	if km.TypeURL() != testutil.HMACPRFTypeURL {
-		t.Errorf("incorrect GetKeyType()")
+		t.Errorf("km.TypeURL() = %q, want %q", km.TypeURL(), testutil.HMACPRFTypeURL)
 	}
 }
 
-func TestHMACKeyMaterialType(t *testing.T) {
+func TestKeyManagerKeyMaterialType(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HMACPRFTypeURL, err)
 	}
 	keyManager, ok := km.(internalregistry.DerivableKeyManager)
 	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
+		t.Fatalf("km.(internalregistry.DerivableKeyManager) failed")
 	}
 	if got, want := keyManager.KeyMaterialType(), tinkpb.KeyData_SYMMETRIC; got != want {
 		t.Errorf("KeyMaterialType() = %v, want %v", got, want)
 	}
 }
 
-func TestHMACDeriveKey(t *testing.T) {
+func TestKeyManagerDeriveKey(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HMACPRFTypeURL, err)
 	}
 	keyManager, ok := km.(internalregistry.DerivableKeyManager)
 	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
+		t.Fatalf("km.(internalregistry.DerivableKeyManager) failed")
 	}
 	keyFormat, err := proto.Marshal(&hmacpb.HmacPrfKeyFormat{
 		Version: testutil.HMACPRFKeyVersion,
@@ -282,14 +283,14 @@ func TestHMACDeriveKey(t *testing.T) {
 	}
 }
 
-func TestHMACDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HMACPRFTypeURL, err)
 	}
 	keyManager, ok := km.(internalregistry.DerivableKeyManager)
 	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
+		t.Fatalf("km.(internalregistry.DerivableKeyManager) failed")
 	}
 
 	validKeyFormat := &hmacpb.HmacPrfKeyFormat{
@@ -348,14 +349,14 @@ func TestHMACDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	}
 }
 
-func TestHMACDeriveKeyFailsWithMalformedKeyFormats(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithMalformedKeyFormats(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HMACPRFTypeURL, err)
 	}
 	keyManager, ok := km.(internalregistry.DerivableKeyManager)
 	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
+		t.Fatalf("km.(internalregistry.DerivableKeyManager) failed")
 	}
 	// Proto messages start with a VarInt, which always ends with a byte with the
 	// MSB unset, so 0x80 is invalid.
@@ -389,14 +390,14 @@ func TestHMACDeriveKeyFailsWithMalformedKeyFormats(t *testing.T) {
 	}
 }
 
-func TestHMACDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HMACPRFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HMACPRFTypeURL, err)
 	}
 	keyManager, ok := km.(internalregistry.DerivableKeyManager)
 	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
+		t.Fatalf("km.(internalregistry.DerivableKeyManager) failed")
 	}
 	keyFormat, err := proto.Marshal(&hmacpb.HmacPrfKeyFormat{
 		Version: testutil.HMACPRFKeyVersion,
@@ -475,42 +476,42 @@ func genValidHMACPRFKeys() []*hmacpb.HmacPrfKey {
 }
 
 // Checks whether the given HMACPRFKey matches the given key HMACPRFKeyFormat
-func validateHMACPRFKey(format *hmacpb.HmacPrfKeyFormat, key *hmacpb.HmacPrfKey) error {
+func validateKey(format *hmacpb.HmacPrfKeyFormat, key *hmacpb.HmacPrfKey) error {
 	if format.KeySize != uint32(len(key.KeyValue)) ||
 		key.Params.Hash != format.Params.Hash {
-		return fmt.Errorf("key format and generated key do not match")
+		return fmt.Errorf("key format and generated key do not match, format: %v, key: %v", format, key)
 	}
 	p, err := subtle.NewHMACPRF(commonpb.HashType_name[int32(key.Params.Hash)], key.KeyValue)
 	if err != nil {
-		return fmt.Errorf("cannot create primitive from key: %s", err)
+		return fmt.Errorf("subtle.NewHMACPRF() err = %q, want nil", err)
 	}
-	return validateHMACPRFPrimitive(p, key)
+	return validatePrimitive(p, key)
 }
 
-// validateHMACPRFPrimitive checks whether the given primitive can compute a PRF of length 16
-func validateHMACPRFPrimitive(p any, key *hmacpb.HmacPrfKey) error {
+// validatePrimitive checks whether the given primitive can compute a PRF of length 16
+func validatePrimitive(p any, key *hmacpb.HmacPrfKey) error {
 	hmac := p.(prf.PRF)
 	prfPrimitive, err := subtle.NewHMACPRF(commonpb.HashType_name[int32(key.Params.Hash)], key.KeyValue)
 	if err != nil {
-		return fmt.Errorf("Could not create HMAC PRF with key material %q: %s", hex.EncodeToString(key.KeyValue), err)
+		return fmt.Errorf("subtle.NewHMACPRF() err = %q, want nil", err)
 	}
 	data := random.GetRandomBytes(20)
 	res, err := hmac.ComputePRF(data, 16)
 	if err != nil {
-		return fmt.Errorf("prf computation failed: %s", err)
+		return fmt.Errorf("hmac.ComputePRF() err = %q, want nil", err)
 	}
 	if len(res) != 16 {
-		return fmt.Errorf("prf computation did not produce 16 byte output")
+		return fmt.Errorf("hmac.ComputePRF() produced %d bytes, want 16", len(res))
 	}
 	res2, err := prfPrimitive.ComputePRF(data, 16)
 	if err != nil {
-		return fmt.Errorf("prf computation failed: %s", err)
+		return fmt.Errorf("prfPrimitive.ComputePRF() err = %q, want nil", err)
 	}
 	if len(res2) != 16 {
-		return fmt.Errorf("prf computation did not produce 16 byte output")
+		return fmt.Errorf("prfPrimitive.ComputePRF() produced %d bytes, want 16", len(res2))
 	}
 	if hex.EncodeToString(res) != hex.EncodeToString(res2) {
-		return fmt.Errorf("prf computation did not produce the same output for the same key and input")
+		return fmt.Errorf("hmac.ComputePRF() and prfPrimitive.ComputePRF() produced different outputs for the same key and input")
 	}
 	return nil
 }

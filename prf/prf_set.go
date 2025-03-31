@@ -18,11 +18,10 @@ package prf
 import (
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	_ "github.com/tink-crypto/tink-go/v2/prf/aescmac" // To register the AES-CMAC PRF key manager.
 	_ "github.com/tink-crypto/tink-go/v2/prf/hkdf"       // To register the HKDF PRF key manager.
+	_ "github.com/tink-crypto/tink-go/v2/prf/hmac"       // To register the HMAC PRF key manager.
 )
 
 // The PRF interface is an abstraction for an element of a pseudo-random
@@ -101,13 +100,4 @@ func (s Set) ComputePrimaryPRF(input []byte, outputLength uint32) ([]byte, error
 		return nil, fmt.Errorf("Could not find primary ID %d in prf.Set", s.PrimaryID)
 	}
 	return prf.ComputePRF(input, outputLength)
-}
-
-func init() {
-	if err := registry.RegisterKeyManager(new(hmacprfKeyManager)); err != nil {
-		panic(fmt.Sprintf("prf.init() failed: %v", err))
-	}
-	if err := internalregistry.AllowKeyDerivation(hmacprfTypeURL); err != nil {
-		panic(fmt.Sprintf("prf.init() failed: %v", err))
-	}
 }
