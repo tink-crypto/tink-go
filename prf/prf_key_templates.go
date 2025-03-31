@@ -91,7 +91,7 @@ func createHKDFPRFKeyTemplate(keySize uint32, hashType commonpb.HashType, salt [
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key format: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          hkdfprfTypeURL,
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.HkdfPrfKey",
 		OutputPrefixType: tinkpb.OutputPrefixType_RAW,
 		Value:            serializedFormat,
 	}

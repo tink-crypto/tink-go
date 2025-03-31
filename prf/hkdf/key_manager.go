@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package prf
+package hkdf
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
@@ -30,106 +29,101 @@ import (
 )
 
 const (
-	hkdfprfKeyVersion = 0
-	hkdfprfTypeURL    = "type.googleapis.com/google.crypto.tink.HkdfPrfKey"
+	keyVersion = 0
+	typeURL    = "type.googleapis.com/google.crypto.tink.HkdfPrfKey"
 )
 
-var errInvalidHKDFPRFKey = errors.New("hkdf_prf_key_manager: invalid key")
-var errInvalidHKDFPRFKeyFormat = errors.New("hkdf_prf_key_manager: invalid key format")
+// keyManager implements the [registry.KeyManager] interface. It generates
+// new HKDF PRF keys and produces new instances of [prf.PRF].
+type keyManager struct{}
 
-// hkdfprfKeyManager generates new HKDF PRF keys and produces new instances of HKDF.
-type hkdfprfKeyManager struct{}
+var _ registry.KeyManager = (*keyManager)(nil)
 
-// Assert that hkdfprfKeyManager implements the KeyManager interface.
-var _ registry.KeyManager = (*hkdfprfKeyManager)(nil)
-
-// Primitive constructs a HKDF instance for the given serialized HKDFKey.
-func (km *hkdfprfKeyManager) Primitive(serializedKey []byte) (any, error) {
+// Primitive constructs a HKDF instance for the given serialized [hkdfpb.HkdfPrfKey].
+func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
-		return nil, errInvalidHKDFPRFKey
+		return nil, fmt.Errorf("hkdf_prf_key_manager: empty key")
 	}
 	key := new(hkdfpb.HkdfPrfKey)
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidHKDFPRFKey
+		return nil, fmt.Errorf("hkdf_prf_key_manager: invalid key")
 	}
 	if err := km.validateKey(key); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hkdf_prf_key_manager: %v", err)
 	}
 	hash := commonpb.HashType_name[int32(key.GetParams().GetHash())]
 	hkdf, err := subtle.NewHKDFPRF(hash, key.GetKeyValue(), key.GetParams().GetSalt())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hkdf_prf_key_manager: %v", err)
 	}
 	return hkdf, nil
 }
 
-// NewKey generates a new HKDFPRFKey according to specification in the given HKDFPRFKeyFormat.
-func (km *hkdfprfKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+// NewKey generates a new [hkdfpb.HkdfPrfKey] according to specification in
+// the given [hkdfpb.HkdfPrfKeyFormat].
+func (km *keyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
 	if len(serializedKeyFormat) == 0 {
-		return nil, errInvalidHKDFPRFKeyFormat
+		return nil, fmt.Errorf("hkdf_prf_key_manager: empty key format")
 	}
 	keyFormat := new(hkdfpb.HkdfPrfKeyFormat)
 	if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
-		return nil, errInvalidHKDFPRFKeyFormat
+		return nil, fmt.Errorf("hkdf_prf_key_manager: invalid key format")
 	}
 	if err := km.validateKeyFormat(keyFormat); err != nil {
 		return nil, fmt.Errorf("hkdf_prf_key_manager: invalid key format: %s", err)
 	}
 	keyValue := random.GetRandomBytes(keyFormat.GetKeySize())
 	return &hkdfpb.HkdfPrfKey{
-		Version:  hkdfprfKeyVersion,
+		Version:  keyVersion,
 		Params:   keyFormat.GetParams(),
 		KeyValue: keyValue,
 	}, nil
 }
 
-// NewKeyData generates a new KeyData according to specification in the given
-// serialized HKDFPRFKeyFormat. This should be used solely by the key management API.
-func (km *hkdfprfKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+// NewKeyData generates a new KeyData according to specification in the
+// given serialized [hkdfpb.HkdfPrfKeyFormat]. This should be used solely by
+// the key management API.
+func (km *keyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
 	key, err := km.NewKey(serializedKeyFormat)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hkdf_prf_key_manager: %v", err)
 	}
 	serializedKey, err := proto.Marshal(key)
 	if err != nil {
-		return nil, errInvalidHKDFPRFKeyFormat
+		return nil, fmt.Errorf("hkdf_prf_key_manager: invalid key format")
 	}
 
 	return &tinkpb.KeyData{
-		TypeUrl:         hkdfprfTypeURL,
+		TypeUrl:         typeURL,
 		Value:           serializedKey,
 		KeyMaterialType: km.KeyMaterialType(),
 	}, nil
 }
 
-// DoesSupport checks whether this KeyManager supports the given key type.
-func (km *hkdfprfKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == hkdfprfTypeURL
-}
+// DoesSupport checks whether this key manager supports the given key type.
+func (km *keyManager) DoesSupport(typeURL string) bool { return km.TypeURL() == typeURL }
 
-// TypeURL returns the type URL of keys managed by this KeyManager.
-func (km *hkdfprfKeyManager) TypeURL() string {
-	return hkdfprfTypeURL
-}
+// TypeURL returns the type URL of keys managed by this key manager.
+func (km *keyManager) TypeURL() string { return typeURL }
 
-// KeyMaterialType returns the key material type of this KeyManager.
-func (km *hkdfprfKeyManager) KeyMaterialType() tinkpb.KeyData_KeyMaterialType {
+// KeyMaterialType returns the key material type of this key manager.
+func (km *keyManager) KeyMaterialType() tinkpb.KeyData_KeyMaterialType {
 	return tinkpb.KeyData_SYMMETRIC
 }
 
 // DeriveKey derives a new key from serializedKeyFormat and pseudorandomness.
-func (km *hkdfprfKeyManager) DeriveKey(serializedKeyFormat []byte, pseudorandomness io.Reader) (proto.Message, error) {
+func (km *keyManager) DeriveKey(serializedKeyFormat []byte, pseudorandomness io.Reader) (proto.Message, error) {
 	if len(serializedKeyFormat) == 0 {
-		return nil, errInvalidHKDFPRFKeyFormat
+		return nil, fmt.Errorf("hkdf_prf_key_manager: empty key format")
 	}
 	keyFormat := new(hkdfpb.HkdfPrfKeyFormat)
 	if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
-		return nil, errInvalidHKDFPRFKeyFormat
+		return nil, fmt.Errorf("hkdf_prf_key_manager: invalid key format")
 	}
 	if err := km.validateKeyFormat(keyFormat); err != nil {
 		return nil, fmt.Errorf("hkdf_prf_key_manager: invalid key format: %s", err)
 	}
-	if err := keyset.ValidateKeyVersion(keyFormat.GetVersion(), hkdfprfKeyVersion); err != nil {
+	if err := keyset.ValidateKeyVersion(keyFormat.GetVersion(), keyVersion); err != nil {
 		return nil, fmt.Errorf("hkdf_prf_key_manager: invalid key version: %s", err)
 	}
 
@@ -139,16 +133,17 @@ func (km *hkdfprfKeyManager) DeriveKey(serializedKeyFormat []byte, pseudorandomn
 	}
 
 	return &hkdfpb.HkdfPrfKey{
-		Version:  hkdfprfKeyVersion,
+		Version:  keyVersion,
 		Params:   keyFormat.GetParams(),
 		KeyValue: keyValue,
 	}, nil
 }
 
-// validateKey validates the given HKDFPRFKey. It only validates the version of the
-// key because other parameters will be validated in primitive construction.
-func (km *hkdfprfKeyManager) validateKey(key *hkdfpb.HkdfPrfKey) error {
-	if err := keyset.ValidateKeyVersion(key.GetVersion(), hkdfprfKeyVersion); err != nil {
+// validateKey validates the given [hkdfpb.HkdfPrfKey]. It only validates the
+// version of the key because other parameters will be validated in
+// primitive construction.
+func (km *keyManager) validateKey(key *hkdfpb.HkdfPrfKey) error {
+	if err := keyset.ValidateKeyVersion(key.GetVersion(), keyVersion); err != nil {
 		return fmt.Errorf("hkdf_prf_key_manager: invalid version: %s", err)
 	}
 	keySize := uint32(len(key.GetKeyValue()))
@@ -156,8 +151,8 @@ func (km *hkdfprfKeyManager) validateKey(key *hkdfpb.HkdfPrfKey) error {
 	return subtle.ValidateHKDFPRFParams(hash, keySize, key.GetParams().GetSalt())
 }
 
-// validateKeyFormat validates the given HKDFKeyFormat
-func (km *hkdfprfKeyManager) validateKeyFormat(format *hkdfpb.HkdfPrfKeyFormat) error {
+// validateKeyFormat validates the given [hkdfpb.HkdfPrfKeyFormat].
+func (km *keyManager) validateKeyFormat(format *hkdfpb.HkdfPrfKeyFormat) error {
 	hash := commonpb.HashType_name[int32(format.GetParams().GetHash())]
 	return subtle.ValidateHKDFPRFParams(hash, format.GetKeySize(), format.GetParams().GetSalt())
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package prf_test
+package hkdf_test
 
 import (
 	"bytes"
@@ -24,6 +24,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	_ "github.com/tink-crypto/tink-go/v2/prf/hkdf" // To register the key manager.
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/prf/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
@@ -33,10 +34,10 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func TestGetPrimitiveHKDFBasic(t *testing.T) {
+func TestKeyManagerGetPrimitiveBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
-		t.Errorf("HKDF PRF key manager not found: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	testKeys := genValidHKDFKeys()
 	for i := 0; i < len(testKeys); i++ {
@@ -46,7 +47,7 @@ func TestGetPrimitiveHKDFBasic(t *testing.T) {
 		}
 		p, err := km.Primitive(serializedKey)
 		if err != nil {
-			t.Errorf("unexpected error in test case %d: %s", i, err)
+			t.Errorf("km.Primitive() err = %q, want nil in test case %d", err, i)
 		}
 		if err := validateHKDFPrimitive(p, testKeys[i]); err != nil {
 			t.Errorf("%s", err)
@@ -54,10 +55,10 @@ func TestGetPrimitiveHKDFBasic(t *testing.T) {
 	}
 }
 
-func TestGetPrimitiveHKDFWithInvalidInput(t *testing.T) {
+func TestKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain HKDF PRF key manager: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	// invalid key
 	testKeys := genInvalidHKDFKeys()
@@ -67,22 +68,22 @@ func TestGetPrimitiveHKDFWithInvalidInput(t *testing.T) {
 			t.Fatalf("proto.Marshal() err = %q, want nil", err)
 		}
 		if _, err := km.Primitive(serializedKey); err == nil {
-			t.Errorf("expect an error in test case %d", i)
+			t.Errorf("km.Primitive() err = nil, want non-nil in test case %d", i)
 		}
 	}
 	if _, err := km.Primitive(nil); err == nil {
-		t.Errorf("expect an error when input is nil")
+		t.Errorf("km.Primitive() err = nil, want non-nil when input is nil")
 	}
 	// empty input
 	if _, err := km.Primitive([]byte{}); err == nil {
-		t.Errorf("expect an error when input is empty")
+		t.Errorf("km.Primitive() err = nil, want non-nil when input is empty")
 	}
 }
 
-func TestNewKeyHKDFMultipleTimes(t *testing.T) {
+func TestKeyManagerNewKeyMultipleTimes(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain HKDF PRF key manager: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	serializedFormat, err := proto.Marshal(testutil.NewHKDFPRFKeyFormat(commonpb.HashType_SHA256, make([]byte, 0)))
 	if err != nil {
@@ -109,14 +110,14 @@ func TestNewKeyHKDFMultipleTimes(t *testing.T) {
 		keys[string(serializedKey)] = true
 	}
 	if len(keys) != nTest*2 {
-		t.Errorf("key is repeated")
+		t.Errorf("km.NewKey() and km.NewKeyData() produced repeated keys")
 	}
 }
 
-func TestNewKeyHKDFBasic(t *testing.T) {
+func TestKeyManagerNewKeyBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain HKDF PRF key manager: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	testFormats := genValidHKDFKeyFormats()
 	for i := 0; i < len(testFormats); i++ {
@@ -126,7 +127,7 @@ func TestNewKeyHKDFBasic(t *testing.T) {
 		}
 		key, err := km.NewKey(serializedFormat)
 		if err != nil {
-			t.Errorf("unexpected error in test case %d: %s", i, err)
+			t.Errorf("km.NewKey() err = %q, want nil in test case %d", err, i)
 		}
 		if err := validateHKDFKey(testFormats[i], key.(*hkdfpb.HkdfPrfKey)); err != nil {
 			t.Errorf("%s", err)
@@ -134,35 +135,35 @@ func TestNewKeyHKDFBasic(t *testing.T) {
 	}
 }
 
-func TestNewKeyHKDFWithInvalidInput(t *testing.T) {
+func TestKeyManagerNewKeyWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain HKDF PRF key manager: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	// invalid key formats
 	testFormats := genInvalidHKDFKeyFormats()
 	for i := 0; i < len(testFormats); i++ {
 		serializedFormat, err := proto.Marshal(testFormats[i])
 		if err != nil {
-			fmt.Println("Error!")
+			t.Fatalf("proto.Marshal() err = %q, want nil", err)
 		}
 		if _, err := km.NewKey(serializedFormat); err == nil {
-			t.Errorf("expect an error in test case %d: %s", i, err)
+			t.Errorf("km.NewKey() err = nil, want non-nil in test case %d", i)
 		}
 	}
 	if _, err := km.NewKey(nil); err == nil {
-		t.Errorf("expect an error when input is nil")
+		t.Errorf("km.NewKey() err = nil, want non-nil when input is nil")
 	}
 	// empty input
 	if _, err := km.NewKey([]byte{}); err == nil {
-		t.Errorf("expect an error when input is empty")
+		t.Errorf("km.NewKey() err = nil, want non-nil when input is empty")
 	}
 }
 
-func TestNewKeyDataHKDFBasic(t *testing.T) {
+func TestKeyManagerNewKeyDataBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain HKDF PRF key manager: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	testFormats := genValidHKDFKeyFormats()
 	for i := 0; i < len(testFormats); i++ {
@@ -172,28 +173,28 @@ func TestNewKeyDataHKDFBasic(t *testing.T) {
 		}
 		keyData, err := km.NewKeyData(serializedFormat)
 		if err != nil {
-			t.Errorf("unexpected error in test case %d: %s", i, err)
+			t.Fatalf("km.NewKeyData() err = %q, want nil in test case %d", err, i)
 		}
-		if keyData.TypeUrl != testutil.HKDFPRFTypeURL {
-			t.Errorf("incorrect type url in test case %d", i)
+		if keyData.GetTypeUrl() != testutil.HKDFPRFTypeURL {
+			t.Errorf("km.NewKeyData() typeUrl = %q, want %q in test case %d", keyData.TypeUrl, testutil.HKDFPRFTypeURL, i)
 		}
-		if keyData.KeyMaterialType != tinkpb.KeyData_SYMMETRIC {
-			t.Errorf("incorrect key material type in test case %d", i)
+		if keyData.GetKeyMaterialType() != tinkpb.KeyData_SYMMETRIC {
+			t.Errorf("km.NewKeyData() keyMaterialType = %q, want %q in test case %d", keyData.KeyMaterialType, tinkpb.KeyData_SYMMETRIC, i)
 		}
 		key := new(hkdfpb.HkdfPrfKey)
 		if err := proto.Unmarshal(keyData.Value, key); err != nil {
-			t.Errorf("invalid key value")
+			t.Fatalf("proto.Unmarshal() err = %q, want nil", err)
 		}
 		if err := validateHKDFKey(testFormats[i], key); err != nil {
-			t.Errorf("invalid key")
+			t.Errorf("validateHKDFKey() err = %q, want nil", err)
 		}
 	}
 }
 
-func TestNewKeyDataHKDFWithInvalidInput(t *testing.T) {
+func TestKeyManagerNewKeyDataWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
-		t.Errorf("HKDF PRF key manager not found: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	// invalid key formats
 	testFormats := genInvalidHKDFKeyFormats()
@@ -203,60 +204,60 @@ func TestNewKeyDataHKDFWithInvalidInput(t *testing.T) {
 			t.Fatalf("proto.Marshal() err = %q, want nil", err)
 		}
 		if _, err := km.NewKeyData(serializedFormat); err == nil {
-			t.Errorf("expect an error in test case %d", i)
+			t.Errorf("km.NewKeyData() err = nil, want non-nil in test case %d", i)
 		}
 	}
 	// nil input
 	if _, err := km.NewKeyData(nil); err == nil {
-		t.Errorf("expect an error when input is nil")
+		t.Errorf("km.NewKeyData() err = nil, want non-nil when input is nil")
 	}
 }
 
-func TestHKDFDoesSupport(t *testing.T) {
+func TestKeyManagerDoesSupport(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
-		t.Errorf("HKDF PRF key manager not found: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	if !km.DoesSupport(testutil.HKDFPRFTypeURL) {
-		t.Errorf("HKDFPRFKeyManager must support %s", testutil.HKDFPRFTypeURL)
+		t.Errorf("km.DoesSupport() = false, want true for %q", testutil.HKDFPRFTypeURL)
 	}
 	if km.DoesSupport("some bad type") {
-		t.Errorf("HKDFPRFKeyManager must support only %s", testutil.HKDFPRFTypeURL)
+		t.Errorf("km.DoesSupport() = true, want false for %q", "some bad type")
 	}
 }
 
-func TestHKDFTypeURL(t *testing.T) {
+func TestKeyManagerTypeURL(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
-		t.Errorf("HKDF PRF key manager not found: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	if km.TypeURL() != testutil.HKDFPRFTypeURL {
-		t.Errorf("incorrect GetKeyType()")
+		t.Errorf("km.TypeURL() = %q, want %q", km.TypeURL(), testutil.HKDFPRFTypeURL)
 	}
 }
 
-func TestHKDFKeyMaterialType(t *testing.T) {
+func TestKeyManagerKeyMaterialType(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HKDFPRFTypeURL, err)
 	}
 	keyManager, ok := km.(internalregistry.DerivableKeyManager)
 	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
+		t.Fatalf("km.(internalregistry.DerivableKeyManager) failed, key manager is not DerivableKeyManager")
 	}
 	if got, want := keyManager.KeyMaterialType(), tinkpb.KeyData_SYMMETRIC; got != want {
 		t.Errorf("KeyMaterialType() = %v, want %v", got, want)
 	}
 }
 
-func TestHKDFDeriveKey(t *testing.T) {
+func TestKeyManagerDeriveKey(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HKDFPRFTypeURL, err)
 	}
 	keyManager, ok := km.(internalregistry.DerivableKeyManager)
 	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
+		t.Fatalf("km.(internalregistry.DerivableKeyManager) failed, key manager is not DerivableKeyManager")
 	}
 
 	var keySize uint32 = 32
@@ -312,14 +313,14 @@ func TestHKDFDeriveKey(t *testing.T) {
 	}
 }
 
-func TestHKDFDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HKDFPRFTypeURL, err)
 	}
 	keyManager, ok := km.(internalregistry.DerivableKeyManager)
 	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
+		t.Fatalf("km.(internalregistry.DerivableKeyManager) failed, key manager is not DerivableKeyManager")
 	}
 
 	var keySize uint32 = 32
@@ -388,14 +389,14 @@ func TestHKDFDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	}
 }
 
-func TestHKDFDeriveKeyFailsWithMalformedSerializedKeyFormat(t *testing.T) {
+func TestKeyManagerDeriveKeyFailsWithMalformedSerializedKeyFormat(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HKDFPRFTypeURL, err)
 	}
 	keyManager, ok := km.(internalregistry.DerivableKeyManager)
 	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
+		t.Fatalf("km.(internalregistry.DerivableKeyManager) failed, key manager is not DerivableKeyManager")
 	}
 
 	var keySize uint32 = 32
@@ -413,14 +414,14 @@ func TestHKDFDeriveKeyFailsWithMalformedSerializedKeyFormat(t *testing.T) {
 	}
 }
 
-func TestAESGCMDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
+func TestKeyManagerAESGCMDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.HKDFPRFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.HKDFPRFTypeURL, err)
 	}
 	keyManager, ok := km.(internalregistry.DerivableKeyManager)
 	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
+		t.Fatalf("km.(internalregistry.DerivableKeyManager) failed, key manager is not DerivableKeyManager")
 	}
 	keyFormat, err := proto.Marshal(testutil.NewHKDFPRFKeyFormat(commonpb.HashType_SHA256, []byte("salty")))
 	if err != nil {
@@ -505,11 +506,11 @@ func genValidHKDFKeys() []*hkdfpb.HkdfPrfKey {
 func validateHKDFKey(format *hkdfpb.HkdfPrfKeyFormat, key *hkdfpb.HkdfPrfKey) error {
 	if format.KeySize != uint32(len(key.KeyValue)) ||
 		key.Params.Hash != format.Params.Hash {
-		return fmt.Errorf("key format and generated key do not match")
+		return fmt.Errorf("key format and generated key do not match, format.KeySize = %d, len(key.KeyValue) = %d, format.Params.Hash = %v, key.Params.Hash = %v", format.KeySize, len(key.KeyValue), format.Params.Hash, key.Params.Hash)
 	}
 	p, err := subtle.NewHKDFPRF(commonpb.HashType_name[int32(key.Params.Hash)], key.KeyValue, key.Params.Salt)
 	if err != nil {
-		return fmt.Errorf("cannot create primitive from key: %s", err)
+		return fmt.Errorf("subtle.NewHKDFPRF() err = %q, want nil", err)
 	}
 	return validateHKDFPrimitive(p, key)
 }
@@ -519,25 +520,25 @@ func validateHKDFPrimitive(p any, key *hkdfpb.HkdfPrfKey) error {
 	hkdfPrimitive := p.(prf.PRF)
 	prfPrimitive, err := subtle.NewHKDFPRF(commonpb.HashType_name[int32(key.Params.Hash)], key.KeyValue, key.Params.Salt)
 	if err != nil {
-		return fmt.Errorf("Could not create HKDF PRF with key material %q: %s", hex.EncodeToString(key.KeyValue), err)
+		return fmt.Errorf("subtle.NewHKDFPRF() err = %q, want nil for key material %q", err, hex.EncodeToString(key.KeyValue))
 	}
 	data := random.GetRandomBytes(20)
 	res, err := hkdfPrimitive.ComputePRF(data, 16)
 	if err != nil {
-		return fmt.Errorf("prf computation failed: %s", err)
+		return fmt.Errorf("hkdfPrimitive.ComputePRF() err = %q, want nil", err)
 	}
 	if len(res) != 16 {
-		return fmt.Errorf("prf computation did not produce 16 byte output")
+		return fmt.Errorf("hkdfPrimitive.ComputePRF() produced %d bytes, want 16", len(res))
 	}
 	res2, err := prfPrimitive.ComputePRF(data, 16)
 	if err != nil {
-		return fmt.Errorf("prf computation failed: %s", err)
+		return fmt.Errorf("prfPrimitive.ComputePRF() err = %q, want nil", err)
 	}
 	if len(res2) != 16 {
-		return fmt.Errorf("prf computation did not produce 16 byte output")
+		return fmt.Errorf("prfPrimitive.ComputePRF() produced %d bytes, want 16", len(res2))
 	}
-	if hex.EncodeToString(res) != hex.EncodeToString(res2) {
-		return fmt.Errorf("prf computation did not produce the same output for the same key and input")
+	if !bytes.Equal(res, res2) {
+		return fmt.Errorf("hkdfPrimitive.ComputePRF() and prfPrimitive.ComputePRF() produced different outputs for the same key and input")
 	}
 	return nil
 }
