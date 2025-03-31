@@ -21,6 +21,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
+	_ "github.com/tink-crypto/tink-go/v2/prf/aescmac" // To register the AES-CMAC PRF key manager.
 )
 
 // The PRF interface is an abstraction for an element of a pseudo-random
@@ -112,9 +113,6 @@ func init() {
 		panic(fmt.Sprintf("prf.init() failed: %v", err))
 	}
 	if err := internalregistry.AllowKeyDerivation(hkdfprfTypeURL); err != nil {
-		panic(fmt.Sprintf("prf.init() failed: %v", err))
-	}
-	if err := registry.RegisterKeyManager(new(aescmacprfKeyManager)); err != nil {
 		panic(fmt.Sprintf("prf.init() failed: %v", err))
 	}
 }

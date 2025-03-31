@@ -107,7 +107,7 @@ func createAESCMACPRFKeyTemplate(keySize uint32) *tinkpb.KeyTemplate {
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key format: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          aescmacprfTypeURL,
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCmacPrfKey",
 		OutputPrefixType: tinkpb.OutputPrefixType_RAW,
 		Value:            serializedFormat,
 	}

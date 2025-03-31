@@ -12,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package prf_test
+package aescmac_test
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	_ "github.com/tink-crypto/tink-go/v2/prf/aescmac" // Register the key manager.
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/prf/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
@@ -30,10 +32,10 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func TestGetPrimitiveCMACBasic(t *testing.T) {
+func TestKeyManagerGetPrimitiveBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("AES CMAC PRF key manager not found: %s", err)
+		t.Fatalf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	testKeys := genValidCMACKeys()
 	for i := 0; i < len(testKeys); i++ {
@@ -43,7 +45,7 @@ func TestGetPrimitiveCMACBasic(t *testing.T) {
 		}
 		p, err := km.Primitive(serializedKey)
 		if err != nil {
-			t.Errorf("unexpected error in test case %d: %s", i, err)
+			t.Fatalf("km.Primitive() err = %q, want nil in test case %d", err, i)
 		}
 		if err := validateCMACPrimitive(p, testKeys[i]); err != nil {
 			t.Errorf("%s", err)
@@ -51,10 +53,10 @@ func TestGetPrimitiveCMACBasic(t *testing.T) {
 	}
 }
 
-func TestGetPrimitiveCMACWithInvalidInput(t *testing.T) {
+func TestKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES CMAC PRF key manager: %s", err)
+		t.Errorf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	// invalid key
 	testKeys := genInvalidCMACKeys()
@@ -64,22 +66,22 @@ func TestGetPrimitiveCMACWithInvalidInput(t *testing.T) {
 			t.Fatalf("proto.Marshal() err = %q, want nil", err)
 		}
 		if _, err := km.Primitive(serializedKey); err == nil {
-			t.Errorf("expect an error in test case %d", i)
+			t.Errorf("km.Primitive() err = nil, want error in test case %d", i)
 		}
 	}
 	if _, err := km.Primitive(nil); err == nil {
-		t.Errorf("expect an error when input is nil")
+		t.Errorf("km.Primitive() err = nil, want error when input is nil")
 	}
 	// empty input
 	if _, err := km.Primitive([]byte{}); err == nil {
-		t.Errorf("expect an error when input is empty")
+		t.Errorf("km.Primitive() err = nil, want error when input is empty")
 	}
 }
 
-func TestNewKeyCMACMultipleTimes(t *testing.T) {
+func TestKeyManagerNewKeyMultipleTimes(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES CMAC PRF key manager: %s", err)
+		t.Errorf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	serializedFormat, err := proto.Marshal(testutil.NewAESCMACPRFKeyFormat())
 	if err != nil {
@@ -106,14 +108,14 @@ func TestNewKeyCMACMultipleTimes(t *testing.T) {
 		keys[string(serializedKey)] = true
 	}
 	if len(keys) != nTest*2 {
-		t.Errorf("key is repeated")
+		t.Errorf("km.NewKey() or km.NewKeyData() returned repeated keys")
 	}
 }
 
-func TestNewKeyCMACBasic(t *testing.T) {
+func TestKeyManagerNewKeyBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES CMAC PRF key manager: %s", err)
+		t.Errorf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	testFormats := genValidCMACKeyFormats()
 	for i := 0; i < len(testFormats); i++ {
@@ -123,18 +125,18 @@ func TestNewKeyCMACBasic(t *testing.T) {
 		}
 		key, err := km.NewKey(serializedFormat)
 		if err != nil {
-			t.Errorf("unexpected error in test case %d: %s", i, err)
+			t.Errorf("km.NewKey() err = %q, want nil in test case %d", err, i)
 		}
-		if err := validateCMACKey(testFormats[i], key.(*cmacpb.AesCmacPrfKey)); err != nil {
+		if err := validateKey(testFormats[i], key.(*cmacpb.AesCmacPrfKey)); err != nil {
 			t.Errorf("%s", err)
 		}
 	}
 }
 
-func TestNewKeyCMACWithInvalidInput(t *testing.T) {
+func TestKeyManagerNewKeyWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES CMAC PRF key manager: %s", err)
+		t.Errorf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	// invalid key formats
 	testFormats := genInvalidCMACKeyFormats()
@@ -144,22 +146,22 @@ func TestNewKeyCMACWithInvalidInput(t *testing.T) {
 			fmt.Println("Error!")
 		}
 		if _, err := km.NewKey(serializedFormat); err == nil {
-			t.Errorf("expect an error in test case %d: %s", i, err)
+			t.Errorf("km.NewKey() err = nil, want error in test case %d: %s", i, err)
 		}
 	}
 	if _, err := km.NewKey(nil); err == nil {
-		t.Errorf("expect an error when input is nil")
+		t.Errorf("km.NewKey() err = nil, want error when input is nil")
 	}
 	// empty input
 	if _, err := km.NewKey([]byte{}); err == nil {
-		t.Errorf("expect an error when input is empty")
+		t.Errorf("km.NewKey() err = nil, want error when input is empty")
 	}
 }
 
-func TestNewKeyDataCMACBasic(t *testing.T) {
+func TestKeyManagerNewKeyDataBasic(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES CMAC PRF key manager: %s", err)
+		t.Errorf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	testFormats := genValidCMACKeyFormats()
 	for i := 0; i < len(testFormats); i++ {
@@ -169,28 +171,28 @@ func TestNewKeyDataCMACBasic(t *testing.T) {
 		}
 		keyData, err := km.NewKeyData(serializedFormat)
 		if err != nil {
-			t.Errorf("unexpected error in test case %d: %s", i, err)
+			t.Errorf("km.NewKeyData() err = %q, want nil in test case %d", err, i)
 		}
 		if keyData.TypeUrl != testutil.AESCMACPRFTypeURL {
-			t.Errorf("incorrect type url in test case %d", i)
+			t.Errorf("km.NewKeyData() returned incorrect type url in test case %d", i)
 		}
 		if keyData.KeyMaterialType != tinkpb.KeyData_SYMMETRIC {
-			t.Errorf("incorrect key material type in test case %d", i)
+			t.Errorf("km.NewKeyData() returned incorrect key material type in test case %d", i)
 		}
 		key := new(cmacpb.AesCmacPrfKey)
 		if err := proto.Unmarshal(keyData.Value, key); err != nil {
-			t.Errorf("invalid key value")
+			t.Errorf("proto.Unmarshal() err = %q, want nil", err)
 		}
-		if err := validateCMACKey(testFormats[i], key); err != nil {
-			t.Errorf("invalid key")
+		if err := validateKey(testFormats[i], key); err != nil {
+			t.Errorf("validateKey() err = %q, want nil", err)
 		}
 	}
 }
 
-func TestNewKeyDataCMACWithInvalidInput(t *testing.T) {
+func TestKeyManagerNewKeyDataWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("AES CMAC PRF key manager not found: %s", err)
+		t.Errorf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	// invalid key formats
 	testFormats := genInvalidCMACKeyFormats()
@@ -200,35 +202,35 @@ func TestNewKeyDataCMACWithInvalidInput(t *testing.T) {
 			t.Fatalf("proto.Marshal() err = %q, want nil", err)
 		}
 		if _, err := km.NewKeyData(serializedFormat); err == nil {
-			t.Errorf("expect an error in test case %d", i)
+			t.Errorf("km.NewKeyData() err = nil, want error in test case %d", i)
 		}
 	}
 	// nil input
 	if _, err := km.NewKeyData(nil); err == nil {
-		t.Errorf("expect an error when input is nil")
+		t.Errorf("km.NewKeyData() err = nil, want error when input is nil")
 	}
 }
 
-func TestCMACDoesSupport(t *testing.T) {
+func TestKeyManagerDoesSupport(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("AES CMAC PRF key manager not found: %s", err)
+		t.Errorf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	if !km.DoesSupport(testutil.AESCMACPRFTypeURL) {
-		t.Errorf("AESCMACPRFKeyManager must support %s", testutil.AESCMACPRFTypeURL)
+		t.Errorf("km.DoesSupport() = false, want true for %s", testutil.AESCMACPRFTypeURL)
 	}
 	if km.DoesSupport("some bad type") {
-		t.Errorf("AESCMACPRFKeyManager must support only %s", testutil.AESCMACPRFTypeURL)
+		t.Errorf("km.DoesSupport() = true, want false for some bad type")
 	}
 }
 
-func TestCMACTypeURL(t *testing.T) {
+func TestKeyManagerTypeURL(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCMACPRFTypeURL)
 	if err != nil {
-		t.Errorf("AES CMAC PRF key manager not found: %s", err)
+		t.Errorf("registry.GetKeyManager() err = %q, want nil", err)
 	}
 	if km.TypeURL() != testutil.AESCMACPRFTypeURL {
-		t.Errorf("incorrect GetKeyType()")
+		t.Errorf("km.TypeURL() = %q, want %q", km.TypeURL(), testutil.AESCMACPRFTypeURL)
 	}
 }
 
@@ -271,13 +273,13 @@ func genValidCMACKeys() []*cmacpb.AesCmacPrfKey {
 }
 
 // Checks whether the given CMACPRFKey matches the given key AESCMACPRFKeyFormat
-func validateCMACKey(format *cmacpb.AesCmacPrfKeyFormat, key *cmacpb.AesCmacPrfKey) error {
+func validateKey(format *cmacpb.AesCmacPrfKeyFormat, key *cmacpb.AesCmacPrfKey) error {
 	if format.KeySize != uint32(len(key.KeyValue)) {
-		return fmt.Errorf("key format and generated key do not match")
+		return fmt.Errorf("key format and generated key do not match, format.KeySize = %d, len(key.KeyValue) = %d", format.KeySize, len(key.KeyValue))
 	}
 	p, err := subtle.NewAESCMACPRF(key.KeyValue)
 	if err != nil {
-		return fmt.Errorf("cannot create primitive from key: %s", err)
+		return fmt.Errorf("subtle.NewAESCMACPRF() err = %q, want nil", err)
 	}
 	return validateCMACPrimitive(p, key)
 }
@@ -287,25 +289,25 @@ func validateCMACPrimitive(p any, key *cmacpb.AesCmacPrfKey) error {
 	cmacPrimitive := p.(prf.PRF)
 	prfPrimitive, err := subtle.NewAESCMACPRF(key.KeyValue)
 	if err != nil {
-		return fmt.Errorf("Could not create AES CMAC PRF with key material %q: %s", hex.EncodeToString(key.KeyValue), err)
+		return fmt.Errorf("subtle.NewAESCMACPRF() err = %q, want nil for key material %q", err, hex.EncodeToString(key.KeyValue))
 	}
 	data := random.GetRandomBytes(20)
 	res, err := cmacPrimitive.ComputePRF(data, 16)
 	if err != nil {
-		return fmt.Errorf("prf computation failed: %s", err)
+		return fmt.Errorf("cmacPrimitive.ComputePRF() err = %q, want nil", err)
 	}
 	if len(res) != 16 {
-		return fmt.Errorf("prf computation did not produce 16 byte output")
+		return fmt.Errorf("cmacPrimitive.ComputePRF() len = %v, want 16", len(res))
 	}
 	res2, err := prfPrimitive.ComputePRF(data, 16)
 	if err != nil {
-		return fmt.Errorf("prf computation failed: %s", err)
+		return fmt.Errorf("prfPrimitive.ComputePRF() err = %q, want nil", err)
 	}
 	if len(res2) != 16 {
-		return fmt.Errorf("prf computation did not produce 16 byte output")
+		return fmt.Errorf("prfPrimitive.ComputePRF() len = %v, want 16", len(res2))
 	}
-	if hex.EncodeToString(res) != hex.EncodeToString(res2) {
-		return fmt.Errorf("prf computation did not produce the same output for the same key and input")
+	if !bytes.Equal(res, res2) {
+		return fmt.Errorf("cmacPrimitive.ComputePRF() and prfPrimitive.ComputePRF() produced different output for the same key and input")
 	}
 	return nil
 }
