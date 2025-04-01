@@ -17,7 +17,9 @@ package signature_test
 import (
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -27,9 +29,18 @@ import (
 
 const benchmarkDataSize = 16 * 1024
 
+func mustCreateECDSAParams(curveType ecdsa.CurveType, hashType ecdsa.HashType, encoding ecdsa.SignatureEncoding, variant ecdsa.Variant) key.Parameters {
+	params, err := ecdsa.NewParameters(curveType, hashType, encoding, variant)
+	if err != nil {
+		panic(err)
+	}
+	return params
+}
+
 var benchmarkTestCases = []struct {
 	name     string
 	template *tinkpb.KeyTemplate
+	params   key.Parameters
 }{
 	{
 		name:     "RSA_SSA_PKCS1_3072",
@@ -44,21 +55,46 @@ var benchmarkTestCases = []struct {
 		name:     "RSA_SSA_PSS_4096",
 		template: signature.RSA_SSA_PSS_4096_SHA512_64_F4_Key_Template(),
 	}, {
-		name:     "ECDSA_P256",
-		template: signature.ECDSAP256KeyTemplate(),
+		name:   "ECDSA_P256",
+		params: mustCreateECDSAParams(ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink),
 	}, {
-		name:     "ECDSA_P256_RAW",
-		template: signature.ECDSAP256RawKeyTemplate(),
+		name:   "ECDSA_P256_RAW",
+		params: mustCreateECDSAParams(ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantNoPrefix),
 	}, {
-		name:     "ECDSA_P384",
-		template: signature.ECDSAP384SHA384KeyTemplate(),
+		name:   "ECDSA_P256_LEGACY",
+		params: mustCreateECDSAParams(ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantLegacy),
 	}, {
-		name:     "ECDSA_P521",
-		template: signature.ECDSAP521KeyTemplate(),
+		name:   "ECDSA_P384",
+		params: mustCreateECDSAParams(ecdsa.NistP384, ecdsa.SHA384, ecdsa.DER, ecdsa.VariantTink),
+	}, {
+		name:   "ECDSA_P521",
+		params: mustCreateECDSAParams(ecdsa.NistP521, ecdsa.SHA512, ecdsa.DER, ecdsa.VariantTink),
 	}, {
 		name:     "ED25519",
 		template: signature.ED25519KeyTemplate(),
 	},
+}
+
+func mustCreateKeyset(b *testing.B, template *tinkpb.KeyTemplate, params key.Parameters) *keyset.Handle {
+	km := keyset.NewManager()
+	var keyID uint32
+	var err error
+	if params != nil {
+		keyID, err = km.AddNewKeyFromParameters(params)
+	} else {
+		keyID, err = km.Add(template)
+	}
+	if err != nil {
+		b.Fatal(err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		b.Fatal(err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		b.Fatal(err)
+	}
+	return handle
 }
 
 func BenchmarkSign(b *testing.B) {
@@ -66,10 +102,7 @@ func BenchmarkSign(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 
-			handle, err := keyset.NewHandle(tc.template)
-			if err != nil {
-				b.Fatal(err)
-			}
+			handle := mustCreateKeyset(b, tc.template, tc.params)
 			primitive, err := signature.NewSigner(handle)
 			if err != nil {
 				b.Fatal(err)
@@ -91,10 +124,7 @@ func BenchmarkVerify(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 
-			handle, err := keyset.NewHandle(tc.template)
-			if err != nil {
-				b.Fatal(err)
-			}
+			handle := mustCreateKeyset(b, tc.template, tc.params)
 			signer, err := signature.NewSigner(handle)
 			if err != nil {
 				b.Fatal(err)
