@@ -3,14 +3,16 @@
 <!-- GCP Ubuntu --->
 
 [tink_go_gomod_badge_gcp_ubuntu]: https://storage.googleapis.com/tink-kokoro-build-badges/tink-go-gomod-gcp-ubuntu.svg
+[tink_go_gomod_386_badge_gcp_ubuntu]: https://storage.googleapis.com/tink-kokoro-build-badges/tink-go-gomod-386-gcp-ubuntu.svg
 
 <!-- MacOS --->
 
 [tink_go_gomod_badge_macos]: https://storage.googleapis.com/tink-kokoro-build-badges/tink-go-gomod-macos-external.svg
 
-**Test**     | **GCP Ubuntu**                                          | **MacOS**
------------- | ------------------------------------------------------- | ---------
-Tink Gomod   | [![Gomod_GcpUbuntu][tink_go_gomod_badge_gcp_ubuntu]](#) | [![Gomod_MacOs][tink_go_gomod_badge_macos]](#)
+**Test**            | **GCP Ubuntu**                                                  | **MacOS**
+------------------- | --------------------------------------------------------------- | ---------
+Tink Gomod          | [![Gomod_GcpUbuntu][tink_go_gomod_badge_gcp_ubuntu]](#)         | [![Gomod_MacOs][tink_go_gomod_badge_macos]](#)
+Tink Gomod (32 bit) | [![Gomod_GcpUbuntu_386][tink_go_gomod_386_badge_gcp_ubuntu]](#) | N/A
 
 > **NOTE**: **Versions of Tink Go prior to v2.0.0 are located at
 > https://github.com/tink-crypto/tink
