@@ -35,6 +35,8 @@ and systems.
 To get a quick overview of Tink's design please take a look at
 [Tink's goals](https://developers.google.com/tink/design/goals_of_tink).
 
+The latest version is 2.4.0.
+
 The official documentation is available at https://developers.google.com/tink.
 
 [devs_are_users_too_slides]: https://www.usenix.org/sites/default/files/conference/protected-files/hotsec15_slides_green.pdf
