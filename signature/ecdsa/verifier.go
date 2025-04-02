@@ -16,12 +16,17 @@ package ecdsa
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/sha256"
+	"crypto/sha512"
 	"fmt"
-	"slices"
+	"hash"
+	"math/big"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	internalecdsa "github.com/tink-crypto/tink-go/v2/internal/signature/ecdsa"
 	"github.com/tink-crypto/tink-go/v2/key"
-	signaturesubtle "github.com/tink-crypto/tink-go/v2/signature/subtle"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -29,32 +34,65 @@ import (
 //
 // It accepts signature in both ASN.1 and IEEE_P1363 encoding.
 type verifier struct {
-	impl    *signaturesubtle.ECDSAVerifier
-	prefix  []byte
-	variant Variant
+	key        *ecdsa.PublicKey
+	prefix     []byte
+	parameters *Parameters
+	hashFunc   func() hash.Hash
 }
 
 var _ tink.Verifier = (*verifier)(nil)
+
+func curveFromTinkECDSACurveType(curveType CurveType) (elliptic.Curve, error) {
+	switch curveType {
+	case NistP256:
+		return elliptic.P256(), nil
+	case NistP384:
+		return elliptic.P384(), nil
+	case NistP521:
+		return elliptic.P521(), nil
+	default:
+		// Should never happen.
+		return nil, fmt.Errorf("unsupported curve: %v", curveType)
+	}
+}
+
+func hashFunctionFromEnum(hash HashType) (func() hash.Hash, error) {
+	switch hash {
+	case SHA256:
+		return sha256.New, nil
+	case SHA384:
+		return sha512.New384, nil
+	case SHA512:
+		return sha512.New, nil
+	default:
+		return nil, fmt.Errorf("invalid hash type: %s", hash)
+	}
+}
 
 // NewVerifier creates a new ECDSA Verifier.
 //
 // This is an internal API.
 func NewVerifier(publicKey *PublicKey, _ internalapi.Token) (tink.Verifier, error) {
-	hashType := publicKey.parameters.HashType().String()
-	encoding := publicKey.parameters.SignatureEncoding().String()
-	curve := publicKey.parameters.CurveType().String()
-	x, y, err := validateEncodingAndGetCoordinates(publicKey.publicPoint, publicKey.parameters.CurveType())
+	hashFunc, err := hashFunctionFromEnum(publicKey.parameters.HashType())
 	if err != nil {
 		return nil, err
 	}
-	rawPrimitive, err := signaturesubtle.NewECDSAVerifier(hashType, curve, encoding, x, y)
+	curve, err := curveFromTinkECDSACurveType(publicKey.parameters.CurveType())
 	if err != nil {
 		return nil, err
+	}
+	publicPoint := publicKey.PublicPoint()
+	xy := publicPoint[1:]
+	ecdsaPublicKey := &ecdsa.PublicKey{
+		Curve: curve,
+		X:     new(big.Int).SetBytes(xy[:len(xy)/2]),
+		Y:     new(big.Int).SetBytes(xy[len(xy)/2:]),
 	}
 	return &verifier{
-		impl:    rawPrimitive,
-		prefix:  publicKey.OutputPrefix(),
-		variant: publicKey.parameters.Variant(),
+		key:        ecdsaPublicKey,
+		prefix:     publicKey.OutputPrefix(),
+		parameters: publicKey.parameters,
+		hashFunc:   hashFunc,
 	}, nil
 }
 
@@ -67,11 +105,33 @@ func (e *verifier) Verify(signatureBytes, data []byte) error {
 	if !bytes.HasPrefix(signatureBytes, e.prefix) {
 		return fmt.Errorf("ecdsa_verifier: invalid signature prefix")
 	}
-	toSign := data
-	if e.variant == VariantLegacy {
-		toSign = slices.Concat(data, []byte{0})
+	rawSignature := signatureBytes[len(e.prefix):]
+	h := e.hashFunc()
+	h.Write(data)
+	if e.parameters.Variant() == VariantLegacy {
+		h.Write([]byte{0})
 	}
-	return e.impl.Verify(signatureBytes[len(e.prefix):], toSign)
+	hashed := h.Sum(nil)
+	var asn1Signature []byte
+	switch encoding := e.parameters.SignatureEncoding(); encoding {
+	case DER:
+		asn1Signature = rawSignature
+	case IEEEP1363:
+		decodedSig, err := internalecdsa.IEEEP1363Decode(rawSignature)
+		if err != nil {
+			return err
+		}
+		asn1Signature, err = internalecdsa.ASN1Encode(decodedSig)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("ecdsa_verifier: unsupported encoding: %s", encoding)
+	}
+	if ok := ecdsa.VerifyASN1(e.key, hashed, asn1Signature); !ok {
+		return fmt.Errorf("ecdsa_verifier: invalid signature")
+	}
+	return nil
 }
 
 func verifierConstructor(key key.Key) (any, error) {

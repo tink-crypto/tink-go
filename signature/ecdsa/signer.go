@@ -15,42 +15,62 @@
 package ecdsa
 
 import (
+	"crypto/ecdsa"
+	"crypto/rand"
 	"fmt"
-	"slices"
+	"hash"
+	"math/big"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	internalecdsa "github.com/tink-crypto/tink-go/v2/internal/signature/ecdsa"
 	"github.com/tink-crypto/tink-go/v2/key"
-	"github.com/tink-crypto/tink-go/v2/signature/subtle"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 // signer is an implementation of the [tink.Signer] interface for ECDSA
 // (RFC6979).
 type signer struct {
-	impl    *subtle.ECDSASigner
-	prefix  []byte
-	variant Variant
+	key        *ecdsa.PrivateKey
+	prefix     []byte
+	parameters *Parameters
+	hashFunc   func() hash.Hash
 }
 
 var _ tink.Signer = (*signer)(nil)
 
 // NewSigner creates a new instance of [Signer].
 //
+// It assumes that the private key k is valid.
+//
 // This is an internal API.
 func NewSigner(k *PrivateKey, _ internalapi.Token) (tink.Signer, error) {
 	params := k.publicKey.parameters
-	hasType := params.HashType().String()
-	encoding := params.SignatureEncoding().String()
-	curve := params.CurveType().String()
-	rawPrimitive, err := subtle.NewECDSASigner(hasType, curve, encoding, k.PrivateKeyValue().Data(insecuresecretdataaccess.Token{}))
+	hashFunc, err := hashFunctionFromEnum(params.HashType())
 	if err != nil {
 		return nil, err
 	}
+	curve, err := curveFromTinkECDSACurveType(params.CurveType())
+	if err != nil {
+		return nil, err
+	}
+
+	publicPoint := k.publicKey.PublicPoint()
+	// The point is guaranteed to be encoded as per SEC 1 v2.0, Section 2.3.3
+	// https://www.secg.org/sec1-v2.pdf#page=17.08.
+	xy := publicPoint[1:]
+	ecdsaPrivateKey := new(ecdsa.PrivateKey)
+	ecdsaPrivateKey.PublicKey.Curve = curve
+	ecdsaPrivateKey.PublicKey.X = new(big.Int).SetBytes(xy[:len(xy)/2])
+	ecdsaPrivateKey.PublicKey.Y = new(big.Int).SetBytes(xy[len(xy)/2:])
+
+	ecdsaPrivateKey.D = new(big.Int).SetBytes(k.PrivateKeyValue().Data(insecuresecretdataaccess.Token{}))
+
 	return &signer{
-		impl:    rawPrimitive,
-		prefix:  k.OutputPrefix(),
-		variant: params.Variant(),
+		key:        ecdsaPrivateKey,
+		prefix:     k.OutputPrefix(),
+		hashFunc:   hashFunc,
+		parameters: params,
 	}, nil
 }
 
@@ -60,15 +80,33 @@ func NewSigner(k *PrivateKey, _ internalapi.Token) (tink.Signer, error) {
 // the key's output prefix which can be empty, and signature is the signature
 // in the encoding specified by the key's parameters.
 func (e *signer) Sign(data []byte) ([]byte, error) {
-	var toSign = data
-	if e.variant == VariantLegacy {
-		toSign = slices.Concat(data, []byte{0})
+	h := e.hashFunc()
+	h.Write(data)
+	if e.parameters.Variant() == VariantLegacy {
+		h.Write([]byte{0})
 	}
-	rawSignature, err := e.impl.Sign(toSign)
-	if err != nil {
-		return nil, err
+	hashed := h.Sum(nil)
+	switch encoding := e.parameters.SignatureEncoding(); encoding {
+	case IEEEP1363:
+		r, s, err := ecdsa.Sign(rand.Reader, e.key, hashed)
+		if err != nil {
+			return nil, err
+		}
+		sig := internalecdsa.Signature{R: r, S: s}
+		signatureBytes, err := internalecdsa.IEEEP1363Encode(&sig, e.key.PublicKey.Curve.Params().Name)
+		if err != nil {
+			return nil, fmt.Errorf("ecdsa_signer: signing failed: %s", err)
+		}
+		return append(e.prefix, signatureBytes...), nil
+	case DER:
+		signatureBytes, err := ecdsa.SignASN1(rand.Reader, e.key, hashed)
+		if err != nil {
+			return nil, fmt.Errorf("ecdsa_signer: signing failed: %s", err)
+		}
+		return append(e.prefix, signatureBytes...), nil
+	default:
+		return nil, fmt.Errorf("ecdsa_signer: unsupported encoding: %s", encoding)
 	}
-	return slices.Concat(e.prefix, rawSignature), nil
 }
 
 func signerConstructor(key key.Key) (any, error) {
