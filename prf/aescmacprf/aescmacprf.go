@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package aescmac provides a key manager for AES-CMAC PRF.
-package aescmac
+// Package aescmacprf provides a key manager for AES-CMAC PRF.
+package aescmacprf
 
 import (
 	"fmt"
@@ -23,6 +23,6 @@ import (
 
 func init() {
 	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
-		panic(fmt.Sprintf("aescmac.init() failed: %v", err))
+		panic(fmt.Sprintf("aescmacprf.init() failed: %v", err))
 	}
 }

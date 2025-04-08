@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package aescmac_test
+package aescmacprf_test
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	_ "github.com/tink-crypto/tink-go/v2/prf/aescmac" // Register the key manager.
+	_ "github.com/tink-crypto/tink-go/v2/prf/aescmacprf" // Register the key manager.
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/prf/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"

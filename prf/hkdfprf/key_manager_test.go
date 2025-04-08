@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hkdf_test
+package hkdfprf_test
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
-	_ "github.com/tink-crypto/tink-go/v2/prf/hkdf" // To register the key manager.
+	_ "github.com/tink-crypto/tink-go/v2/prf/hkdfprf" // To register the key manager.
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/prf/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package hmac provides an implementation of the HMAC PRF key manager.
-package hmac
+// Package hmacprf provides an implementation of the HMAC PRF key manager.
+package hmacprf
 
 import (
 	"fmt"
@@ -24,9 +24,9 @@ import (
 
 func init() {
 	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
-		panic(fmt.Sprintf("hmac.init() failed: %v", err))
+		panic(fmt.Sprintf("hmacprf.init() failed: %v", err))
 	}
 	if err := internalregistry.AllowKeyDerivation(typeURL); err != nil {
-		panic(fmt.Sprintf("hmac.init() failed: %v", err))
+		panic(fmt.Sprintf("hmacprf.init() failed: %v", err))
 	}
 }

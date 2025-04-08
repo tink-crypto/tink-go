@@ -19,9 +19,9 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/monitoring"
-	_ "github.com/tink-crypto/tink-go/v2/prf/aescmac" // To register the AES-CMAC PRF key manager.
-	_ "github.com/tink-crypto/tink-go/v2/prf/hkdf"       // To register the HKDF PRF key manager.
-	_ "github.com/tink-crypto/tink-go/v2/prf/hmac"       // To register the HMAC PRF key manager.
+	_ "github.com/tink-crypto/tink-go/v2/prf/aescmacprf" // To register the AES-CMAC PRF key manager.
+	_ "github.com/tink-crypto/tink-go/v2/prf/hkdfprf"       // To register the HKDF PRF key manager.
+	_ "github.com/tink-crypto/tink-go/v2/prf/hmacprf"       // To register the HMAC PRF key manager.
 )
 
 // The PRF interface is an abstraction for an element of a pseudo-random

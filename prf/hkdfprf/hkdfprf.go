@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package hkdf provides the HKDF PRF key manager.
-package hkdf
+// Package hkdfprf provides the HKDF PRF key manager.
+package hkdfprf
 
 import (
 	"fmt"
@@ -24,9 +24,9 @@ import (
 
 func init() {
 	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
-		panic(fmt.Sprintf("hkdf.init() failed: %v", err))
+		panic(fmt.Sprintf("hkdfprf.init() failed: %v", err))
 	}
 	if err := internalregistry.AllowKeyDerivation(typeURL); err != nil {
-		panic(fmt.Sprintf("hkdf.init() failed: %v", err))
+		panic(fmt.Sprintf("hkdfprf.init() failed: %v", err))
 	}
 }
