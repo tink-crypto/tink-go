@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package aescmacprf provides a key manager for AES-CMAC PRF.
+// Package aescmacprf provides key manager and keys definitions for
+// AES-CMAC PRF.
 package aescmacprf
 
 import (

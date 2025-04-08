@@ -1,0 +1,124 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package aescmacprf_test
+
+import (
+	"bytes"
+	"fmt"
+	"testing"
+
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
+)
+
+var key128Bits = []byte{
+	0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+}
+var key256Bits = []byte{
+	0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+	0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+}
+
+func TestNewKey(t *testing.T) {
+	for _, keySize := range []int{16, 32} {
+		t.Run(fmt.Sprintf("keySize=%d", keySize), func(t *testing.T) {
+			keyBytes := secretdata.NewBytesFromData(key256Bits[:keySize], insecuresecretdataaccess.Token{})
+			key, err := aescmacprf.NewKey(keyBytes)
+			if err != nil {
+				t.Errorf("aescmacprf.NewKey() err = %v, want nil", err)
+			}
+			if !key.KeyBytes().Equal(keyBytes) {
+				t.Errorf("KeyBytes() = %v, want %v", key.KeyBytes(), keyBytes)
+			}
+			wantParams, err := aescmacprf.NewParameters(keySize)
+			if err != nil {
+				t.Fatalf("aescmacprf.NewParameters() err = %v, want nil", err)
+			}
+			if !key.Parameters().Equal(&wantParams) {
+				t.Errorf("Parameters() = %v, want %v", key.Parameters(), wantParams)
+			}
+			id, required := key.IDRequirement()
+			if id != 0 {
+				t.Errorf("IDRequirement() = %v, want 0", id)
+			}
+			if required {
+				t.Errorf("IDRequirement() = %v, want false", required)
+			}
+			if key.OutputPrefix() != nil {
+				t.Errorf("OutputPrefix() = %v, want nil", key.OutputPrefix())
+			}
+		})
+	}
+}
+
+func TestNewKeyFails(t *testing.T) {
+	keyBytes := secretdata.NewBytesFromData(make([]byte, 33), insecuresecretdataaccess.Token{})
+	if _, err := aescmacprf.NewKey(keyBytes); err == nil {
+		t.Errorf("aescmacprf.NewKey() err = nil, want error")
+	}
+}
+
+func TestEqual(t *testing.T) {
+	keyBytes := secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{})
+	key1, err := aescmacprf.NewKey(keyBytes)
+	if err != nil {
+		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
+	}
+	key2, err := aescmacprf.NewKey(keyBytes)
+	if err != nil {
+		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
+	}
+	if !key1.Equal(key2) {
+		t.Errorf("Equal() = false, want true")
+	}
+}
+
+func TestNotEqualIfDifferentKeyBytes(t *testing.T) {
+	keyBytes1 := secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{})
+	key1, err := aescmacprf.NewKey(keyBytes1)
+	if err != nil {
+		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
+	}
+
+	otherKey := bytes.Clone(key256Bits)
+	otherKey[0] ^= 0xff
+
+	keyBytes2 := secretdata.NewBytesFromData(otherKey, insecuresecretdataaccess.Token{})
+	key2, err := aescmacprf.NewKey(keyBytes2)
+	if err != nil {
+		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
+	}
+	if key1.Equal(key2) {
+		t.Errorf("Equal() = true, want false")
+	}
+}
+
+func TestNotEqualIfDifferentKeySizes(t *testing.T) {
+	keyBytes1 := secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{})
+	key1, err := aescmacprf.NewKey(keyBytes1)
+	if err != nil {
+		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
+	}
+
+	keyBytes2 := secretdata.NewBytesFromData(key128Bits, insecuresecretdataaccess.Token{})
+	key2, err := aescmacprf.NewKey(keyBytes2)
+	if err != nil {
+		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
+	}
+	if key1.Equal(key2) {
+		t.Errorf("Equal() = true, want false")
+	}
+}
