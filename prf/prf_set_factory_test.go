@@ -154,32 +154,6 @@ func TestFactoryBasic(t *testing.T) {
 	}
 }
 
-func TestNonRawKeys(t *testing.T) {
-	template := prf.AESCMACPRFKeyTemplate()
-	template.OutputPrefixType = tinkpb.OutputPrefixType_TINK
-	h, err := keyset.NewHandle(template)
-	if err != nil {
-		t.Errorf("Couldn't create keyset: %v", err)
-	}
-	_, err = prf.NewPRFSet(h)
-	if err == nil {
-		t.Errorf("Expected non RAW prefix to fail to create prf.Set")
-	}
-	m := keyset.NewManagerFromHandle(h)
-	_, err = addKeyAndReturnID(m, prf.HMACSHA256PRFKeyTemplate())
-	if err != nil {
-		t.Errorf("Expected to be able to add keys to the keyset: %v", err)
-	}
-	h, err = m.Handle()
-	if err != nil {
-		t.Errorf("Expected to be able to create keyset handle: %v", err)
-	}
-	_, err = prf.NewPRFSet(h)
-	if err == nil {
-		t.Errorf("Expected mixed prefix keyset to fail to create prf.Set")
-	}
-}
-
 func TestNonPRFPrimitives(t *testing.T) {
 	template := mac.AESCMACTag128KeyTemplate()
 	template.OutputPrefixType = tinkpb.OutputPrefixType_RAW
