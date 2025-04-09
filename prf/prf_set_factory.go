@@ -53,8 +53,12 @@ func wrapPRFset(ps *primitiveset.PrimitiveSet[PRF]) (*Set, error) {
 		return nil, fmt.Errorf("Only raw entries allowed for prf.Set")
 	}
 	for _, entry := range entries {
+		prf := entry.Primitive
+		if prf == nil {
+			prf = entry.FullPrimitive
+		}
 		set.PRFs[entry.KeyID] = &monitoredPRF{
-			prf:    entry.Primitive,
+			prf:    prf,
 			keyID:  entry.KeyID,
 			logger: logger,
 		}
