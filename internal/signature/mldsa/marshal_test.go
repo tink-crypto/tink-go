@@ -164,14 +164,14 @@ func TestHintBitUnpackInvalidPaddingVectorFails(t *testing.T) {
 	}
 }
 
-func comparePublicKey(u, v *publicKey) bool {
+func comparePublicKey(u, v *PublicKey) bool {
 	return bytes.Equal(u.rho[:], v.rho[:]) &&
 		compareVector(u.t1, v.t1) &&
 		bytes.Equal(u.tr[:], v.tr[:]) &&
 		u.par == v.par
 }
 
-func compareSecretKey(u, v *secretKey) bool {
+func compareSecretKey(u, v *SecretKey) bool {
 	return bytes.Equal(u.rho[:], v.rho[:]) &&
 		bytes.Equal(u.kK[:], v.kK[:]) &&
 		bytes.Equal(u.tr[:], v.tr[:]) &&

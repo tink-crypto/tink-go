@@ -147,7 +147,7 @@ func (par *params) hintBitUnpackVector(encoded []byte) (vector, error) {
 }
 
 // Encode encodes a public key. This is Algorithm 22 (pkEncode) of the ML-DSA specification.
-func (pk *publicKey) Encode() []byte {
+func (pk *PublicKey) Encode() []byte {
 	res := make([]byte, 32)
 	copy(res[0:32], pk.rho[:])
 	for i := range pk.t1 {
@@ -156,9 +156,14 @@ func (pk *publicKey) Encode() []byte {
 	return res
 }
 
+// PublicKeyLength returns the length of a public key.
+func (par *params) PublicKeyLength() int {
+	return 32 + 32*par.k*(qBits-d)
+}
+
 // DecodePublicKey decodes a public key. This is Algorithm 23 (pkDecode) of the ML-DSA specification.
-func (par *params) DecodePublicKey(pkEnc []byte) (*publicKey, error) {
-	if len(pkEnc) != 32+32*par.k*(qBits-d) {
+func (par *params) DecodePublicKey(pkEnc []byte) (*PublicKey, error) {
+	if len(pkEnc) != par.PublicKeyLength() {
 		return nil, fmt.Errorf("invalid public key length")
 	}
 	var rho [32]byte
@@ -171,11 +176,11 @@ func (par *params) DecodePublicKey(pkEnc []byte) (*publicKey, error) {
 	// We additionally cache the hash of the public key.
 	var tr [64]byte
 	sha3.ShakeSum256(tr[:], pkEnc)
-	return &publicKey{rho, res, tr, par}, nil
+	return &PublicKey{rho, res, tr, par}, nil
 }
 
 // Encode encodes a secret key. This is Algorithm 24 (skEncode) of the ML-DSA specification.
-func (sk *secretKey) Encode() []byte {
+func (sk *SecretKey) Encode() []byte {
 	par := sk.par
 	res := make([]byte, 32+32+64)
 	copy(res[0:32], sk.rho[:])
@@ -193,9 +198,14 @@ func (sk *secretKey) Encode() []byte {
 	return res
 }
 
+// SecretKeyLength returns the length of a secret key.
+func (par *params) SecretKeyLength() int {
+	return 32 + 32 + 64 + 32*((par.l+par.k)*par.etaBits+d*par.k)
+}
+
 // DecodeSecretKey decodes a secret key. This is Algorithm 25 (skDecode) of the ML-DSA specification.
-func (par *params) DecodeSecretKey(skEnc []byte) (*secretKey, error) {
-	if len(skEnc) != 32+32+64+32*((par.l+par.k)*par.etaBits+d*par.k) {
+func (par *params) DecodeSecretKey(skEnc []byte) (*SecretKey, error) {
+	if len(skEnc) != par.SecretKeyLength() {
 		return nil, fmt.Errorf("invalid secret key length")
 	}
 	var rho [32]byte
@@ -220,7 +230,7 @@ func (par *params) DecodeSecretKey(skEnc []byte) (*secretKey, error) {
 		pos := 128 + par.l*sStep + par.k*sStep + i*32*d
 		t0[i] = bitUnpackPoly(skEnc[pos:pos+32*d], rZq(1<<(d-1)), d)
 	}
-	return &secretKey{rho, K, tr, s1, s2, t0, par}, nil
+	return &SecretKey{rho, K, tr, s1, s2, t0, nil, par}, nil
 }
 
 // Algorithm 26 (SigEncode)

@@ -79,7 +79,7 @@ func TestKeyGenFromSeed(t *testing.T) {
 	}
 	for _, par := range pars {
 		seedBytes, _ := hex.DecodeString(par.seed)
-		var seed [32]byte
+		var seed [SecretKeySeedSize]byte
 		copy(seed[:], seedBytes[:])
 		pk, sk := par.par.KeyGenFromSeed(seed)
 		pkString := hex.EncodeToString(pk.Encode())
@@ -90,6 +90,42 @@ func TestKeyGenFromSeed(t *testing.T) {
 		if par.expSk != skString {
 			t.Errorf("KeyGenFromSeed(%v).sk = %v, want", skString, par.expSk)
 		}
+	}
+}
+
+func TestSeedCorrect(t *testing.T) {
+	pars := []struct {
+		name string
+		par  *params
+		seed string
+	}{
+		{
+			"MLDSA44",
+			MLDSA44,
+			"000102030405060708090A0B0C0D0E0F000102030405060708090A0B0C0D0E01",
+		},
+		{
+			"MLDSA65",
+			MLDSA65,
+			"000102030405060708090A0B0C0D0E0F000102030405060708090A0B0C0D0E02",
+		},
+		{
+			"MLDSA87",
+			MLDSA87,
+			"000102030405060708090A0B0C0D0E0F000102030405060708090A0B0C0D0E03",
+		},
+	}
+	for _, par := range pars {
+		t.Run(par.name, func(t *testing.T) {
+			seed, _ := hex.DecodeString(par.seed)
+			var wantSeed [SecretKeySeedSize]byte
+			copy(wantSeed[:], seed[:])
+			_, sk := par.par.KeyGenFromSeed(wantSeed)
+			gotSeed := sk.Seed()
+			if *gotSeed != wantSeed {
+				t.Errorf("sk.Seed() = %v, want %v", gotSeed, wantSeed)
+			}
+		})
 	}
 }
 

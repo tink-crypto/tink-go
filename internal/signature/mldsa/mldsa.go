@@ -40,6 +40,9 @@ const (
 
 	// Dropped bits.
 	d = 13
+
+	// SecretKeySeedSize is the size of the seed used to generate a secret key.
+	SecretKeySeedSize = 32
 )
 
 type params struct {
@@ -111,8 +114,8 @@ var (
 	})
 )
 
-// publicKey represents a ML-DSA public key.
-type publicKey struct {
+// PublicKey represents a ML-DSA public key.
+type PublicKey struct {
 	rho [32]byte
 	t1  vector
 	// Cached public key hash.
@@ -121,14 +124,16 @@ type publicKey struct {
 	par *params
 }
 
-// secretKey represents a ML-DSA secret key.
-type secretKey struct {
+// SecretKey represents a ML-DSA secret key.
+type SecretKey struct {
 	rho [32]byte
 	kK  [32]byte
 	tr  [64]byte
 	s1  vector
 	s2  vector
 	t0  vector
+	// Cached secret key seed.
+	seed *[SecretKeySeedSize]byte
 	// Corresponding parameters.
 	par *params
 }
@@ -183,7 +188,7 @@ func (par *params) expandMask(rho [64]byte, mu int) vector {
 }
 
 // Algorithm 6 (KeyGen_internal)
-func (par *params) keyGenInternal(seed [32]byte) (*publicKey, *secretKey) {
+func (par *params) keyGenInternal(seed [SecretKeySeedSize]byte) (*PublicKey, *SecretKey) {
 	H := sha3.NewShake256()
 	H.Write(append(seed[:], byte(par.k), byte(par.l)))
 	var rho [32]byte
@@ -196,12 +201,12 @@ func (par *params) keyGenInternal(seed [32]byte) (*publicKey, *secretKey) {
 	s1, s2 := par.expandS(rhop)
 	t := Ah.mul(s1.ntt()).intt().add(s2)
 	t1, t0 := t.power2Round()
-	pk := &publicKey{rho, t1, [64]byte{}, par}
+	pk := &PublicKey{rho, t1, [64]byte{}, par}
 	sha3.ShakeSum256(pk.tr[:], pk.Encode())
-	return pk, &secretKey{rho, K, pk.tr, s1, s2, t0, par}
+	return pk, &SecretKey{rho, K, pk.tr, s1, s2, t0, &seed, par}
 }
 
-func (sk *secretKey) signInternalWithMu(mu [64]byte, rnd [32]byte) []byte {
+func (sk *SecretKey) signInternalWithMu(mu [64]byte, rnd [32]byte) []byte {
 	par := sk.par
 	beta := uint32(par.tau * par.eta)
 	s1h := sk.s1.ntt()
@@ -232,7 +237,7 @@ func (sk *secretKey) signInternalWithMu(mu [64]byte, rnd [32]byte) []byte {
 	}
 }
 
-func (pk *publicKey) verifyInternalWithMu(mu [64]byte, sigma []byte) error {
+func (pk *PublicKey) verifyInternalWithMu(mu [64]byte, sigma []byte) error {
 	par := pk.par
 	ct, z, h, err := par.sigDecode(sigma)
 	if err != nil {
@@ -254,46 +259,54 @@ func (pk *publicKey) verifyInternalWithMu(mu [64]byte, sigma []byte) error {
 }
 
 // Algorithm 7 (Sign_internal)
-func (sk *secretKey) signInternal(Mp []byte, rnd [32]byte) []byte {
+func (sk *SecretKey) signInternal(Mp []byte, rnd [32]byte) []byte {
 	var mu [64]byte
 	sha3.ShakeSum256(mu[:], slices.Concat(sk.tr[:], Mp))
 	return sk.signInternalWithMu(mu, rnd)
 }
 
 // Algorithm 8 (Verify_internal)
-func (pk *publicKey) verifyInternal(Mp []byte, sigma []byte) error {
+func (pk *PublicKey) verifyInternal(Mp []byte, sigma []byte) error {
 	var mu [64]byte
 	sha3.ShakeSum256(mu[:], slices.Concat(pk.tr[:], Mp))
 	return pk.verifyInternalWithMu(mu, sigma)
 }
 
 // KeyGen generates a new public and secret key. This is Algorithm 1 (KeyGen) of the ML-DSA specification.
-func (par *params) KeyGen() (*publicKey, *secretKey) {
-	var seed [32]byte
+func (par *params) KeyGen() (*PublicKey, *SecretKey) {
+	var seed [SecretKeySeedSize]byte
 	rand.Read(seed[:])
 	return par.keyGenInternal(seed)
 }
 
 // KeyGenFromSeed generates a public and secret key from a specified seed.
-func (par *params) KeyGenFromSeed(seed [32]byte) (*publicKey, *secretKey) {
+func (par *params) KeyGenFromSeed(seed [SecretKeySeedSize]byte) (*PublicKey, *SecretKey) {
 	return par.keyGenInternal(seed)
 }
 
+// Seed returns the seed used to generate the secret key.
+// The returned value is nil if the secret key was not generated from a seed but decoded from
+// an expanded secret key (in which case the initial seed is not available to this library due
+// to how the secret key generation works).
+func (sk *SecretKey) Seed() *[SecretKeySeedSize]byte {
+	return sk.seed
+}
+
 // SignWithMu signs with a precomputed mu.
-func (sk *secretKey) SignWithMu(mu [64]byte) []byte {
+func (sk *SecretKey) SignWithMu(mu [64]byte) []byte {
 	var rnd [32]byte
 	rand.Read(rnd[:])
 	return sk.signInternalWithMu(mu, rnd)
 }
 
 // SignDeterministicWithMu signs deterministically with a precomputed mu. It uses a fixed all zeroes randomness.
-func (sk *secretKey) SignDeterministicWithMu(mu [64]byte) []byte {
+func (sk *SecretKey) SignDeterministicWithMu(mu [64]byte) []byte {
 	var zeroes [32]byte
 	return sk.signInternalWithMu(mu, zeroes)
 }
 
 // Sign is the standard signing function. This is Algorithm 2 (Sign) of the ML-DSA specification.
-func (sk *secretKey) Sign(M []byte, ctx []byte) ([]byte, error) {
+func (sk *SecretKey) Sign(M []byte, ctx []byte) ([]byte, error) {
 	if len(ctx) > 255 {
 		return nil, fmt.Errorf("context too long")
 	}
@@ -303,7 +316,7 @@ func (sk *secretKey) Sign(M []byte, ctx []byte) ([]byte, error) {
 }
 
 // SignDeterministic signs deterministically. This is Algorithm 2 (Sign) of the ML-DSA specification with a fixed all zeroes randomness.
-func (sk *secretKey) SignDeterministic(M []byte, ctx []byte) ([]byte, error) {
+func (sk *SecretKey) SignDeterministic(M []byte, ctx []byte) ([]byte, error) {
 	if len(ctx) > 255 {
 		return nil, fmt.Errorf("context too long")
 	}
@@ -313,13 +326,13 @@ func (sk *secretKey) SignDeterministic(M []byte, ctx []byte) ([]byte, error) {
 
 // VerifyWithMu verifies a signature with a precomputed mu.
 // Returns nil if the signature is valid for mu, otherwise returns an error.
-func (pk *publicKey) VerifyWithMu(mu [64]byte, sigma []byte) error {
+func (pk *PublicKey) VerifyWithMu(mu [64]byte, sigma []byte) error {
 	return pk.verifyInternalWithMu(mu, sigma)
 }
 
 // Verify verifies a signature. This is Algorithm 3 (Verify) of the ML-DSA specification.
 // Returns nil if the signature is valid for the message and context, otherwise returns an error.
-func (pk *publicKey) Verify(M []byte, sigma []byte, ctx []byte) error {
+func (pk *PublicKey) Verify(M []byte, sigma []byte, ctx []byte) error {
 	if len(ctx) > 255 {
 		return fmt.Errorf("context too long")
 	}
