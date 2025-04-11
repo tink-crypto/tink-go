@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package hkdfprf provides the HKDF PRF key manager.
+// Package hkdfprf provides the HKDF PRF key manager, key and parameters.
 package hkdfprf
 
 import (
@@ -21,6 +21,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 )
 
 func init() {
@@ -40,6 +41,9 @@ func init() {
 		panic(fmt.Sprintf("hkdfprf.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterParametersParser(typeURL, new(parametersParser)); err != nil {
+		panic(fmt.Sprintf("hkdfprf.init() failed: %v", err))
+	}
+	if err := registryconfig.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("hkdfprf.init() failed: %v", err))
 	}
 }
