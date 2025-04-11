@@ -71,7 +71,7 @@ func TestParseKeyFails(t *testing.T) {
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.AesCmacPrfKey",
 				Value:           serializedKeyWithInvalidKeySize,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-			}, tinkpb.OutputPrefixType_TINK, 12345),
+			}, tinkpb.OutputPrefixType_RAW, 0),
 		},
 		{
 			name: "invalid key proto serialization",
@@ -79,7 +79,7 @@ func TestParseKeyFails(t *testing.T) {
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.AesCmacPrfKey",
 				Value:           []byte("invalid proto"),
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-			}, tinkpb.OutputPrefixType_TINK, 12345),
+			}, tinkpb.OutputPrefixType_RAW, 0),
 		},
 		{
 			name: "invalid key version",
@@ -87,7 +87,7 @@ func TestParseKeyFails(t *testing.T) {
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.AesCmacPrfKey",
 				Value:           serializedKeyWithInvalidVersion,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-			}, tinkpb.OutputPrefixType_TINK, 12345),
+			}, tinkpb.OutputPrefixType_RAW, 0),
 		},
 		{
 			name: "invalid output prefix type",
@@ -95,7 +95,7 @@ func TestParseKeyFails(t *testing.T) {
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.AesCmacPrfKey",
 				Value:           serializedKey,
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-			}, tinkpb.OutputPrefixType_UNKNOWN_PREFIX, 12345),
+			}, tinkpb.OutputPrefixType_TINK, 12345),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
