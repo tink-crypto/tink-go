@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package aescmacprf
+package hkdfprf
 
 import (
+	"bytes"
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
@@ -22,7 +23,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	aescmacprfpb "github.com/tink-crypto/tink-go/v2/proto/aes_cmac_prf_go_proto"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	hkdfprfpb "github.com/tink-crypto/tink-go/v2/proto/hkdf_prf_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -30,18 +32,44 @@ type keySerializer struct{}
 
 var _ protoserialization.KeySerializer = (*keySerializer)(nil)
 
+func toProtoHashType(hashType HashType) (commonpb.HashType, error) {
+	switch hashType {
+	case SHA1:
+		return commonpb.HashType_SHA1, nil
+	case SHA224:
+		return commonpb.HashType_SHA224, nil
+	case SHA256:
+		return commonpb.HashType_SHA256, nil
+	case SHA384:
+		return commonpb.HashType_SHA384, nil
+	case SHA512:
+		return commonpb.HashType_SHA512, nil
+	default:
+		return commonpb.HashType_UNKNOWN_HASH, fmt.Errorf("unsupported hash type: %v", hashType)
+	}
+}
+
 func (s *keySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
 	actualKey, ok := key.(*Key)
 	if !ok {
 		return nil, fmt.Errorf("invalid key type: got %T, want %T", key, (*Key)(nil))
 	}
-	if _, ok := actualKey.Parameters().(*Parameters); !ok {
+	params, ok := actualKey.Parameters().(*Parameters)
+	if !ok {
 		return nil, fmt.Errorf("key parameters is not a Parameters")
 	}
+	protoHashType, err := toProtoHashType(params.HashType())
+	if err != nil {
+		return nil, err
+	}
 	keyBytes := actualKey.KeyBytes()
-	protoKey := &aescmacprfpb.AesCmacPrfKey{
+	protoKey := &hkdfprfpb.HkdfPrfKey{
 		KeyValue: keyBytes.Data(insecuresecretdataaccess.Token{}),
 		Version:  0,
+		Params: &hkdfprfpb.HkdfPrfParams{
+			Hash: protoHashType,
+			Salt: bytes.Clone(params.Salt()),
+		},
 	}
 	serializedKey, err := proto.Marshal(protoKey)
 	if err != nil {
@@ -61,6 +89,23 @@ type keyParser struct{}
 
 var _ protoserialization.KeyParser = (*keyParser)(nil)
 
+func fromProtoHashType(hashType commonpb.HashType) (HashType, error) {
+	switch hashType {
+	case commonpb.HashType_SHA1:
+		return SHA1, nil
+	case commonpb.HashType_SHA224:
+		return SHA224, nil
+	case commonpb.HashType_SHA256:
+		return SHA256, nil
+	case commonpb.HashType_SHA384:
+		return SHA384, nil
+	case commonpb.HashType_SHA512:
+		return SHA512, nil
+	default:
+		return UnknownHashType, fmt.Errorf("unsupported proto hash type: %v", hashType)
+	}
+}
+
 func (s *keyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
 	if keySerialization == nil {
 		return nil, fmt.Errorf("key serialization is nil")
@@ -74,7 +119,7 @@ func (s *keyParser) ParseKey(keySerialization *protoserialization.KeySerializati
 	}
 	// Do not check key material type for compatibility with other Tink implementations.
 	// TODO - b/403459737: Consider adding the check.
-	protoKey := new(aescmacprfpb.AesCmacPrfKey)
+	protoKey := new(hkdfprfpb.HkdfPrfKey)
 	if err := proto.Unmarshal(keyData.GetValue(), protoKey); err != nil {
 		return nil, err
 	}
@@ -82,7 +127,15 @@ func (s *keyParser) ParseKey(keySerialization *protoserialization.KeySerializati
 		return nil, fmt.Errorf("key has unsupported version: %v", protoKey.GetVersion())
 	}
 	keyMaterial := secretdata.NewBytesFromData(protoKey.GetKeyValue(), insecuresecretdataaccess.Token{})
-	return NewKey(keyMaterial)
+	hashType, err := fromProtoHashType(protoKey.GetParams().GetHash())
+	if err != nil {
+		return nil, err
+	}
+	params, err := NewParameters(keyMaterial.Len(), hashType, bytes.Clone(protoKey.GetParams().GetSalt()))
+	if err != nil {
+		return nil, err
+	}
+	return NewKey(keyMaterial, params)
 }
 
 type parametersSerializer struct{}
@@ -94,9 +147,17 @@ func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.Key
 	if !ok {
 		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", parameters, (*Parameters)(nil))
 	}
-	format := &aescmacprfpb.AesCmacPrfKeyFormat{
+	hashType, err := toProtoHashType(actualParameters.HashType())
+	if err != nil {
+		return nil, err
+	}
+	format := &hkdfprfpb.HkdfPrfKeyFormat{
 		Version: 0,
 		KeySize: uint32(actualParameters.KeySizeInBytes()),
+		Params: &hkdfprfpb.HkdfPrfParams{
+			Hash: hashType,
+			Salt: bytes.Clone(actualParameters.Salt()),
+		},
 	}
 	serializedFormat, err := proto.Marshal(format)
 	if err != nil {
@@ -120,16 +181,16 @@ func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameter
 	if keyTemplate.GetOutputPrefixType() != tinkpb.OutputPrefixType_RAW {
 		return nil, fmt.Errorf("unsupported output prefix type: %v", keyTemplate.GetOutputPrefixType())
 	}
-	format := new(aescmacprfpb.AesCmacPrfKeyFormat)
+	format := new(hkdfprfpb.HkdfPrfKeyFormat)
 	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
 		return nil, err
 	}
 	if format.GetVersion() != 0 {
 		return nil, fmt.Errorf("key has unsupported version: %v", format.GetVersion())
 	}
-	parameters, err := NewParameters(int(format.GetKeySize()))
+	hashType, err := fromProtoHashType(format.GetParams().GetHash())
 	if err != nil {
 		return nil, err
 	}
-	return &parameters, nil
+	return NewParameters(int(format.GetKeySize()), hashType, bytes.Clone(format.GetParams().GetSalt()))
 }
