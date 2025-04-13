@@ -20,6 +20,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
 
 func init() {
@@ -27,6 +28,18 @@ func init() {
 		panic(fmt.Sprintf("hmacprf.init() failed: %v", err))
 	}
 	if err := internalregistry.AllowKeyDerivation(typeURL); err != nil {
+		panic(fmt.Sprintf("hmacprf.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*Key](new(keySerializer)); err != nil {
+		panic(fmt.Sprintf("hmacprf.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(typeURL, new(keyParser)); err != nil {
+		panic(fmt.Sprintf("hmacprf.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](new(parametersSerializer)); err != nil {
+		panic(fmt.Sprintf("hmacprf.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(typeURL, new(parametersParser)); err != nil {
 		panic(fmt.Sprintf("hmacprf.init() failed: %v", err))
 	}
 }
