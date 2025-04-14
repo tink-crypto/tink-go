@@ -17,7 +17,9 @@ package hmacprf
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/prf/subtle"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -58,4 +60,16 @@ func (k *Key) OutputPrefix() []byte { return nil }
 func (k *Key) Equal(other key.Key) bool {
 	that, ok := other.(*Key)
 	return ok && k.keyBytes.Equal(that.keyBytes) && k.parameters.Equal(that.parameters)
+}
+
+func primitiveConstructor(key key.Key) (any, error) {
+	actualKey, ok := key.(*Key)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type: got %T, want %T", key, (*Key)(nil))
+	}
+	params := actualKey.Parameters().(*Parameters)
+	if err := subtle.ValidateHMACPRFParams(params.HashType().String(), uint32(params.KeySizeInBytes())); err != nil {
+		return nil, err
+	}
+	return subtle.NewHMACPRF(params.HashType().String(), actualKey.KeyBytes().Data(insecuresecretdataaccess.Token{}))
 }
