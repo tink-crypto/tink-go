@@ -15,3 +15,30 @@
 // Package mldsa provides ML-DSA keys and parameters definitions, and key
 // managers.
 package mldsa
+
+import (
+	"fmt"
+
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+)
+
+func init() {
+	if err := protoserialization.RegisterKeySerializer[*PublicKey](&publicKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(verifierTypeURL, &publicKeyParser{}); err != nil {
+		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*PrivateKey](&privateKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(signerTypeURL, &privateKeyParser{}); err != nil {
+		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
+		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(signerTypeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
+	}
+}
