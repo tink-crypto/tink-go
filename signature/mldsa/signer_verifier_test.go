@@ -20,11 +20,104 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/signature/mldsa"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	tinkmldsa "github.com/tink-crypto/tink-go/v2/signature/mldsa"
+	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 )
+
+func TestSignVerifyManager(t *testing.T) {
+	message := random.GetRandomBytes(20)
+	for _, tc := range []struct {
+		name          string
+		instance      tinkmldsa.Instance
+		variant       tinkmldsa.Variant
+		idRequirement uint32
+	}{
+		{
+			name:          "TINK",
+			instance:      tinkmldsa.MLDSA65,
+			variant:       tinkmldsa.VariantTink,
+			idRequirement: uint32(0x01020304),
+		},
+		{
+			name:          "RAW",
+			instance:      tinkmldsa.MLDSA65,
+			variant:       tinkmldsa.VariantNoPrefix,
+			idRequirement: uint32(0),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			params, err := tinkmldsa.NewParameters(tc.instance, tc.variant)
+			if err != nil {
+				t.Fatalf("tinkmldsa.NewParameters(%v) err = %v, want nil", tc.variant, err)
+			}
+			publicKeyBytes, privateKeyBytes := getTestKeyPair(t, tc.instance)
+			publicKey, err := tinkmldsa.NewPublicKey(publicKeyBytes, tc.idRequirement, params)
+			if err != nil {
+				t.Fatalf("tinkmldsa.NewPublicKey(%v, %v, %v) err = %v, want nil", publicKeyBytes, tc.idRequirement, params, err)
+			}
+			privateKey, err := tinkmldsa.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}), tc.idRequirement, params)
+			if err != nil {
+				t.Fatalf("tinkmldsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", privateKeyBytes, tc.idRequirement, params, err)
+			}
+
+			// Signer verifier from keys.
+			signer, err := tinkmldsa.NewSigner(privateKey, internalapi.Token{})
+			if err != nil {
+				t.Fatalf("tinkmldsa.NewSigner(%v, internalapi.Token{}) err = %v, want nil", privateKey, err)
+			}
+			sigBytes, err := signer.Sign(message)
+			if err != nil {
+				t.Fatalf("signer.Sign(%x) err = %v, want nil", message, err)
+			}
+
+			verifier, err := tinkmldsa.NewVerifier(publicKey, internalapi.Token{})
+			if err != nil {
+				t.Fatalf("tinkmldsa.NewVerifier(%v, internalapi.Token{}) err = %v, want nil", publicKey, err)
+			}
+			if err := verifier.Verify(sigBytes, message); err != nil {
+				t.Errorf("verifier.Verify(%x, %x) err = %v, want nil", sigBytes, message, err)
+			}
+
+			// Signer verifier from keyset handle.
+			km := keyset.NewManager()
+			keyID, err := km.AddKey(privateKey)
+			if err != nil {
+				t.Fatalf("km.AddKey(%v) err = %v, want nil", privateKey, err)
+			}
+			if err := km.SetPrimary(keyID); err != nil {
+				t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID, err)
+			}
+			keysetHandle, err := km.Handle()
+			if err != nil {
+				t.Fatalf("km.Handle() err = %v, want nil", err)
+			}
+			publicKeysetHandle, err := keysetHandle.Public()
+			if err != nil {
+				t.Fatalf("keysetHandle.Public() err = %v, want nil", err)
+			}
+
+			signerFromKeyset, err := signature.NewSigner(keysetHandle)
+			if err != nil {
+				t.Fatalf("signature.NewSigner(%v) err = %v, want nil", keysetHandle, err)
+			}
+			sigBytesFromKeyset, err := signerFromKeyset.Sign(message)
+			if err != nil {
+				t.Fatalf("signerFromKeyset.Sign(%x) err = %v, want nil", message, err)
+			}
+
+			verifierFromKeyset, err := signature.NewVerifier(publicKeysetHandle)
+			if err != nil {
+				t.Fatalf("signature.NewVerifier() err = %v, want nil", err)
+			}
+			if err := verifierFromKeyset.Verify(sigBytesFromKeyset, message); err != nil {
+				t.Errorf("verifierFromKeyset.Verify(%x, %x) err = %v, want nil", sigBytesFromKeyset, message, err)
+			}
+		})
+	}
+}
 
 func TestVerifyFails(t *testing.T) {
 	for _, tc := range []struct {
@@ -44,15 +137,27 @@ func TestVerifyFails(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pub, priv := keyGen(t, tc.instance)
-			publicKey, privateKey := keyPair(t, pub, priv, tc.variant)
+			seed := random.GetRandomBytes(32)
+			params, err := tinkmldsa.NewParameters(tc.instance, tc.variant)
+			if err != nil {
+				t.Fatalf("tinkmldsa.NewParameters(%v, %v) err = %v, want nil", tc.instance, tc.variant, err)
+			}
+			privateKey, err := tinkmldsa.NewPrivateKey(secretdata.NewBytesFromData(seed, insecuresecretdataaccess.Token{}), 0, params)
+			if err != nil {
+				t.Fatalf("tinkmldsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", seed, 0, params, err)
+			}
+			publicKey, _ := privateKey.PublicKey()
+			mldsaPublicKey, ok := publicKey.(*tinkmldsa.PublicKey)
+			if !ok {
+				t.Fatalf("privateKey.PublicKey() is not a *tinkmldsa.PublicKey")
+			}
 			signer, err := tinkmldsa.NewSigner(privateKey, internalapi.Token{})
 			if err != nil {
 				t.Fatalf("tinkmldsa.NewSigner(%v, internalapi.Token{}) err = %v, want nil", privateKey, err)
 			}
-			verifier, err := tinkmldsa.NewVerifier(publicKey, internalapi.Token{})
+			verifier, err := tinkmldsa.NewVerifier(mldsaPublicKey, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("tinkmldsa.NewVerifier(%v, internalapi.Token{}) err = %v, want nil", publicKey, err)
+				t.Fatalf("tinkmldsa.NewVerifier(%v, internalapi.Token{}) err = %v, want nil", mldsaPublicKey, err)
 			}
 			data := random.GetRandomBytes(20)
 			signature, err := signer.Sign(data)
@@ -60,8 +165,8 @@ func TestVerifyFails(t *testing.T) {
 				t.Fatalf("signer.Sign(%x) err = %v, want nil", data, err)
 			}
 
-			prefix := signature[:len(publicKey.OutputPrefix())]
-			rawSignature := signature[len(publicKey.OutputPrefix()):]
+			prefix := signature[:len(mldsaPublicKey.OutputPrefix())]
+			rawSignature := signature[len(mldsaPublicKey.OutputPrefix()):]
 
 			// Modify the prefix.
 			for i := 0; i < len(prefix); i++ {
@@ -99,7 +204,7 @@ func TestVerifyFails(t *testing.T) {
 	}
 }
 
-func TestSignVerify(t *testing.T) {
+func TestSignVerifyCorrectness(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		instance tinkmldsa.Instance
@@ -117,15 +222,27 @@ func TestSignVerify(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pub, priv := keyGen(t, tc.instance)
-			publicKey, privateKey := keyPair(t, pub, priv, tc.variant)
+			seed := random.GetRandomBytes(32)
+			params, err := tinkmldsa.NewParameters(tc.instance, tc.variant)
+			if err != nil {
+				t.Fatalf("tinkmldsa.NewParameters(%v, %v) err = %v, want nil", tc.instance, tc.variant, err)
+			}
+			privateKey, err := tinkmldsa.NewPrivateKey(secretdata.NewBytesFromData(seed, insecuresecretdataaccess.Token{}), 0, params)
+			if err != nil {
+				t.Fatalf("tinkmldsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", seed, 0, params, err)
+			}
+			publicKey, _ := privateKey.PublicKey()
+			mldsaPublicKey, ok := publicKey.(*tinkmldsa.PublicKey)
+			if !ok {
+				t.Fatalf("privateKey.PublicKey() is not a *tinkmldsa.PublicKey")
+			}
 			signer, err := tinkmldsa.NewSigner(privateKey, internalapi.Token{})
 			if err != nil {
 				t.Fatalf("tinkmldsa.NewSigner(%v, internalapi.Token{}) err = %v, want nil", privateKey, err)
 			}
-			verifier, err := tinkmldsa.NewVerifier(publicKey, internalapi.Token{})
+			verifier, err := tinkmldsa.NewVerifier(mldsaPublicKey, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("tinkmldsa.NewVerifier(%v, internalapi.Token{}) err = %v, want nil", publicKey, err)
+				t.Fatalf("tinkmldsa.NewVerifier(%v, internalapi.Token{}) err = %v, want nil", mldsaPublicKey, err)
 			}
 			for i := 0; i < 100; i++ {
 				data := random.GetRandomBytes(20)
@@ -139,36 +256,4 @@ func TestSignVerify(t *testing.T) {
 			}
 		})
 	}
-}
-
-func keyGen(t *testing.T, instance tinkmldsa.Instance) (*mldsa.PublicKey, *mldsa.SecretKey) {
-	switch instance {
-	case tinkmldsa.MLDSA65:
-		return mldsa.MLDSA65.KeyGen()
-	default:
-		t.Fatalf("unsupported instance: %v", instance)
-		return nil, nil
-	}
-}
-
-func keyPair(t *testing.T, pub *mldsa.PublicKey, priv *mldsa.SecretKey, variant tinkmldsa.Variant) (*tinkmldsa.PublicKey, *tinkmldsa.PrivateKey) {
-	params, err := tinkmldsa.NewParameters(tinkmldsa.MLDSA65, variant)
-	if err != nil {
-		t.Fatalf("tinkmldsa.NewParameters(%v) err = %v, want nil", variant, err)
-	}
-	idRequirement := uint32(0x01020304)
-	if variant == tinkmldsa.VariantNoPrefix {
-		idRequirement = 0
-	}
-	pubBytes := pub.Encode()
-	pubKey, err := tinkmldsa.NewPublicKey(pubBytes, idRequirement, params)
-	if err != nil {
-		t.Fatalf("tinkmldsa.NewPublicKey(%v, %v	, %v) err = %v, want nil", pubBytes, idRequirement, params, err)
-	}
-	privBytes := priv.Seed()
-	privKey, err := tinkmldsa.NewPrivateKey(secretdata.NewBytesFromData(privBytes[:], insecuresecretdataaccess.Token{}), idRequirement, params)
-	if err != nil {
-		t.Fatalf("tinkmldsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", privBytes, idRequirement, params, err)
-	}
-	return pubKey, privKey
 }

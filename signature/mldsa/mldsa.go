@@ -19,10 +19,18 @@ package mldsa
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 )
 
 func init() {
+	if err := registry.RegisterKeyManager(new(signerKeyManager)); err != nil {
+		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
+	}
+	if err := registry.RegisterKeyManager(new(verifierKeyManager)); err != nil {
+		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
+	}
 	if err := protoserialization.RegisterKeySerializer[*PublicKey](&publicKeySerializer{}); err != nil {
 		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
 	}
@@ -39,6 +47,12 @@ func init() {
 		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterParametersParser(signerTypeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
+	}
+	if err := registryconfig.RegisterPrimitiveConstructor[*PublicKey](verifierConstructor); err != nil {
+		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
+	}
+	if err := registryconfig.RegisterPrimitiveConstructor[*PrivateKey](signerConstructor); err != nil {
 		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
 	}
 }
