@@ -22,6 +22,7 @@ package signature
 import (
 	_ "github.com/tink-crypto/tink-go/v2/signature/ecdsa"             // register ecdsa key managers and keys
 	_ "github.com/tink-crypto/tink-go/v2/signature/ed25519"         // register ed25519 key managers and keys
+	_ "github.com/tink-crypto/tink-go/v2/signature/mldsa"             // register mldsa key managers
 	_ "github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1" // register rsassapkcs1 key managers
 	_ "github.com/tink-crypto/tink-go/v2/signature/rsassapss"     // register rsassapss key managers
 )
