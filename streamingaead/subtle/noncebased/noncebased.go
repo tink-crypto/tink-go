@@ -314,6 +314,7 @@ func (r *Reader) Read(p []byte) (int, error) {
 		return n, nil
 	}
 
+	r.plaintext = r.plaintext[:0]
 	r.plaintextPos = 0
 
 	ctLim := len(r.ciphertext)

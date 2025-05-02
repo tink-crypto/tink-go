@@ -118,6 +118,94 @@ func TestNonceBased(t *testing.T) {
 		})
 	}
 }
+
+func TestNonceBased_doubleEncrypt(t *testing.T) {
+	var (
+		nonceSize                    = 10
+		noncePrefixSize              = 5
+		plaintextSegmentSize         = 20
+		firstCiphertextSegmentOffset = 10
+	)
+
+	plaintext := bytes.Repeat([]byte{0x01, 0x02, 0x03, 0x04, 0x05}, 20)
+
+	noncePrefix := make([]byte, noncePrefixSize)
+	if _, err := rand.Read(noncePrefix); err != nil {
+		t.Fatalf("rand.Read() = _, err = %v, want nil", err)
+	}
+
+	var b bytes.Buffer
+	w1, err := noncebased.NewWriter(noncebased.WriterParams{
+		W:                            &b,
+		SegmentEncrypter:             testEncrypterWithDst{},
+		NoncePrefix:                  noncePrefix,
+		NonceSize:                    nonceSize,
+		PlaintextSegmentSize:         plaintextSegmentSize,
+		FirstCiphertextSegmentOffset: firstCiphertextSegmentOffset,
+	})
+	if err != nil {
+		t.Fatalf("noncebased.NewWriter() = _, err = %v, want nil", err)
+	}
+
+	w1.Write(plaintext)
+	w1.Close()
+
+	ciphertext1 := make([]byte, len(b.Bytes()))
+	copy(ciphertext1, b.Bytes())
+	b.Reset()
+
+	w2, err := noncebased.NewWriter(noncebased.WriterParams{
+		W:                            &b,
+		SegmentEncrypter:             testEncrypterWithDst{},
+		NoncePrefix:                  noncePrefix,
+		NonceSize:                    nonceSize,
+		PlaintextSegmentSize:         plaintextSegmentSize,
+		FirstCiphertextSegmentOffset: firstCiphertextSegmentOffset,
+	})
+	if err != nil {
+		t.Fatalf("noncebased.NewWriter = _, err = %v, want nil", err)
+	}
+
+	w2.Write(ciphertext1)
+	w2.Close()
+
+	ciphertext2 := make([]byte, len(b.Bytes()))
+	copy(ciphertext2, b.Bytes())
+	b.Reset()
+
+	r2, err := noncebased.NewReader(noncebased.ReaderParams{
+		R:                            bytes.NewReader(ciphertext2),
+		SegmentDecrypter:             testDecrypterWithDst{},
+		NonceSize:                    nonceSize,
+		NoncePrefix:                  noncePrefix,
+		CiphertextSegmentSize:        plaintextSegmentSize + nonceSize,
+		FirstCiphertextSegmentOffset: firstCiphertextSegmentOffset,
+	})
+	if err != nil {
+		t.Fatalf("noncebased.NewReader() = _, err = %v, want nil", err)
+	}
+	r1, err := noncebased.NewReader(noncebased.ReaderParams{
+		R:                            r2,
+		SegmentDecrypter:             testDecrypterWithDst{},
+		NonceSize:                    nonceSize,
+		NoncePrefix:                  noncePrefix,
+		CiphertextSegmentSize:        plaintextSegmentSize + nonceSize,
+		FirstCiphertextSegmentOffset: firstCiphertextSegmentOffset,
+	})
+	if err != nil {
+		t.Fatalf("noncebased.NewReader() = _, err = %v, want nil", err)
+	}
+
+	decrypted, err := io.ReadAll(r1)
+	if err != nil {
+		t.Fatalf("io.ReadAll(r1) = _, err = %v, want nil", err)
+	}
+
+	if !bytes.Equal(decrypted, plaintext) {
+		t.Fatalf("Decryption does not equal plaintext. (got = %x, want = %x)", decrypted, plaintext)
+	}
+}
+
 func TestNonceBased_invalidParameters(t *testing.T) {
 
 	testcases := []struct {
