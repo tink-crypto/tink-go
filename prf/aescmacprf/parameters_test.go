@@ -17,6 +17,7 @@ package aescmacprf_test
 import (
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
 )
 
@@ -69,6 +70,14 @@ func TestParametersEquals(t *testing.T) {
 	}
 }
 
+type stubParameters struct{}
+
+var _ key.Parameters = (*stubParameters)(nil)
+
+func (p *stubParameters) Equal(other key.Parameters) bool { return false }
+
+func (p *stubParameters) HasIDRequirement() bool { return false }
+
 func TestParametersNotEquals(t *testing.T) {
 	params1, err := aescmacprf.NewParameters(32)
 	if err != nil {
@@ -79,6 +88,10 @@ func TestParametersNotEquals(t *testing.T) {
 		t.Fatalf("aescmacprf.NewParameters(16) failed: %v", err)
 	}
 	if params1.Equal(&params2) {
+		t.Errorf("Equal() returned true, expected false")
+	}
+
+	if params1.Equal(&stubParameters{}) {
 		t.Errorf("Equal() returned true, expected false")
 	}
 }

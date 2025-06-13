@@ -17,6 +17,7 @@ package hmacprf_test
 import (
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 )
 
@@ -85,12 +86,19 @@ func mustCreateParameters(t *testing.T, keySize int, hashType hmacprf.HashType) 
 	return params
 }
 
-func TestParametersNotEquals(t *testing.T) {
+type stubParameters struct{}
 
+var _ key.Parameters = (*stubParameters)(nil)
+
+func (p *stubParameters) Equal(other key.Parameters) bool { return false }
+
+func (p *stubParameters) HasIDRequirement() bool { return false }
+
+func TestParametersNotEquals(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		params1 *hmacprf.Parameters
-		params2 *hmacprf.Parameters
+		params2 key.Parameters
 	}{
 		{
 			name:    "different key size",
@@ -101,6 +109,11 @@ func TestParametersNotEquals(t *testing.T) {
 			name:    "different hash type",
 			params1: mustCreateParameters(t, 32, hmacprf.SHA256),
 			params2: mustCreateParameters(t, 32, hmacprf.SHA512),
+		},
+		{
+			name:    "different parameters type",
+			params1: mustCreateParameters(t, 32, hmacprf.SHA256),
+			params2: &stubParameters{},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

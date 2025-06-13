@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
 )
 
@@ -94,12 +95,19 @@ func mustCreateParameters(t *testing.T, keySize int, hashType hkdfprf.HashType, 
 	return params
 }
 
-func TestParametersNotEquals(t *testing.T) {
+type stubParameters struct{}
 
+var _ key.Parameters = (*stubParameters)(nil)
+
+func (p *stubParameters) Equal(other key.Parameters) bool { return false }
+
+func (p *stubParameters) HasIDRequirement() bool { return false }
+
+func TestParametersNotEquals(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		params1 *hkdfprf.Parameters
-		params2 *hkdfprf.Parameters
+		params2 key.Parameters
 	}{
 		{
 			name:    "different key size",
@@ -115,6 +123,11 @@ func TestParametersNotEquals(t *testing.T) {
 			name:    "different salt",
 			params1: mustCreateParameters(t, 32, hkdfprf.SHA256, []byte("salt")),
 			params2: mustCreateParameters(t, 32, hkdfprf.SHA256, nil),
+		},
+		{
+			name:    "different parameters type",
+			params1: mustCreateParameters(t, 32, hkdfprf.SHA256, []byte("salt")),
+			params2: &stubParameters{},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

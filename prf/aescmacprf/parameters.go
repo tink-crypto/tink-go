@@ -45,5 +45,6 @@ func (p *Parameters) HasIDRequirement() bool { return false }
 
 // Equal tells whether this parameters value is equal to other.
 func (p *Parameters) Equal(other key.Parameters) bool {
-	return p.keySizeInBytes == other.(*Parameters).keySizeInBytes
+	otherParams, ok := other.(*Parameters)
+	return ok && p.keySizeInBytes == otherParams.keySizeInBytes
 }
