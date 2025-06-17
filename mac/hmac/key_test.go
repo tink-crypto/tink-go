@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
@@ -193,12 +194,30 @@ func mustCreateKey(t *testing.T, key secretdata.Bytes, params *hmac.Parameters, 
 	return cmacKey
 }
 
+type stubKey struct{}
+
+var _ key.Key = (*stubKey)(nil)
+
+func (k *stubKey) Parameters() key.Parameters    { return nil }
+func (k *stubKey) Equal(other key.Key) bool      { return true }
+func (k *stubKey) IDRequirement() (uint32, bool) { return 123, true }
+
 func TestKeyEqualFalseIfDifferent(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		key1 *hmac.Key
-		key2 *hmac.Key
+		key2 key.Key
 	}{
+		{
+			name: "Different key type",
+			key1: mustCreateKey(t, hmac128Key, mustCreateParameters(t, hmac.ParametersOpts{
+				KeySizeInBytes: 16,
+				TagSizeInBytes: 16,
+				HashType:       hmac.SHA256,
+				Variant:        hmac.VariantTink,
+			}), 0x01020304),
+			key2: &stubKey{},
+		},
 		{
 			name: "Different Key Bytes",
 			key1: mustCreateKey(t, hmac128Key, mustCreateParameters(t, hmac.ParametersOpts{
