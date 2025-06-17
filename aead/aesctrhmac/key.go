@@ -103,11 +103,8 @@ func (k *Key) OutputPrefix() []byte { return bytes.Clone(k.outputPrefix) }
 // Equal returns whether this key object is equal to other.
 func (k *Key) Equal(other key.Key) bool {
 	that, ok := other.(*Key)
-	thisIDRequirement, thisIDRequired := k.IDRequirement()
-	thatIDRequirement, thatIDRequired := that.IDRequirement()
 	return ok && k.Parameters().Equal(that.Parameters()) &&
-		thisIDRequired == thatIDRequired &&
-		thisIDRequirement == thatIDRequirement &&
+		k.idRequirement == that.idRequirement &&
 		k.aesKeyBytes.Equal(that.aesKeyBytes) &&
 		k.hmacKeyBytes.Equal(that.hmacKeyBytes) &&
 		bytes.Equal(k.outputPrefix, that.outputPrefix)

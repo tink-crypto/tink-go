@@ -23,6 +23,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -449,6 +450,34 @@ func TestNewKeyWorks(t *testing.T) {
 				t.Errorf("key1.Equal(key2) = %v, want true", key1.Equal(key2))
 			}
 		})
+	}
+}
+
+type stubKey struct{}
+
+var _ key.Key = (*stubKey)(nil)
+
+func (k *stubKey) Parameters() key.Parameters    { return nil }
+func (k *stubKey) Equal(other key.Key) bool      { return true }
+func (k *stubKey) IDRequirement() (uint32, bool) { return 123, true }
+
+func TestKeyEqual_FalseIfDifferentType(t *testing.T) {
+	params, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 16,
+		IVSizeInBytes:  12,
+		Variant:        aesgcm.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{})
+	key, err := aesgcm.NewKey(keyBytes, 1234, params)
+	if err != nil {
+		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
+	}
+	if key.Equal(&stubKey{}) {
+		t.Errorf("key.Equal(&stubKey{}) = true, want false")
 	}
 }
 

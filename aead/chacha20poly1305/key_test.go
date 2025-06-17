@@ -23,6 +23,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -238,6 +239,29 @@ func TestNewKeyFailsIfNoPrefixAndIDIsNotZero(t *testing.T) {
 	keyBytes := secretdata.NewBytesFromData(rawKey, insecuresecretdataaccess.Token{})
 	if _, err := chacha20poly1305.NewKey(keyBytes, 123, params); err == nil {
 		t.Errorf("chacha20poly1305.NewKey(keyBytes, 123, %v) err = nil, want error", params)
+	}
+}
+
+type stubKey struct{}
+
+var _ key.Key = (*stubKey)(nil)
+
+func (k *stubKey) Parameters() key.Parameters    { return nil }
+func (k *stubKey) Equal(other key.Key) bool      { return true }
+func (k *stubKey) IDRequirement() (uint32, bool) { return 123, true }
+
+func TestKeyEqual_FalseIfDifferentType(t *testing.T) {
+	params, err := chacha20poly1305.NewParameters(chacha20poly1305.VariantTink)
+	if err != nil {
+		t.Fatalf("chacha20poly1305.NewParameters(%v) err = %v, want nil", chacha20poly1305.VariantTink, err)
+	}
+	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{})
+	key, err := chacha20poly1305.NewKey(keyBytes, 1234, params)
+	if err != nil {
+		t.Fatalf("chacha20poly1305.NewKey(keyBytes, %v, %v) err = %v, want nil", 1234, params, err)
+	}
+	if key.Equal(&stubKey{}) {
+		t.Errorf("key.Equal(&stubKey{}) = true, want false")
 	}
 }
 
