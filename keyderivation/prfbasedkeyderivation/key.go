@@ -1,0 +1,98 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package prfbasedkeyderivation
+
+import (
+	"fmt"
+
+	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
+	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
+	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
+)
+
+// Key represents a PRF-based key derivation function.
+type Key struct {
+	parameters    *Parameters
+	prfKey        key.Key
+	idRequirement uint32
+}
+
+var _ key.Key = (*Key)(nil)
+
+// NewKey creates a new Key object.
+//
+// Inputs are such that:
+//  1. prfKey must be one of the following types:
+//     - [aescmacprf.Key]
+//     - [hkdfprf.Key]
+//     - [hmacprf.Key]
+//  2. prfKey.Parameters() must be equal to parameters.PRFParameters()
+//  3. idRequirement must be zero if and only if parameters.HasIDRequirement() is false.
+func NewKey(parameters *Parameters, prfKey key.Key, idRequirement uint32) (*Key, error) {
+	if parameters == nil {
+		return nil, fmt.Errorf("parameters must not be nil")
+	}
+	if prfKey == nil {
+		return nil, fmt.Errorf("prfKey must not be nil")
+	}
+
+	// 1.
+	switch prfKey.(type) {
+	case *aescmacprf.Key:
+	case *hkdfprf.Key:
+	case *hmacprf.Key:
+		// Do nothing.
+	default:
+		return nil, fmt.Errorf("unknown PRF key type: %T", prfKey)
+	}
+	// 2.
+	if !parameters.PRFParameters().Equal(prfKey.Parameters()) {
+		return nil, fmt.Errorf("prfKey.Parameters() is not equal to parameters.PrfParameters()")
+	}
+	// 3.
+	if idRequirement != 0 && !parameters.HasIDRequirement() {
+		return nil, fmt.Errorf("idRequirement != 0 but parameters.HasIDRequirement() is false")
+	}
+	if idRequirement == 0 && parameters.HasIDRequirement() {
+		return nil, fmt.Errorf("idRequirement == 0 but parameters.HasIDRequirement() is true")
+	}
+
+	return &Key{
+		parameters:    parameters,
+		prfKey:        prfKey,
+		idRequirement: idRequirement,
+	}, nil
+}
+
+// PRFKey returns the PRF key.
+func (k *Key) PRFKey() key.Key { return k.prfKey }
+
+// Parameters returns the parameters of this key.
+func (k *Key) Parameters() key.Parameters { return k.parameters }
+
+// IDRequirement returns required to indicate if this key requires an
+// identifier. If it does, id will contain that identifier.
+func (k *Key) IDRequirement() (uint32, bool) {
+	return k.idRequirement, k.parameters.HasIDRequirement()
+}
+
+// Equal returns whether this key object is equal to other.
+func (k *Key) Equal(other key.Key) bool {
+	that, ok := other.(*Key)
+	return ok && k.parameters.Equal(that.parameters) &&
+		k.prfKey.Equal(that.prfKey) &&
+		k.idRequirement == that.idRequirement
+}
