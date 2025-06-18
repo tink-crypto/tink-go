@@ -23,6 +23,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/hybrid/hpke"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -281,6 +282,28 @@ func TestNewPublicKeyFailsWithInvalidValues(t *testing.T) {
 	}
 }
 
+type stubKey struct{}
+
+var _ key.Key = (*stubKey)(nil)
+
+func (k *stubKey) Parameters() key.Parameters    { return nil }
+func (k *stubKey) Equal(other key.Key) bool      { return true }
+func (k *stubKey) IDRequirement() (uint32, bool) { return 123, true }
+
+func TestPublicKey_Equal_FalseIfDifferentType(t *testing.T) {
+	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
+	params := mustCreateParameters(t, hpke.ParametersOpts{
+		KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+		KDFID:   hpke.HKDFSHA256,
+		AEADID:  hpke.AES256GCM,
+		Variant: hpke.VariantTink,
+	})
+	publicKey := mustCreatePublicKey(t, x25519PublicKeyBytes, 0x01020304, params)
+	if publicKey.Equal(&stubKey{}) {
+		t.Errorf("publicKey.Equal(&stubKey{}) = true, want false")
+	}
+}
+
 func TestNewPublicKey(t *testing.T) {
 	testCases := mustCreateKeyTestCases(t)
 	for _, tc := range testCases {
@@ -513,6 +536,25 @@ func TestNewPrivateKeyFromPublicKeyFailsWithInvalidValues(t *testing.T) {
 				t.Errorf("hpke.NewPrivateKeyFromPublicKey(%v, %v) err = nil, want non-nil", tc.privateKeybytes, tc.publicKey)
 			}
 		})
+	}
+}
+
+func TestPrivateKey_Equal_FalseIfDifferentType(t *testing.T) {
+	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
+	x25519PrivateKeyBytes := mustHexDecode(t, x25519PrivateKeyBytesHex)
+	params := mustCreateParameters(t, hpke.ParametersOpts{
+		KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+		KDFID:   hpke.HKDFSHA256,
+		AEADID:  hpke.AES256GCM,
+		Variant: hpke.VariantTink,
+	})
+	publicKey := mustCreatePublicKey(t, x25519PublicKeyBytes, 0x01020304, params)
+	privateKey, err := hpke.NewPrivateKeyFromPublicKey(secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}), publicKey)
+	if err != nil {
+		t.Fatalf("hpke.NewPrivateKeyFromPublicKey() err = %v, want nil", err)
+	}
+	if privateKey.Equal(&stubKey{}) {
+		t.Errorf("privateKey.Equal(&stubKey{}) = true, want false")
 	}
 }
 

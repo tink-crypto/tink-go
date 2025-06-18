@@ -22,6 +22,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
 )
@@ -621,6 +622,23 @@ func TestPublicKeyOutputPrefix(t *testing.T) {
 	}
 }
 
+type stubKey struct{}
+
+var _ key.Key = (*stubKey)(nil)
+
+func (k *stubKey) Parameters() key.Parameters    { return nil }
+func (k *stubKey) Equal(other key.Key) bool      { return true }
+func (k *stubKey) IDRequirement() (uint32, bool) { return 123, true }
+
+func TestPublicKey_Equal_FalseIfDifferentType(t *testing.T) {
+	publicPoint := bytesFromHex(t, pubKeyUncompressedP256Hex)
+	params := mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)
+	pubKey := mustCreatePublicKey(t, publicPoint, 123, params)
+	if pubKey.Equal(&stubKey{}) {
+		t.Errorf("pubKey.Equal(&stubKey{}) = true, want false")
+	}
+}
+
 func mustCreateParameters(t *testing.T, curveType ecdsa.CurveType, hashType ecdsa.HashType, signatureEncoding ecdsa.SignatureEncoding, variant ecdsa.Variant) *ecdsa.Parameters {
 	t.Helper()
 	params, err := ecdsa.NewParameters(curveType, hashType, signatureEncoding, variant)
@@ -683,6 +701,22 @@ func TestNewPrivateKeyInvalidValues(t *testing.T) {
 				t.Errorf("ecdsa.NewPrivateKey(tc.privateKeyValue, 123, %v) = nil, want error", tc.params)
 			}
 		})
+	}
+}
+
+func TestPrivateKey_Equal_FalseIfDifferentType(t *testing.T) {
+	publicPoint := bytesFromHex(t, pubKeyUncompressedP256Hex)
+	params := mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)
+	publicKey := mustCreatePublicKey(t, publicPoint, 123, params)
+	token := insecuresecretdataaccess.Token{}
+	privateKeyValueBytes := bytesFromHex(t, privKeyValueP256Hex)
+	privateKeyValue := secretdata.NewBytesFromData(privateKeyValueBytes, token)
+	prvKey, err := ecdsa.NewPrivateKeyFromPublicKey(publicKey, privateKeyValue)
+	if err != nil {
+		t.Fatalf("ecdsa.NewPrivateKeyFromPublicKey(%v, privateKeyValue) err = %v, want nil", publicKey, err)
+	}
+	if prvKey.Equal(&stubKey{}) {
+		t.Errorf("prvKey.Equal(&stubKey{}) = true, want false")
 	}
 }
 

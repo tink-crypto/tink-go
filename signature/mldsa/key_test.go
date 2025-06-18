@@ -22,6 +22,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/mldsa"
 )
@@ -420,6 +421,38 @@ func TestPublicKeyEqualSelf(t *testing.T) {
 			}
 			if !pubKey.Equal(pubKey) {
 				t.Errorf("pubKey.Equal(pubKey) = false, want true")
+			}
+		})
+	}
+}
+
+type stubKey struct{}
+
+var _ key.Key = (*stubKey)(nil)
+
+func (k *stubKey) Parameters() key.Parameters    { return nil }
+func (k *stubKey) Equal(other key.Key) bool      { return true }
+func (k *stubKey) IDRequirement() (uint32, bool) { return 123, true }
+
+func TestPublicKeyEqual_FalseIfDifferentType(t *testing.T) {
+	for _, inst := range []mldsa.Instance{
+		mldsa.MLDSA65,
+	} {
+		t.Run(fmt.Sprintf("%s", inst), func(t *testing.T) {
+			params, err := mldsa.NewParameters(inst, mldsa.VariantTink)
+			if err != nil {
+				t.Fatalf("mldsa.NewParameters(%v) err = %v, want nil", mldsa.VariantTink, err)
+			}
+			keyBytes, err := hex.DecodeString(pubKey65Hex)
+			if err != nil {
+				t.Fatalf("hex.DecodeString(pubKeyHex) err = %v, want nil", err)
+			}
+			pubKey, err := mldsa.NewPublicKey(keyBytes, 123, params)
+			if err != nil {
+				t.Fatalf("mldsa.NewPublicKey(%v, %v, %v) err = %v, want nil", keyBytes, 123, params, err)
+			}
+			if pubKey.Equal(&stubKey{}) {
+				t.Errorf("pubKey.Equal(&stubKey{}) = true, want false")
 			}
 		})
 	}
@@ -847,6 +880,32 @@ func TestPrivateKeyEqualSelf(t *testing.T) {
 			}
 			if !privKey.Equal(privKey) {
 				t.Errorf("privKey.Equal(privKey) = false, want true")
+			}
+		})
+	}
+}
+
+func TestPrivateKeyEqual_FalseIfDifferentType(t *testing.T) {
+	for _, inst := range []mldsa.Instance{
+		mldsa.MLDSA65,
+	} {
+		t.Run(fmt.Sprintf("%s", inst), func(t *testing.T) {
+			params, err := mldsa.NewParameters(inst, mldsa.VariantTink)
+			if err != nil {
+				t.Fatalf("mldsa.NewParameters(%v) err = %v, want nil", mldsa.VariantTink, err)
+			}
+			pubKeyBytes, privKeyBytes := getTestKeyPair(t, inst)
+			pubKey, err := mldsa.NewPublicKey(pubKeyBytes, 123, params)
+			if err != nil {
+				t.Fatalf("mldsa.NewPublicKey(%v, %v, %v) err = %v", pubKeyBytes, 123, params, err)
+			}
+			secretSeed := secretdata.NewBytesFromData(privKeyBytes, insecuresecretdataaccess.Token{})
+			privKey, err := mldsa.NewPrivateKeyWithPublicKey(secretSeed, pubKey)
+			if err != nil {
+				t.Fatalf("mldsa.NewPrivateKeyWithPublicKey(%v, %v) err = %v", secretSeed, pubKey, err)
+			}
+			if privKey.Equal(&stubKey{}) {
+				t.Errorf("privKey.Equal(&stubKey{}) = true, want false")
 			}
 		})
 	}

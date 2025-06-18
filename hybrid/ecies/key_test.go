@@ -25,6 +25,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -335,6 +336,41 @@ func TestNewPublicKeyFailsWithInvalidValues(t *testing.T) {
 				t.Errorf("ecies.NewPublicKey(%v, %v, %v) err = nil, want non-nil", tc.publicKeyBytes, tc.idRequirement, tc.params)
 			}
 		})
+	}
+}
+
+type stubKey struct{}
+
+var _ key.Key = (*stubKey)(nil)
+
+func (k *stubKey) Parameters() key.Parameters    { return nil }
+func (k *stubKey) Equal(other key.Key) bool      { return true }
+func (k *stubKey) IDRequirement() (uint32, bool) { return 123, true }
+
+func TestPublicKey_Equal_FalseIfDifferentType(t *testing.T) {
+	aesGCMDEMParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
+	params := mustCreateParameters(t, ecies.ParametersOpts{
+		CurveType:            ecies.X25519,
+		HashType:             ecies.SHA256,
+		NISTCurvePointFormat: ecies.UnspecifiedPointFormat,
+		DEMParameters:        aesGCMDEMParams,
+		Variant:              ecies.VariantTink,
+	})
+	publicKey, err := ecies.NewPublicKey(x25519PublicKeyBytes, 0x01020304, params)
+	if err != nil {
+		t.Fatalf("ecies.NewPublicKey(%x, %v, %v) err = %v, want nil", x25519PublicKeyBytes, 0x01020304, params, err)
+	}
+	if publicKey.Equal(&stubKey{}) {
+		t.Errorf("publicKey.Equal(&stubKey{}) = true, want false")
 	}
 }
 
@@ -665,6 +701,38 @@ func TestNewPrivateKeyFromPublicKey(t *testing.T) {
 				t.Errorf("otherPrivKey.Equal(privKey) = false, want true")
 			}
 		})
+	}
+}
+
+func TestPrivateKey_Equal_FalseIfDifferentType(t *testing.T) {
+	aesGCMDEMParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
+	x25519PrivateKeyBytes := mustHexDecode(t, x25519PrivateKeyBytesHex)
+	params := mustCreateParameters(t, ecies.ParametersOpts{
+		CurveType:            ecies.X25519,
+		HashType:             ecies.SHA256,
+		NISTCurvePointFormat: ecies.UnspecifiedPointFormat,
+		DEMParameters:        aesGCMDEMParams,
+		Variant:              ecies.VariantTink,
+	})
+	publicKey, err := ecies.NewPublicKey(x25519PublicKeyBytes, 0x01020304, params)
+	if err != nil {
+		t.Fatalf("ecies.NewPublicKey(%x, %v, %v) err = %v, want nil", x25519PublicKeyBytes, 0x01020304, params, err)
+	}
+	privateKey, err := ecies.NewPrivateKeyFromPublicKey(secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}), publicKey)
+	if err != nil {
+		t.Fatalf("ecies.NewPrivateKeyFromPublicKey(%x, %v) err = %v, want nil", x25519PrivateKeyBytes, publicKey, err)
+	}
+	if privateKey.Equal(&stubKey{}) {
+		t.Errorf("privateKey.Equal(&stubKey{}) = true, want false")
 	}
 }
 
