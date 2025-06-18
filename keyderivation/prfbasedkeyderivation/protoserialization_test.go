@@ -22,6 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/prfbasedkeyderivation"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
@@ -493,6 +494,50 @@ func TestParseKey_Failure(t *testing.T) {
 				t.Errorf("protoserialization.ParseKey(%v) err = nil, want error", tc.keySerialization)
 			} else {
 				t.Logf("protoserialization.ParseKey(%v) err = %v", tc.keySerialization, err)
+			}
+		})
+	}
+}
+
+func TestSerializeKey_Success(t *testing.T) {
+	for _, tc := range keyParsingTestCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.SerializeKey(tc.key)
+			if err != nil {
+				t.Errorf("protoserialization.SerializeKey(%v) err = %p, want nil", tc.key, err)
+			}
+			if diff := cmp.Diff(tc.keySerialization, got); diff != "" {
+				t.Errorf("protoserialization.SerializeKey(%v) returned diff (-want +got):\n%s", tc.key, diff)
+			}
+		})
+	}
+}
+
+type stubParams struct{}
+
+var _ key.Parameters = (*stubParams)(nil)
+
+func (p *stubParams) Equal(_ key.Parameters) bool { return true }
+func (p *stubParams) HasIDRequirement() bool      { return true }
+
+func TestSerializeKey_Failure(t *testing.T) {
+	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{}))
+	if err != nil {
+		t.Fatalf("aescmacprf.NewKey() failed: %v", err)
+	}
+	aesCMACPRFParams := aesCMACPRFKey.Parameters().(*aescmacprf.Parameters)
+	for _, tc := range []struct {
+		name string
+		key  key.Key
+	}{
+		{
+			name: "derived_key_parameters_not_serializable",
+			key:  mustCreateKey(t, aesCMACPRFParams, aesCMACPRFKey, &stubParams{}, 12345),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.SerializeKey(tc.key); err == nil {
+				t.Errorf("protoserialization.SerializeKey(%v) err = nil, want error", tc.key)
 			}
 		})
 	}

@@ -28,6 +28,53 @@ const (
 	typeURL = "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey"
 )
 
+type keySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*keySerializer)(nil)
+
+// SerializeKey converts a [prfbasedkeyderivation.Key] into its proto serialized form.
+// It assumes that the input k is a *[prfbasedkeyderivation.Key] and that this
+// struct provides a method like `toProto()` to access the underlying *prfderpb.PrfBasedDeriverKey.
+func (s *keySerializer) SerializeKey(k key.Key) (*protoserialization.KeySerialization, error) {
+	pbdKey, ok := k.(*Key)
+	if !ok {
+		return nil, fmt.Errorf("prfbasedkeyderivation: unexpected key type: got %T, want %T", k, (*Key)(nil))
+	}
+
+	derivedKeyTemplate, err := protoserialization.SerializeParameters(pbdKey.Parameters().(*Parameters).DerivedKeyParameters())
+	if err != nil {
+		return nil, fmt.Errorf("prfbasedkeyderivation: failed to serialize parameters: %w", err)
+	}
+
+	serializedPrfKey, err := protoserialization.SerializeKey(pbdKey.PRFKey())
+	if err != nil {
+		return nil, fmt.Errorf("prfbasedkeyderivation: failed to serialize PRF key: %w", err)
+	}
+
+	protoKey := &prfderpb.PrfBasedDeriverKey{
+		Version: 0,
+		PrfKey:  serializedPrfKey.KeyData(),
+		Params: &prfderpb.PrfBasedDeriverParams{
+			DerivedKeyTemplate: derivedKeyTemplate,
+		},
+	}
+
+	serializedProtoKey, err := proto.Marshal(protoKey)
+	if err != nil {
+		return nil, fmt.Errorf("prfbasedkeyderivation: failed to marshal key proto: %w", err)
+	}
+
+	idRequirement, _ := pbdKey.IDRequirement()
+
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         typeURL,
+		Value:           serializedProtoKey,
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC, // PRF-based deriver keys are considered symmetric.
+	}
+
+	return protoserialization.NewKeySerialization(keyData, derivedKeyTemplate.GetOutputPrefixType(), idRequirement)
+}
+
 type keyParser struct{}
 
 var _ protoserialization.KeyParser = (*keyParser)(nil)

@@ -25,4 +25,7 @@ func init() {
 	if err := protoserialization.RegisterKeyParser(typeURL, new(keyParser)); err != nil {
 		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
 	}
+	if err := protoserialization.RegisterKeySerializer[*Key](new(keySerializer)); err != nil {
+		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
+	}
 }
