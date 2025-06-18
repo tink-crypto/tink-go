@@ -14,3 +14,15 @@
 
 // Package prfbasedkeyderivation provides a key derivation function that is based on a PRF.
 package prfbasedkeyderivation
+
+import (
+	"fmt"
+
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+)
+
+func init() {
+	if err := protoserialization.RegisterKeyParser(typeURL, new(keyParser)); err != nil {
+		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
+	}
+}
