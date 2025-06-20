@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package streamingaead provides implementations of the streaming AEAD primitive.
-//
-// AEAD encryption assures the confidentiality and authenticity of the data.
-// This primitive is CPA secure.
-package streamingaead
+// Package aesgcmhkdf provides a key manager for AES-CTR-HMAC streaming AEADs.
+package aesgcmhkdf
 
 import (
-	_ "github.com/tink-crypto/tink-go/v2/streamingaead/aesctrhmac" // To register the key manager.
-	_ "github.com/tink-crypto/tink-go/v2/streamingaead/aesgcmhkdf" // To register the key manager.
+	"fmt"
+
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 )
+
+func init() {
+	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
+		panic(fmt.Sprintf("aesgcmhkdf.init() failed: %v", err))
+	}
+	if err := internalregistry.AllowKeyDerivation(typeURL); err != nil {
+		panic(fmt.Sprintf("streamingaead.init() failed: %v", err))
+	}
+}

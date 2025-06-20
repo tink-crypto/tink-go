@@ -12,42 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package streamingaead_test
+package aesgcmhkdf_test
 
 import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	_ "github.com/tink-crypto/tink-go/v2/streamingaead/aesgcmhkdf"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	gcmhkdfpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_hkdf_streaming_go_proto"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-var aesGCMHKDFKeySizes = []uint32{16, 32}
-
-func TestAESGCMHKDFGetPrimitiveBasic(t *testing.T) {
+func TestGetPrimitiveBasic(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-GCM-HKDF key manager: %s", err)
+		t.Fatalf("cannot obtain AES-GCM-HKDF key manager: %s", err)
 	}
-	for _, keySize := range aesGCMHKDFKeySizes {
+	for _, keySize := range []uint32{16, 32} {
 		key := testutil.NewAESGCMHKDFKey(testutil.AESGCMHKDFKeyVersion, keySize, keySize, commonpb.HashType_SHA256, 4096)
 		serializedKey, err := proto.Marshal(key)
 		if err != nil {
-			t.Errorf("failed to marshal key: %s", err)
+			t.Fatalf("failed to marshal key: %s", err)
 		}
 		p, err := keyManager.Primitive(serializedKey)
 		if err != nil {
-			t.Errorf("unexpected error: %s", err)
+			t.Fatalf("unexpected error: %s", err)
 		}
 		if err := validatePrimitive(p, key); err != nil {
 			t.Errorf("%s", err)
@@ -55,20 +56,20 @@ func TestAESGCMHKDFGetPrimitiveBasic(t *testing.T) {
 	}
 }
 
-func TestAESGCMHKDFGetPrimitiveWithInvalidInput(t *testing.T) {
+func TestGetPrimitiveWithInvalidInput(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-GCM-HKDF key manager: %s", err)
+		t.Fatalf("cannot obtain AES-GCM-HKDF key manager: %s", err)
 	}
 
 	testKeys := genInvalidAESGCMHKDFKeys()
 	for i := 0; i < len(testKeys); i++ {
 		serializedKey, err := proto.Marshal(testKeys[i])
 		if err != nil {
-			t.Errorf("failed to marshal key: %s", err)
+			t.Fatalf("failed to marshal key: %s", err)
 		}
 		if _, err := keyManager.Primitive(serializedKey); err == nil {
-			t.Errorf("expect an error in test case %d", i)
+			t.Fatalf("expect an error in test case %d", i)
 		}
 	}
 
@@ -82,22 +83,22 @@ func TestAESGCMHKDFGetPrimitiveWithInvalidInput(t *testing.T) {
 	keyNilParams.Params = nil
 	serializedKeyNilParams, err := proto.Marshal(keyNilParams)
 	if err != nil {
-		t.Errorf("proto.Marshal(keyNilParams) err = %v, want nil", err)
+		t.Fatalf("proto.Marshal(keyNilParams) err = %v, want nil", err)
 	}
 	if _, err := keyManager.Primitive(serializedKeyNilParams); err == nil {
 		t.Errorf("keyManager.Primitive(serializedKeyNilParams) err = nil, want non-nil")
 	}
 }
 
-func TestAESGCMHKDFNewKeyMultipleTimes(t *testing.T) {
+func TestNewKeyMultipleTimes(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-GCM-HKDF key manager: %s", err)
+		t.Fatalf("cannot obtain AES-GCM-HKDF key manager: %s", err)
 	}
 	format := testutil.NewAESGCMHKDFKeyFormat(32, 32, commonpb.HashType_SHA256, 4096)
 	serializedFormat, err := proto.Marshal(format)
 	if err != nil {
-		t.Errorf("failed to marshal key: %s", err)
+		t.Fatalf("failed to marshal key: %s", err)
 	}
 	keys := make(map[string]struct{})
 	n := 26
@@ -108,7 +109,7 @@ func TestAESGCMHKDFNewKeyMultipleTimes(t *testing.T) {
 		}
 		serializedKey, err := proto.Marshal(key)
 		if err != nil {
-			t.Errorf("failed to marshal key: %s", err)
+			t.Fatalf("failed to marshal key: %s", err)
 		}
 		keys[string(serializedKey)] = struct{}{}
 
@@ -124,12 +125,12 @@ func TestAESGCMHKDFNewKeyMultipleTimes(t *testing.T) {
 	}
 }
 
-func TestAESGCMHKDFNewKeyBasic(t *testing.T) {
+func TestNewKeyBasic(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-GCM-HKDF key manager: %s", err)
+		t.Fatalf("cannot obtain AES-GCM-HKDF key manager: %s", err)
 	}
-	for _, keySize := range aesGCMHKDFKeySizes {
+	for _, keySize := range []uint32{16, 32} {
 		format := testutil.NewAESGCMHKDFKeyFormat(
 			keySize,
 			keySize,
@@ -138,11 +139,11 @@ func TestAESGCMHKDFNewKeyBasic(t *testing.T) {
 		)
 		serializedFormat, err := proto.Marshal(format)
 		if err != nil {
-			t.Errorf("failed to marshal key: %s", err)
+			t.Fatalf("failed to marshal key: %s", err)
 		}
 		m, err := keyManager.NewKey(serializedFormat)
 		if err != nil {
-			t.Errorf("unexpected error: %s", err)
+			t.Fatalf("unexpected error: %s", err)
 		}
 		key := m.(*gcmhkdfpb.AesGcmHkdfStreamingKey)
 		if err := validateAESGCMHKDFKey(key, format); err != nil {
@@ -151,48 +152,48 @@ func TestAESGCMHKDFNewKeyBasic(t *testing.T) {
 	}
 }
 
-func TestAESGCMHKDFNewKeyWithInvalidInput(t *testing.T) {
+func TestNewKeyWithInvalidInput(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-GCM-HKDF key manager: %s", err)
+		t.Fatalf("cannot obtain AES-GCM-HKDF key manager: %s", err)
 	}
 	// bad format
 	badFormats := genInvalidAESGCMHKDFKeyFormats()
 	for i := 0; i < len(badFormats); i++ {
 		serializedFormat, err := proto.Marshal(badFormats[i])
 		if err != nil {
-			t.Errorf("failed to marshal key: %s", err)
+			t.Fatalf("failed to marshal key: %s", err)
 		}
 		if _, err := keyManager.NewKey(serializedFormat); err == nil {
-			t.Errorf("expect an error in test case %d", i)
+			t.Fatalf("expect an error in test case %d", i)
 		}
 	}
 	// nil
 	if _, err := keyManager.NewKey(nil); err == nil {
-		t.Errorf("expect an error when input is nil")
+		t.Fatalf("expect an error when input is nil")
 	}
 	// empty array
 	if _, err := keyManager.NewKey([]byte{}); err == nil {
-		t.Errorf("expect an error when input is empty")
+		t.Fatalf("expect an error when input is empty")
 	}
 	// params field is unset
 	formatNilParams := testutil.NewAESGCMHKDFKeyFormat(32, 32, commonpb.HashType_SHA256, 4096)
 	formatNilParams.Params = nil
 	serializedFormatNilParams, err := proto.Marshal(formatNilParams)
 	if err != nil {
-		t.Errorf("proto.Marshal(formatNilParams) err = %v, want nil", err)
+		t.Fatalf("proto.Marshal(formatNilParams) err = %v, want nil", err)
 	}
 	if _, err := keyManager.NewKey(serializedFormatNilParams); err == nil {
 		t.Errorf("keyManager.NewKey(serializedFormatNilParams) err = nil, want non-nil")
 	}
 }
 
-func TestAESGCMHKDFNewKeyDataBasic(t *testing.T) {
+func TestNewKeyDataBasic(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-GCM-HKDF key manager: %s", err)
+		t.Fatalf("cannot obtain AES-GCM-HKDF key manager: %s", err)
 	}
-	for _, keySize := range aesGCMHKDFKeySizes {
+	for _, keySize := range []uint32{16, 32} {
 		format := testutil.NewAESGCMHKDFKeyFormat(
 			keySize,
 			keySize,
@@ -201,28 +202,28 @@ func TestAESGCMHKDFNewKeyDataBasic(t *testing.T) {
 		)
 		serializedFormat, err := proto.Marshal(format)
 		if err != nil {
-			t.Errorf("failed to marshal key: %s", err)
+			t.Fatalf("failed to marshal key: %s", err)
 		}
 		keyData, err := keyManager.NewKeyData(serializedFormat)
 		if err != nil {
-			t.Errorf("unexpected error: %s", err)
+			t.Fatalf("unexpected error: %s", err)
 		}
 		if keyData.TypeUrl != testutil.AESGCMHKDFTypeURL {
-			t.Errorf("incorrect type url")
+			t.Fatalf("incorrect type url")
 		}
 		if keyData.KeyMaterialType != tinkpb.KeyData_SYMMETRIC {
-			t.Errorf("incorrect key material type")
+			t.Fatalf("incorrect key material type")
 		}
 		key := new(gcmhkdfpb.AesGcmHkdfStreamingKey)
 		if err := proto.Unmarshal(keyData.Value, key); err != nil {
-			t.Errorf("incorrect key value")
+			t.Fatalf("incorrect key value")
 		}
 		if err := validateAESGCMHKDFKey(key, format); err != nil {
-			t.Errorf("%s", err)
+			t.Fatalf("%s", err)
 		}
 		p, err := registry.PrimitiveFromKeyData(keyData)
 		if err != nil {
-			t.Errorf("registry.PrimitiveFromKeyData(keyData) err = %v, want nil", err)
+			t.Fatalf("registry.PrimitiveFromKeyData(keyData) err = %v, want nil", err)
 		}
 		_, ok := p.(*subtle.AESGCMHKDF)
 		if !ok {
@@ -231,10 +232,10 @@ func TestAESGCMHKDFNewKeyDataBasic(t *testing.T) {
 	}
 }
 
-func TestAESGCMHKDFNewKeyDataWithInvalidInput(t *testing.T) {
+func TestNewKeyDataWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-GCM-HKDF key manager: %s", err)
+		t.Fatalf("cannot obtain AES-GCM-HKDF key manager: %s", err)
 	}
 	badFormats := genInvalidAESGCMHKDFKeyFormats()
 	for i := 0; i < len(badFormats); i++ {
@@ -256,30 +257,30 @@ func TestAESGCMHKDFNewKeyDataWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestAESGCMHKDFDoesSupport(t *testing.T) {
+func TestDoesSupport(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AES-GCM-HKDF key manager: %s", err)
 	}
 	if !keyManager.DoesSupport(testutil.AESGCMHKDFTypeURL) {
-		t.Errorf("AESGCMHKDFKeyManager must support %s", testutil.AESGCMHKDFTypeURL)
+		t.Fatalf("AESGCMHKDFKeyManager must support %s", testutil.AESGCMHKDFTypeURL)
 	}
 	if keyManager.DoesSupport("some bad type") {
 		t.Errorf("AESGCMHKDFKeyManager must support only %s", testutil.AESGCMHKDFTypeURL)
 	}
 }
 
-func TestAESGCMHKDFTypeURL(t *testing.T) {
+func TestTypeURL(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-GCM-HKDF key manager: %s", err)
+		t.Fatalf("cannot obtain AES-GCM-HKDF key manager: %s", err)
 	}
 	if keyManager.TypeURL() != testutil.AESGCMHKDFTypeURL {
 		t.Errorf("incorrect key type")
 	}
 }
 
-func TestAESGCMHKDFKeyMaterialType(t *testing.T) {
+func TestKeyMaterialType(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.AESGCMHKDFTypeURL, err)
@@ -293,7 +294,7 @@ func TestAESGCMHKDFKeyMaterialType(t *testing.T) {
 	}
 }
 
-func TestAESGCMHKDFDeriveKey(t *testing.T) {
+func TestDeriveKey(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.AESGCMHKDFTypeURL, err)
@@ -326,7 +327,7 @@ func TestAESGCMHKDFDeriveKey(t *testing.T) {
 			}
 			key := k.(*gcmhkdfpb.AesGcmHkdfStreamingKey)
 			if got, want := len(key.GetKeyValue()), int(keySize); got != want {
-				t.Errorf("key length = %d, want %d", got, want)
+				t.Fatalf("key length = %d, want %d", got, want)
 			}
 			if diff := cmp.Diff(key.GetKeyValue(), rand); diff != "" {
 				t.Errorf("incorrect derived key: diff = %v", diff)
@@ -335,7 +336,7 @@ func TestAESGCMHKDFDeriveKey(t *testing.T) {
 	}
 }
 
-func TestAESGCMHKDFDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
+func TestDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.AESGCMHKDFTypeURL, err)
@@ -457,7 +458,7 @@ func TestAESGCMHKDFDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
 	}
 }
 
-func TestAESGCMHKDFDeriveKeyFailsWithMalformedKeyFormats(t *testing.T) {
+func TestDeriveKeyFailsWithMalformedKeyFormats(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.AESGCMHKDFTypeURL, err)
@@ -498,7 +499,7 @@ func TestAESGCMHKDFDeriveKeyFailsWithMalformedKeyFormats(t *testing.T) {
 	}
 }
 
-func TestAESGCMHKDFDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
+func TestDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESGCMHKDFTypeURL)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.AESGCMHKDFTypeURL, err)
@@ -590,4 +591,36 @@ func validateAESGCMHKDFKey(key *gcmhkdfpb.AesGcmHkdfStreamingKey, format *gcmhkd
 func validatePrimitive(p any, key *gcmhkdfpb.AesGcmHkdfStreamingKey) error {
 	cipher := p.(*subtle.AESGCMHKDF)
 	return encryptDecrypt(cipher, cipher, 32, 32)
+}
+
+func encryptDecrypt(encryptCipher, decryptCipher tink.StreamingAEAD, ptSize, aadSize int) error {
+	pt := random.GetRandomBytes(uint32(ptSize))
+	aad := random.GetRandomBytes(uint32(aadSize))
+
+	buf := &bytes.Buffer{}
+	w, err := encryptCipher.NewEncryptingWriter(buf, aad)
+	if err != nil {
+		return fmt.Errorf("cannot create encrypt writer: %v", err)
+	}
+	if _, err := w.Write(pt); err != nil {
+		return fmt.Errorf("error writing data: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("error closing writer: %v", err)
+	}
+
+	r, err := decryptCipher.NewDecryptingReader(buf, aad)
+	if err != nil {
+		return fmt.Errorf("cannot create decrypt reader: %v", err)
+	}
+	ptGot := make([]byte, len(pt)+1)
+	n, err := io.ReadFull(r, ptGot)
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return fmt.Errorf("decryption failed: %v", err)
+	}
+	ptGot = ptGot[:n]
+	if !bytes.Equal(pt, ptGot) {
+		return fmt.Errorf("decryption failed")
+	}
+	return nil
 }

@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package streamingaead
+package aesctrhmac
 
 import (
-	"errors"
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
 	subtleaead "github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	subtlemac "github.com/tink-crypto/tink-go/v2/mac/subtle"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle"
@@ -30,30 +30,23 @@ import (
 )
 
 const (
-	aesCTRHMACKeyVersion = 0
-	aesCTRHMACTypeURL    = "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey"
+	keyVersion = 0
+	typeURL    = "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey"
 )
 
-var (
-	errInvalidAESCTRHMACKey       = errors.New("aes_ctr_hmac_key_manager: invalid key")
-	errInvalidAESCTRHMACKeyFormat = errors.New("aes_ctr_hmac_key_manager: invalid key format")
-)
+type keyManager struct{}
 
-// aesCTRHMACKeyManager is an implementation of KeyManager interface.
-//
-// It generates new AESCTRHMACKey keys and produces new instances of AESCTRHMAC
-// subtle.
-type aesCTRHMACKeyManager struct{}
+var _ registry.KeyManager = &keyManager{}
 
-// Primitive creates an AESCTRHMAC subtle for the given serialized
-// AESCTRHMACKey proto.
-func (km *aesCTRHMACKeyManager) Primitive(serializedKey []byte) (any, error) {
+// Primitive creates a [subtle.NewAESCTRHMAC] for the given serialized
+// [chpb.AesCtrHmacStreamingKey].
+func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
-		return nil, errInvalidAESCTRHMACKey
+		return nil, fmt.Errorf("aes_ctr_hmac_key_manager: invalid serialized key")
 	}
 	key := &chpb.AesCtrHmacStreamingKey{}
 	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidAESCTRHMACKey
+		return nil, fmt.Errorf("aes_ctr_hmac_key_manager: invalid serialized key")
 	}
 	if err := km.validateKey(key); err != nil {
 		return nil, err
@@ -74,30 +67,30 @@ func (km *aesCTRHMACKeyManager) Primitive(serializedKey []byte) (any, error) {
 }
 
 // NewKey creates a new key according to specification in the given serialized
-// AesCtrHmacStreamingKeyFormat.
-func (km *aesCTRHMACKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+// [chpb.AesCtrHmacStreamingKeyFormat].
+func (km *keyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
 	if len(serializedKeyFormat) == 0 {
-		return nil, errInvalidAESCTRHMACKeyFormat
+		return nil, fmt.Errorf("aes_ctr_hmac_key_manager: invalid key format")
 	}
 	keyFormat := &chpb.AesCtrHmacStreamingKeyFormat{}
 	if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
-		return nil, errInvalidAESCTRHMACKeyFormat
+		return nil, fmt.Errorf("aes_ctr_hmac_key_manager: invalid key format")
 	}
 	if err := km.validateKeyFormat(keyFormat); err != nil {
-		return nil, fmt.Errorf("%s: %s", errInvalidAESCTRHMACKeyFormat, err)
+		return nil, fmt.Errorf("%s: %s", fmt.Errorf("aes_ctr_hmac_key_manager: invalid key format"), err)
 	}
 	return &chpb.AesCtrHmacStreamingKey{
-		Version:  aesCTRHMACKeyVersion,
+		Version:  keyVersion,
 		KeyValue: random.GetRandomBytes(keyFormat.GetKeySize()),
 		Params:   keyFormat.Params,
 	}, nil
 }
 
 // NewKeyData creates a new KeyData according to specification in the given
-// serialized AesCtrHmacStreamingKeyFormat.
+// serialized [chpb.AesCtrHmacStreamingKeyFormat].
 //
 // It should be used solely by the key management API.
-func (km *aesCTRHMACKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+func (km *keyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
 	key, err := km.NewKey(serializedKeyFormat)
 	if err != nil {
 		return nil, err
@@ -114,51 +107,41 @@ func (km *aesCTRHMACKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.
 }
 
 // DoesSupport indicates if this key manager supports the given key type.
-func (km *aesCTRHMACKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == aesCTRHMACTypeURL
-}
+func (km *keyManager) DoesSupport(typeURL string) bool { return km.TypeURL() == typeURL }
 
 // TypeURL returns the key type of keys managed by this key manager.
-func (km *aesCTRHMACKeyManager) TypeURL() string {
-	return aesCTRHMACTypeURL
-}
+func (km *keyManager) TypeURL() string { return typeURL }
 
 // validateKey validates the given AESCTRHMACKey.
-func (km *aesCTRHMACKeyManager) validateKey(key *chpb.AesCtrHmacStreamingKey) error {
-	if err := keyset.ValidateKeyVersion(key.GetVersion(), aesCTRHMACKeyVersion); err != nil {
+func (km *keyManager) validateKey(key *chpb.AesCtrHmacStreamingKey) error {
+	if err := keyset.ValidateKeyVersion(key.GetVersion(), keyVersion); err != nil {
 		return err
 	}
 	keySize := uint32(len(key.GetKeyValue()))
 	if err := subtleaead.ValidateAESKeySize(keySize); err != nil {
 		return err
 	}
-	if err := km.validateParams(key.GetParams()); err != nil {
-		return err
-	}
-	return nil
+	return km.validateParams(key.GetParams())
 }
 
 // validateKeyFormat validates the given AESCTRHMACKeyFormat.
-func (km *aesCTRHMACKeyManager) validateKeyFormat(format *chpb.AesCtrHmacStreamingKeyFormat) error {
+func (km *keyManager) validateKeyFormat(format *chpb.AesCtrHmacStreamingKeyFormat) error {
 	if err := subtleaead.ValidateAESKeySize(format.KeySize); err != nil {
 		return err
 	}
-	if err := km.validateParams(format.GetParams()); err != nil {
-		return err
-	}
-	return nil
+	return km.validateParams(format.GetParams())
 }
 
 // validateParams validates the given AESCTRHMACStreamingParams.
-func (km *aesCTRHMACKeyManager) validateParams(params *chpb.AesCtrHmacStreamingParams) error {
+func (km *keyManager) validateParams(params *chpb.AesCtrHmacStreamingParams) error {
 	if err := subtleaead.ValidateAESKeySize(params.GetDerivedKeySize()); err != nil {
 		return err
 	}
 	if params.GetHkdfHashType() != commonpb.HashType_SHA1 && params.GetHkdfHashType() != commonpb.HashType_SHA256 && params.GetHkdfHashType() != commonpb.HashType_SHA512 {
-		return fmt.Errorf("Invalid HKDF hash type (%s)", params.GetHkdfHashType())
+		return fmt.Errorf("aes_ctr_hmac_key_manager: invalid HKDF hash type (%s)", params.GetHkdfHashType())
 	}
 	if params.GetHmacParams().GetHash() != commonpb.HashType_SHA1 && params.GetHmacParams().GetHash() != commonpb.HashType_SHA256 && params.GetHmacParams().GetHash() != commonpb.HashType_SHA512 {
-		return fmt.Errorf("Invalid tag algorithm (%s)", params.GetHmacParams().GetHash())
+		return fmt.Errorf("aes_ctr_hmac_key_manager: invalid tag algorithm (%s)", params.GetHmacParams().GetHash())
 	}
 	hmacHash := commonpb.HashType_name[int32(params.GetHmacParams().GetHash())]
 	if err := subtlemac.ValidateHMACParams(hmacHash, subtle.AESCTRHMACKeySizeInBytes, params.GetHmacParams().GetTagSize()); err != nil {
@@ -166,10 +149,10 @@ func (km *aesCTRHMACKeyManager) validateParams(params *chpb.AesCtrHmacStreamingP
 	}
 	minSegmentSize := params.GetDerivedKeySize() + subtle.AESCTRHMACNoncePrefixSizeInBytes + params.GetHmacParams().GetTagSize() + 2
 	if params.GetCiphertextSegmentSize() < minSegmentSize {
-		return fmt.Errorf("ciphertext segment size must be at least (derivedKeySize + noncePrefixInBytes + tagSizeInBytes + 2)")
+		return fmt.Errorf("aes_ctr_hmac_key_manager: ciphertext segment size must be at least (derivedKeySize + noncePrefixInBytes + tagSizeInBytes + 2)")
 	}
 	if params.GetCiphertextSegmentSize() > 0x7fffffff {
-		return fmt.Errorf("ciphertext segment size must be at most 2^31 - 1")
+		return fmt.Errorf("aes_ctr_hmac_key_manager: ciphertext segment size must be at most 2^31 - 1")
 	}
 	return nil
 }

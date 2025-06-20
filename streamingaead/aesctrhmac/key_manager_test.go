@@ -12,58 +12,61 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package streamingaead_test
+package aesctrhmac_test
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
+	_ "github.com/tink-crypto/tink-go/v2/streamingaead/aesctrhmac"
 	ctrhmacpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_streaming_go_proto"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-var aesCTRHMACKeySizes = []uint32{16, 32}
-
-func TestAESCTRHMACGetPrimitiveBasic(t *testing.T) {
+func TestGetPrimitiveBasic(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-CTR-HMAC key manager: %s", err)
+		t.Fatalf("cannot obtain AES-CTR-HMAC key manager: %s", err)
 	}
-	for _, keySize := range aesCTRHMACKeySizes {
+	for _, keySize := range []uint32{16, 32} {
 		key := testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, keySize, commonpb.HashType_SHA256, keySize, commonpb.HashType_SHA256, 16, 4096)
 		serializedKey, err := proto.Marshal(key)
 		if err != nil {
-			t.Errorf("failed to marshal key: %s", err)
+			t.Fatalf("failed to marshal key: %s", err)
 		}
 		p, err := keyManager.Primitive(serializedKey)
 		if err != nil {
-			t.Errorf("unexpected error: %s", err)
+			t.Fatalf("unexpected error: %s", err)
 		}
-		if err := validateAESCTRHMACPrimitive(p, key); err != nil {
+		if err := validatePrimitive(p, key); err != nil {
 			t.Errorf("%s", err)
 		}
 	}
 }
 
-func TestAESCTRHMACGetPrimitiveWithInvalidInput(t *testing.T) {
+func TestGetPrimitiveWithInvalidInput(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AES-CTR-HMAC key manager: %s", err)
+		t.Fatalf("cannot obtain AES-CTR-HMAC key manager: %s", err)
 	}
 
 	testKeys := genInvalidAESCTRHMACKeys()
 	for i := 0; i < len(testKeys); i++ {
 		serializedKey, err := proto.Marshal(testKeys[i])
 		if err != nil {
-			t.Errorf("failed to marshal key: %s", err)
+			t.Fatalf("failed to marshal key: %s", err)
 		}
 		if _, err := keyManager.Primitive(serializedKey); err == nil {
-			t.Errorf("expect an error in test case %d", i)
+			t.Fatalf("expect an error in test case %d", i)
 		}
 	}
 
@@ -85,7 +88,7 @@ func TestAESCTRHMACGetPrimitiveWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestAESCTRHMACNewKeyMultipleTimes(t *testing.T) {
+func TestNewKeyMultipleTimes(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AES-CTR-HMAC key manager: %s", err)
@@ -120,12 +123,12 @@ func TestAESCTRHMACNewKeyMultipleTimes(t *testing.T) {
 	}
 }
 
-func TestAESCTRHMACNewKeyBasic(t *testing.T) {
+func TestNewKeyBasic(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AES-CTR-HMAC key manager: %s", err)
 	}
-	for _, keySize := range aesCTRHMACKeySizes {
+	for _, keySize := range []uint32{16, 32} {
 		format := testutil.NewAESCTRHMACKeyFormat(keySize, commonpb.HashType_SHA256, keySize, commonpb.HashType_SHA256, 16, 4096)
 		serializedFormat, err := proto.Marshal(format)
 		if err != nil {
@@ -142,7 +145,7 @@ func TestAESCTRHMACNewKeyBasic(t *testing.T) {
 	}
 }
 
-func TestAESCTRHMACNewKeyWithInvalidInput(t *testing.T) {
+func TestNewKeyWithInvalidInput(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AES-CTR-HMAC key manager: %s", err)
@@ -178,12 +181,12 @@ func TestAESCTRHMACNewKeyWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestAESCTRHMACNewKeyDataBasic(t *testing.T) {
+func TestNewKeyDataBasic(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AES-CTR-HMAC key manager: %s", err)
 	}
-	for _, keySize := range aesCTRHMACKeySizes {
+	for _, keySize := range []uint32{16, 32} {
 		format := testutil.NewAESCTRHMACKeyFormat(keySize, commonpb.HashType_SHA256, keySize, commonpb.HashType_SHA256, 16, 4096)
 		serializedFormat, err := proto.Marshal(format)
 		if err != nil {
@@ -217,7 +220,7 @@ func TestAESCTRHMACNewKeyDataBasic(t *testing.T) {
 	}
 }
 
-func TestAESCTRHMACNewKeyDataWithInvalidInput(t *testing.T) {
+func TestNewKeyDataWithInvalidInput(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESCTRHMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AES-CTR-HMAC key manager: %s", err)
@@ -242,7 +245,7 @@ func TestAESCTRHMACNewKeyDataWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestAESCTRHMACDoesSupport(t *testing.T) {
+func TestDoesSupport(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AES-CTR-HMAC key manager: %s", err)
@@ -255,7 +258,7 @@ func TestAESCTRHMACDoesSupport(t *testing.T) {
 	}
 }
 
-func TestAESCTRHMACTypeURL(t *testing.T) {
+func TestTypeURL(t *testing.T) {
 	keyManager, err := registry.GetKeyManager(testutil.AESCTRHMACTypeURL)
 	if err != nil {
 		t.Errorf("cannot obtain AES-CTR-HMAC key manager: %s", err)
@@ -332,10 +335,42 @@ func validateAESCTRHMACKey(key *ctrhmacpb.AesCtrHmacStreamingKey, format *ctrhma
 	if err != nil {
 		return fmt.Errorf("invalid key")
 	}
-	return validateAESCTRHMACPrimitive(p, key)
+	return validatePrimitive(p, key)
 }
 
-func validateAESCTRHMACPrimitive(p any, key *ctrhmacpb.AesCtrHmacStreamingKey) error {
+func validatePrimitive(p any, key *ctrhmacpb.AesCtrHmacStreamingKey) error {
 	cipher := p.(*subtle.AESCTRHMAC)
 	return encryptDecrypt(cipher, cipher, 32, 32)
+}
+
+func encryptDecrypt(encryptCipher, decryptCipher tink.StreamingAEAD, ptSize, aadSize int) error {
+	pt := random.GetRandomBytes(uint32(ptSize))
+	aad := random.GetRandomBytes(uint32(aadSize))
+
+	buf := &bytes.Buffer{}
+	w, err := encryptCipher.NewEncryptingWriter(buf, aad)
+	if err != nil {
+		return fmt.Errorf("cannot create encrypt writer: %v", err)
+	}
+	if _, err := w.Write(pt); err != nil {
+		return fmt.Errorf("error writing data: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("error closing writer: %v", err)
+	}
+
+	r, err := decryptCipher.NewDecryptingReader(buf, aad)
+	if err != nil {
+		return fmt.Errorf("cannot create decrypt reader: %v", err)
+	}
+	ptGot := make([]byte, len(pt)+1)
+	n, err := io.ReadFull(r, ptGot)
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return fmt.Errorf("decryption failed: %v", err)
+	}
+	ptGot = ptGot[:n]
+	if !bytes.Equal(pt, ptGot) {
+		return fmt.Errorf("decryption failed")
+	}
+	return nil
 }

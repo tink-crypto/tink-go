@@ -128,7 +128,7 @@ func newAESGCMHKDFKeyTemplate(mainKeySize uint32, hkdfHashType commonpb.HashType
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          aesGCMHKDFTypeURL,
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmHkdfStreamingKey",
 		Value:            serializedFormat,
 		OutputPrefixType: tinkpb.OutputPrefixType_RAW,
 	}
@@ -153,7 +153,7 @@ func newAESCTRHMACKeyTemplate(mainKeySize uint32, hkdfHashType commonpb.HashType
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          aesCTRHMACTypeURL,
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
 		Value:            serializedFormat,
 		OutputPrefixType: tinkpb.OutputPrefixType_RAW,
 	}
