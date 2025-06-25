@@ -21,6 +21,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
@@ -82,40 +83,113 @@ func (km *Manager) Add(kt *tinkpb.KeyTemplate) (uint32, error) {
 	return keyID, nil
 }
 
-func (km *Manager) getIDForKey(key key.Key) (uint32, error) {
-	id, required := key.IDRequirement()
-	if !required {
-		return km.newRandomKeyID(), nil
-	}
-	if _, found := km.unavailableKeyIDs[id]; found {
-		return 0, fmt.Errorf("keyset already has a key with ID %d", id)
-	}
-	km.unavailableKeyIDs[id] = true
-	return id, nil
+// entry is a wrapper struct that holds a key, its status and the key ID
+// strategy.
+type entry struct {
+	key key.Key
+	// A key ID is the ID requirement of the [key.Key] object, if set, otherwise a
+	// random ID.
+	fixedID    uint32
+	hasFixedID bool
+	status     KeyStatus
 }
 
-// AddKey adds key to the keyset and returns the key ID. The added key is
-// enabled by default.
-func (km *Manager) AddKey(key key.Key) (uint32, error) {
+// KeyOpts is an interface for options that can be applied to a key.
+type KeyOpts interface {
+	apply(*entry) error
+}
+
+type keyOpts func(*entry) error
+
+func (o keyOpts) apply(e *entry) error { return o(e) }
+
+// WithStatus sets the status of the key.
+func WithStatus(status KeyStatus) KeyOpts {
+	return keyOpts(func(e *entry) error {
+		e.status = status
+		return nil
+	})
+}
+
+// WithFixedID sets the ID of the key.
+//
+// NOTE: It is preferable to add keys with ID requirements or fixed IDs before
+// adding keys without ID requirements to reduce the risk of ID collisions.
+func WithFixedID(id uint32) KeyOpts {
+	return keyOpts(func(e *entry) error {
+		idReq, isRequired := e.key.IDRequirement()
+		if isRequired && idReq != id {
+			return fmt.Errorf("keyset.Manager: key requires ID %d, but WithFixedID was given ID %d", idReq, id)
+		}
+		e.fixedID = id
+		e.hasFixedID = true
+		return nil
+	})
+}
+
+// AddKeyWithOpts adds a key to the keyset with the given options.
+//
+// Default options are:
+// - The key is enabled.
+// - The key ID is random if the key does not require an ID.
+//
+// This is an internal API.
+func (km *Manager) AddKeyWithOpts(key key.Key, _ internalapi.Token, opts ...KeyOpts) (uint32, error) {
 	if key == nil {
-		return 0, fmt.Errorf("keyset.Manager: entry must have Key set")
+		return 0, fmt.Errorf("keyset.Manager: key is nil")
+	}
+
+	// By default, use the key's ID requirement if it is set. Otherwise, use a
+	// random ID.
+	idReq, isRequired := key.IDRequirement()
+	e := &entry{
+		key:        key,
+		fixedID:    idReq,
+		hasFixedID: isRequired,
+		status:     Enabled, // Default status is Enabled.
+	}
+	// Apply options.
+	for _, opt := range opts {
+		if err := opt.apply(e); err != nil {
+			return 0, err
+		}
+	}
+
+	var keyID uint32
+	if e.hasFixedID {
+		// Use the fixed ID if not already in use.
+		if _, found := km.unavailableKeyIDs[e.fixedID]; found {
+			return 0, fmt.Errorf("keyset.Manager: key already has ID %d", e.fixedID)
+		}
+		keyID = e.fixedID
+		km.unavailableKeyIDs[keyID] = true
+	} else {
+		// Use a random ID.
+		keyID = km.newRandomKeyID()
+	}
+
+	protoStatus, err := keyStatusToProto(e.status)
+	if err != nil {
+		return 0, fmt.Errorf("keyset.Manager: %v", err)
 	}
 	keySerialization, err := protoserialization.SerializeKey(key)
 	if err != nil {
 		return 0, fmt.Errorf("keyset.Manager: %v", err)
 	}
-	// This is going to be either an ID requirement or a new random ID.
-	keyID, err := km.getIDForKey(key)
-	if err != nil {
-		return 0, err
-	}
-	km.ks.Key = append(km.ks.Key, &tinkpb.Keyset_Key{
+	newKey := &tinkpb.Keyset_Key{
 		KeyId:            keyID,
-		Status:           tinkpb.KeyStatusType_ENABLED,
+		Status:           protoStatus,
 		OutputPrefixType: keySerialization.OutputPrefixType(),
 		KeyData:          keySerialization.KeyData(),
-	})
-	return keyID, nil
+	}
+	km.ks.Key = append(km.ks.Key, newKey)
+	return newKey.GetKeyId(), nil
+}
+
+// AddKey adds key to the keyset and returns the key ID. The added key is
+// enabled by default.
+func (km *Manager) AddKey(key key.Key) (uint32, error) {
+	return km.AddKeyWithOpts(key, internalapi.Token{})
 }
 
 // AddNewKeyFromParameters generates a new key from parameters, adds the key to
