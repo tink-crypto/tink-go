@@ -26,6 +26,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
+	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
+	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -123,6 +125,36 @@ func addHMACKeyDeriver() {
 	}
 }
 
+func addHKDFPRFKeyDeriver() {
+	parametersType := reflect.TypeFor[*hkdfprf.Parameters]()
+	keyDerivers[parametersType] = func(p key.Parameters, _ uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
+		params, ok := p.(*hkdfprf.Parameters)
+		if !ok {
+			return nil, fmt.Errorf("key is of type %T; needed %T", p, (*hkdfprf.Parameters)(nil))
+		}
+		keyBytes := make([]byte, params.KeySizeInBytes())
+		if _, err := io.ReadFull(reader, keyBytes); err != nil {
+			return nil, fmt.Errorf("insufficient pseudorandomness")
+		}
+		return hkdfprf.NewKey(secretdata.NewBytesFromData(keyBytes, token), params)
+	}
+}
+
+func addHMACPRFKeyDeriver() {
+	parametersType := reflect.TypeFor[*hmacprf.Parameters]()
+	keyDerivers[parametersType] = func(p key.Parameters, _ uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
+		params, ok := p.(*hmacprf.Parameters)
+		if !ok {
+			return nil, fmt.Errorf("key is of type %T; needed %T", p, (*hmacprf.Parameters)(nil))
+		}
+		keyBytes := make([]byte, params.KeySizeInBytes())
+		if _, err := io.ReadFull(reader, keyBytes); err != nil {
+			return nil, fmt.Errorf("insufficient pseudorandomness")
+		}
+		return hmacprf.NewKey(secretdata.NewBytesFromData(keyBytes, token), params)
+	}
+}
+
 func init() {
 	// TODO: b/425280769 - Add key derivers for other key types.
 	addAESGCMKeyDeriver()
@@ -130,4 +162,6 @@ func init() {
 	addXAESGCMKeyDeriver()
 	addXAESSIVKeyDeriver()
 	addHMACKeyDeriver()
+	addHKDFPRFKeyDeriver()
+	addHMACPRFKeyDeriver()
 }

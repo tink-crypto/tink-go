@@ -27,6 +27,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderivers"
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
+	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
+	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -219,6 +221,32 @@ func TestDeriveKey(t *testing.T) {
 		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
 	}
 
+	// PRF keys.
+	hkdfPRFSHA256Params, err := hkdfprf.NewParameters(32, hkdfprf.SHA256, []byte("salt"))
+	if err != nil {
+		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
+	}
+	hkdfPRFSHA256Key, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hkdfPRFSHA256Params)
+	if err != nil {
+		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
+	}
+	hmacSHA256PRFParams, err := hmacprf.NewParameters(32, hmacprf.SHA256)
+	if err != nil {
+		t.Fatalf("hmacprf.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA256PRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA256PRFParams)
+	if err != nil {
+		t.Fatalf("hmacprf.NewKey() err = %v, want nil", err)
+	}
+	hmacSHA512PRFParams, err := hmacprf.NewParameters(64, hmacprf.SHA512)
+	if err != nil {
+		t.Fatalf("hmacprf.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA512PRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA512PRFParams)
+	if err != nil {
+		t.Fatalf("hmacprf.NewKey() err = %v, want nil", err)
+	}
+
 	for _, tc := range []struct {
 		name          string
 		params        key.Parameters
@@ -394,6 +422,48 @@ func TestDeriveKey(t *testing.T) {
 			randomBytes:   []byte("0123456789012345012345678901234501234567890123450123456789012345"),
 			wantKey:       hmacSHA512Tag512NoPrefixKey,
 		},
+		{
+			name:          "HKDF_SHA256",
+			params:        hkdfPRFSHA256Params,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345"),
+			wantKey:       hkdfPRFSHA256Key,
+		},
+		{
+			name:          "HKDF_SHA256_longer_key_bytes",
+			params:        hkdfPRFSHA256Params,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+			wantKey:       hkdfPRFSHA256Key,
+		},
+		{
+			name:          "HMAC_SHA256_PRF",
+			params:        hmacSHA256PRFParams,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345"),
+			wantKey:       hmacSHA256PRFKey,
+		},
+		{
+			name:          "HMAC_SHA256_longer_key_bytes_PRF",
+			params:        hmacSHA256PRFParams,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+			wantKey:       hmacSHA256PRFKey,
+		},
+		{
+			name:          "HMAC_SHA512_PRF",
+			params:        hmacSHA512PRFParams,
+			idRequirement: 123,
+			randomBytes:   []byte("0123456789012345012345678901234501234567890123450123456789012345"),
+			wantKey:       hmacSHA512PRFKey,
+		},
+		{
+			name:          "HMAC_SHA512_longer_key_bytes_PRF",
+			params:        hmacSHA512PRFParams,
+			idRequirement: 123,
+			randomBytes:   []byte("0123456789012345012345678901234501234567890123450123456789012345ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+			wantKey:       hmacSHA512PRFKey,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			derivedKey, err := keyderivers.DeriveKey(tc.params, tc.idRequirement, bytes.NewBuffer(tc.randomBytes), insecuresecretdataaccess.Token{})
@@ -474,6 +544,15 @@ func TestDeriveKey_Failures(t *testing.T) {
 		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
 	}
 
+	hkdfPRFSHA256Params, err := hkdfprf.NewParameters(32, hkdfprf.SHA256, []byte("salt"))
+	if err != nil {
+		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA256PRFParams, err := hmacprf.NewParameters(32, hmacprf.SHA256)
+	if err != nil {
+		t.Fatalf("hmacprf.NewParameters() err = %v, want nil", err)
+	}
+
 	for _, tc := range []struct {
 		name            string
 		params          key.Parameters
@@ -545,6 +624,18 @@ func TestDeriveKey_Failures(t *testing.T) {
 			params:          hmacSHA256Tag128NoPrefixParams,
 			idRequirement:   123,
 			randomnessBytes: []byte("01234567890123450123456789012345"),
+		},
+		{
+			name:            "HKDF PRF insufficient random bytes",
+			params:          hkdfPRFSHA256Params,
+			idRequirement:   123,
+			randomnessBytes: []byte("0123456789012345012345678901234"), // 1 byte short
+		},
+		{
+			name:            "HMAC PRF insufficient random bytes",
+			params:          hmacSHA256PRFParams,
+			idRequirement:   123,
+			randomnessBytes: []byte("0123456789012345012345678901234"), // 1 byte short
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
