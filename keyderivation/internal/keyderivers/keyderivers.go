@@ -19,6 +19,7 @@ import (
 	"io"
 	"reflect"
 
+	"golang.org/x/crypto/ed25519"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
@@ -29,6 +30,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	tinked25519 "github.com/tink-crypto/tink-go/v2/signature/ed25519"
 )
 
 var (
@@ -155,6 +157,21 @@ func addHMACPRFKeyDeriver() {
 	}
 }
 
+func addSignatureED25519KeyDeriver() {
+	parametersType := reflect.TypeFor[*tinked25519.Parameters]()
+	keyDerivers[parametersType] = func(p key.Parameters, idRequirement uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
+		params, ok := p.(*tinked25519.Parameters)
+		if !ok {
+			return nil, fmt.Errorf("key is of type %T; needed %T", p, (*tinked25519.Parameters)(nil))
+		}
+		_, priv, err := ed25519.GenerateKey(reader)
+		if err != nil {
+			return nil, fmt.Errorf("ed25519.GenerateKey() failed: %v", err)
+		}
+		return tinked25519.NewPrivateKey(secretdata.NewBytesFromData(priv.Seed(), token), idRequirement, *params)
+	}
+}
+
 func init() {
 	// TODO: b/425280769 - Add key derivers for other key types.
 	addAESGCMKeyDeriver()
@@ -164,4 +181,5 @@ func init() {
 	addHMACKeyDeriver()
 	addHKDFPRFKeyDeriver()
 	addHMACPRFKeyDeriver()
+	addSignatureED25519KeyDeriver()
 }
