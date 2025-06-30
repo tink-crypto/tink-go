@@ -25,6 +25,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -107,10 +108,26 @@ func addXAESSIVKeyDeriver() {
 	}
 }
 
+func addHMACKeyDeriver() {
+	parametersType := reflect.TypeFor[*hmac.Parameters]()
+	keyDerivers[parametersType] = func(p key.Parameters, idRequirement uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
+		params, ok := p.(*hmac.Parameters)
+		if !ok {
+			return nil, fmt.Errorf("key is of type %T; needed %T", p, (*hmac.Parameters)(nil))
+		}
+		keyBytes := make([]byte, params.KeySizeInBytes())
+		if _, err := io.ReadFull(reader, keyBytes); err != nil {
+			return nil, fmt.Errorf("insufficient pseudorandomness")
+		}
+		return hmac.NewKey(secretdata.NewBytesFromData(keyBytes, token), params, idRequirement)
+	}
+}
+
 func init() {
 	// TODO: b/425280769 - Add key derivers for other key types.
 	addAESGCMKeyDeriver()
 	addXChaCha20Poly1305KeyDeriver()
 	addXAESGCMKeyDeriver()
 	addXAESSIVKeyDeriver()
+	addHMACKeyDeriver()
 }

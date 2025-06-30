@@ -26,6 +26,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderivers"
+	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -110,6 +111,112 @@ func TestDeriveKey(t *testing.T) {
 	aes256SIVNoPrefixKey, err := aessiv.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 0, aes256SIVNoPrefixParams)
 	if err != nil {
 		t.Fatalf("aessiv.NewKey() err = %v, want nil", err)
+	}
+
+	// HMAC keys.
+	hmacSHA256Tag128Params, err := hmac.NewParameters(hmac.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 16,
+		HashType:       hmac.SHA256,
+		Variant:        hmac.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA256Tag128Key, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA256Tag128Params, 123)
+	if err != nil {
+		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
+	}
+	hmacSHA256Tag128NoPrefixParams, err := hmac.NewParameters(hmac.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 16,
+		HashType:       hmac.SHA256,
+		Variant:        hmac.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA256Tag128NoPrefixKey, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA256Tag128NoPrefixParams, 0)
+	if err != nil {
+		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
+	}
+	hmacSHA256Tag256Params, err := hmac.NewParameters(hmac.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 32,
+		HashType:       hmac.SHA256,
+		Variant:        hmac.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA256Tag256Key, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA256Tag256Params, 123)
+	if err != nil {
+		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
+	}
+	hmacSHA256Tag256NoPrefixParams, err := hmac.NewParameters(hmac.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 32,
+		HashType:       hmac.SHA256,
+		Variant:        hmac.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA256Tag256NoPrefixKey, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA256Tag256NoPrefixParams, 0)
+	if err != nil {
+		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
+	}
+	hmacSHA512Tag256Params, err := hmac.NewParameters(hmac.ParametersOpts{
+		KeySizeInBytes: 64,
+		TagSizeInBytes: 32,
+		HashType:       hmac.SHA512,
+		Variant:        hmac.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA512Tag256Key, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA512Tag256Params, 123)
+	if err != nil {
+		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
+	}
+	hmacSHA512Tag256NoPrefixParams, err := hmac.NewParameters(hmac.ParametersOpts{
+		KeySizeInBytes: 64,
+		TagSizeInBytes: 32,
+		HashType:       hmac.SHA512,
+		Variant:        hmac.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA512Tag256NoPrefixKey, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA512Tag256NoPrefixParams, 0)
+	if err != nil {
+		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
+	}
+	hmacSHA512Tag512Params, err := hmac.NewParameters(hmac.ParametersOpts{
+		KeySizeInBytes: 64,
+		TagSizeInBytes: 64,
+		HashType:       hmac.SHA512,
+		Variant:        hmac.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA512Tag512Key, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA512Tag512Params, 123)
+	if err != nil {
+		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
+	}
+	hmacSHA512Tag512NoPrefixParams, err := hmac.NewParameters(hmac.ParametersOpts{
+		KeySizeInBytes: 64,
+		TagSizeInBytes: 64,
+		HashType:       hmac.SHA512,
+		Variant:        hmac.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA512Tag512NoPrefixKey, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA512Tag512NoPrefixParams, 0)
+	if err != nil {
+		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
 	}
 
 	for _, tc := range []struct {
@@ -203,6 +310,90 @@ func TestDeriveKey(t *testing.T) {
 			randomBytes:   []byte("01234567890123450123456789012345"),
 			wantKey:       aes256SIVNoPrefixKey,
 		},
+		{
+			name:          "HMACSHA256Tag128",
+			params:        hmacSHA256Tag128Params,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345"),
+			wantKey:       hmacSHA256Tag128Key,
+		},
+		{
+			name:          "HMACSHA256Tag128_longer_key_bytes",
+			params:        hmacSHA256Tag128Params,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+			wantKey:       hmacSHA256Tag128Key,
+		},
+		{
+			name:          "HMACSHA256Tag128NoPrefix",
+			params:        hmacSHA256Tag128NoPrefixParams,
+			idRequirement: 0,
+			randomBytes:   []byte("01234567890123450123456789012345"),
+			wantKey:       hmacSHA256Tag128NoPrefixKey,
+		},
+		{
+			name:          "HMACSHA256Tag256",
+			params:        hmacSHA256Tag256Params,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345"),
+			wantKey:       hmacSHA256Tag256Key,
+		},
+		{
+			name:          "HMACSHA256Tag256_longer_key_bytes",
+			params:        hmacSHA256Tag256Params,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+			wantKey:       hmacSHA256Tag256Key,
+		},
+		{
+			name:          "HMACSHA256Tag256NoPrefix",
+			params:        hmacSHA256Tag256NoPrefixParams,
+			idRequirement: 0,
+			randomBytes:   []byte("01234567890123450123456789012345"),
+			wantKey:       hmacSHA256Tag256NoPrefixKey,
+		},
+		{
+			name:          "HMACSHA512Tag256",
+			params:        hmacSHA512Tag256Params,
+			idRequirement: 123,
+			randomBytes:   []byte("0123456789012345012345678901234501234567890123450123456789012345"),
+			wantKey:       hmacSHA512Tag256Key,
+		},
+		{
+			name:          "HMACSHA512Tag256_longer_key_bytes",
+			params:        hmacSHA512Tag256Params,
+			idRequirement: 123,
+			randomBytes:   []byte("0123456789012345012345678901234501234567890123450123456789012345ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+			wantKey:       hmacSHA512Tag256Key,
+		},
+		{
+			name:          "HMACSHA512Tag256NoPrefix",
+			params:        hmacSHA512Tag256NoPrefixParams,
+			idRequirement: 0,
+			randomBytes:   []byte("0123456789012345012345678901234501234567890123450123456789012345"),
+			wantKey:       hmacSHA512Tag256NoPrefixKey,
+		},
+		{
+			name:          "HMACSHA512Tag512",
+			params:        hmacSHA512Tag512Params,
+			idRequirement: 123,
+			randomBytes:   []byte("0123456789012345012345678901234501234567890123450123456789012345"),
+			wantKey:       hmacSHA512Tag512Key,
+		},
+		{
+			name:          "HMACSHA512Tag512_longer_key_bytes",
+			params:        hmacSHA512Tag512Params,
+			idRequirement: 123,
+			randomBytes:   []byte("0123456789012345012345678901234501234567890123450123456789012345ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+			wantKey:       hmacSHA512Tag512Key,
+		},
+		{
+			name:          "HMACSHA512Tag512NoPrefix",
+			params:        hmacSHA512Tag512NoPrefixParams,
+			idRequirement: 0,
+			randomBytes:   []byte("0123456789012345012345678901234501234567890123450123456789012345"),
+			wantKey:       hmacSHA512Tag512NoPrefixKey,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			derivedKey, err := keyderivers.DeriveKey(tc.params, tc.idRequirement, bytes.NewBuffer(tc.randomBytes), insecuresecretdataaccess.Token{})
@@ -264,6 +455,25 @@ func TestDeriveKey_Failures(t *testing.T) {
 		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
 	}
 
+	hmacSHA256Tag128Params, err := hmac.NewParameters(hmac.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 16,
+		HashType:       hmac.SHA256,
+		Variant:        hmac.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA256Tag128NoPrefixParams, err := hmac.NewParameters(hmac.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 16,
+		HashType:       hmac.SHA256,
+		Variant:        hmac.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
+	}
+
 	for _, tc := range []struct {
 		name            string
 		params          key.Parameters
@@ -321,6 +531,18 @@ func TestDeriveKey_Failures(t *testing.T) {
 		{
 			name:            "AES-SIV invalid ID requirement",
 			params:          aes256SIVNoPrefixParams,
+			idRequirement:   123,
+			randomnessBytes: []byte("01234567890123450123456789012345"),
+		},
+		{
+			name:            "HMAC insufficient random bytes",
+			params:          hmacSHA256Tag128Params,
+			idRequirement:   123,
+			randomnessBytes: []byte("0123456789012345012345678901234"), // 1 byte short
+		},
+		{
+			name:            "HMAC invalid ID requirement",
+			params:          hmacSHA256Tag128NoPrefixParams,
 			idRequirement:   123,
 			randomnessBytes: []byte("01234567890123450123456789012345"),
 		},
