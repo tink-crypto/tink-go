@@ -180,7 +180,14 @@ func TestNewParameters_InvalidCiphertextSegmentSize(t *testing.T) {
 	}
 }
 
-func TestNewParameters(t *testing.T) {
+type parametersTestCases struct {
+	name          string
+	parameterOpts aesctrhmac.ParameterOpts
+}
+
+func getParametersTestCases(t *testing.T) []parametersTestCases {
+	t.Helper()
+	var testCases []parametersTestCases
 	for _, derivedKeySize := range []int{16, 32} {
 		for _, hkdfHashType := range []aesctrhmac.HashType{aesctrhmac.SHA1, aesctrhmac.SHA256, aesctrhmac.SHA512} {
 			for _, ht := range []struct {
@@ -189,61 +196,65 @@ func TestNewParameters(t *testing.T) {
 			}{{aesctrhmac.SHA1, 20}, {aesctrhmac.SHA256, 32}, {aesctrhmac.SHA512, 64}} {
 				hmacHashType := ht.hashType
 				hmacTagSize := ht.hashSize
-				t.Run(fmt.Sprintf("keySizeInBytes=%d, derivedKeySize=%d, hkdfHashType=%s, hmacHashType=%s", derivedKeySize, derivedKeySize, hkdfHashType, hmacHashType), func(t *testing.T) {
-					params, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+				testCases = append(testCases, parametersTestCases{
+					name: fmt.Sprintf("keySizeInBytes=%d, derivedKeySize=%d, hkdfHashType=%s, hmacHashType=%s", derivedKeySize, derivedKeySize, hkdfHashType, hmacHashType),
+					parameterOpts: aesctrhmac.ParameterOpts{
 						KeySizeInBytes:        derivedKeySize,
 						DerivedKeySizeInBytes: derivedKeySize,
 						HkdfHashType:          hkdfHashType,
 						HmacHashType:          hmacHashType,
 						HmacTagSizeInBytes:    hmacTagSize,
 						SegmentSizeInBytes:    1024,
-					})
-					if err != nil {
-						t.Fatalf("NewParameters() err = %v, want nil", err)
-					}
-					if params.KeySizeInBytes() != derivedKeySize {
-						t.Errorf("params.KeySizeInBytes() = %d, want %d", params.KeySizeInBytes(), derivedKeySize)
-					}
-					if params.DerivedKeySizeInBytes() != derivedKeySize {
-						t.Errorf("params.DerivedKeySizeInBytes() = %d, want %d", params.DerivedKeySizeInBytes(), derivedKeySize)
-					}
-					if params.HkdfHashType() != hkdfHashType {
-						t.Errorf("params.HkdfHashType() = %s, want %s", params.HkdfHashType(), hkdfHashType)
-					}
-					if params.HmacHashType() != hmacHashType {
-						t.Errorf("params.HmacHashType() = %s, want %s", params.HmacHashType(), hmacHashType)
-					}
-					if params.HmacTagSizeInBytes() != hmacTagSize {
-						t.Errorf("params.HmacTagSizeInBytes() = %d, want %d", params.HmacTagSizeInBytes(), hmacTagSize)
-					}
-					if params.SegmentSizeInBytes() != 1024 {
-						t.Errorf("params.SegmentSizeInBytes() = %d, want 1024", params.SegmentSizeInBytes())
-					}
-					if params.HasIDRequirement() {
-						t.Errorf("params.HasIDRequirement() = true, want false")
-					}
-
-					// Test equality.
-					if diff := cmp.Diff(params, params, cmp.AllowUnexported(aesctrhmac.Parameters{})); diff != "" {
-						t.Errorf("params.Equal(params) returned unexpected diff (-want +got):\n%s", diff)
-					}
-					otherParams, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
-						KeySizeInBytes:        derivedKeySize,
-						DerivedKeySizeInBytes: derivedKeySize,
-						HkdfHashType:          hkdfHashType,
-						HmacHashType:          hmacHashType,
-						HmacTagSizeInBytes:    hmacTagSize,
-						SegmentSizeInBytes:    1024,
-					})
-					if err != nil {
-						t.Fatalf("NewParameters() err = %v, want nil", err)
-					}
-					if diff := cmp.Diff(params, otherParams, cmp.AllowUnexported(aesctrhmac.Parameters{})); diff != "" {
-						t.Errorf("params.Equal(otherParams) returned unexpected diff (-want +got):\n%s", diff)
-					}
+					},
 				})
 			}
 		}
+	}
+	return testCases
+}
+
+func TestNewParameters(t *testing.T) {
+	testCases := getParametersTestCases(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			params, err := aesctrhmac.NewParameters(tc.parameterOpts)
+			if err != nil {
+				t.Fatalf("NewParameters() err = %v, want nil", err)
+			}
+			if params.KeySizeInBytes() != tc.parameterOpts.KeySizeInBytes {
+				t.Errorf("params.KeySizeInBytes() = %d, want %d", params.KeySizeInBytes(), tc.parameterOpts.KeySizeInBytes)
+			}
+			if params.DerivedKeySizeInBytes() != tc.parameterOpts.DerivedKeySizeInBytes {
+				t.Errorf("params.DerivedKeySizeInBytes() = %d, want %d", params.DerivedKeySizeInBytes(), tc.parameterOpts.DerivedKeySizeInBytes)
+			}
+			if params.HkdfHashType() != tc.parameterOpts.HkdfHashType {
+				t.Errorf("params.HkdfHashType() = %s, want %s", params.HkdfHashType(), tc.parameterOpts.HkdfHashType)
+			}
+			if params.HmacHashType() != tc.parameterOpts.HmacHashType {
+				t.Errorf("params.HmacHashType() = %s, want %s", params.HmacHashType(), tc.parameterOpts.HmacHashType)
+			}
+			if params.HmacTagSizeInBytes() != tc.parameterOpts.HmacTagSizeInBytes {
+				t.Errorf("params.HmacTagSizeInBytes() = %d, want %d", params.HmacTagSizeInBytes(), tc.parameterOpts.HmacTagSizeInBytes)
+			}
+			if params.SegmentSizeInBytes() != tc.parameterOpts.SegmentSizeInBytes {
+				t.Errorf("params.SegmentSizeInBytes() = %d, want %d", params.SegmentSizeInBytes(), tc.parameterOpts.SegmentSizeInBytes)
+			}
+			if params.HasIDRequirement() {
+				t.Errorf("params.HasIDRequirement() = true, want false")
+			}
+
+			// Test equality.
+			if diff := cmp.Diff(params, params, cmp.AllowUnexported(aesctrhmac.Parameters{})); diff != "" {
+				t.Errorf("params.Equal(params) returned unexpected diff (-want +got):\n%s", diff)
+			}
+			otherParams, err := aesctrhmac.NewParameters(tc.parameterOpts)
+			if err != nil {
+				t.Fatalf("NewParameters() err = %v, want nil", err)
+			}
+			if diff := cmp.Diff(params, otherParams, cmp.AllowUnexported(aesctrhmac.Parameters{})); diff != "" {
+				t.Errorf("params.Equal(otherParams) returned unexpected diff (-want +got):\n%s", diff)
+			}
+				})
 	}
 }
 
