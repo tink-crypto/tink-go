@@ -237,34 +237,97 @@ func TestDeriveKey_Failures(t *testing.T) {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
 
+	xChaCha20Poly1305Params, err := xchacha20poly1305.NewParameters(xchacha20poly1305.VariantTink)
+	if err != nil {
+		t.Fatalf("xchacha20poly1305.NewParameters() err = %v, want nil", err)
+	}
+	xChaCha20Poly1305NoPrefixParams, err := xchacha20poly1305.NewParameters(xchacha20poly1305.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("xchacha20poly1305.NewParameters() err = %v, want nil", err)
+	}
+
+	xAES256GCMParams, err := xaesgcm.NewParameters(xaesgcm.VariantTink, 12)
+	if err != nil {
+		t.Fatalf("xaesgcm.NewParameters() err = %v, want nil", err)
+	}
+	xAES256GCMNoPrefixParams, err := xaesgcm.NewParameters(xaesgcm.VariantNoPrefix, 12)
+	if err != nil {
+		t.Fatalf("xaesgcm.NewParameters() err = %v, want nil", err)
+	}
+
+	aes256SIVParams, err := aessiv.NewParameters(32, aessiv.VariantTink)
+	if err != nil {
+		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
+	}
+	aes256SIVNoPrefixParams, err := aessiv.NewParameters(32, aessiv.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
+	}
+
 	for _, tc := range []struct {
-		name          string
-		params        key.Parameters
-		idRequirement uint32
-		keyBytes      []byte
+		name            string
+		params          key.Parameters
+		idRequirement   uint32
+		randomnessBytes []byte
 	}{
 		{
-			name:          "invalid parameters type",
-			params:        &stubParams{},
-			idRequirement: 123,
-			keyBytes:      []byte("0123456789012345"),
+			name:            "invalid parameters type",
+			params:          &stubParams{},
+			idRequirement:   123,
+			randomnessBytes: []byte("0123456789012345"),
 		},
 		{
-			name:          "insufficient random bytes",
-			params:        aes128GCMParams,
-			idRequirement: 123,
-			keyBytes:      []byte("01234"),
+			name:            "AES128GCM insufficient random bytes",
+			params:          aes128GCMParams,
+			idRequirement:   123,
+			randomnessBytes: []byte("012345678901234"), // 1 byte short
 		},
 		{
-			name:          "invalid ID requirement",
-			params:        aes128GCMNoPrefixParams,
-			idRequirement: 123,
-			keyBytes:      []byte("0123456789012345"),
+			name:            "AES128GCM invalid ID requirement",
+			params:          aes128GCMNoPrefixParams,
+			idRequirement:   123,
+			randomnessBytes: []byte("0123456789012345"),
+		},
+		{
+			name:            "XChaCha20Poly1305 insufficient random bytes",
+			params:          xChaCha20Poly1305Params,
+			idRequirement:   123,
+			randomnessBytes: []byte("0123456789012345012345678901234"), // 1 byte short
+		},
+		{
+			name:            "XChaCha20Poly1305 invalid ID requirement",
+			params:          xChaCha20Poly1305NoPrefixParams,
+			idRequirement:   123,
+			randomnessBytes: []byte("01234567890123450123456789012345"),
+		},
+		{
+			name:            "XAESGCM insufficient random bytes",
+			params:          xAES256GCMParams,
+			idRequirement:   123,
+			randomnessBytes: []byte("0123456789012345012345678901234"), // 1 byte short
+		},
+		{
+			name:            "XAESGCM invalid ID requirement",
+			params:          xAES256GCMNoPrefixParams,
+			idRequirement:   123,
+			randomnessBytes: []byte("01234567890123450123456789012345"),
+		},
+		{
+			name:            "AES-SIV insufficient random bytes",
+			params:          aes256SIVParams,
+			idRequirement:   123,
+			randomnessBytes: []byte("0123456789012345012345678901234"), // 1 byte short
+		},
+		{
+			name:            "AES-SIV invalid ID requirement",
+			params:          aes256SIVNoPrefixParams,
+			idRequirement:   123,
+			randomnessBytes: []byte("01234567890123450123456789012345"),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := keyderivers.DeriveKey(&stubParams{}, 123, bytes.NewBuffer(tc.keyBytes), insecuresecretdataaccess.Token{}); err == nil {
-				t.Fatal("keyderivers.DeriveKey() err = nil, want error")
+			if _, err := keyderivers.DeriveKey(tc.params, tc.idRequirement, bytes.NewBuffer(tc.randomnessBytes), insecuresecretdataaccess.Token{}); err == nil {
+				t.Errorf("keyderivers.DeriveKey() err = nil, want error")
 			}
 		})
 	}
