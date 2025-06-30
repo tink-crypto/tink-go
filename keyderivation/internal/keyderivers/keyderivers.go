@@ -20,6 +20,9 @@ import (
 	"reflect"
 
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
+	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
+	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -29,37 +32,85 @@ var (
 	keyDerivers = make(map[reflect.Type]keyDeriver)
 )
 
-type keyDeriver func(parameters key.Parameters, idRequirement uint32, reader io.Reader) (key.Key, error)
+type keyDeriver func(parameters key.Parameters, idRequirement uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error)
 
 // DeriveKey derives a new [key.Key] from the given [key.Parameters].
 //
 // It looks up the appropriate key deriver from the registry based on the type
 // of params.
-func DeriveKey(params key.Parameters, idRequirement uint32, reader io.Reader) (key.Key, error) {
+func DeriveKey(params key.Parameters, idRequirement uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
 	pType := reflect.TypeOf(params)
 	deriver, ok := keyDerivers[pType]
 	if !ok {
 		return nil, fmt.Errorf("no key deriver found for %v", pType)
 	}
-	return deriver(params, idRequirement, reader)
+	return deriver(params, idRequirement, reader, token)
 }
 
 func addAESGCMKeyDeriver() {
 	parametersType := reflect.TypeFor[*aesgcm.Parameters]()
-	keyDerivers[parametersType] = func(p key.Parameters, idRequirement uint32, reader io.Reader) (key.Key, error) {
-		aesGCMParams, ok := p.(*aesgcm.Parameters)
+	keyDerivers[parametersType] = func(p key.Parameters, idRequirement uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
+		params, ok := p.(*aesgcm.Parameters)
 		if !ok {
-			return nil, fmt.Errorf("key is of type %T; needed %T", p, &aesgcm.Parameters{})
+			return nil, fmt.Errorf("key is of type %T; needed %T", p, (*aesgcm.Parameters)(nil))
 		}
-		keyBytes := make([]byte, aesGCMParams.KeySizeInBytes())
+		keyBytes := make([]byte, params.KeySizeInBytes())
 		if _, err := io.ReadFull(reader, keyBytes); err != nil {
-			return nil, fmt.Errorf("not enough pseudorandomness given")
+			return nil, fmt.Errorf("insufficient pseudorandomness")
 		}
-		return aesgcm.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), idRequirement, aesGCMParams)
+		return aesgcm.NewKey(secretdata.NewBytesFromData(keyBytes, token), idRequirement, params)
+	}
+}
+
+func addXChaCha20Poly1305KeyDeriver() {
+	parametersType := reflect.TypeFor[*xchacha20poly1305.Parameters]()
+	keyDerivers[parametersType] = func(p key.Parameters, idRequirement uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
+		params, ok := p.(*xchacha20poly1305.Parameters)
+		if !ok {
+			return nil, fmt.Errorf("key is of type %T; needed %T", p, (*xchacha20poly1305.Parameters)(nil))
+		}
+		keyBytes := make([]byte, 32)
+		if _, err := io.ReadFull(reader, keyBytes); err != nil {
+			return nil, fmt.Errorf("insufficient pseudorandomness")
+		}
+		return xchacha20poly1305.NewKey(secretdata.NewBytesFromData(keyBytes, token), idRequirement, params)
+	}
+}
+
+func addXAESGCMKeyDeriver() {
+	parametersType := reflect.TypeFor[*xaesgcm.Parameters]()
+	keyDerivers[parametersType] = func(p key.Parameters, idRequirement uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
+		params, ok := p.(*xaesgcm.Parameters)
+		if !ok {
+			return nil, fmt.Errorf("key is of type %T; needed %T", p, (*xaesgcm.Parameters)(nil))
+		}
+		keyBytes := make([]byte, 32)
+		if _, err := io.ReadFull(reader, keyBytes); err != nil {
+			return nil, fmt.Errorf("insufficient pseudorandomness")
+		}
+		return xaesgcm.NewKey(secretdata.NewBytesFromData(keyBytes, token), idRequirement, params)
+	}
+}
+
+func addXAESSIVKeyDeriver() {
+	parametersType := reflect.TypeFor[*aessiv.Parameters]()
+	keyDerivers[parametersType] = func(p key.Parameters, idRequirement uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
+		params, ok := p.(*aessiv.Parameters)
+		if !ok {
+			return nil, fmt.Errorf("key is of type %T; needed %T", p, (*aessiv.Parameters)(nil))
+		}
+		keyBytes := make([]byte, params.KeySizeInBytes())
+		if _, err := io.ReadFull(reader, keyBytes); err != nil {
+			return nil, fmt.Errorf("insufficient pseudorandomness")
+		}
+		return aessiv.NewKey(secretdata.NewBytesFromData(keyBytes, token), idRequirement, params)
 	}
 }
 
 func init() {
 	// TODO: b/425280769 - Add key derivers for other key types.
 	addAESGCMKeyDeriver()
+	addXChaCha20Poly1305KeyDeriver()
+	addXAESGCMKeyDeriver()
+	addXAESSIVKeyDeriver()
 }

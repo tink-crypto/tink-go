@@ -20,6 +20,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
+	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
+	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderivers"
@@ -27,6 +30,7 @@ import (
 )
 
 func TestDeriveKey(t *testing.T) {
+	// AES-GCM keys.
 	aes128GCMParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
 		KeySizeInBytes: 16,
 		IVSizeInBytes:  12,
@@ -40,7 +44,6 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
 	}
-
 	aes128GCMNoPrefixParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
 		KeySizeInBytes: 16,
 		IVSizeInBytes:  12,
@@ -53,6 +56,60 @@ func TestDeriveKey(t *testing.T) {
 	aes128GCMNoPrefixKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}), 0, aes128GCMNoPrefixParams)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
+	}
+
+	// XChaCha20-Poly1305 keys.
+	xChaCha20Poly1305Params, err := xchacha20poly1305.NewParameters(xchacha20poly1305.VariantTink)
+	if err != nil {
+		t.Fatalf("xchacha20poly1305.NewParameters() err = %v, want nil", err)
+	}
+	xChaCha20Poly1305Key, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 123, xChaCha20Poly1305Params)
+	if err != nil {
+		t.Fatalf("xchacha20poly1305.NewKey() err = %v, want nil", err)
+	}
+	xChaCha20Poly1305NoPrefixParams, err := xchacha20poly1305.NewParameters(xchacha20poly1305.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("xchacha20poly1305.NewParameters() err = %v, want nil", err)
+	}
+	xChaCha20Poly1305NoPrefixKey, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 0, xChaCha20Poly1305NoPrefixParams)
+	if err != nil {
+		t.Fatalf("xchacha20poly1305.NewKey() err = %v, want nil", err)
+	}
+
+	// X-AES-GCM keys.
+	xAES256GCMParams, err := xaesgcm.NewParameters(xaesgcm.VariantTink, 12)
+	if err != nil {
+		t.Fatalf("xaesgcm.NewParameters() err = %v, want nil", err)
+	}
+	xAES256GCMKey, err := xaesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 123, xAES256GCMParams)
+	if err != nil {
+		t.Fatalf("xaesgcm.NewKey() err = %v, want nil", err)
+	}
+	xAES256GCMNoPrefixParams, err := xaesgcm.NewParameters(xaesgcm.VariantNoPrefix, 12)
+	if err != nil {
+		t.Fatalf("xaesgcm.NewParameters() err = %v, want nil", err)
+	}
+	xAES256GCMNoPrefixKey, err := xaesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 0, xAES256GCMNoPrefixParams)
+	if err != nil {
+		t.Fatalf("xaesgcm.NewKey() err = %v, want nil", err)
+	}
+
+	// AES-SIV keys.
+	aes256SIVParams, err := aessiv.NewParameters(32, aessiv.VariantTink)
+	if err != nil {
+		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
+	}
+	aes256SIVKey, err := aessiv.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 123, aes256SIVParams)
+	if err != nil {
+		t.Fatalf("aessiv.NewKey() err = %v, want nil", err)
+	}
+	aes256SIVNoPrefixParams, err := aessiv.NewParameters(32, aessiv.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
+	}
+	aes256SIVNoPrefixKey, err := aessiv.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 0, aes256SIVNoPrefixParams)
+	if err != nil {
+		t.Fatalf("aessiv.NewKey() err = %v, want nil", err)
 	}
 
 	for _, tc := range []struct {
@@ -83,9 +140,72 @@ func TestDeriveKey(t *testing.T) {
 			randomBytes:   []byte("0123456789012345"),
 			wantKey:       aes128GCMNoPrefixKey,
 		},
+		{
+			name:          "XChaCha20Poly13035",
+			params:        xChaCha20Poly1305Params,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345"),
+			wantKey:       xChaCha20Poly1305Key,
+		},
+		{
+			name:          "XChaCha20Poly13035_longer_key_bytes",
+			params:        xChaCha20Poly1305Params,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+			wantKey:       xChaCha20Poly1305Key,
+		},
+		{
+			name:          "XChaCha20Poly13035NoPrefix",
+			params:        xChaCha20Poly1305NoPrefixParams,
+			idRequirement: 0,
+			randomBytes:   []byte("01234567890123450123456789012345"),
+			wantKey:       xChaCha20Poly1305NoPrefixKey,
+		},
+		{
+			name:          "XAES256GCM",
+			params:        xAES256GCMParams,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345"),
+			wantKey:       xAES256GCMKey,
+		},
+		{
+			name:          "XAES256GCM_longer_key_bytes",
+			params:        xAES256GCMParams,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+			wantKey:       xAES256GCMKey,
+		},
+		{
+			name:          "XAES256GCMNoPrefix",
+			params:        xAES256GCMNoPrefixParams,
+			idRequirement: 0,
+			randomBytes:   []byte("01234567890123450123456789012345"),
+			wantKey:       xAES256GCMNoPrefixKey,
+		},
+		{
+			name:          "AES256SIV",
+			params:        aes256SIVParams,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345"),
+			wantKey:       aes256SIVKey,
+		},
+		{
+			name:          "AES256SIV_longer_key_bytes",
+			params:        aes256SIVParams,
+			idRequirement: 123,
+			randomBytes:   []byte("01234567890123450123456789012345ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+			wantKey:       aes256SIVKey,
+		},
+		{
+			name:          "AES256SIVNoPrefix",
+			params:        aes256SIVNoPrefixParams,
+			idRequirement: 0,
+			randomBytes:   []byte("01234567890123450123456789012345"),
+			wantKey:       aes256SIVNoPrefixKey,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			derivedKey, err := keyderivers.DeriveKey(tc.params, tc.idRequirement, bytes.NewBuffer(tc.randomBytes))
+			derivedKey, err := keyderivers.DeriveKey(tc.params, tc.idRequirement, bytes.NewBuffer(tc.randomBytes), insecuresecretdataaccess.Token{})
 			if err != nil {
 				t.Fatalf("keyderivation.DeriveKey() err = %v, want nil", err)
 			}
@@ -143,7 +263,7 @@ func TestDeriveKey_Failures(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := keyderivers.DeriveKey(&stubParams{}, 123, bytes.NewBuffer(tc.keyBytes)); err == nil {
+			if _, err := keyderivers.DeriveKey(&stubParams{}, 123, bytes.NewBuffer(tc.keyBytes), insecuresecretdataaccess.Token{}); err == nil {
 				t.Fatal("keyderivers.DeriveKey() err = nil, want error")
 			}
 		})
