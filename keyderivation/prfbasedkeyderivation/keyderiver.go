@@ -15,24 +15,21 @@
 package prfbasedkeyderivation
 
 import (
-	"errors"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
+	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderivers"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/streamingprf"
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 type keyDeriver struct {
-	key *Key
-
-	derivedKeyTemplate *tinkpb.KeyTemplate
-	streamingPRF       streamingprf.StreamingPRF
+	key          *Key
+	streamingPRF streamingprf.StreamingPRF
 }
 
 // NewKeyDeriver creates a new KeyDeriver.
@@ -44,15 +41,10 @@ func NewKeyDeriver(key *Key, _ internalapi.Token) (keyderiver.KeyDeriver, error)
 	if key == nil {
 		return nil, fmt.Errorf("prfbasedkeyderivation: key must not be nil")
 	}
-	prfKey := key.PRFKey()
-
-	switch prfKey.(type) {
-	case *hkdfprf.Key:
-		// Do nothing.
-	default:
-		return nil, fmt.Errorf("unsupported PRF key type: %T", prfKey)
+	prfKey, ok := key.PRFKey().(*hkdfprf.Key)
+	if !ok {
+		return nil, fmt.Errorf("prfbasedkeyderivation: key is not a HKDF PRF key. Got %T, want %T", key.PRFKey(), (*hkdfprf.Key)(nil))
 	}
-
 	// Construct a StreamingPRF RAW primitive from the PRF key.
 	prfKeyProtoSerialization, err := protoserialization.SerializeKey(prfKey)
 	if err != nil {
@@ -66,19 +58,11 @@ func NewKeyDeriver(key *Key, _ internalapi.Token) (keyderiver.KeyDeriver, error)
 	prf, ok := p.(streamingprf.StreamingPRF)
 	if !ok {
 		// This should never happen.
-		return nil, errors.New("primitive is not StreamingPRF")
+		return nil, fmt.Errorf("primitive is not StreamingPRF")
 	}
-
-	derivedKeyParameters := key.Parameters().(*Parameters).DerivedKeyParameters()
-	derivedKeyTemplate, err := protoserialization.SerializeParameters(derivedKeyParameters)
-	if err != nil {
-		return nil, fmt.Errorf("prfbasedkeyderivation: could not serialize derived key parameters: %v", err)
-	}
-
 	return &keyDeriver{
-		key:                key,
-		derivedKeyTemplate: derivedKeyTemplate,
-		streamingPRF:       prf,
+		key:          key,
+		streamingPRF: prf,
 	}, nil
 }
 
@@ -91,21 +75,9 @@ func (k *keyDeriver) DeriveKey(salt []byte) (key.Key, error) {
 		return nil, fmt.Errorf("prfbasedkeyderivation: compute randomness from PRF failed: %v", err)
 	}
 
-	keyData, err := internalregistry.DeriveKey(k.derivedKeyTemplate, randomness)
-	if err != nil {
-		return nil, fmt.Errorf("prfbasedkeyderivation: derive key failed: %v", err)
-	}
-
+	derivedKeyParameters := k.key.Parameters().(*Parameters).DerivedKeyParameters()
 	idRequirement, _ := k.key.IDRequirement()
-	derivedKeySerialization, err := protoserialization.NewKeySerialization(keyData, k.derivedKeyTemplate.GetOutputPrefixType(), idRequirement)
-	if err != nil {
-		return nil, fmt.Errorf("prfbasedkeyderivation: create derived key serialization failed: %v", err)
-	}
-	derivedKey, err := protoserialization.ParseKey(derivedKeySerialization)
-	if err != nil {
-		return nil, fmt.Errorf("prfbasedkeyderivation: parsing the derived key failed: %v", err)
-	}
-	return derivedKey, nil
+	return keyderivers.DeriveKey(derivedKeyParameters, idRequirement, randomness, insecuresecretdataaccess.Token{})
 }
 
 func primitiveConstructor(key key.Key) (any, error) {
