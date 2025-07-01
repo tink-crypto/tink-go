@@ -146,3 +146,82 @@ func (s *keyParser) ParseKey(keySerialization *protoserialization.KeySerializati
 	keyBytes := secretdata.NewBytesFromData(protoKey.GetKeyValue(), insecuresecretdataaccess.Token{})
 	return NewKey(params, keyBytes)
 }
+
+type parametersSerializer struct{}
+
+var _ protoserialization.ParametersSerializer = (*parametersSerializer)(nil)
+
+func (s *parametersSerializer) Serialize(params key.Parameters) (*tinkpb.KeyTemplate, error) {
+	actualParams, ok := params.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("parameters is not a aesctrhmac.Parameters")
+	}
+	hkdfHashType, err := hashTypeToProto(actualParams.HkdfHashType())
+	if err != nil {
+		return nil, fmt.Errorf("invalid HKDF hash type: %v", actualParams.HkdfHashType())
+	}
+	hmacHashType, err := hashTypeToProto(actualParams.HmacHashType())
+	if err != nil {
+		return nil, fmt.Errorf("invalid HMAC hash type: %v", actualParams.HmacHashType())
+	}
+	protoParams := &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+		Version: 0,
+		Params: &streamaeadpb.AesCtrHmacStreamingParams{
+			HkdfHashType:          hkdfHashType,
+			DerivedKeySize:        uint32(actualParams.DerivedKeySizeInBytes()),
+			CiphertextSegmentSize: uint32(actualParams.SegmentSizeInBytes()),
+			HmacParams: &hmacpb.HmacParams{
+				Hash:    hmacHashType,
+				TagSize: uint32(actualParams.HmacTagSizeInBytes()),
+			},
+		},
+		KeySize: uint32(actualParams.KeySizeInBytes()),
+	}
+	serializedParams, err := proto.Marshal(protoParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal parameters: %v", err)
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          typeURL,
+		Value:            serializedParams,
+		OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+	}, nil
+}
+
+type parametersParser struct{}
+
+var _ protoserialization.ParametersParser = (*parametersParser)(nil)
+
+func (s *parametersParser) Parse(kt *tinkpb.KeyTemplate) (key.Parameters, error) {
+	if kt == nil {
+		return nil, fmt.Errorf("parameters serialization is nil")
+	}
+	if kt.GetTypeUrl() != typeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", kt.GetTypeUrl(), typeURL)
+	}
+	if kt.GetOutputPrefixType() != tinkpb.OutputPrefixType_RAW {
+		return nil, fmt.Errorf("output prefix type is not RAW")
+	}
+	keyFormat := new(streamaeadpb.AesCtrHmacStreamingKeyFormat)
+	if err := proto.Unmarshal(kt.GetValue(), keyFormat); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal key format: %v", err)
+	}
+	protoParams := keyFormat.GetParams()
+	hkdfHashType, err := hashTypeFromProto(protoParams.GetHkdfHashType())
+	if err != nil {
+		return nil, fmt.Errorf("invalid HKDF hash type: %v", protoParams.GetHkdfHashType())
+	}
+	hmacParams := protoParams.GetHmacParams()
+	hmacHashType, err := hashTypeFromProto(hmacParams.GetHash())
+	if err != nil {
+		return nil, fmt.Errorf("invalid HMAC hash type: %v", hmacParams.GetHash())
+	}
+	return NewParameters(ParameterOpts{
+		DerivedKeySizeInBytes: int(protoParams.GetDerivedKeySize()),
+		HkdfHashType:          hkdfHashType,
+		HmacHashType:          hmacHashType,
+		HmacTagSizeInBytes:    int(hmacParams.GetTagSize()),
+		SegmentSizeInBytes:    int32(protoParams.GetCiphertextSegmentSize()),
+		KeySizeInBytes:        int(keyFormat.GetKeySize()),
+	})
+}

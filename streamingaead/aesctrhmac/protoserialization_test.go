@@ -400,3 +400,252 @@ func TestSerializeKey_Fails(t *testing.T) {
 		})
 	}
 }
+
+type parametersTestCase struct {
+	name        string
+	parameters  *aesctrhmac.Parameters
+	keyTemplate *tinkpb.KeyTemplate
+}
+
+func parameterTestCases(t *testing.T) []*parametersTestCase {
+	t.Helper()
+	var testCases []*parametersTestCase
+	keySizes := []int{16, 32}
+	segmentSizes := []int32{4096, 8192}
+
+	for _, keySize := range keySizes {
+		for _, hashType := range []struct {
+			hashType      aesctrhmac.HashType
+			protoHashType commonpb.HashType
+		}{
+			{aesctrhmac.SHA1, commonpb.HashType_SHA1},
+			{aesctrhmac.SHA256, commonpb.HashType_SHA256},
+			{aesctrhmac.SHA512, commonpb.HashType_SHA512},
+		} {
+			for _, hmacHashType := range []struct {
+				hashType      aesctrhmac.HashType
+				protoHashType commonpb.HashType
+				tagSize       int
+			}{
+				{aesctrhmac.SHA1, commonpb.HashType_SHA1, 20},
+				{aesctrhmac.SHA256, commonpb.HashType_SHA256, 32},
+				{aesctrhmac.SHA512, commonpb.HashType_SHA512, 64},
+			} {
+				for _, segmentSize := range segmentSizes {
+					params, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+						KeySizeInBytes:        keySize,
+						DerivedKeySizeInBytes: keySize,
+						HkdfHashType:          hashType.hashType,
+						HmacHashType:          hmacHashType.hashType,
+						HmacTagSizeInBytes:    hmacHashType.tagSize,
+						SegmentSizeInBytes:    segmentSize,
+					})
+					if err != nil {
+						t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
+					}
+
+					keyTemplate := &tinkpb.KeyTemplate{
+						TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
+						Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+							Version: 0,
+							Params: &streamaeadpb.AesCtrHmacStreamingParams{
+								HkdfHashType:          hashType.protoHashType,
+								DerivedKeySize:        uint32(keySize),
+								CiphertextSegmentSize: uint32(segmentSize),
+								HmacParams: &hmacpb.HmacParams{
+									Hash:    hmacHashType.protoHashType,
+									TagSize: uint32(hmacHashType.tagSize),
+								},
+							},
+							KeySize: uint32(keySize),
+						}),
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+					}
+
+					testCases = append(testCases, &parametersTestCase{
+						name:        fmt.Sprintf("keySize:%d,derivedKeySize:%d,hkdfHashType:%s,hmacHashType:%s,tagSize:%d,segmentSize:%d", keySize, keySize, hashType.hashType, hmacHashType.hashType, hmacHashType.tagSize, segmentSize),
+						parameters:  params,
+						keyTemplate: keyTemplate,
+					})
+				}
+			}
+		}
+	}
+	return testCases
+}
+
+func TestParseParameters(t *testing.T) {
+	for _, tc := range parameterTestCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			gotParams, err := protoserialization.ParseParameters(tc.keyTemplate)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseParameters() err = %v, want nil", err)
+			}
+			if diff := cmp.Diff(tc.parameters, gotParams); diff != "" {
+				t.Errorf("parsed parameters are not equal to original parameters. diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestParseParameters_Fails(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		keyTemplate *tinkpb.KeyTemplate
+		keyFormat   proto.Message
+	}{
+		{
+			name: "invalid_derived_key_size",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
+				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+					Params: &streamaeadpb.AesCtrHmacStreamingParams{
+						HkdfHashType:          commonpb.HashType_SHA256,
+						DerivedKeySize:        12, // Derived key size should be 16 or 32
+						CiphertextSegmentSize: 4096,
+						HmacParams: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 16,
+						},
+					},
+					KeySize: 16,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+			},
+		},
+		{
+			name: "invalid_key_size",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
+				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+					Params: &streamaeadpb.AesCtrHmacStreamingParams{
+						HkdfHashType:          commonpb.HashType_SHA256,
+						DerivedKeySize:        12, // Derived key size should be 16 or 32
+						CiphertextSegmentSize: 4096,
+						HmacParams: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 16,
+						},
+					},
+					KeySize: 12, // Key size should be 16 or 32
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+			},
+		},
+		{
+			name: "invalid_segment_size",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
+				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+					Params: &streamaeadpb.AesCtrHmacStreamingParams{
+						HkdfHashType:          commonpb.HashType_SHA256,
+						DerivedKeySize:        16,
+						CiphertextSegmentSize: 10,
+						HmacParams: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 16,
+						},
+					},
+					KeySize: 16,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+			},
+		},
+		{
+			name: "invalid_hmac_tag_size",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
+				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+					Params: &streamaeadpb.AesCtrHmacStreamingParams{
+						HkdfHashType:          commonpb.HashType_SHA256,
+						DerivedKeySize:        16,
+						CiphertextSegmentSize: 4096,
+						HmacParams: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 2, // tag size should be at least 10.
+						},
+					},
+					KeySize: 16,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+			},
+		},
+		{
+			name: "invalid_hkdf_hash_type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
+				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+					Params: &streamaeadpb.AesCtrHmacStreamingParams{
+						HkdfHashType:          commonpb.HashType_UNKNOWN_HASH,
+						DerivedKeySize:        16,
+						CiphertextSegmentSize: 4096,
+						HmacParams: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 2, // tag size should be at least 10.
+						},
+					},
+					KeySize: 16,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+			},
+		},
+		{
+			name: "invalid_hmac_hash_type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
+				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+					Params: &streamaeadpb.AesCtrHmacStreamingParams{
+						HkdfHashType:          commonpb.HashType_SHA256,
+						DerivedKeySize:        16,
+						CiphertextSegmentSize: 4096,
+						HmacParams: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_UNKNOWN_HASH,
+							TagSize: 32,
+						},
+					},
+					KeySize: 16,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+			},
+		},
+		{
+			name: "invalid_output_prefix_type",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
+				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+					Params: &streamaeadpb.AesCtrHmacStreamingParams{
+						HkdfHashType:          commonpb.HashType_SHA256,
+						DerivedKeySize:        16,
+						CiphertextSegmentSize: 4096,
+						HmacParams: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 32,
+						},
+					},
+					KeySize: 16,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK, // Output prefix type should be RAW.
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseParameters(tc.keyTemplate); err == nil {
+				t.Errorf("protoserialization.ParseParameters(%v) err = nil, want non-nil", tc.keyTemplate)
+			}
+		})
+	}
+}
+
+func TestSerializeParameters(t *testing.T) {
+	for _, tc := range parameterTestCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.SerializeParameters(tc.parameters)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeParameters() err = %v, want nil", err)
+			}
+			if diff := cmp.Diff(tc.keyTemplate, got, protocmp.Transform()); diff != "" {
+				t.Errorf("serialized parameters are not equal to original. diff: %s", diff)
+			}
+		})
+	}
+}
