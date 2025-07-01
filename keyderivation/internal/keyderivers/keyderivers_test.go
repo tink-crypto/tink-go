@@ -31,6 +31,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/ed25519"
+	"github.com/tink-crypto/tink-go/v2/streamingaead/aesgcmhkdf"
 )
 
 func TestDeriveKey(t *testing.T) {
@@ -264,6 +265,21 @@ func TestDeriveKey(t *testing.T) {
 	ed25519KeyNoPrefixKey, err := ed25519.NewPrivateKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 0, ed25519NoPrefixParams)
 	if err != nil {
 		t.Fatalf("ed25519.NewPrivateKey() err = %v, want nil", err)
+	}
+
+	// Streaming AEAD keys.
+	aesGCMHKDFParams, err := aesgcmhkdf.NewParameters(aesgcmhkdf.ParametersOpts{
+		KeySizeInBytes:        16,
+		DerivedKeySizeInBytes: 16,
+		HKDFHashType:          aesgcmhkdf.SHA256,
+		SegmentSizeInBytes:    4096,
+	})
+	if err != nil {
+		t.Fatalf("aesgcmhkdf.NewParameters() err = %v, want nil", err)
+	}
+	aesGCMHKDFKey, err := aesgcmhkdf.NewKey(aesGCMHKDFParams, secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}))
+	if err != nil {
+		t.Fatalf("aesgcmhkdf.NewPrivateKey() err = %v, want nil", err)
 	}
 
 	for _, tc := range []struct {
@@ -503,6 +519,20 @@ func TestDeriveKey(t *testing.T) {
 			idRequirement: 0,
 			randomBytes:   []byte("01234567890123450123456789012345"),
 			wantKey:       ed25519KeyNoPrefixKey,
+		},
+		{
+			name:          "AESGCMHKDF",
+			params:        aesGCMHKDFParams,
+			idRequirement: 0,
+			randomBytes:   []byte("0123456789012345"),
+			wantKey:       aesGCMHKDFKey,
+		},
+		{
+			name:          "AESGCMHKDF_longer_key_bytes",
+			params:        aesGCMHKDFParams,
+			idRequirement: 0,
+			randomBytes:   []byte("0123456789012345ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+			wantKey:       aesGCMHKDFKey,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

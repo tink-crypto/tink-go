@@ -31,6 +31,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	tinked25519 "github.com/tink-crypto/tink-go/v2/signature/ed25519"
+	"github.com/tink-crypto/tink-go/v2/streamingaead/aesgcmhkdf"
 )
 
 var (
@@ -172,8 +173,22 @@ func addSignatureED25519KeyDeriver() {
 	}
 }
 
+func addStreamingAEADAESGCMHKDFKeyDeriver() {
+	parametersType := reflect.TypeFor[*aesgcmhkdf.Parameters]()
+	keyDerivers[parametersType] = func(p key.Parameters, idRequirement uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
+		params, ok := p.(*aesgcmhkdf.Parameters)
+		if !ok {
+			return nil, fmt.Errorf("key is of type %T; needed %T", p, (*aesgcmhkdf.Parameters)(nil))
+		}
+		keyBytes := make([]byte, params.KeySizeInBytes())
+		if _, err := io.ReadFull(reader, keyBytes); err != nil {
+			return nil, fmt.Errorf("insufficient pseudorandomness")
+		}
+		return aesgcmhkdf.NewKey(params, secretdata.NewBytesFromData(keyBytes, token))
+	}
+}
+
 func init() {
-	// TODO: b/425280769 - Add key derivers for other key types.
 	addAESGCMKeyDeriver()
 	addXChaCha20Poly1305KeyDeriver()
 	addXAESGCMKeyDeriver()
@@ -182,4 +197,5 @@ func init() {
 	addHKDFPRFKeyDeriver()
 	addHMACPRFKeyDeriver()
 	addSignatureED25519KeyDeriver()
+	addStreamingAEADAESGCMHKDFKeyDeriver()
 }
