@@ -25,7 +25,7 @@ import (
 )
 
 func TestNewKey_Fails(t *testing.T) {
-	params, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+	params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
 		KeySizeInBytes:        32,
 		DerivedKeySizeInBytes: 32,
 		HkdfHashType:          aesctrhmac.SHA256,
@@ -92,7 +92,7 @@ func (k *stubKey) Equal(other key.Key) bool      { return true }
 func (k *stubKey) IDRequirement() (uint32, bool) { return 0, false }
 
 func TestKeyEqual_FalseIfDifferent(t *testing.T) {
-	params, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+	params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
 		KeySizeInBytes:        32,
 		DerivedKeySizeInBytes: 32,
 		HkdfHashType:          aesctrhmac.SHA256,
@@ -116,7 +116,7 @@ func TestKeyEqual_FalseIfDifferent(t *testing.T) {
 		{
 			name: "different_key_size",
 			key: func() *aesctrhmac.Key {
-				params, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+				params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
 					KeySizeInBytes:        16,
 					DerivedKeySizeInBytes: 16,
 					HkdfHashType:          aesctrhmac.SHA256,
@@ -139,7 +139,7 @@ func TestKeyEqual_FalseIfDifferent(t *testing.T) {
 		{
 			name: "different_key_bytes",
 			key: func() *aesctrhmac.Key {
-				params, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+				params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
 					KeySizeInBytes:        32,
 					DerivedKeySizeInBytes: 32,
 					HkdfHashType:          aesctrhmac.SHA256,

@@ -25,7 +25,7 @@ import (
 func TestNewParameters_InvalidKeySize(t *testing.T) {
 	for _, derivedKeySize := range []int{16, 32} {
 		t.Run(fmt.Sprintf("derivedKeySize=%d, keySize=%d", derivedKeySize, derivedKeySize-1), func(t *testing.T) {
-			_, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+			_, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
 				KeySizeInBytes:        derivedKeySize - 1,
 				DerivedKeySizeInBytes: derivedKeySize,
 				HkdfHashType:          aesctrhmac.SHA256,
@@ -43,7 +43,7 @@ func TestNewParameters_InvalidKeySize(t *testing.T) {
 func TestNewParameters_InvalidDerivedKeySize(t *testing.T) {
 	for _, derivedKeySize := range []int{0, 15, 33} {
 		t.Run(fmt.Sprintf("derivedKeySize=%d", derivedKeySize), func(t *testing.T) {
-			_, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+			_, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
 				KeySizeInBytes:        derivedKeySize,
 				DerivedKeySizeInBytes: derivedKeySize,
 				HkdfHashType:          aesctrhmac.SHA256,
@@ -59,7 +59,7 @@ func TestNewParameters_InvalidDerivedKeySize(t *testing.T) {
 }
 
 func TestNewParameters_InvalidHkdfHashType(t *testing.T) {
-	_, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+	_, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
 		KeySizeInBytes:        16,
 		DerivedKeySizeInBytes: 16,
 		HkdfHashType:          aesctrhmac.UnknownHashType,
@@ -73,7 +73,7 @@ func TestNewParameters_InvalidHkdfHashType(t *testing.T) {
 }
 
 func TestNewParameters_InvalidHmacHashType(t *testing.T) {
-	_, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+	_, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
 		KeySizeInBytes:        16,
 		DerivedKeySizeInBytes: 16,
 		HkdfHashType:          aesctrhmac.SHA256,
@@ -89,11 +89,11 @@ func TestNewParameters_InvalidHmacHashType(t *testing.T) {
 func TestNewParameters_InvalidTagSize(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts aesctrhmac.ParameterOpts
+		opts aesctrhmac.ParametersOpts
 	}{
 		{
 			name: "SHA1_tag_size_9",
-			opts: aesctrhmac.ParameterOpts{
+			opts: aesctrhmac.ParametersOpts{
 				KeySizeInBytes:        16,
 				DerivedKeySizeInBytes: 16,
 				HkdfHashType:          aesctrhmac.SHA256,
@@ -104,7 +104,7 @@ func TestNewParameters_InvalidTagSize(t *testing.T) {
 		},
 		{
 			name: "SHA1_tag_size_21",
-			opts: aesctrhmac.ParameterOpts{
+			opts: aesctrhmac.ParametersOpts{
 				KeySizeInBytes:        16,
 				DerivedKeySizeInBytes: 16,
 				HkdfHashType:          aesctrhmac.SHA256,
@@ -115,7 +115,7 @@ func TestNewParameters_InvalidTagSize(t *testing.T) {
 		},
 		{
 			name: "SHA256_tag_size_9",
-			opts: aesctrhmac.ParameterOpts{
+			opts: aesctrhmac.ParametersOpts{
 				KeySizeInBytes:        16,
 				DerivedKeySizeInBytes: 16,
 				HkdfHashType:          aesctrhmac.SHA256,
@@ -126,7 +126,7 @@ func TestNewParameters_InvalidTagSize(t *testing.T) {
 		},
 		{
 			name: "SHA256_tag_size_33",
-			opts: aesctrhmac.ParameterOpts{
+			opts: aesctrhmac.ParametersOpts{
 				KeySizeInBytes:        16,
 				DerivedKeySizeInBytes: 16,
 				HkdfHashType:          aesctrhmac.SHA256,
@@ -137,7 +137,7 @@ func TestNewParameters_InvalidTagSize(t *testing.T) {
 		},
 		{
 			name: "SHA512_tag_size_9",
-			opts: aesctrhmac.ParameterOpts{
+			opts: aesctrhmac.ParametersOpts{
 				KeySizeInBytes:        16,
 				DerivedKeySizeInBytes: 16,
 				HkdfHashType:          aesctrhmac.SHA256,
@@ -148,7 +148,7 @@ func TestNewParameters_InvalidTagSize(t *testing.T) {
 		},
 		{
 			name: "SHA512_tag_size_65",
-			opts: aesctrhmac.ParameterOpts{
+			opts: aesctrhmac.ParametersOpts{
 				KeySizeInBytes:        16,
 				DerivedKeySizeInBytes: 16,
 				HkdfHashType:          aesctrhmac.SHA256,
@@ -167,7 +167,7 @@ func TestNewParameters_InvalidTagSize(t *testing.T) {
 }
 
 func TestNewParameters_InvalidCiphertextSegmentSize(t *testing.T) {
-	_, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+	_, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
 		KeySizeInBytes:        16,
 		DerivedKeySizeInBytes: 16,
 		HkdfHashType:          aesctrhmac.SHA256,
@@ -182,7 +182,7 @@ func TestNewParameters_InvalidCiphertextSegmentSize(t *testing.T) {
 
 type parametersTestCases struct {
 	name          string
-	parameterOpts aesctrhmac.ParameterOpts
+	parameterOpts aesctrhmac.ParametersOpts
 }
 
 func getParametersTestCases(t *testing.T) []parametersTestCases {
@@ -198,7 +198,7 @@ func getParametersTestCases(t *testing.T) []parametersTestCases {
 				hmacTagSize := ht.hashSize
 				testCases = append(testCases, parametersTestCases{
 					name: fmt.Sprintf("keySizeInBytes=%d, derivedKeySize=%d, hkdfHashType=%s, hmacHashType=%s", derivedKeySize, derivedKeySize, hkdfHashType, hmacHashType),
-					parameterOpts: aesctrhmac.ParameterOpts{
+					parameterOpts: aesctrhmac.ParametersOpts{
 						KeySizeInBytes:        derivedKeySize,
 						DerivedKeySizeInBytes: derivedKeySize,
 						HkdfHashType:          hkdfHashType,
@@ -254,11 +254,11 @@ func TestNewParameters(t *testing.T) {
 			if diff := cmp.Diff(params, otherParams, cmp.AllowUnexported(aesctrhmac.Parameters{})); diff != "" {
 				t.Errorf("params.Equal(otherParams) returned unexpected diff (-want +got):\n%s", diff)
 			}
-				})
+		})
 	}
 }
 
-func mustCreateParameters(t *testing.T, opts aesctrhmac.ParameterOpts) *aesctrhmac.Parameters {
+func mustCreateParameters(t *testing.T, opts aesctrhmac.ParametersOpts) *aesctrhmac.Parameters {
 	t.Helper()
 	params, err := aesctrhmac.NewParameters(opts)
 	if err != nil {
@@ -275,33 +275,33 @@ func TestParametersEqual_FalseIfDifferent(t *testing.T) {
 	}{
 		{
 			name:    "different key size",
-			params1: mustCreateParameters(t, aesctrhmac.ParameterOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
-			params2: mustCreateParameters(t, aesctrhmac.ParameterOpts{KeySizeInBytes: 32, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
+			params1: mustCreateParameters(t, aesctrhmac.ParametersOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
+			params2: mustCreateParameters(t, aesctrhmac.ParametersOpts{KeySizeInBytes: 32, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
 		},
 		{
 			name:    "different derived key size",
-			params1: mustCreateParameters(t, aesctrhmac.ParameterOpts{KeySizeInBytes: 32, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
-			params2: mustCreateParameters(t, aesctrhmac.ParameterOpts{KeySizeInBytes: 32, DerivedKeySizeInBytes: 32, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
+			params1: mustCreateParameters(t, aesctrhmac.ParametersOpts{KeySizeInBytes: 32, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
+			params2: mustCreateParameters(t, aesctrhmac.ParametersOpts{KeySizeInBytes: 32, DerivedKeySizeInBytes: 32, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
 		},
 		{
 			name:    "different hkdf hash type",
-			params1: mustCreateParameters(t, aesctrhmac.ParameterOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
-			params2: mustCreateParameters(t, aesctrhmac.ParameterOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA512, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
+			params1: mustCreateParameters(t, aesctrhmac.ParametersOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
+			params2: mustCreateParameters(t, aesctrhmac.ParametersOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA512, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
 		},
 		{
 			name:    "different hmac hash type",
-			params1: mustCreateParameters(t, aesctrhmac.ParameterOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
-			params2: mustCreateParameters(t, aesctrhmac.ParameterOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA512, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
+			params1: mustCreateParameters(t, aesctrhmac.ParametersOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
+			params2: mustCreateParameters(t, aesctrhmac.ParametersOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA512, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
 		},
 		{
 			name:    "different hmac tag size",
-			params1: mustCreateParameters(t, aesctrhmac.ParameterOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
-			params2: mustCreateParameters(t, aesctrhmac.ParameterOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 32, SegmentSizeInBytes: 256}),
+			params1: mustCreateParameters(t, aesctrhmac.ParametersOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
+			params2: mustCreateParameters(t, aesctrhmac.ParametersOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 32, SegmentSizeInBytes: 256}),
 		},
 		{
 			name:    "different ciphertext segment size",
-			params1: mustCreateParameters(t, aesctrhmac.ParameterOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
-			params2: mustCreateParameters(t, aesctrhmac.ParameterOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 512}),
+			params1: mustCreateParameters(t, aesctrhmac.ParametersOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 256}),
+			params2: mustCreateParameters(t, aesctrhmac.ParametersOpts{KeySizeInBytes: 16, DerivedKeySizeInBytes: 16, HkdfHashType: aesctrhmac.SHA256, HmacHashType: aesctrhmac.SHA256, HmacTagSizeInBytes: 16, SegmentSizeInBytes: 512}),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

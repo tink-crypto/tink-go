@@ -33,7 +33,7 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func mustSerialize(t *testing.T, p proto.Message) []byte {
+func mustMarshal(t *testing.T, p proto.Message) []byte {
 	t.Helper()
 	data, err := proto.Marshal(p)
 	if err != nil {
@@ -76,7 +76,7 @@ func testCases(t *testing.T) []*keyParsingTestCase {
 				{aesctrhmac.SHA512, commonpb.HashType_SHA512, 64},
 			} {
 				for _, segmentSize := range segmentSizes {
-					params, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+					params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
 						KeySizeInBytes:        keySize,
 						DerivedKeySizeInBytes: keySize,
 						HkdfHashType:          hashType.hashType,
@@ -93,7 +93,7 @@ func testCases(t *testing.T) []*keyParsingTestCase {
 						t.Fatalf("aesctrhmac.NewKey() err = %v, want nil", err)
 					}
 
-					serializedKey := mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKey{
+					serializedKey := mustMarshal(t, &streamaeadpb.AesCtrHmacStreamingKey{
 						Version:  0,
 						KeyValue: keySecretDataBytes.Data(insecuresecretdataaccess.Token{}),
 						Params: &streamaeadpb.AesCtrHmacStreamingParams{
@@ -139,15 +139,6 @@ func TestParseKey(t *testing.T) {
 			}
 		})
 	}
-}
-
-func mustMarshal(t *testing.T, p proto.Message) []byte {
-	t.Helper()
-	data, err := proto.Marshal(p)
-	if err != nil {
-		t.Fatalf("proto.Marshal() err = %v, want nil", err)
-	}
-	return data
 }
 
 func mustCreateProtoSerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
@@ -432,7 +423,7 @@ func parameterTestCases(t *testing.T) []*parametersTestCase {
 				{aesctrhmac.SHA512, commonpb.HashType_SHA512, 64},
 			} {
 				for _, segmentSize := range segmentSizes {
-					params, err := aesctrhmac.NewParameters(aesctrhmac.ParameterOpts{
+					params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
 						KeySizeInBytes:        keySize,
 						DerivedKeySizeInBytes: keySize,
 						HkdfHashType:          hashType.hashType,
@@ -446,7 +437,7 @@ func parameterTestCases(t *testing.T) []*parametersTestCase {
 
 					keyTemplate := &tinkpb.KeyTemplate{
 						TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
-						Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+						Value: mustMarshal(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
 							Version: 0,
 							Params: &streamaeadpb.AesCtrHmacStreamingParams{
 								HkdfHashType:          hashType.protoHashType,
@@ -498,7 +489,7 @@ func TestParseParameters_Fails(t *testing.T) {
 			name: "invalid_derived_key_size",
 			keyTemplate: &tinkpb.KeyTemplate{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
-				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+				Value: mustMarshal(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
 					Params: &streamaeadpb.AesCtrHmacStreamingParams{
 						HkdfHashType:          commonpb.HashType_SHA256,
 						DerivedKeySize:        12, // Derived key size should be 16 or 32
@@ -517,7 +508,7 @@ func TestParseParameters_Fails(t *testing.T) {
 			name: "invalid_key_size",
 			keyTemplate: &tinkpb.KeyTemplate{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
-				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+				Value: mustMarshal(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
 					Params: &streamaeadpb.AesCtrHmacStreamingParams{
 						HkdfHashType:          commonpb.HashType_SHA256,
 						DerivedKeySize:        12, // Derived key size should be 16 or 32
@@ -536,7 +527,7 @@ func TestParseParameters_Fails(t *testing.T) {
 			name: "invalid_segment_size",
 			keyTemplate: &tinkpb.KeyTemplate{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
-				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+				Value: mustMarshal(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
 					Params: &streamaeadpb.AesCtrHmacStreamingParams{
 						HkdfHashType:          commonpb.HashType_SHA256,
 						DerivedKeySize:        16,
@@ -555,7 +546,7 @@ func TestParseParameters_Fails(t *testing.T) {
 			name: "invalid_hmac_tag_size",
 			keyTemplate: &tinkpb.KeyTemplate{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
-				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+				Value: mustMarshal(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
 					Params: &streamaeadpb.AesCtrHmacStreamingParams{
 						HkdfHashType:          commonpb.HashType_SHA256,
 						DerivedKeySize:        16,
@@ -574,7 +565,7 @@ func TestParseParameters_Fails(t *testing.T) {
 			name: "invalid_hkdf_hash_type",
 			keyTemplate: &tinkpb.KeyTemplate{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
-				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+				Value: mustMarshal(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
 					Params: &streamaeadpb.AesCtrHmacStreamingParams{
 						HkdfHashType:          commonpb.HashType_UNKNOWN_HASH,
 						DerivedKeySize:        16,
@@ -593,7 +584,7 @@ func TestParseParameters_Fails(t *testing.T) {
 			name: "invalid_hmac_hash_type",
 			keyTemplate: &tinkpb.KeyTemplate{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
-				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+				Value: mustMarshal(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
 					Params: &streamaeadpb.AesCtrHmacStreamingParams{
 						HkdfHashType:          commonpb.HashType_SHA256,
 						DerivedKeySize:        16,
@@ -612,7 +603,7 @@ func TestParseParameters_Fails(t *testing.T) {
 			name: "invalid_output_prefix_type",
 			keyTemplate: &tinkpb.KeyTemplate{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
-				Value: mustSerialize(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+				Value: mustMarshal(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
 					Params: &streamaeadpb.AesCtrHmacStreamingParams{
 						HkdfHashType:          commonpb.HashType_SHA256,
 						DerivedKeySize:        16,

@@ -48,11 +48,11 @@ func hashTypeToProto(ht HashType) (commonpb.HashType, error) {
 func (s *keySerializer) SerializeKey(k key.Key) (*protoserialization.KeySerialization, error) {
 	actualKey, ok := k.(*Key)
 	if !ok {
-		return nil, fmt.Errorf("key is not a aesctrhmac.Key")
+		return nil, fmt.Errorf("key is not a %T", (*Key)(nil))
 	}
 	actualParameters, ok := actualKey.Parameters().(*Parameters)
 	if !ok {
-		return nil, fmt.Errorf("key parameters is not a aesctrhmac.Parameters")
+		return nil, fmt.Errorf("key parameters is not a %T", (*Parameters)(nil))
 	}
 	hkdfHashType, err := hashTypeToProto(actualParameters.HkdfHashType())
 	if err != nil {
@@ -120,7 +120,7 @@ func (s *keyParser) ParseKey(keySerialization *protoserialization.KeySerializati
 		return nil, err
 	}
 	if protoKey.GetVersion() != 0 {
-		return nil, fmt.Errorf("unsupported aesctrhmac.AesCtrHmacStreamingKey version: got %q, want %q", protoKey.GetVersion(), 0)
+		return nil, fmt.Errorf("unsupported key version: got %q, want %q", protoKey.GetVersion(), 0)
 	}
 	paramsProto := protoKey.GetParams()
 	hkdfHashType, err := hashTypeFromProto(paramsProto.GetHkdfHashType())
@@ -132,7 +132,7 @@ func (s *keyParser) ParseKey(keySerialization *protoserialization.KeySerializati
 	if err != nil {
 		return nil, err
 	}
-	params, err := NewParameters(ParameterOpts{
+	params, err := NewParameters(ParametersOpts{
 		KeySizeInBytes:        len(protoKey.GetKeyValue()),
 		DerivedKeySizeInBytes: int(paramsProto.GetDerivedKeySize()),
 		HkdfHashType:          hkdfHashType,
@@ -154,7 +154,7 @@ var _ protoserialization.ParametersSerializer = (*parametersSerializer)(nil)
 func (s *parametersSerializer) Serialize(params key.Parameters) (*tinkpb.KeyTemplate, error) {
 	actualParams, ok := params.(*Parameters)
 	if !ok {
-		return nil, fmt.Errorf("parameters is not a aesctrhmac.Parameters")
+		return nil, fmt.Errorf("parameters is not a %T", (*Parameters)(nil))
 	}
 	hkdfHashType, err := hashTypeToProto(actualParams.HkdfHashType())
 	if err != nil {
@@ -193,9 +193,6 @@ type parametersParser struct{}
 var _ protoserialization.ParametersParser = (*parametersParser)(nil)
 
 func (s *parametersParser) Parse(kt *tinkpb.KeyTemplate) (key.Parameters, error) {
-	if kt == nil {
-		return nil, fmt.Errorf("parameters serialization is nil")
-	}
 	if kt.GetTypeUrl() != typeURL {
 		return nil, fmt.Errorf("invalid type URL: got %q, want %q", kt.GetTypeUrl(), typeURL)
 	}
@@ -216,7 +213,7 @@ func (s *parametersParser) Parse(kt *tinkpb.KeyTemplate) (key.Parameters, error)
 	if err != nil {
 		return nil, fmt.Errorf("invalid HMAC hash type: %v", hmacParams.GetHash())
 	}
-	return NewParameters(ParameterOpts{
+	return NewParameters(ParametersOpts{
 		DerivedKeySizeInBytes: int(protoParams.GetDerivedKeySize()),
 		HkdfHashType:          hkdfHashType,
 		HmacHashType:          hmacHashType,

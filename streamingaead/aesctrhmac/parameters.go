@@ -95,9 +95,9 @@ func (p *Parameters) Equal(other key.Parameters) bool {
 // This ensures that the Parameters type implements the key.Parameters interface.
 var _ key.Parameters = (*Parameters)(nil)
 
-// ParameterOpts holds options for creating new AES-CTR-HMAC Streaming AEAD
+// ParametersOpts holds options for creating new AES-CTR-HMAC Streaming AEAD
 // parameters.
-type ParameterOpts struct {
+type ParametersOpts struct {
 	KeySizeInBytes        int
 	DerivedKeySizeInBytes int
 	HkdfHashType          HashType
@@ -114,8 +114,8 @@ const (
 	headerLengthSize = 1
 )
 
-// NewParameters creates a new Parameters object from ParameterOpts.
-func NewParameters(opts ParameterOpts) (*Parameters, error) {
+// NewParameters creates a new Parameters object from ParametersOpts.
+func NewParameters(opts ParametersOpts) (*Parameters, error) {
 	if opts.DerivedKeySizeInBytes != 16 && opts.DerivedKeySizeInBytes != 32 {
 		return nil, fmt.Errorf("invalid derived key size: %d", opts.DerivedKeySizeInBytes)
 	}
