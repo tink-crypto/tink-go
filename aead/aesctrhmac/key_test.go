@@ -22,7 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
@@ -741,8 +741,7 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 	}
 }
 
-func TestRegisterKeyCreator(t *testing.T) {
-	keyCreator := aesctrhmac.KeyCreator(internalapi.Token{})
+func TestKeyCreator(t *testing.T) {
 	params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
 		AESKeySizeInBytes:  16,
 		HMACKeySizeInBytes: 32,
@@ -755,13 +754,13 @@ func TestRegisterKeyCreator(t *testing.T) {
 		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
 	}
 
-	key, err := keyCreator(params, 123)
+	key, err := keygenregistry.CreateKey(params, 123)
 	if err != nil {
-		t.Fatalf("keyCreator(%v, 123) err = %v, want nil", params, err)
+		t.Fatalf("keygenregistry.CreateKey(%v, 123) err = %v, want nil", params, err)
 	}
 	then, ok := key.(*aesctrhmac.Key)
 	if !ok {
-		t.Fatalf("keyCreator(%v, 123) returned key of type %T, want %T", params, key, (*aesctrhmac.Key)(nil))
+		t.Fatalf("keygenregistry.CreateKey(%v, 123) returned key of type %T, want %T", params, key, (*aesctrhmac.Key)(nil))
 	}
 
 	idRequirement, hasIDRequirement := then.IDRequirement()

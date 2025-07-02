@@ -22,7 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
@@ -343,19 +343,18 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 }
 
 func TestKeyCreator(t *testing.T) {
-	keyCreator := xchacha20poly1305.KeyCreator(internalapi.Token{})
 	params, err := xchacha20poly1305.NewParameters(xchacha20poly1305.VariantTink)
 	if err != nil {
 		t.Fatalf("xchacha20poly1305.NewParameters() err = %v, want nil", err)
 	}
 
-	key, err := keyCreator(params, 123)
+	key, err := keygenregistry.CreateKey(params, 123)
 	if err != nil {
-		t.Fatalf("keyCreator(%v, 123) err = %v, want nil", params, err)
+		t.Fatalf("keygenregistry.CreateKey(%v, 123) err = %v, want nil", params, err)
 	}
 	xChaCha20Poly1305, ok := key.(*xchacha20poly1305.Key)
 	if !ok {
-		t.Fatalf("keyCreator(%v, 123) returned key of type %T, want %T", params, key, (*xchacha20poly1305.Key)(nil))
+		t.Fatalf("keygenregistry.CreateKey(%v, 123) returned key of type %T, want %T", params, key, (*xchacha20poly1305.Key)(nil))
 	}
 
 	idRequirement, hasIDRequirement := xChaCha20Poly1305.IDRequirement()

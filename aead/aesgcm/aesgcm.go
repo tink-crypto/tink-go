@@ -22,6 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -68,6 +69,9 @@ func init() {
 		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
 	}
 	if err := registryconfig.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
+		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
+	}
+	if err := keygenregistry.RegisterKeyCreator[*Parameters](createKey); err != nil {
 		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
 	}
 }

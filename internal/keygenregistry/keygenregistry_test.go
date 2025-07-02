@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package keygenconfig_test
+package keygenregistry_test
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/v2/internal/keygenconfig"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 )
 
@@ -54,23 +53,25 @@ func stubKeyCreator2(p key.Parameters, idRequirement uint32) (key.Key, error) {
 }
 
 func TestRegisterKeyCreatorWorks(t *testing.T) {
-	config := keygenconfig.New()
-	if err := config.RegisterKeyCreator(reflect.TypeOf((*stubParams1)(nil)), stubKeyCreator1); err != nil {
-		t.Fatalf("config.RegisterKeyCreator(reflect.TypeOf((*stubParams1)(nil)), stubKeyCreator1) err = %v, want nil", err)
+	defer keygenregistry.UnregisterKeyCreator[*stubParams1]()
+	defer keygenregistry.UnregisterKeyCreator[*stubParams2]()
+
+	if err := keygenregistry.RegisterKeyCreator[*stubParams1](stubKeyCreator1); err != nil {
+		t.Fatalf("keygenregistry.RegisterKeyCreator[*stubParams1](stubKeyCreator1) err = %v, want nil", err)
 	}
-	if err := config.RegisterKeyCreator(reflect.TypeOf((*stubParams2)(nil)), stubKeyCreator2); err != nil {
-		t.Fatalf("config.RegisterKeyCreator(reflect.TypeOf((*stubParams2)(nil)), stubKeyCreator2) err = %v, want nil", err)
+	if err := keygenregistry.RegisterKeyCreator[*stubParams2](stubKeyCreator2); err != nil {
+		t.Fatalf("keygenregistry.RegisterKeyCreator[*stubParams2](stubKeyCreator2) err = %v, want nil", err)
 	}
-	key1, err := config.CreateKey(&stubParams1{}, 123)
+	key1, err := keygenregistry.CreateKey(&stubParams1{}, 123)
 	if err != nil {
-		t.Fatalf("config.CreateKey(&stubParams1{}, 123) err = %v, want nil", err)
+		t.Fatalf("keygenregistry.CreateKey(&stubParams1{}, 123) err = %v, want nil", err)
 	}
 	if _, ok := key1.(*stubKey1); !ok {
 		t.Errorf("key is of type %T; want *stubKey1", key1)
 	}
-	key2, err := config.CreateKey(&stubParams2{}, 123)
+	key2, err := keygenregistry.CreateKey(&stubParams2{}, 123)
 	if err != nil {
-		t.Fatalf("config.CreateKey(&stubParams2{}, 123) err = %v, want nil", err)
+		t.Fatalf("keygenregistry.CreateKey(&stubParams2{}, 123) err = %v, want nil", err)
 	}
 	if _, ok := key2.(*stubKey2); !ok {
 		t.Errorf("key is of type %T; want *stubKey2", key2)
@@ -78,20 +79,20 @@ func TestRegisterKeyCreatorWorks(t *testing.T) {
 }
 
 func TestRegisterKeyCreatorFailsIfRegisteredTwice(t *testing.T) {
-	config := keygenconfig.New()
-	if err := config.RegisterKeyCreator(reflect.TypeOf((*stubParams1)(nil)), stubKeyCreator1); err != nil {
-		t.Errorf("config.RegisterKeyCreator(reflect.TypeOf((*stubParams1)(nil)), stubKeyCreator1) err = %v, want nil", err)
+	defer keygenregistry.UnregisterKeyCreator[*stubParams1]()
+
+	if err := keygenregistry.RegisterKeyCreator[*stubParams1](stubKeyCreator1); err != nil {
+		t.Errorf("keygenregistry.RegisterKeyCreator[*stubParams1](stubKeyCreator1) err = %v, want nil", err)
 	}
 	// Another creator function for the same type fails.
-	if err := config.RegisterKeyCreator(reflect.TypeOf((*stubParams1)(nil)), stubKeyCreator2); err == nil {
-		t.Errorf("config.RegisterKeyCreator(reflect.TypeOf((*stubParams1)(nil)), stubKeyCreator1) err = nil, want error")
+	if err := keygenregistry.RegisterKeyCreator[*stubParams1](stubKeyCreator2); err == nil {
+		t.Errorf("keygenregistry.RegisterKeyCreator[*stubParams1](stubKeyCreator1) err = nil, want error")
 	}
 }
 
 func TestCreateKeyFailsIfKeyCreatorIsNotRegistered(t *testing.T) {
-	config := keygenconfig.New()
-	if _, err := config.CreateKey(&stubParams1{}, 123); err == nil {
-		t.Errorf("config.CreateKey(&stubParams1{}, 123) err = nil, want error")
+	if _, err := keygenregistry.CreateKey(&stubParams1{}, 123); err == nil {
+		t.Errorf("keygenregistry.CreateKey(&stubParams1{}, 123) err = nil, want error")
 	}
 }
 
@@ -100,11 +101,10 @@ func stubKeyCreatorFails(p key.Parameters, idRequirement uint32) (key.Key, error
 }
 
 func TestCreateKeyFailsIfKeyCreatorFails(t *testing.T) {
-	config := keygenconfig.New()
-	if err := config.RegisterKeyCreator(reflect.TypeOf((*stubParams1)(nil)), stubKeyCreatorFails); err != nil {
-		t.Errorf("config.RegisterKeyCreator(reflect.TypeOf((*stubParams1)(nil)), stubKeyCreatorFails) err = %v, want nil", err)
+	if err := keygenregistry.RegisterKeyCreator[*stubParams1](stubKeyCreatorFails); err != nil {
+		t.Errorf("keygenregistry.RegisterKeyCreator[*stubParams1](stubKeyCreatorFails) err = %v, want nil", err)
 	}
-	if _, err := config.CreateKey(&stubParams1{}, 123); err == nil {
-		t.Errorf("config.CreateKey(&stubParams1{}, 123) err = nil, want error")
+	if _, err := keygenregistry.CreateKey(&stubParams1{}, 123); err == nil {
+		t.Errorf("keygenregistry.CreateKey(&stubParams1{}, 123) err = nil, want error")
 	}
 }

@@ -22,7 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
@@ -340,19 +340,18 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 }
 
 func TestKeyCreator(t *testing.T) {
-	keyCreator := xaesgcm.KeyCreator(internalapi.Token{})
 	params, err := xaesgcm.NewParameters(xaesgcm.VariantTink, 12)
 	if err != nil {
 		t.Fatalf("xaesgcm.NewParameters() err = %v, want nil", err)
 	}
 
-	key, err := keyCreator(params, 123)
+	key, err := keygenregistry.CreateKey(params, 123)
 	if err != nil {
-		t.Fatalf("keyCreator(%v, 123) err = %v, want nil", params, err)
+		t.Fatalf("keygenregistry.CreateKey(%v, 123) err = %v, want nil", params, err)
 	}
 	xAESGCMKey, ok := key.(*xaesgcm.Key)
 	if !ok {
-		t.Fatalf("keyCreator(%v, 123) returned key of type %T, want %T", params, key, (*xaesgcm.Key)(nil))
+		t.Fatalf("keygenregistry.CreateKey(%v, 123) returned key of type %T, want %T", params, key, (*xaesgcm.Key)(nil))
 	}
 
 	idRequirement, hasIDRequirement := xAESGCMKey.IDRequirement()
