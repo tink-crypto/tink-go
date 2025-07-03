@@ -21,6 +21,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -29,7 +30,7 @@ var errNotKeysetDeriverPrimitive = errors.New("keyset_deriver_factory: not a Key
 
 // New generates a new instance of the Keyset Deriver primitive.
 func New(handle *keyset.Handle) (KeysetDeriver, error) {
-	ps, err := keyset.Primitives[KeysetDeriver](handle, internalapi.Token{})
+	ps, err := keyset.Primitives[keyderiver.KeyDeriver](handle, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("keyset_deriver_factory: cannot obtain primitive set: %v", err)
 	}
@@ -38,7 +39,7 @@ func New(handle *keyset.Handle) (KeysetDeriver, error) {
 
 // wrappedKeysetDeriver is a Keyset Deriver implementation that uses the underlying primitive set to derive keysets.
 type wrappedKeysetDeriver struct {
-	ps *primitiveset.PrimitiveSet[KeysetDeriver]
+	ps *primitiveset.PrimitiveSet[keyderiver.KeyDeriver]
 }
 
 // Asserts that wrappedKeysetDeriver implements the KeysetDeriver interface.
@@ -47,18 +48,11 @@ var _ KeysetDeriver = (*wrappedKeysetDeriver)(nil)
 func (w *wrappedKeysetDeriver) DeriveKeyset(salt []byte) (*keyset.Handle, error) {
 	keys := make([]*tinkpb.Keyset_Key, 0, len(w.ps.EntriesInKeysetOrder))
 	for _, e := range w.ps.EntriesInKeysetOrder {
-		handle, err := e.Primitive.DeriveKeyset(salt)
+		derivedKey, err := e.Primitive.DeriveKey(salt)
 		if err != nil {
 			return nil, errors.New("keyset_deriver_factory: keyset derivation failed")
 		}
-		if handle.Len() != 1 {
-			return nil, errors.New("keyset_deriver_factory: primitive must derive keyset handle with exactly one key")
-		}
-		entry, err := handle.Entry(0)
-		if err != nil {
-			return nil, fmt.Errorf("keyset_deriver_factory: cannot obtain entry from derived keyset: %v", err)
-		}
-		keySerialization, err := protoserialization.SerializeKey(entry.Key())
+		keySerialization, err := protoserialization.SerializeKey(derivedKey)
 		if err != nil {
 			return nil, fmt.Errorf("keyset_deriver_factory: cannot get proto key from entry: %v", err)
 		}

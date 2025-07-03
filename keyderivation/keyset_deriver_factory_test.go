@@ -16,7 +16,6 @@ package keyderivation_test
 
 import (
 	"fmt"
-	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -27,6 +26,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
 	"github.com/tink-crypto/tink-go/v2/keyderivation"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
@@ -117,24 +117,63 @@ func (s *stubKeysetDeriverKeyParser) ParseKey(serialization *protoserialization.
 	}, nil
 }
 
-type stubLegacyKeysetDeriver struct{}
+const (
+	derivedKeyURL = "type.googleapis.com/google.crypto.tink.DerivedKey"
+)
 
-var _ keyderivation.KeysetDeriver = (*stubLegacyKeysetDeriver)(nil)
+type derivedKey struct {
+	prefixType    tinkpb.OutputPrefixType
+	idRequirement uint32
+}
 
-func (s *stubLegacyKeysetDeriver) DeriveKeyset(salt []byte) (*keyset.Handle, error) {
-	ks := testutil.NewKeyset(0, []*tinkpb.Keyset_Key{
-		{
-			KeyData: &tinkpb.KeyData{
-				TypeUrl:         stubKeysetDeriverURL,
-				Value:           slices.Concat(salt, []byte("_derived_key")),
-				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-			},
-			Status:           tinkpb.KeyStatusType_ENABLED,
-			KeyId:            0,
-			OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+var _ key.Key = (*derivedKey)(nil)
+
+func (p *derivedKey) Equal(_ key.Key) bool       { return true }
+func (p *derivedKey) Parameters() key.Parameters { return &stubKeysetDeriverParams{} }
+func (p *derivedKey) IDRequirement() (uint32, bool) {
+	return p.idRequirement, p.HasIDRequirement()
+}
+func (p *derivedKey) HasIDRequirement() bool {
+	return p.prefixType != tinkpb.OutputPrefixType_RAW
+}
+
+type stubLegacyKeyDeriver struct{}
+
+var _ keyderiver.KeyDeriver = (*stubLegacyKeyDeriver)(nil)
+
+func (s *stubLegacyKeyDeriver) DeriveKey(salt []byte) (key.Key, error) {
+	return &derivedKey{
+		prefixType:    tinkpb.OutputPrefixType_RAW,
+		idRequirement: 0,
+	}, nil
+}
+
+type derivedKeySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*derivedKeySerializer)(nil)
+
+func (s *derivedKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	return protoserialization.NewKeySerialization(
+		&tinkpb.KeyData{
+			TypeUrl:         derivedKeyURL,
+			Value:           []byte("serialized_derived_key"),
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 		},
-	})
-	return testkeyset.NewHandle(ks)
+		key.(*derivedKey).prefixType,
+		key.(*derivedKey).idRequirement,
+	)
+}
+
+type derivedKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*derivedKeyParser)(nil)
+
+func (s *derivedKeyParser) ParseKey(serialization *protoserialization.KeySerialization) (key.Key, error) {
+	idRequirement, _ := serialization.IDRequirement()
+	return &derivedKey{
+		prefixType:    serialization.OutputPrefixType(),
+		idRequirement: idRequirement,
+	}, nil
 }
 
 type stubKeysetDeriverKeyManager struct{}
@@ -152,7 +191,7 @@ func (km *stubKeysetDeriverKeyManager) DoesSupport(keyURL string) bool {
 }
 func (km *stubKeysetDeriverKeyManager) TypeURL() string { return stubKeysetDeriverURL }
 func (km *stubKeysetDeriverKeyManager) Primitive(_ []byte) (any, error) {
-	return &stubLegacyKeysetDeriver{}, nil
+	return &stubLegacyKeyDeriver{}, nil
 }
 
 func TestPrimitiveFactory_New_FailsIfNoKeyManagerRegistered(t *testing.T) {
@@ -188,11 +227,19 @@ func TestPrimitiveFactory_New_FailsIfNoKeyManagerRegistered(t *testing.T) {
 func TestPrimitiveFactory_UsesRawPrimitives(t *testing.T) {
 	defer protoserialization.UnregisterKeyParser(stubKeysetDeriverURL)
 	defer protoserialization.UnregisterKeySerializer[*stubKeysetDeriverKey]()
+	defer protoserialization.UnregisterKeyParser(derivedKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*derivedKey]()
 
 	if err := protoserialization.RegisterKeyParser(stubKeysetDeriverURL, &stubKeysetDeriverKeyParser{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
 	}
 	if err := protoserialization.RegisterKeySerializer[*stubKeysetDeriverKey](&stubKeysetDeriverKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(derivedKeyURL, &derivedKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*derivedKey](&derivedKeySerializer{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
 	}
 	// Register the key manager.
@@ -212,7 +259,7 @@ func TestPrimitiveFactory_UsesRawPrimitives(t *testing.T) {
 				ks := testutil.NewKeyset(0x1234, []*tinkpb.Keyset_Key{
 					{
 						KeyData: &tinkpb.KeyData{
-							TypeUrl:         stubKeysetDeriverURL,
+							TypeUrl:         derivedKeyURL,
 							Value:           []byte("a_very_unique_salt_derived_key"),
 							KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 						},
@@ -235,7 +282,7 @@ func TestPrimitiveFactory_UsesRawPrimitives(t *testing.T) {
 				ks := testutil.NewKeyset(0x12345678, []*tinkpb.Keyset_Key{
 					{
 						KeyData: &tinkpb.KeyData{
-							TypeUrl:         stubKeysetDeriverURL,
+							TypeUrl:         derivedKeyURL,
 							Value:           []byte("a_very_unique_salt_derived_key"),
 							KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 						},
@@ -258,7 +305,7 @@ func TestPrimitiveFactory_UsesRawPrimitives(t *testing.T) {
 				ks := testutil.NewKeyset(0x1234, []*tinkpb.Keyset_Key{
 					{
 						KeyData: &tinkpb.KeyData{
-							TypeUrl:         stubKeysetDeriverURL,
+							TypeUrl:         derivedKeyURL,
 							Value:           []byte("a_very_unique_salt_derived_key"),
 							KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 						},

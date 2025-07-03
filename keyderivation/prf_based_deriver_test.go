@@ -20,11 +20,15 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/daead"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/signature"
@@ -137,8 +141,25 @@ func TestPRFBasedDeriver(t *testing.T) {
 					if err != nil {
 						t.Fatalf("newPRFBasedDeriver() err = %v, want nil", err)
 					}
-					if _, err := d.DeriveKeyset(salt); err != nil {
-						t.Errorf("DeriveKeyset() err = %v, want nil", err)
+					derivedKey, err := d.DeriveKey(salt)
+					if err != nil {
+						t.Fatalf("DeriveKey() err = %v, want nil", err)
+					}
+
+					derivedKeyset, err := d.DeriveKeyset(salt)
+					if err != nil {
+						t.Fatalf("DeriveKeyset() err = %v, want nil", err)
+					}
+					if derivedKeyset.Len() != 1 {
+						t.Fatalf("derivedKeyset.Len() = %d, want 1", derivedKeyset.Len())
+					}
+
+					entry, err := derivedKeyset.Entry(0)
+					if err != nil {
+						t.Fatalf("derivedKeyset.Entry() err = %v, want nil", err)
+					}
+					if diff := cmp.Diff(entry.Key(), derivedKey, protocmp.Transform()); diff != "" {
+						t.Errorf("derivedKeyset.Entry().Key() diff = %s", diff)
 					}
 					// We cannot test the derived keyset handle because, at this point, it
 					// is filled with placeholder values for the key ID, status, and
@@ -226,11 +247,34 @@ func TestPRFBasedDeriverWithHKDFRFCVectorForAESGCM(t *testing.T) {
 			if err != nil {
 				t.Fatalf("newPRFBasedDeriver() err = %v, want nil", err)
 			}
+			derivedKey, err := d.DeriveKey(derivationSalt)
+			if err != nil {
+				t.Fatalf("DeriveKey() err = %v, want nil", err)
+			}
+
 			derivedHandle, err := d.DeriveKeyset(derivationSalt)
 			if err != nil {
 				t.Fatalf("DeriveKeyset() err = %v, want nil", err)
 			}
+
+			km := keyset.NewManager()
+			keyID, err := km.AddKeyWithOpts(derivedKey, internalapi.Token{}, keyset.WithFixedID(0))
+			if err != nil {
+				t.Fatalf("km.AddKeyWithOpts() err = %v, want nil", err)
+			}
+			if err := km.SetPrimary(keyID); err != nil {
+				t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+			}
+			derivedHandle2, err := km.Handle()
+			if err != nil {
+				t.Fatalf("km.Handle() err = %v, want nil", err)
+			}
+
 			derivedKeyset := insecurecleartextkeyset.KeysetMaterial(derivedHandle)
+			derivedKeyset2 := insecurecleartextkeyset.KeysetMaterial(derivedHandle2)
+			if diff := cmp.Diff(derivedKeyset, derivedKeyset2, protocmp.Transform()); diff != "" {
+				t.Errorf("derivedKeyset diff = %s", diff)
+			}
 
 			// Verify keyset.
 			if len(derivedKeyset.GetKey()) != 1 {

@@ -18,7 +18,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/streamingprf"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -33,8 +37,8 @@ type prfBasedDeriver struct {
 	derivedKeyTemplate *tinkpb.KeyTemplate
 }
 
-// Asserts that prfBasedDeriver implements the KeysetDeriver interface.
 var _ KeysetDeriver = (*prfBasedDeriver)(nil)
+var _ keyderiver.KeyDeriver = (*prfBasedDeriver)(nil)
 
 func newPRFBasedDeriver(prfKeyData *tinkpb.KeyData, derivedKeyTemplate *tinkpb.KeyTemplate) (*prfBasedDeriver, error) {
 	// Obtain Streaming PRF from PRF key data.
@@ -73,7 +77,7 @@ func newPRFBasedDeriver(prfKeyData *tinkpb.KeyData, derivedKeyTemplate *tinkpb.K
 	}, nil
 }
 
-func (p *prfBasedDeriver) DeriveKeyset(salt []byte) (*keyset.Handle, error) {
+func (p *prfBasedDeriver) DeriveKey(salt []byte) (key.Key, error) {
 	randomness, err := p.prf.Compute(salt)
 	if err != nil {
 		return nil, fmt.Errorf("compute randomness from PRF failed: %v", err)
@@ -82,22 +86,43 @@ func (p *prfBasedDeriver) DeriveKeyset(salt []byte) (*keyset.Handle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("derive key failed: %v", err)
 	}
-	// Fill in placeholder values for key ID, status, and output prefix type.
-	// The placeholder values are s.t. the keyset is valid and can be used to
-	// create a keyset handle.
-	// These will be populated with the correct values in the keyset deriver
-	// factory. This is acceptable because the keyset as-is will never leave
-	// Tink, and the user only interacts via the keyset deriver factory.
-	var primaryKeyID uint32 = 0
-	return keysetHandle(&tinkpb.Keyset{
-		PrimaryKeyId: primaryKeyID,
-		Key: []*tinkpb.Keyset_Key{
-			&tinkpb.Keyset_Key{
-				KeyData:          keyData,
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				KeyId:            primaryKeyID,
-				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
-			},
-		},
-	})
+
+	// We can rely on protoserialization to have the correct key parser already
+	// registered for two reasons:
+	//  1. While Tink users can register key managers, key derivation requires
+	//     marking a typeURL as derivable using
+	// 		 internalregistry.AllowKeyDerivation(), which is not exported.
+	//  2. Calls to this assume that internalregistry.AllowKeyDerivation was
+	//     called, which happens when a key package such as `aesgcm` is imported,
+	//     which is the case when users import any primitive package, such as
+	//     `aead`, `daead`, etc. On key package import, the `init` function
+	//     registers proto serializations as well.
+	keySerialization, err := protoserialization.NewKeySerialization(keyData, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
+		return nil, fmt.Errorf("create key serialization failed: %v", err)
+	}
+	key, err := protoserialization.ParseKey(keySerialization)
+	if err != nil {
+		return nil, fmt.Errorf("parse key failed: %v", err)
+	}
+	return key, nil
+}
+
+// DeriveKeyset is a legacy implementation of the [KeysetDeriver] interface.
+//
+// This is deprecated, use DeriveKey instead.
+func (p *prfBasedDeriver) DeriveKeyset(salt []byte) (*keyset.Handle, error) {
+	key, err := p.DeriveKey(salt)
+	if err != nil {
+		return nil, fmt.Errorf("derive key failed: %v", err)
+	}
+	km := keyset.NewManager()
+	keyID, err := km.AddKeyWithOpts(key, internalapi.Token{}, keyset.WithFixedID(0))
+	if err != nil {
+		return nil, fmt.Errorf("add key failed: %v", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		return nil, fmt.Errorf("set primary key failed: %v", err)
+	}
+	return km.Handle()
 }

@@ -23,6 +23,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
 	"github.com/tink-crypto/tink-go/v2/keyderivation"
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
@@ -94,13 +95,36 @@ func TestPRFBasedDeriverKeyManagerPrimitive(t *testing.T) {
 					if err != nil {
 						t.Fatalf("Primitive() err = %v, want nil", err)
 					}
-					d, ok := p.(keyderivation.KeysetDeriver)
+					d, ok := p.(keyderiver.KeyDeriver)
 					if !ok {
-						t.Fatal("primitive is not KeysetDeriver")
+						t.Fatalf("primitive is not %T", (keyderiver.KeyDeriver)(nil))
 					}
-					if _, err := d.DeriveKeyset(salt); err != nil {
+
+					derivedKey, err := d.DeriveKey(salt)
+					if err != nil {
+						t.Fatalf("DeriveKey() err = %v, want nil", err)
+					}
+
+					keysetDeriver, ok := p.(keyderivation.KeysetDeriver)
+					if !ok {
+						t.Fatalf("primitive is not %T", (keyderivation.KeysetDeriver)(nil))
+					}
+					derivedKeyset, err := keysetDeriver.DeriveKeyset(salt)
+					if err != nil {
 						t.Fatalf("DeriveKeyset() err = %v, want nil", err)
 					}
+					if derivedKeyset.Len() != 1 {
+						t.Fatalf("derivedKeyset.Len() = %d, want 1", derivedKeyset.Len())
+					}
+
+					entry, err := derivedKeyset.Entry(0)
+					if err != nil {
+						t.Fatalf("derivedKeyset.Entry() err = %v, want nil", err)
+					}
+					if diff := cmp.Diff(entry.Key(), derivedKey, protocmp.Transform()); diff != "" {
+						t.Errorf("derivedKeyset.Entry().Key() diff = %s", diff)
+					}
+
 					// We cannot test the derived keyset handle because, at this point, it
 					// is filled with placeholder values for the key ID, status, and
 					// output prefix type fields.
