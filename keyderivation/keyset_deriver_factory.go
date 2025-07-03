@@ -15,18 +15,40 @@
 package keyderivation
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-var errNotKeysetDeriverPrimitive = errors.New("keyset_deriver_factory: not a Keyset Deriver primitive")
+type fullPrimitiveWrapper struct {
+	rawPrimitive  keyderiver.KeyDeriver
+	idRequirement uint32
+	prefixType    tinkpb.OutputPrefixType
+}
+
+var _ keyderiver.KeyDeriver = (*fullPrimitiveWrapper)(nil)
+
+func (w *fullPrimitiveWrapper) DeriveKey(salt []byte) (key.Key, error) {
+	key, err := w.rawPrimitive.DeriveKey(salt)
+	if err != nil {
+		return nil, err
+	}
+	keySerialization, err := protoserialization.SerializeKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get proto key from entry: %v", err)
+	}
+	// Manually set the ID requirement and prefix type.
+	newKeySerialization, err := protoserialization.NewKeySerialization(keySerialization.KeyData(), w.prefixType, w.idRequirement)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create new key serialization: %v", err)
+	}
+	return protoserialization.ParseKey(newKeySerialization)
+}
 
 // New generates a new instance of the Keyset Deriver primitive.
 func New(handle *keyset.Handle) (KeysetDeriver, error) {
@@ -34,40 +56,63 @@ func New(handle *keyset.Handle) (KeysetDeriver, error) {
 	if err != nil {
 		return nil, fmt.Errorf("keyset_deriver_factory: cannot obtain primitive set: %v", err)
 	}
-	return &wrappedKeysetDeriver{ps: ps}, nil
+
+	var fullKeyDerivers []fullKeyDeriverWithKeyID
+	for _, e := range ps.EntriesInKeysetOrder {
+		if e.Primitive == nil {
+			fullKeyDerivers = append(fullKeyDerivers, fullKeyDeriverWithKeyID{
+				fullKeyDeriver: e.FullPrimitive,
+				keyID:          e.KeyID,
+			})
+		} else {
+			idRequirement := e.KeyID
+			if e.PrefixType == tinkpb.OutputPrefixType_RAW {
+				idRequirement = 0
+			}
+			fullKeyDerivers = append(fullKeyDerivers, fullKeyDeriverWithKeyID{
+				fullKeyDeriver: &fullPrimitiveWrapper{
+					rawPrimitive:  e.Primitive,
+					idRequirement: idRequirement,
+					prefixType:    e.PrefixType,
+				},
+				keyID: e.KeyID,
+			})
+		}
+	}
+
+	return &wrappedKeysetDeriver{fullKeyDerivers: fullKeyDerivers, primaryKeyID: ps.Primary.KeyID}, nil
+}
+
+type fullKeyDeriverWithKeyID struct {
+	fullKeyDeriver keyderiver.KeyDeriver
+	keyID          uint32
+}
+
+func (w *fullKeyDeriverWithKeyID) DeriveKey(salt []byte) (key.Key, error) {
+	return w.fullKeyDeriver.DeriveKey(salt)
 }
 
 // wrappedKeysetDeriver is a Keyset Deriver implementation that uses the underlying primitive set to derive keysets.
 type wrappedKeysetDeriver struct {
-	ps *primitiveset.PrimitiveSet[keyderiver.KeyDeriver]
+	fullKeyDerivers []fullKeyDeriverWithKeyID
+	primaryKeyID    uint32
 }
 
-// Asserts that wrappedKeysetDeriver implements the KeysetDeriver interface.
 var _ KeysetDeriver = (*wrappedKeysetDeriver)(nil)
 
 func (w *wrappedKeysetDeriver) DeriveKeyset(salt []byte) (*keyset.Handle, error) {
-	keys := make([]*tinkpb.Keyset_Key, 0, len(w.ps.EntriesInKeysetOrder))
-	for _, e := range w.ps.EntriesInKeysetOrder {
-		derivedKey, err := e.Primitive.DeriveKey(salt)
+	km := keyset.NewManager()
+	for _, e := range w.fullKeyDerivers {
+		derivedKey, err := e.DeriveKey(salt)
 		if err != nil {
-			return nil, errors.New("keyset_deriver_factory: keyset derivation failed")
+			return nil, fmt.Errorf("keyset_deriver_factory: keyset derivation failed: %v", err)
 		}
-		keySerialization, err := protoserialization.SerializeKey(derivedKey)
-		if err != nil {
-			return nil, fmt.Errorf("keyset_deriver_factory: cannot get proto key from entry: %v", err)
+		km.AddKeyWithOpts(derivedKey, internalapi.Token{}, keyset.WithFixedID(e.keyID))
+		if e.keyID == w.primaryKeyID {
+			if err := km.SetPrimary(e.keyID); err != nil {
+				return nil, fmt.Errorf("keyset_deriver_factory: cannot set primary key: %v", err)
+			}
 		}
-		// Set all fields, except for KeyData, to match the Entry in the keyset.
-		key := &tinkpb.Keyset_Key{
-			KeyData:          keySerialization.KeyData(),
-			Status:           e.Status,
-			KeyId:            e.KeyID,
-			OutputPrefixType: e.PrefixType,
-		}
-		keys = append(keys, key)
 	}
-	ks := &tinkpb.Keyset{
-		PrimaryKeyId: w.ps.Primary.KeyID,
-		Key:          keys,
-	}
-	return keysetHandle(ks)
+	return km.Handle()
 }
