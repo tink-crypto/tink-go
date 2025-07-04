@@ -16,15 +16,21 @@ package aesgcmsiv_test
 
 import (
 	"bytes"
+	"encoding/hex"
 	"reflect"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 func TestGetKeyFromHandle(t *testing.T) {
@@ -186,5 +192,55 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	kt := reflect.TypeFor[*aesgcmsiv.Key]()
 	if _, ok := sc.PrimitiveConstructors[kt]; !ok {
 		t.Errorf("aesgcmsiv.RegisterPrimitiveConstructor() registered wrong key type, want \"%v\"", kt)
+	}
+}
+
+func mustDecodeHex(t *testing.T, hexStr string) []byte {
+	t.Helper()
+	x, err := hex.DecodeString(hexStr)
+	if err != nil {
+		t.Fatalf("hex.DecodeString(%v) err = %v, want nil", hexStr, err)
+	}
+	return x
+}
+
+func TestGetKeyManager(t *testing.T) {
+	keyBytes := secretdata.NewBytesFromData(mustDecodeHex(t, "01000000000000000000000000000000"), insecuresecretdataaccess.Token{})
+	wantMessage := mustDecodeHex(t, "01000000000000000000000000000000")
+	ciphertext := mustDecodeHex(t, "030000000000000000000000743f7c8077ab25f8624e2e948579cf77303aaf90f6fe21199c6068577437a0c4")
+	params, err := aesgcmsiv.NewParameters(keyBytes.Len(), aesgcmsiv.VariantTink)
+	if err != nil {
+		t.Fatalf("aesgcmsiv.NewParameters() err = %v, want nil", err)
+	}
+	key, err := aesgcmsiv.NewKey(keyBytes, 0x1234, params)
+	if err != nil {
+		t.Fatalf("aesgcmsiv.NewKey() err = %v, want nil", err)
+	}
+
+	keySerialization, err := protoserialization.SerializeKey(key)
+	if err != nil {
+		t.Fatalf("protoserialization.SerializeKey() err = %v, want nil", err)
+	}
+
+	km, err := registry.GetKeyManager(testutil.AESGCMSIVTypeURL)
+	if err != nil {
+		t.Fatalf("registry.GetKeyManager() err = %v, want nil", err)
+	}
+	km.Primitive(keySerialization.KeyData().GetValue())
+	// It is expected to ignore the output prefix.
+	primitive, err := km.Primitive(keySerialization.KeyData().GetValue())
+	if err != nil {
+		t.Fatalf("GetPrimitive() err = %v, want nil", err)
+	}
+	aead, ok := primitive.(tink.AEAD)
+	if !ok {
+		t.Errorf("GetPrimitive() = %T, want tink.AEAD", primitive)
+	}
+	decrypted, err := aead.Decrypt(ciphertext, nil)
+	if err != nil {
+		t.Fatalf("Decrypt() err = %v, want nil", err)
+	}
+	if !bytes.Equal(decrypted, wantMessage) {
+		t.Errorf("Decrypt() = %v, want %v", decrypted, wantMessage)
 	}
 }

@@ -28,6 +28,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -407,5 +408,51 @@ func TestRegisterPrimitiveConstructorFailsIfConfigFails(t *testing.T) {
 	sc := &alwaysFailingStubConfig{}
 	if err := aesgcm.RegisterPrimitiveConstructor(sc, internalapi.Token{}); err == nil {
 		t.Errorf("RegisterPrimitiveConstructor() err = nil, want error")
+	}
+}
+
+func TestGetKeyManager(t *testing.T) {
+	keyBytes := mustDecodeHex(t, "51e4bf2bad92b7aff1a4bc05550ba81df4b96fabf41c12c7b00e60e48db7e152")
+	ciphertext := mustDecodeHex(t, "4f07afedfdc3b6c2361823d3cf332a12fdee800b602e8d7c4799d62c140c9bb834876b09")
+	wantMessage := mustDecodeHex(t, "be3308f72a2c6aed")
+	aesGCMParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	key, err := aesgcm.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), 0x1234, aesGCMParams)
+	if err != nil {
+		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
+	}
+
+	keySerialization, err := protoserialization.SerializeKey(key)
+	if err != nil {
+		t.Fatalf("protoserialization.SerializeKey() err = %v, want nil", err)
+	}
+
+	km, err := registry.GetKeyManager(testutil.AESGCMTypeURL)
+	if err != nil {
+		t.Fatalf("registry.GetKeyManager() err = %v, want nil", err)
+	}
+	km.Primitive(keySerialization.KeyData().GetValue())
+	// It is expected to ignore the output prefix.
+	primitive, err := km.Primitive(keySerialization.KeyData().GetValue())
+	if err != nil {
+		t.Fatalf("GetPrimitive() err = %v, want nil", err)
+	}
+	aead, ok := primitive.(tink.AEAD)
+	if !ok {
+		t.Errorf("GetPrimitive() = %T, want tink.AEAD", primitive)
+	}
+	decrypted, err := aead.Decrypt(ciphertext, nil)
+	if err != nil {
+		t.Fatalf("Decrypt() err = %v, want nil", err)
+	}
+	if !bytes.Equal(decrypted, wantMessage) {
+		t.Errorf("Decrypt() = %v, want %v", decrypted, wantMessage)
 	}
 }

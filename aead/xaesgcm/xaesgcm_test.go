@@ -16,14 +16,18 @@ package xaesgcm_test
 
 import (
 	"bytes"
+	"slices"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 func TestCreateKeysetHandleFromKeysetKey(t *testing.T) {
@@ -156,5 +160,50 @@ func TestCreateKeysetHandleFromParameters(t *testing.T) {
 	}
 	if !bytes.Equal(decrypted, plaintext) {
 		t.Errorf("decrypted = %v, want %v", decrypted, plaintext)
+	}
+}
+
+func TestGetKeyManager(t *testing.T) {
+	// https://github.com/C2SP/wycheproof/blob/b063b4aedae951c69df014cd25fa6d69ae9e8cb9/testvectors/xchacha20_poly1305_test.json#L21
+	keyBytes := secretdata.NewBytesFromData(mustHexDecode(t, "0101010101010101010101010101010101010101010101010101010101010101"), insecuresecretdataaccess.Token{})
+	wantMessage := []byte("XAES-256-GCM")
+
+	iv := []byte("ABCDEFGHIJKLMNOPQRSTUVWX")
+	ct := mustHexDecode(t, "ce546ef63c9cc60765923609b33a9a1974e96e52daf2fcf7075e2271")
+	ciphertext := slices.Concat(iv, ct)
+	params, err := xaesgcm.NewParameters(xaesgcm.VariantTink, 12)
+	if err != nil {
+		t.Fatalf("xaesgcm.NewParameters() err = %v, want nil", err)
+	}
+	key, err := xaesgcm.NewKey(keyBytes, 0x1234, params)
+	if err != nil {
+		t.Fatalf("xaesgcm.NewKey() err = %v, want nil", err)
+	}
+
+	keySerialization, err := protoserialization.SerializeKey(key)
+	if err != nil {
+		t.Fatalf("protoserialization.SerializeKey() err = %v, want nil", err)
+	}
+
+	km, err := registry.GetKeyManager("type.googleapis.com/google.crypto.tink.XAesGcmKey")
+	if err != nil {
+		t.Fatalf("registry.GetKeyManager() err = %v, want nil", err)
+	}
+	km.Primitive(keySerialization.KeyData().GetValue())
+	// It is expected to ignore the output prefix.
+	primitive, err := km.Primitive(keySerialization.KeyData().GetValue())
+	if err != nil {
+		t.Fatalf("GetPrimitive() err = %v, want nil", err)
+	}
+	aead, ok := primitive.(tink.AEAD)
+	if !ok {
+		t.Errorf("GetPrimitive() = %T, want tink.AEAD", primitive)
+	}
+	decrypted, err := aead.Decrypt(ciphertext, nil)
+	if err != nil {
+		t.Fatalf("Decrypt() err = %v, want nil", err)
+	}
+	if !bytes.Equal(decrypted, wantMessage) {
+		t.Errorf("Decrypt() = %v, want %v", decrypted, wantMessage)
 	}
 }

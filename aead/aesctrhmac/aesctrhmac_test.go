@@ -22,10 +22,15 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 func TestGetKeyFromHandle(t *testing.T) {
@@ -209,5 +214,76 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	kt := reflect.TypeFor[*aesctrhmac.Key]()
 	if _, ok := sc.PrimitiveConstructors[kt]; !ok {
 		t.Errorf("aesctrhmac.RegisterPrimitiveConstructor() registered wrong key type, want \"%v\"", kt)
+	}
+}
+
+func TestGetKeyManager(t *testing.T) {
+	// From https://tools.ietf.org/html/draft-mcgrew-aead-aes-cbc-hmac-sha2-05.
+	//
+	// We use CTR but the RFC uses CBC mode, so it's not possible to compare
+	// plaintexts. However, the tests are still valuable to ensure that we
+	// correctly compute HMAC over ciphertext and associatedData.
+	macKeyBytes := mustDecodeHex(t, "000102030405060708090a0b0c0d0e0f")
+	aesKeyBytes := mustDecodeHex(t, "101112131415161718191a1b1c1d1e1f")
+	ciphertext := mustDecodeHex(t, ""+
+		"1af38c2dc2b96ffdd86694092341bc04"+
+		"c80edfa32ddf39d5ef00c0b468834279"+
+		"a2e46a1b8049f792f76bfe54b903a9c9"+
+		"a94ac9b47ad2655c5f10f9aef71427e2"+
+		"fc6f9b3f399a221489f16362c7032336"+
+		"09d45ac69864e3321cf82935ac4096c8"+
+		"6e133314c54019e8ca7980dfa4b9cf1b"+
+		"384c486f3a54c51078158ee5d79de59f"+
+		"bd34d848b3d69550a67646344427ade5"+
+		"4b8851ffb598f7f80074b9473c82e2db"+
+		"652c3fa36b0a7c5b3219fab3a30bc1c4")
+	associatedData := mustDecodeHex(t, ""+
+		"546865207365636f6e64207072696e63"+
+		"69706c65206f66204175677573746520"+
+		"4b6572636b686f666673")
+
+	params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
+		AESKeySizeInBytes:  16,
+		HMACKeySizeInBytes: 16,
+		IVSizeInBytes:      16,
+		TagSizeInBytes:     16,
+		HashType:           aesctrhmac.SHA256,
+		Variant:            aesctrhmac.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
+	}
+	key, err := aesctrhmac.NewKey(aesctrhmac.KeyOpts{
+		AESKeyBytes:   secretdata.NewBytesFromData(aesKeyBytes, insecuresecretdataaccess.Token{}),
+		HMACKeyBytes:  secretdata.NewBytesFromData(macKeyBytes, insecuresecretdataaccess.Token{}),
+		IDRequirement: 0x1234,
+		Parameters:    params,
+	})
+	if err != nil {
+		t.Fatalf("aesctrhmac.NewKey() err = %v, want nil", err)
+	}
+
+	keySerialization, err := protoserialization.SerializeKey(key)
+	if err != nil {
+		t.Fatalf("protoserialization.SerializeKey() err = %v, want nil", err)
+	}
+
+	km, err := registry.GetKeyManager(testutil.AESCTRHMACAEADTypeURL)
+	if err != nil {
+		t.Fatalf("registry.GetKeyManager() err = %v, want nil", err)
+	}
+	km.Primitive(keySerialization.KeyData().GetValue())
+	// It is expected to ignore the output prefix.
+	primitive, err := km.Primitive(keySerialization.KeyData().GetValue())
+	if err != nil {
+		t.Fatalf("GetPrimitive() err = %v, want nil", err)
+	}
+	aead, ok := primitive.(tink.AEAD)
+	if !ok {
+		t.Errorf("GetPrimitive() = %T, want tink.AEAD", primitive)
+	}
+
+	if _, err := aead.Decrypt(ciphertext, associatedData); err != nil {
+		t.Fatalf("Decrypt() err = %v, want nil", err)
 	}
 }
