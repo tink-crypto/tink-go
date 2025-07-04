@@ -20,7 +20,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
-	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
@@ -79,24 +78,6 @@ func TestDeriveKey(t *testing.T) {
 	xChaCha20Poly1305NoPrefixKey, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 0, xChaCha20Poly1305NoPrefixParams)
 	if err != nil {
 		t.Fatalf("xchacha20poly1305.NewKey() err = %v, want nil", err)
-	}
-
-	// X-AES-GCM keys.
-	xAES256GCMParams, err := xaesgcm.NewParameters(xaesgcm.VariantTink, 12)
-	if err != nil {
-		t.Fatalf("xaesgcm.NewParameters() err = %v, want nil", err)
-	}
-	xAES256GCMKey, err := xaesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 123, xAES256GCMParams)
-	if err != nil {
-		t.Fatalf("xaesgcm.NewKey() err = %v, want nil", err)
-	}
-	xAES256GCMNoPrefixParams, err := xaesgcm.NewParameters(xaesgcm.VariantNoPrefix, 12)
-	if err != nil {
-		t.Fatalf("xaesgcm.NewParameters() err = %v, want nil", err)
-	}
-	xAES256GCMNoPrefixKey, err := xaesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 0, xAES256GCMNoPrefixParams)
-	if err != nil {
-		t.Fatalf("xaesgcm.NewKey() err = %v, want nil", err)
 	}
 
 	// AES-SIV keys.
@@ -332,27 +313,6 @@ func TestDeriveKey(t *testing.T) {
 			wantKey:       xChaCha20Poly1305NoPrefixKey,
 		},
 		{
-			name:          "XAES256GCM",
-			params:        xAES256GCMParams,
-			idRequirement: 123,
-			randomBytes:   []byte("01234567890123450123456789012345"),
-			wantKey:       xAES256GCMKey,
-		},
-		{
-			name:          "XAES256GCM_longer_key_bytes",
-			params:        xAES256GCMParams,
-			idRequirement: 123,
-			randomBytes:   []byte("01234567890123450123456789012345ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
-			wantKey:       xAES256GCMKey,
-		},
-		{
-			name:          "XAES256GCMNoPrefix",
-			params:        xAES256GCMNoPrefixParams,
-			idRequirement: 0,
-			randomBytes:   []byte("01234567890123450123456789012345"),
-			wantKey:       xAES256GCMNoPrefixKey,
-		},
-		{
 			name:          "AES256SIV",
 			params:        aes256SIVParams,
 			idRequirement: 123,
@@ -577,15 +537,6 @@ func TestDeriveKey_Failures(t *testing.T) {
 		t.Fatalf("xchacha20poly1305.NewParameters() err = %v, want nil", err)
 	}
 
-	xAES256GCMParams, err := xaesgcm.NewParameters(xaesgcm.VariantTink, 12)
-	if err != nil {
-		t.Fatalf("xaesgcm.NewParameters() err = %v, want nil", err)
-	}
-	xAES256GCMNoPrefixParams, err := xaesgcm.NewParameters(xaesgcm.VariantNoPrefix, 12)
-	if err != nil {
-		t.Fatalf("xaesgcm.NewParameters() err = %v, want nil", err)
-	}
-
 	aes256SIVParams, err := aessiv.NewParameters(32, aessiv.VariantTink)
 	if err != nil {
 		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
@@ -665,18 +616,6 @@ func TestDeriveKey_Failures(t *testing.T) {
 		{
 			name:            "XChaCha20Poly1305 invalid ID requirement",
 			params:          xChaCha20Poly1305NoPrefixParams,
-			idRequirement:   123,
-			randomnessBytes: []byte("01234567890123450123456789012345"),
-		},
-		{
-			name:            "XAESGCM insufficient random bytes",
-			params:          xAES256GCMParams,
-			idRequirement:   123,
-			randomnessBytes: []byte("0123456789012345012345678901234"), // 1 byte short
-		},
-		{
-			name:            "XAESGCM invalid ID requirement",
-			params:          xAES256GCMNoPrefixParams,
 			idRequirement:   123,
 			randomnessBytes: []byte("01234567890123450123456789012345"),
 		},

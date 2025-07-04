@@ -21,7 +21,6 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
-	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
@@ -83,22 +82,7 @@ func addXChaCha20Poly1305KeyDeriver() {
 	}
 }
 
-func addXAESGCMKeyDeriver() {
-	parametersType := reflect.TypeFor[*xaesgcm.Parameters]()
-	keyDerivers[parametersType] = func(p key.Parameters, idRequirement uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
-		params, ok := p.(*xaesgcm.Parameters)
-		if !ok {
-			return nil, fmt.Errorf("key is of type %T; needed %T", p, (*xaesgcm.Parameters)(nil))
-		}
-		keyBytes := make([]byte, 32)
-		if _, err := io.ReadFull(reader, keyBytes); err != nil {
-			return nil, fmt.Errorf("insufficient pseudorandomness")
-		}
-		return xaesgcm.NewKey(secretdata.NewBytesFromData(keyBytes, token), idRequirement, params)
-	}
-}
-
-func addXAESSIVKeyDeriver() {
+func addAESSIVKeyDeriver() {
 	parametersType := reflect.TypeFor[*aessiv.Parameters]()
 	keyDerivers[parametersType] = func(p key.Parameters, idRequirement uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
 		params, ok := p.(*aessiv.Parameters)
@@ -191,8 +175,7 @@ func addStreamingAEADAESGCMHKDFKeyDeriver() {
 func init() {
 	addAESGCMKeyDeriver()
 	addXChaCha20Poly1305KeyDeriver()
-	addXAESGCMKeyDeriver()
-	addXAESSIVKeyDeriver()
+	addAESSIVKeyDeriver()
 	addHMACKeyDeriver()
 	addHKDFPRFKeyDeriver()
 	addHMACPRFKeyDeriver()
