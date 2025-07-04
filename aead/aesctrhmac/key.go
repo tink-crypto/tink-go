@@ -114,6 +114,13 @@ func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
 	if !ok {
 		return nil, fmt.Errorf("key is of type %T; needed %T", p, (*Parameters)(nil))
 	}
+
+	// Make sure AES key size is either 16 or 32 bytes for consistency with other Tink
+	// implementations.
+	if aesCTRHMACParams.AESKeySizeInBytes() != 16 && aesCTRHMACParams.AESKeySizeInBytes() != 32 {
+		return nil, fmt.Errorf("AES key size = %v, want 16 or 32", aesCTRHMACParams.AESKeySizeInBytes())
+	}
+
 	aesKeyBytes, err := secretdata.NewBytesFromRand(uint32(aesCTRHMACParams.AESKeySizeInBytes()))
 	if err != nil {
 		return nil, err

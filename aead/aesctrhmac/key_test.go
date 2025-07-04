@@ -777,3 +777,20 @@ func TestKeyCreator(t *testing.T) {
 		t.Errorf("then.Parameters() diff (-want +got):\n%s", diff)
 	}
 }
+
+func TestKeyCreator_FailsForWrongAESKeySize(t *testing.T) {
+	params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
+		AESKeySizeInBytes:  24, // Only 16 and 32 are supported.
+		HMACKeySizeInBytes: 32,
+		IVSizeInBytes:      12,
+		TagSizeInBytes:     16,
+		HashType:           aesctrhmac.SHA256,
+		Variant:            aesctrhmac.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
+	}
+	if _, err := keygenregistry.CreateKey(params, 123); err == nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 123) err = nil, want error", params)
+	}
+}
