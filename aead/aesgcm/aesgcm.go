@@ -19,13 +19,16 @@ import (
 	"fmt"
 	"reflect"
 
+	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
+	aesgcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 type config interface {
@@ -33,12 +36,22 @@ type config interface {
 	RegisterKeyManager(keyTypeURL string, km registry.KeyManager, t internalapi.Token) error
 }
 
+func newKeyManager() registry.KeyManager {
+	return legacykeymanager.New(typeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_SYMMETRIC, func(b []byte) (proto.Message, error) {
+		protoKey := &aesgcmpb.AesGcmKey{}
+		if err := proto.Unmarshal(b, protoKey); err != nil {
+			return nil, err
+		}
+		return protoKey, nil
+	})
+}
+
 // RegisterKeyManager accepts a config object and registers an
 // instance of an AES-GCM AEAD KeyManager to the provided config.
 //
 // It is *NOT* part of the public API.
 func RegisterKeyManager(c config, t internalapi.Token) error {
-	return c.RegisterKeyManager(typeURL, new(keyManager), t)
+	return c.RegisterKeyManager(typeURL, newKeyManager(), t)
 }
 
 // RegisterPrimitiveConstructor accepts a config object and registers the
@@ -50,10 +63,7 @@ func RegisterPrimitiveConstructor(c config, t internalapi.Token) error {
 }
 
 func init() {
-	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
-		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
-	}
-	if err := internalregistry.AllowKeyDerivation(typeURL); err != nil {
+	if err := registry.RegisterKeyManager(newKeyManager()); err != nil {
 		panic(fmt.Sprintf("aesgcm.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterKeySerializer[*Key](&keySerializer{}); err != nil {

@@ -15,17 +15,13 @@
 package xchacha20poly1305_test
 
 import (
-	"bytes"
-	"encoding/hex"
 	"fmt"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"golang.org/x/crypto/chacha20poly1305"
 	"google.golang.org/protobuf/proto"
 	aeadtestutil "github.com/tink-crypto/tink-go/v2/aead/internal/testutil"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -188,139 +184,6 @@ func TestKeyManagerTypeURL(t *testing.T) {
 	}
 	if kt := km.TypeURL(); kt != testutil.XChaCha20Poly1305TypeURL {
 		t.Errorf("km.TypeURL() = %s; want %s", kt, testutil.XChaCha20Poly1305TypeURL)
-	}
-}
-
-func TestKeyManagerKeyMaterialType(t *testing.T) {
-	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
-	}
-	keyManager, ok := km.(internalregistry.DerivableKeyManager)
-	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
-	}
-	if got, want := keyManager.KeyMaterialType(), tpb.KeyData_SYMMETRIC; got != want {
-		t.Errorf("KeyMaterialType() = %v, want %v", got, want)
-	}
-}
-
-func TestKeyManagerDeriveKey(t *testing.T) {
-	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
-	}
-	keyManager, ok := km.(internalregistry.DerivableKeyManager)
-	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
-	}
-	keyFormat, err := proto.Marshal(&xpb.XChaCha20Poly1305KeyFormat{Version: 0})
-	if err != nil {
-		t.Fatalf("proto.Marshal() err = %v, want nil", err)
-	}
-	for _, test := range []struct {
-		name      string
-		keyFormat []byte
-	}{
-		{
-			// nil unmarshals to an empty proto, which implies version = 0.
-			name:      "nil",
-			keyFormat: nil,
-		},
-		{
-			// An empty proto implies version = 0.
-			name:      "empty",
-			keyFormat: []byte{},
-		},
-		{
-			name:      "specified",
-			keyFormat: keyFormat,
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			rand := random.GetRandomBytes(chacha20poly1305.KeySize)
-			buf := &bytes.Buffer{}
-			buf.Write(rand) // never returns a non-nil error
-			k, err := keyManager.DeriveKey(test.keyFormat, buf)
-			if err != nil {
-				t.Fatalf("keyManager.DeriveKey() err = %v, want nil", err)
-			}
-			key := k.(*xpb.XChaCha20Poly1305Key)
-			if got, want := len(key.GetKeyValue()), chacha20poly1305.KeySize; got != want {
-				t.Errorf("key length = %d, want %d", got, want)
-			}
-			if diff := cmp.Diff(key.GetKeyValue(), rand); diff != "" {
-				t.Errorf("incorrect derived key: diff = %v", diff)
-			}
-		})
-	}
-}
-
-func TestKeyManagerDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
-	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
-	}
-	keyManager, ok := km.(internalregistry.DerivableKeyManager)
-	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
-	}
-	invalidVersion, err := proto.Marshal(&xpb.XChaCha20Poly1305KeyFormat{Version: 10})
-	if err != nil {
-		t.Fatalf("proto.Marshal() err = %v, want nil", err)
-	}
-	// Proto messages start with a VarInt, which always ends with a byte with the
-	// MSB unset, so 0x80 is invalid.
-	invalidSerialization, err := hex.DecodeString("80")
-	if err != nil {
-		t.Errorf("hex.DecodeString() err = %v, want nil", err)
-	}
-	for _, test := range []struct {
-		name      string
-		keyFormat []byte
-	}{
-		{
-			name:      "invalid version",
-			keyFormat: invalidVersion,
-		},
-		{
-			name:      "invalid serialization",
-			keyFormat: invalidSerialization,
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			buf := bytes.NewBuffer(random.GetRandomBytes(chacha20poly1305.KeySize))
-			if _, err := keyManager.DeriveKey(test.keyFormat, buf); err == nil {
-				t.Errorf("keyManager.DeriveKey() err = nil, want non-nil")
-			}
-		})
-	}
-}
-
-func TestKeyManagerDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
-	km, err := registry.GetKeyManager(testutil.XChaCha20Poly1305TypeURL)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testutil.XChaCha20Poly1305TypeURL, err)
-	}
-	keyManager, ok := km.(internalregistry.DerivableKeyManager)
-	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
-	}
-	keyFormat, err := proto.Marshal(&xpb.XChaCha20Poly1305KeyFormat{Version: 0})
-	if err != nil {
-		t.Fatalf("proto.Marshal() err = %v, want nil", err)
-	}
-	{
-		buf := bytes.NewBuffer(random.GetRandomBytes(chacha20poly1305.KeySize))
-		if _, err := keyManager.DeriveKey(keyFormat, buf); err != nil {
-			t.Errorf("keyManager.DeriveKey() err = %v, want nil", err)
-		}
-	}
-	{
-		insufficientBuf := bytes.NewBuffer(random.GetRandomBytes(chacha20poly1305.KeySize - 1))
-		if _, err := keyManager.DeriveKey(keyFormat, insufficientBuf); err == nil {
-			t.Errorf("keyManager.DeriveKey() err = nil, want non-nil")
-		}
 	}
 }
 

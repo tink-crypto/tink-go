@@ -15,19 +15,15 @@
 package xaesgcm_test
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead/internal/testutil"
 	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -225,142 +221,6 @@ func TestKeyManagerTypeURL(t *testing.T) {
 	}
 	if kt := km.TypeURL(); kt != typeURL {
 		t.Errorf("km.TypeURL() = %s; want %s", kt, typeURL)
-	}
-}
-
-func TestKeyManagerKeyMaterialType(t *testing.T) {
-	km, err := registry.GetKeyManager(typeURL)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", typeURL, err)
-	}
-	keyManager, ok := km.(internalregistry.DerivableKeyManager)
-	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
-	}
-	if got, want := keyManager.KeyMaterialType(), tpb.KeyData_SYMMETRIC; got != want {
-		t.Errorf("KeyMaterialType() = %v, want %v", got, want)
-	}
-}
-
-func TestKeyManagerDeriveKey(t *testing.T) {
-	km, err := registry.GetKeyManager(typeURL)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", typeURL, err)
-	}
-	keyManager, ok := km.(internalregistry.DerivableKeyManager)
-	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
-	}
-	keyFormat := mustMarshalProto(t, &xaesgcmpb.XAesGcmKeyFormat{
-		Version: 0,
-		Params: &xaesgcmpb.XAesGcmParams{
-			SaltSize: 12,
-		},
-	})
-	for _, test := range []struct {
-		name      string
-		keyFormat []byte
-	}{
-		{
-			name:      "specified",
-			keyFormat: keyFormat,
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			rand := random.GetRandomBytes(32)
-			buf := &bytes.Buffer{}
-			buf.Write(rand) // never returns a non-nil error
-			k, err := keyManager.DeriveKey(test.keyFormat, buf)
-			if err != nil {
-				t.Fatalf("keyManager.DeriveKey() err = %v, want nil", err)
-			}
-			key := k.(*xaesgcmpb.XAesGcmKey)
-			want := &xaesgcmpb.XAesGcmKey{
-				Version:  0,
-				KeyValue: rand,
-				Params: &xaesgcmpb.XAesGcmParams{
-					SaltSize: 12,
-				},
-			}
-			if diff := cmp.Diff(key, want, protocmp.Transform()); diff != "" {
-				t.Errorf("incorrect derived key: diff = %v", diff)
-			}
-		})
-	}
-}
-
-func TestKeyManagerDeriveKeyFailsWithInvalidKeyFormats(t *testing.T) {
-	km, err := registry.GetKeyManager(typeURL)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", typeURL, err)
-	}
-	keyManager, ok := km.(internalregistry.DerivableKeyManager)
-	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
-	}
-	for _, test := range []struct {
-		name      string
-		keyFormat []byte
-	}{
-		{
-			name:      "nil",
-			keyFormat: nil,
-		},
-		{
-			name:      "empty",
-			keyFormat: []byte{},
-		},
-		{
-			name: "invalid version",
-			keyFormat: mustMarshalProto(t, &xaesgcmpb.XAesGcmKeyFormat{
-				Version: 10,
-				Params: &xaesgcmpb.XAesGcmParams{
-					SaltSize: 12,
-				},
-			}),
-		},
-		{
-			// Proto messages start with a VarInt, which always ends with a byte with the
-			// MSB unset, so 0x80 is invalid.
-			name:      "invalid serialization",
-			keyFormat: mustHexDecode(t, "80"),
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			buf := bytes.NewBuffer(random.GetRandomBytes(32))
-			if _, err := keyManager.DeriveKey(test.keyFormat, buf); err == nil {
-				t.Errorf("keyManager.DeriveKey() err = nil, want non-nil")
-			}
-		})
-	}
-}
-
-func TestKeyManagerDeriveKeyFailsWithInsufficientRandomness(t *testing.T) {
-	km, err := registry.GetKeyManager(typeURL)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", typeURL, err)
-	}
-	keyManager, ok := km.(internalregistry.DerivableKeyManager)
-	if !ok {
-		t.Fatalf("key manager is not DerivableKeyManager")
-	}
-	keyFormat := mustMarshalProto(t, &xaesgcmpb.XAesGcmKeyFormat{
-		Version: 0,
-		Params: &xaesgcmpb.XAesGcmParams{
-			SaltSize: 12,
-		},
-	})
-	{
-		buf := bytes.NewBuffer(random.GetRandomBytes(32))
-		if _, err := keyManager.DeriveKey(keyFormat, buf); err != nil {
-			t.Errorf("keyManager.DeriveKey() err = %v, want nil", err)
-		}
-	}
-	{
-		insufficientBuf := bytes.NewBuffer(random.GetRandomBytes(32 - 1))
-		if _, err := keyManager.DeriveKey(keyFormat, insufficientBuf); err == nil {
-			t.Errorf("keyManager.DeriveKey() err = nil, want non-nil")
-		}
 	}
 }
 

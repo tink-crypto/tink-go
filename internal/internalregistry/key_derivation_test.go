@@ -25,6 +25,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager"
+	"github.com/tink-crypto/tink-go/v2/mac"
+	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -63,8 +65,7 @@ func mustRegisterBadKeyManagers(t *testing.T) {
 func TestDerivableKeyManagers(t *testing.T) {
 	mustRegisterBadKeyManagers(t)
 	for _, typeURL := range []string{
-		aead.AES128GCMKeyTemplate().GetTypeUrl(),
-		aead.AES256GCMKeyTemplate().GetTypeUrl(),
+		signature.ED25519KeyTemplate().GetTypeUrl(),
 		failingKMTypeURL,
 	} {
 		t.Run(typeURL, func(t *testing.T) {
@@ -104,14 +105,14 @@ func TestDeriveKey(t *testing.T) {
 		keyMaterialType tinkpb.KeyData_KeyMaterialType
 	}{
 		{
-			name:            "AES-128-GCM",
-			keyTemplate:     aead.AES128GCMKeyTemplate(),
-			keySize:         16,
+			name:            "HMAC-SHA256-Tag128",
+			keyTemplate:     mac.HMACSHA256Tag128KeyTemplate(),
+			keySize:         32,
 			keyMaterialType: tinkpb.KeyData_SYMMETRIC,
 		},
 		{
-			name:            "AES-256-GCM",
-			keyTemplate:     aead.AES256GCMKeyTemplate(),
+			name:            "HMAC-SHA256-Tag256",
+			keyTemplate:     mac.HMACSHA256Tag256KeyTemplate(),
 			keySize:         32,
 			keyMaterialType: tinkpb.KeyData_SYMMETRIC,
 		},
@@ -149,7 +150,7 @@ func TestDeriveKeyFails(t *testing.T) {
 	}{
 		{
 			name:        "not enough randomness",
-			keyTemplate: aead.AES128GCMKeyTemplate(),
+			keyTemplate: mac.HMACSHA256Tag128KeyTemplate(),
 			randLen:     15},
 		{
 			name:    "nil key template",

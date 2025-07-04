@@ -19,11 +19,25 @@ package xaesgcm
 import (
 	"fmt"
 
+	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+	xaesgcmpb "github.com/tink-crypto/tink-go/v2/proto/x_aes_gcm_go_proto"
 )
+
+func newKeyManager() registry.KeyManager {
+	return legacykeymanager.New(typeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_SYMMETRIC, func(b []byte) (proto.Message, error) {
+		protoKey := &xaesgcmpb.XAesGcmKey{}
+		if err := proto.Unmarshal(b, protoKey); err != nil {
+			return nil, err
+		}
+		return protoKey, nil
+	})
+}
 
 func init() {
 	if err := protoserialization.RegisterKeySerializer[*Key](&keySerializer{}); err != nil {
@@ -38,7 +52,7 @@ func init() {
 	if err := protoserialization.RegisterParametersParser(typeURL, &parametersParser{}); err != nil {
 		panic(fmt.Sprintf("xaesgcm.init() failed: %v", err))
 	}
-	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
+	if err := registry.RegisterKeyManager(newKeyManager()); err != nil {
 		panic(fmt.Sprintf("xaesgcm.init() failed: %v", err))
 	}
 	if err := registryconfig.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
