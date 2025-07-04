@@ -547,5 +547,8 @@ func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameter
 	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
 		return nil, err
 	}
+	if format.GetVersion() != 0 {
+		return nil, fmt.Errorf("unsupported key version: got %d, want %d", format.GetVersion(), 0)
+	}
 	return parseParameters(format.GetParams(), keyTemplate.GetOutputPrefixType())
 }

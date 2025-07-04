@@ -798,27 +798,16 @@ func TestParseParameters(t *testing.T) {
 	}
 }
 
-func TestParseParametersFails(t *testing.T) {
-	format := &mldsapb.MlDsaKeyFormat{
-		Version: 0,
-		Params: &mldsapb.MlDsaParams{
-			MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_65,
-		},
-	}
+func mustMarshal(t *testing.T, format proto.Message) []byte {
+	t.Helper()
 	serializedFormat, err := proto.Marshal(format)
 	if err != nil {
 		t.Fatalf("proto.Marshal(format) err = %v, want nil", err)
 	}
-	invalidFormat := &mldsapb.MlDsaKeyFormat{
-		Version: 0,
-		Params: &mldsapb.MlDsaParams{
-			MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_UNKNOWN_INSTANCE,
-		},
-	}
-	serializedInvalidFormat, err := proto.Marshal(invalidFormat)
-	if err != nil {
-		t.Fatalf("proto.Marshal(invalidFormat) err = %v, want nil", err)
-	}
+	return serializedFormat
+}
+
+func TestParseParametersFails(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		template *tinkpb.KeyTemplate
@@ -828,7 +817,25 @@ func TestParseParametersFails(t *testing.T) {
 			template: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
-				Value:            serializedFormat,
+				Value: mustMarshal(t, &mldsapb.MlDsaKeyFormat{
+					Version: 0,
+					Params: &mldsapb.MlDsaParams{
+						MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_65,
+					},
+				}),
+			},
+		},
+		{
+			name: "invalid version",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshal(t, &mldsapb.MlDsaKeyFormat{
+					Version: 1,
+					Params: &mldsapb.MlDsaParams{
+						MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_65,
+					},
+				}),
 			},
 		},
 		{
@@ -844,7 +851,12 @@ func TestParseParametersFails(t *testing.T) {
 			template: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				Value:            serializedInvalidFormat,
+				Value: mustMarshal(t, &mldsapb.MlDsaKeyFormat{
+					Version: 0,
+					Params: &mldsapb.MlDsaParams{
+						MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_UNKNOWN_INSTANCE,
+					},
+				}),
 			},
 		},
 	} {

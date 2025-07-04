@@ -186,6 +186,9 @@ func (s *parametersParser) Parse(kt *tinkpb.KeyTemplate) (key.Parameters, error)
 	if err := proto.Unmarshal(kt.GetValue(), keyFormat); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal key format: %v", err)
 	}
+	if keyFormat.GetVersion() != 0 {
+		return nil, fmt.Errorf("unsupported key version: got %d, want %d", keyFormat.GetVersion(), 0)
+	}
 	protoParams := keyFormat.GetParams()
 	hkdfHashType, err := hashTypeFromProto(protoParams.GetHkdfHashType())
 	if err != nil {

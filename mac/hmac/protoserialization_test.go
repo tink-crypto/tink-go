@@ -429,6 +429,22 @@ func TestParseParametersFailsWithWrongKeyTemplate(t *testing.T) {
 					KeySize: 16,
 					Params: &hmacpb.HmacParams{
 						TagSize: 2,
+						Hash:    commonpb.HashType_SHA256,
+					},
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "invalid version",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.HmacKey",
+				Value: mustMarshal(t, &hmacpb.HmacKeyFormat{
+					Version: 1,
+					KeySize: 16,
+					Params: &hmacpb.HmacParams{
+						TagSize: 16,
+						Hash:    commonpb.HashType_SHA256,
 					},
 				}),
 				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
@@ -442,6 +458,7 @@ func TestParseParametersFailsWithWrongKeyTemplate(t *testing.T) {
 					KeySize: 10,
 					Params: &hmacpb.HmacParams{
 						TagSize: 16,
+						Hash:    commonpb.HashType_SHA256,
 					},
 				}),
 				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
@@ -469,6 +486,7 @@ func TestParseParametersFailsWithWrongKeyTemplate(t *testing.T) {
 					KeySize: 16,
 					Params: &hmacpb.HmacParams{
 						TagSize: 16,
+						Hash:    commonpb.HashType_SHA256,
 					},
 				}),
 				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,

@@ -24,7 +24,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	cppb "github.com/tink-crypto/tink-go/v2/proto/chacha20_poly1305_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	xcppb "github.com/tink-crypto/tink-go/v2/proto/xchacha20_poly1305_go_proto"
 )
@@ -490,10 +489,12 @@ func TestParseParametersFailsWithWrongKeyTemplate(t *testing.T) {
 			},
 		},
 		{
-			name: "wrong type URL",
+			name: "invalid version",
 			keyTemplate: &tinkpb.KeyTemplate{
-				TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCtrHmacAeadKey",
-				Value:            mustMarshal(t, &cppb.ChaCha20Poly1305KeyFormat{}),
+				TypeUrl: "type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key",
+				Value: mustMarshal(t, &xcppb.XChaCha20Poly1305KeyFormat{
+					Version: 1,
+				}),
 				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
 		},
@@ -501,7 +502,7 @@ func TestParseParametersFailsWithWrongKeyTemplate(t *testing.T) {
 			name: "unknown output prefix type",
 			keyTemplate: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key",
-				Value:            mustMarshal(t, &cppb.ChaCha20Poly1305KeyFormat{}),
+				Value:            mustMarshal(t, &xcppb.XChaCha20Poly1305KeyFormat{}),
 				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
 			},
 		},

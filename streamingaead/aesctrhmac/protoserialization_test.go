@@ -572,7 +572,27 @@ func TestParseParameters_Fails(t *testing.T) {
 						CiphertextSegmentSize: 4096,
 						HmacParams: &hmacpb.HmacParams{
 							Hash:    commonpb.HashType_SHA256,
-							TagSize: 2, // tag size should be at least 10.
+							TagSize: 16,
+						},
+					},
+					KeySize: 16,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+			},
+		},
+		{
+			name: "invalid_version",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesCtrHmacStreamingKey",
+				Value: mustMarshal(t, &streamaeadpb.AesCtrHmacStreamingKeyFormat{
+					Version: 1,
+					Params: &streamaeadpb.AesCtrHmacStreamingParams{
+						HkdfHashType:          commonpb.HashType_SHA256,
+						DerivedKeySize:        16,
+						CiphertextSegmentSize: 4096,
+						HmacParams: &hmacpb.HmacParams{
+							Hash:    commonpb.HashType_SHA256,
+							TagSize: 16,
 						},
 					},
 					KeySize: 16,

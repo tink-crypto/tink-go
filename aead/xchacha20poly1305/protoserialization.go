@@ -166,6 +166,11 @@ func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameter
 	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
 		return nil, err
 	}
+
+	if format.GetVersion() != protoVersion {
+		return nil, fmt.Errorf("unsupported key version: got %d, want %d", format.GetVersion(), protoVersion)
+	}
+
 	variant, err := variantFromProto(keyTemplate.GetOutputPrefixType())
 	if err != nil {
 		return nil, err

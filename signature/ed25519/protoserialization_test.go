@@ -790,14 +790,16 @@ func TestParseParameters(t *testing.T) {
 	}
 }
 
-func TestParseParametersFails(t *testing.T) {
-	format := &ed25519pb.Ed25519KeyFormat{
-		Version: 0,
-	}
-	serializedFormat, err := proto.Marshal(format)
+func mustMarshal(t *testing.T, message proto.Message) []byte {
+	t.Helper()
+	serializedMessage, err := proto.Marshal(message)
 	if err != nil {
-		t.Fatalf("proto.Marshal(format) err = %v, want nil", err)
+		t.Fatalf("proto.Marshal(%v) err = %v, want nil", message, err)
 	}
+	return serializedMessage
+}
+
+func TestParseParametersFails(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		template *tinkpb.KeyTemplate
@@ -807,7 +809,17 @@ func TestParseParametersFails(t *testing.T) {
 			template: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
-				Value:            serializedFormat,
+				Value:            mustMarshal(t, &ed25519pb.Ed25519KeyFormat{}),
+			},
+		},
+		{
+			name: "invalid version",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey",
+				Value: mustMarshal(t, &ed25519pb.Ed25519KeyFormat{
+					Version: 1,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
 		},
 		{

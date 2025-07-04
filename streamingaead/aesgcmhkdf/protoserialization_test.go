@@ -448,6 +448,22 @@ func TestParseParameters_Fails(t *testing.T) {
 			},
 		},
 		{
+			name: "invalid_version",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.AesGcmHkdfStreamingKey",
+				Value: mustMarshal(t, &streamaeadpb.AesGcmHkdfStreamingKeyFormat{
+					Version: 1,
+					Params: &streamaeadpb.AesGcmHkdfStreamingParams{
+						HkdfHashType:          commonpb.HashType_SHA256,
+						DerivedKeySize:        16,
+						CiphertextSegmentSize: 4096,
+					},
+					KeySize: 16,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+			},
+		},
+		{
 			name: "invalid_output_prefix_type",
 			keyTemplate: &tinkpb.KeyTemplate{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.AesGcmHkdfStreamingKey",

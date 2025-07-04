@@ -946,11 +946,8 @@ func TestSerializeParametersFailsWithWrongParameters(t *testing.T) {
 	}
 }
 
-func mustCreateKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixType, protoParams *ecdsapb.EcdsaParams) *tinkpb.KeyTemplate {
+func mustCreateKeyTemplate(t *testing.T, outputPrefixType tinkpb.OutputPrefixType, format *ecdsapb.EcdsaKeyFormat) *tinkpb.KeyTemplate {
 	t.Helper()
-	format := &ecdsapb.EcdsaKeyFormat{
-		Params: protoParams,
-	}
 	serializedFormat, err := proto.Marshal(format)
 	if err != nil {
 		t.Fatalf("proto.Marshal(%v) err = %v, want nil", format, err)
@@ -984,218 +981,242 @@ func mustCreateParametersParsingTestValues(t *testing.T) []*parametersParsingTes
 		{
 			name:       "curveType:NIST_P256_hashType:SHA256_encoding:DER_variant:VariantTink",
 			parameters: mustCreateParameters(t, NistP256, SHA256, DER, VariantTink),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P256,
-				HashType: commonpb.HashType_SHA256,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P256,
+					HashType: commonpb.HashType_SHA256,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P256_hashType:SHA256_encoding:IEEEP1363_variant:VariantTink",
 			parameters: mustCreateParameters(t, NistP256, SHA256, IEEEP1363, VariantTink),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P256,
-				HashType: commonpb.HashType_SHA256,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P256,
+					HashType: commonpb.HashType_SHA256,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P256_hashType:SHA256_encoding:DER_variant:VariantLegacy",
 			parameters: mustCreateParameters(t, NistP256, SHA256, DER, VariantLegacy),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P256,
-				HashType: commonpb.HashType_SHA256,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P256,
+					HashType: commonpb.HashType_SHA256,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P256_hashType:SHA256_encoding:IEEEP1363_variant:VariantLegacy",
 			parameters: mustCreateParameters(t, NistP256, SHA256, IEEEP1363, VariantLegacy),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P256,
-				HashType: commonpb.HashType_SHA256,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P256,
+					HashType: commonpb.HashType_SHA256,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P256_hashType:SHA256_encoding:DER_variant:VariantCrunchy",
 			parameters: mustCreateParameters(t, NistP256, SHA256, DER, VariantCrunchy),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P256,
-				HashType: commonpb.HashType_SHA256,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P256,
+					HashType: commonpb.HashType_SHA256,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P256_hashType:SHA256_encoding:IEEEP1363_variant:VariantCrunchy",
 			parameters: mustCreateParameters(t, NistP256, SHA256, IEEEP1363, VariantCrunchy),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P256,
-				HashType: commonpb.HashType_SHA256,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P256,
+					HashType: commonpb.HashType_SHA256,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P256_hashType:SHA256_encoding:DER_variant:VariantNoPrefix",
 			parameters: mustCreateParameters(t, NistP256, SHA256, DER, VariantNoPrefix),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P256,
-				HashType: commonpb.HashType_SHA256,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P256,
+					HashType: commonpb.HashType_SHA256,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P256_hashType:SHA256_encoding:IEEEP1363_variant:VariantNoPrefix",
 			parameters: mustCreateParameters(t, NistP256, SHA256, IEEEP1363, VariantNoPrefix),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P256,
-				HashType: commonpb.HashType_SHA256,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P256,
+					HashType: commonpb.HashType_SHA256,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P384_hashType:SHA384_encoding:DER_variant:VariantTink",
 			parameters: mustCreateParameters(t, NistP384, SHA384, DER, VariantTink),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P384,
-				HashType: commonpb.HashType_SHA384,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P384,
+					HashType: commonpb.HashType_SHA384,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P384_hashType:SHA384_encoding:IEEEP1363_variant:VariantTink",
 			parameters: mustCreateParameters(t, NistP384, SHA384, IEEEP1363, VariantTink),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P384,
-				HashType: commonpb.HashType_SHA384,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P384,
+					HashType: commonpb.HashType_SHA384,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P384_hashType:SHA384_encoding:DER_variant:VariantLegacy",
 			parameters: mustCreateParameters(t, NistP384, SHA384, DER, VariantLegacy),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P384,
-				HashType: commonpb.HashType_SHA384,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P384,
+					HashType: commonpb.HashType_SHA384,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P384_hashType:SHA384_encoding:IEEEP1363_variant:VariantLegacy",
 			parameters: mustCreateParameters(t, NistP384, SHA384, IEEEP1363, VariantLegacy),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P384,
-				HashType: commonpb.HashType_SHA384,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P384,
+					HashType: commonpb.HashType_SHA384,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P384_hashType:SHA384_encoding:DER_variant:VariantCrunchy",
 			parameters: mustCreateParameters(t, NistP384, SHA384, DER, VariantCrunchy),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P384,
-				HashType: commonpb.HashType_SHA384,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P384,
+					HashType: commonpb.HashType_SHA384,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P384_hashType:SHA384_encoding:IEEEP1363_variant:VariantCrunchy",
 			parameters: mustCreateParameters(t, NistP384, SHA384, IEEEP1363, VariantCrunchy),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P384,
-				HashType: commonpb.HashType_SHA384,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P384,
+					HashType: commonpb.HashType_SHA384,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P384_hashType:SHA384_encoding:DER_variant:VariantNoPrefix",
 			parameters: mustCreateParameters(t, NistP384, SHA384, DER, VariantNoPrefix),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P384,
-				HashType: commonpb.HashType_SHA384,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P384,
+					HashType: commonpb.HashType_SHA384,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P384_hashType:SHA384_encoding:IEEEP1363_variant:VariantNoPrefix",
 			parameters: mustCreateParameters(t, NistP384, SHA384, IEEEP1363, VariantNoPrefix),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P384,
-				HashType: commonpb.HashType_SHA384,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P384,
+					HashType: commonpb.HashType_SHA384,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P521_hashType:SHA512_encoding:DER_variant:VariantTink",
 			parameters: mustCreateParameters(t, NistP521, SHA512, DER, VariantTink),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P521,
-				HashType: commonpb.HashType_SHA512,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P521,
+					HashType: commonpb.HashType_SHA512,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P521_hashType:SHA512_encoding:IEEEP1363_variant:VariantTink",
 			parameters: mustCreateParameters(t, NistP521, SHA512, IEEEP1363, VariantTink),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P521,
-				HashType: commonpb.HashType_SHA512,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P521,
+					HashType: commonpb.HashType_SHA512,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P521_hashType:SHA512_encoding:DER_variant:VariantLegacy",
 			parameters: mustCreateParameters(t, NistP521, SHA512, DER, VariantLegacy),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P521,
-				HashType: commonpb.HashType_SHA512,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P521,
+					HashType: commonpb.HashType_SHA512,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P521_hashType:SHA512_encoding:IEEEP1363_variant:VariantLegacy",
 			parameters: mustCreateParameters(t, NistP521, SHA512, IEEEP1363, VariantLegacy),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P521,
-				HashType: commonpb.HashType_SHA512,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P521,
+					HashType: commonpb.HashType_SHA512,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P521_hashType:SHA512_encoding:DER_variant:VariantCrunchy",
 			parameters: mustCreateParameters(t, NistP521, SHA512, DER, VariantCrunchy),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P521,
-				HashType: commonpb.HashType_SHA512,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P521,
+					HashType: commonpb.HashType_SHA512,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P521_hashType:SHA512_encoding:IEEEP1363_variant:VariantCrunchy",
 			parameters: mustCreateParameters(t, NistP521, SHA512, IEEEP1363, VariantCrunchy),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P521,
-				HashType: commonpb.HashType_SHA512,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P521,
+					HashType: commonpb.HashType_SHA512,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P521_hashType:SHA512_encoding:DER_variant:VariantNoPrefix",
 			parameters: mustCreateParameters(t, NistP521, SHA512, DER, VariantNoPrefix),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P521,
-				HashType: commonpb.HashType_SHA512,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P521,
+					HashType: commonpb.HashType_SHA512,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name:       "curveType:NIST_P521_hashType:SHA512_encoding:IEEEP1363_variant:VariantNoPrefix",
 			parameters: mustCreateParameters(t, NistP521, SHA512, IEEEP1363, VariantNoPrefix),
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P521,
-				HashType: commonpb.HashType_SHA512,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P521,
+					HashType: commonpb.HashType_SHA512,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+				}}),
 		},
 	}
 	return values
@@ -1237,35 +1258,49 @@ func TestParseParametersFails(t *testing.T) {
 	}{
 		{
 			name: "unknown curve type",
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_UNKNOWN_CURVE,
-				HashType: commonpb.HashType_SHA256,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_UNKNOWN_CURVE,
+					HashType: commonpb.HashType_SHA256,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name: "unknown hash type",
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P256,
-				HashType: commonpb.HashType_UNKNOWN_HASH,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P256,
+					HashType: commonpb.HashType_UNKNOWN_HASH,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name: "unknown encoding",
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P256,
-				HashType: commonpb.HashType_SHA256,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_UNKNOWN_ENCODING,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P256,
+					HashType: commonpb.HashType_SHA256,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_UNKNOWN_ENCODING,
+				}}),
+		},
+		{
+			name: "invalid version",
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &ecdsapb.EcdsaKeyFormat{
+				Version: 1,
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P256,
+					HashType: commonpb.HashType_SHA256,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name: "unknown output prefix type",
-			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_UNKNOWN_PREFIX, &ecdsapb.EcdsaParams{
-				Curve:    commonpb.EllipticCurveType_NIST_P256,
-				HashType: commonpb.HashType_SHA256,
-				Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
-			}),
+			template: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_UNKNOWN_PREFIX, &ecdsapb.EcdsaKeyFormat{
+				Params: &ecdsapb.EcdsaParams{
+					Curve:    commonpb.EllipticCurveType_NIST_P256,
+					HashType: commonpb.HashType_SHA256,
+					Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+				}}),
 		},
 		{
 			name: "invalid template",
