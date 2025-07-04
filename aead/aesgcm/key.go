@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 
+	internalaead "github.com/tink-crypto/tink-go/v2/internal/aead"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -225,6 +226,13 @@ func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
 	if !ok {
 		return nil, fmt.Errorf("key is of type %T; needed *aesgcm.Parameters", p)
 	}
+
+	// Make sure AES key size is either 16 or 32 bytes for consistency with other Tink
+	// implementations.
+	if err := internalaead.ValidateAESKeySize(uint32(aesGCMParams.KeySizeInBytes())); err != nil {
+		return nil, err
+	}
+
 	keyBytes, err := secretdata.NewBytesFromRand(uint32(aesGCMParams.KeySizeInBytes()))
 	if err != nil {
 		return nil, err

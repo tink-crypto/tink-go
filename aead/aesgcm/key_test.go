@@ -621,3 +621,18 @@ func TestKeyCreator(t *testing.T) {
 		t.Errorf("aesGCMKey.Parameters() diff (-want +got):\n%s", diff)
 	}
 }
+
+func TestKeyCreator_FailsIfInvalidKeySize(t *testing.T) {
+	params, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 24,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	if _, err := keygenregistry.CreateKey(params, 123); err == nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 123) err = nil, want error", params)
+	}
+}
