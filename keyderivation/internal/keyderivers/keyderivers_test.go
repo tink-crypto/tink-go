@@ -16,6 +16,7 @@ package keyderivers_test
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -671,6 +672,66 @@ func TestDeriveKey_Failures(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := keyderivers.DeriveKey(tc.params, tc.idRequirement, bytes.NewBuffer(tc.randomnessBytes), insecuresecretdataaccess.Token{}); err == nil {
 				t.Errorf("keyderivers.DeriveKey() err = nil, want error")
+			}
+		})
+	}
+}
+
+func TestCanDeriveKey(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		paramsType reflect.Type
+		want       bool
+	}{
+		{
+			name:       "AESGCM",
+			paramsType: reflect.TypeFor[*aesgcm.Parameters](),
+			want:       true,
+		},
+		{
+			name:       "XCHACHA20POLY1305",
+			paramsType: reflect.TypeFor[*xchacha20poly1305.Parameters](),
+			want:       true,
+		},
+		{
+			name:       "AESSIV",
+			paramsType: reflect.TypeFor[*aessiv.Parameters](),
+			want:       true,
+		},
+		{
+			name:       "HMAC",
+			paramsType: reflect.TypeFor[*hmac.Parameters](),
+			want:       true,
+		},
+		{
+			name:       "HKDF-PRF",
+			paramsType: reflect.TypeFor[*hkdfprf.Parameters](),
+			want:       true,
+		},
+		{
+			name:       "HMAC-PRF",
+			paramsType: reflect.TypeFor[*hmacprf.Parameters](),
+			want:       true,
+		},
+		{
+			name:       "ED25519",
+			paramsType: reflect.TypeFor[*ed25519.Parameters](),
+			want:       true,
+		},
+		{
+			name:       "AESGCMHKDF",
+			paramsType: reflect.TypeFor[*aesgcmhkdf.Parameters](),
+			want:       true,
+		},
+		{
+			name:       "invalid parameters type",
+			paramsType: reflect.TypeFor[*stubParams](),
+			want:       false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := keyderivers.CanDeriveKey(tc.paramsType); got != tc.want {
+				t.Errorf("keyderivers.CanDeriveKey() = %v, want %v", got, tc.want)
 			}
 		})
 	}

@@ -17,12 +17,14 @@ package keyderivation
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
+	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderivers"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/streamingprf"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -33,8 +35,8 @@ const hkdfPRFTypeURL = "type.googleapis.com/google.crypto.tink.HkdfPrfKey"
 // prfBasedDeriver uses prf and the Tink registry to derive a keyset handle as
 // described by derivedKeyTemplate.
 type prfBasedDeriver struct {
-	prf                streamingprf.StreamingPRF
-	derivedKeyTemplate *tinkpb.KeyTemplate
+	prf              streamingprf.StreamingPRF
+	derivedKeyParams key.Parameters
 }
 
 var _ KeysetDeriver = (*prfBasedDeriver)(nil)
@@ -65,15 +67,17 @@ func newPRFBasedDeriver(prfKeyData *tinkpb.KeyData, derivedKeyTemplate *tinkpb.K
 	if !ok {
 		return nil, errors.New("primitive is not StreamingPRF")
 	}
-
+	params, err := protoserialization.ParseParameters(derivedKeyTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create parameters from key template: %v", err)
+	}
 	// Validate derived key template.
-	if !internalregistry.CanDeriveKeys(derivedKeyTemplate.GetTypeUrl()) {
+	if !keyderivers.CanDeriveKey(reflect.TypeOf(params)) {
 		return nil, errors.New("derived key template is not a derivable key type")
 	}
-
 	return &prfBasedDeriver{
-		prf:                prf,
-		derivedKeyTemplate: derivedKeyTemplate,
+		prf:              prf,
+		derivedKeyParams: params,
 	}, nil
 }
 
@@ -82,7 +86,7 @@ func (p *prfBasedDeriver) DeriveKey(salt []byte) (key.Key, error) {
 	if err != nil {
 		return nil, fmt.Errorf("compute randomness from PRF failed: %v", err)
 	}
-	keyData, err := internalregistry.DeriveKey(p.derivedKeyTemplate, randomness)
+	key, err := keyderivers.DeriveKey(p.derivedKeyParams, 0, randomness, insecuresecretdataaccess.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("derive key failed: %v", err)
 	}
@@ -97,15 +101,16 @@ func (p *prfBasedDeriver) DeriveKey(salt []byte) (key.Key, error) {
 	//     which is the case when users import any primitive package, such as
 	//     `aead`, `daead`, etc. On key package import, the `init` function
 	//     registers proto serializations as well.
-	keySerialization, err := protoserialization.NewKeySerialization(keyData, tinkpb.OutputPrefixType_RAW, 0)
+	keySerialization, err := protoserialization.SerializeKey(key)
 	if err != nil {
 		return nil, fmt.Errorf("create key serialization failed: %v", err)
 	}
-	key, err := protoserialization.ParseKey(keySerialization)
+	// Replace output prefix with RAW.
+	newKeySerialization, err := protoserialization.NewKeySerialization(keySerialization.KeyData(), tinkpb.OutputPrefixType_RAW, 0)
 	if err != nil {
-		return nil, fmt.Errorf("parse key failed: %v", err)
+		return nil, fmt.Errorf("create key serialization failed: %v", err)
 	}
-	return key, nil
+	return protoserialization.ParseKey(newKeySerialization)
 }
 
 // DeriveKeyset is a legacy implementation of the [KeysetDeriver] interface.

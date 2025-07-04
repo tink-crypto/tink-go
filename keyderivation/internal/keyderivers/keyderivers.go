@@ -52,6 +52,13 @@ func DeriveKey(params key.Parameters, idRequirement uint32, reader io.Reader, to
 	return deriver(params, idRequirement, reader, token)
 }
 
+// CanDeriveKey returns true if the given parameters type can be used to derive
+// a key.
+func CanDeriveKey(paramsType reflect.Type) bool {
+	_, ok := keyDerivers[paramsType]
+	return ok
+}
+
 func addAESGCMKeyDeriver() {
 	parametersType := reflect.TypeFor[*aesgcm.Parameters]()
 	keyDerivers[parametersType] = func(p key.Parameters, idRequirement uint32, reader io.Reader, token insecuresecretdataaccess.Token) (key.Key, error) {
