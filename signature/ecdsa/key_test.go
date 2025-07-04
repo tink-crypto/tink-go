@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
@@ -866,5 +868,29 @@ func TestNewPrivateKeyFromPublicKey(t *testing.T) {
 				t.Errorf("otherPrvKey.Equal(prvKey) = false, want true")
 			}
 		})
+	}
+}
+
+func TestKeyCreator(t *testing.T) {
+	params, err := ecdsa.NewParameters(ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)
+	if err != nil {
+		t.Fatalf("ecdsa.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keygenregistry.CreateKey(params, 0x1234)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) err = %v, want nil", params, err)
+	}
+	ecdsaPrivateKey, ok := key.(*ecdsa.PrivateKey)
+	if !ok {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) returned key of type %T, want %T", params, key, (*ecdsa.PrivateKey)(nil))
+	}
+
+	idRequirement, hasIDRequirement := ecdsaPrivateKey.IDRequirement()
+	if !hasIDRequirement || idRequirement != 0x1234 {
+		t.Errorf("ecdsaPrivateKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 0x1234, true)
+	}
+	if diff := cmp.Diff(ecdsaPrivateKey.Parameters(), params); diff != "" {
+		t.Errorf("ecdsaPrivateKey.Parameters() diff (-want +got):\n%s", diff)
 	}
 }

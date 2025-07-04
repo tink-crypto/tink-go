@@ -19,8 +19,10 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/ed25519"
 )
@@ -784,5 +786,28 @@ func TestPrivateKeyKeyBytes(t *testing.T) {
 	}
 	if got, want := privKey.PrivateKeyBytes().Data(insecuresecretdataaccess.Token{}), []byte(privKeyBytes); !bytes.Equal(got, want) {
 		t.Errorf("bytes.Equal(got, want) = false, want true")
+	}
+}
+
+func TestKeyCreator(t *testing.T) {
+	params, err := ed25519.NewParameters(ed25519.VariantTink)
+	if err != nil {
+		t.Fatalf("ed25519.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keygenregistry.CreateKey(&params, 0x1234)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) err = %v, want nil", params, err)
+	}
+	ed25519PrivateKey, ok := key.(*ed25519.PrivateKey)
+	if !ok {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) returned key of type %T, want %T", params, key, (*ed25519.PrivateKey)(nil))
+	}
+	idRequirement, hasIDRequirement := ed25519PrivateKey.IDRequirement()
+	if !hasIDRequirement || idRequirement != 0x1234 {
+		t.Errorf("ed25519PrivateKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 123, true)
+	}
+	if diff := cmp.Diff(ed25519PrivateKey.Parameters(), &params); diff != "" {
+		t.Errorf("ed25519PrivateKey.Parameters() diff (-want +got):\n%s", diff)
 	}
 }

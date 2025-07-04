@@ -17,6 +17,7 @@ package ecdsa
 import (
 	"bytes"
 	"crypto/ecdh"
+	"crypto/rand"
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
@@ -473,4 +474,21 @@ func (k *PrivateKey) Equal(other key.Key) bool {
 	actualKey, ok := other.(*PrivateKey)
 	return ok && k.publicKey.Equal(actualKey.publicKey) &&
 		k.privateKeyValue.Equal(actualKey.privateKeyValue)
+}
+
+func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	ecdsaParams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("ecdsa.createKey: invalid parameters type: %T", p)
+	}
+	curve, err := ecdhCurveFromCurveType(ecdsaParams.CurveType())
+	if err != nil {
+		return nil, fmt.Errorf("ecdsa.createKey: %v", err)
+	}
+	privateKey, err := curve.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("ecdsa.createKey: %v", err)
+	}
+	privateKeyValue := secretdata.NewBytesFromData(privateKey.Bytes(), insecuresecretdataaccess.Token{})
+	return NewPrivateKey(privateKeyValue, idRequirement, ecdsaParams)
 }

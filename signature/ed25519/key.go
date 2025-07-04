@@ -17,6 +17,7 @@ package ed25519
 import (
 	"bytes"
 	"crypto/ed25519"
+	"crypto/rand"
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
@@ -179,7 +180,7 @@ var _ key.Key = (*PrivateKey)(nil)
 // idRequirement and params.
 func NewPrivateKey(privateKeyBytes secretdata.Bytes, idRequirement uint32, params Parameters) (*PrivateKey, error) {
 	if privateKeyBytes.Len() != 32 {
-		return nil, fmt.Errorf("ed25519.NewPrivateKey: privateKeyBytes must be 32 bytes")
+		return nil, fmt.Errorf("ed25519.NewPrivateKey: privateKeyBytes must be 32 bytes, got %d", privateKeyBytes.Len())
 	}
 	privKey := ed25519.NewKeyFromSeed(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
 	pubKeyBytes := privKey.Public().(ed25519.PublicKey)
@@ -200,7 +201,7 @@ func NewPrivateKeyWithPublicKey(privateKeyBytes secretdata.Bytes, pubKey *Public
 		return nil, fmt.Errorf("ed25519.NewPrivateKeyWithPublicKey: pubKey must not be nil")
 	}
 	if privateKeyBytes.Len() != 32 {
-		return nil, fmt.Errorf("ed25519.NewPrivateKey: seed must be 32 bytes")
+		return nil, fmt.Errorf("ed25519.NewPrivateKey: seed must be 32 bytes, got %d", privateKeyBytes.Len())
 	}
 	// Make sure the public key is correct.
 	privKey := ed25519.NewKeyFromSeed(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
@@ -238,4 +239,17 @@ func (k *PrivateKey) Equal(other key.Key) bool {
 	}
 	that, ok := other.(*PrivateKey)
 	return ok && k.publicKey.Equal(that.publicKey) && k.keyBytes.Equal(that.keyBytes)
+}
+
+func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	ed25519Params, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: %T", p)
+	}
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("cannot generate ED25519 key: %s", err)
+	}
+	privateKeyValue := secretdata.NewBytesFromData(priv.Seed(), insecuresecretdataaccess.Token{})
+	return NewPrivateKey(privateKeyValue, idRequirement, *ed25519Params)
 }
