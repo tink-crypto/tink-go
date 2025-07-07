@@ -15,52 +15,33 @@
 package keyderivation_test
 
 import (
-	"fmt"
-	"log"
+	"testing"
 
+	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead"
-	"github.com/tink-crypto/tink-go/v2/keyderivation"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/prf"
+	prfderpb "github.com/tink-crypto/tink-go/v2/proto/prf_based_deriver_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func Example() {
-	template, err := keyderivation.CreatePRFBasedKeyTemplate(prf.HKDFSHA256PRFKeyTemplate(), aead.AES128GCMKeyTemplate())
-	if err != nil {
-		log.Fatal(err)
+func TestDeriveKeyset_CreateKeysetFailsWithInconsistentOutputPrefixTypes(t *testing.T) {
+	keyFormat := &prfderpb.PrfBasedDeriverKeyFormat{
+		PrfKeyTemplate: prf.HKDFSHA256PRFKeyTemplate(),
+		Params: &prfderpb.PrfBasedDeriverParams{
+			DerivedKeyTemplate: aead.AES256GCMNoPrefixKeyTemplate(),
+		},
 	}
-
-	handle, err := keyset.NewHandle(template)
+	serializedFormat, err := proto.Marshal(keyFormat)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatalf("proto.Marshal() err = %v, want nil", err)
 	}
-
-	deriver, err := keyderivation.New(handle)
-	if err != nil {
-		log.Fatal(err)
+	template := &tinkpb.KeyTemplate{
+		TypeUrl:          prfBasedDeriverTypeURL,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+		Value:            serializedFormat,
 	}
-
-	derivedHandle, err := deriver.DeriveKeyset([]byte("salt"))
-	if err != nil {
-		log.Fatal(err)
+	if _, err := keyset.NewHandle(template); err == nil {
+		t.Errorf("keyset.NewHandle() err = nil, want non-nil")
 	}
-
-	// Use the derived keyset.
-	a, err := aead.New(derivedHandle)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ciphertext, err := a.Encrypt([]byte("a secret message"), nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	plaintext, err := a.Decrypt(ciphertext, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(string(plaintext))
-	// Output: a secret message
 }

@@ -37,11 +37,11 @@ func TestWrappedKeysetDeriver(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Fatalf("proto.Marshal(aes128GCMKeyFormat) err = %v, want nil", err)
+		t.Fatalf("proto.Marshal() err = %v, want nil", err)
 	}
 	singleKeyHandle, err := keyset.NewHandle(&tinkpb.KeyTemplate{
 		TypeUrl:          prfBasedDeriverTypeURL,
-		OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 		Value:            aes128GCMKeyFormat,
 	})
 	if err != nil {
@@ -49,6 +49,15 @@ func TestWrappedKeysetDeriver(t *testing.T) {
 	}
 
 	// Construct deriving keyset handle containing three keys.
+	aes256GCMKeyNoPrefixFormat, err := proto.Marshal(&prfderpb.PrfBasedDeriverKeyFormat{
+		PrfKeyTemplate: prf.HKDFSHA256PRFKeyTemplate(),
+		Params: &prfderpb.PrfBasedDeriverParams{
+			DerivedKeyTemplate: aead.AES256GCMNoPrefixKeyTemplate(),
+		},
+	})
+	if err != nil {
+		t.Fatalf("proto.Marshal() err = %v, want nil", err)
+	}
 	xChaChaKeyFormat, err := proto.Marshal(&prfderpb.PrfBasedDeriverKeyFormat{
 		PrfKeyTemplate: prf.HKDFSHA256PRFKeyTemplate(),
 		Params: &prfderpb.PrfBasedDeriverParams{
@@ -57,6 +66,18 @@ func TestWrappedKeysetDeriver(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("proto.Marshal(xChaChaKeyFormat) err = %v, want nil", err)
+	}
+	xChaChaKeyCrunchyFormat, err := proto.Marshal(&prfderpb.PrfBasedDeriverKeyFormat{
+		PrfKeyTemplate: prf.HKDFSHA256PRFKeyTemplate(),
+		Params: &prfderpb.PrfBasedDeriverParams{
+			DerivedKeyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key",
+				OutputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("proto.Marshal(xChaChaKeyCrunchyFormat) err = %v, want nil", err)
 	}
 	aes256GCMKeyFormat, err := proto.Marshal(&prfderpb.PrfBasedDeriverKeyFormat{
 		PrfKeyTemplate: prf.HKDFSHA256PRFKeyTemplate(),
@@ -71,10 +92,10 @@ func TestWrappedKeysetDeriver(t *testing.T) {
 	aes128GCMKeyID, err := manager.Add(&tinkpb.KeyTemplate{
 		TypeUrl:          prfBasedDeriverTypeURL,
 		OutputPrefixType: tinkpb.OutputPrefixType_RAW,
-		Value:            aes128GCMKeyFormat,
+		Value:            aes256GCMKeyNoPrefixFormat,
 	})
 	if err != nil {
-		t.Fatalf("manager.Add(aes128GCMTemplate) err = %v, want nil", err)
+		t.Fatalf("manager.Add(aes256GCMKeyNoPrefixFormat) err = %v, want nil", err)
 	}
 	if err := manager.SetPrimary(aes128GCMKeyID); err != nil {
 		t.Fatalf("manager.SetPrimary() err = %v, want nil", err)
@@ -88,16 +109,23 @@ func TestWrappedKeysetDeriver(t *testing.T) {
 	}
 	if _, err := manager.Add(&tinkpb.KeyTemplate{
 		TypeUrl:          prfBasedDeriverTypeURL,
-		OutputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
+		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 		Value:            aes256GCMKeyFormat,
 	}); err != nil {
-		t.Fatalf("manager.Add(aes256GCMTemplate) err = %v, want nil", err)
+		t.Fatalf("manager.Add(aes256GCMKeyFormat) err = %v, want nil", err)
+	}
+	if _, err := manager.Add(&tinkpb.KeyTemplate{
+		TypeUrl:          prfBasedDeriverTypeURL,
+		OutputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
+		Value:            xChaChaKeyCrunchyFormat,
+	}); err != nil {
+		t.Fatalf("manager.Add(xChaChaKeyCrunchyFormat) err = %v, want nil", err)
 	}
 	multipleKeysHandle, err := manager.Handle()
 	if err != nil {
 		t.Fatalf("manager.Handle() err = %v, want nil", err)
 	}
-	if got, want := len(multipleKeysHandle.KeysetInfo().GetKeyInfo()), 3; got != want {
+	if got, want := len(multipleKeysHandle.KeysetInfo().GetKeyInfo()), 4; got != want {
 		t.Fatalf("len(multipleKeysHandle) = %d, want %d", got, want)
 	}
 
@@ -120,6 +148,7 @@ func TestWrappedKeysetDeriver(t *testing.T) {
 				"type.googleapis.com/google.crypto.tink.AesGcmKey",
 				"type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key",
 				"type.googleapis.com/google.crypto.tink.AesGcmKey",
+				"type.googleapis.com/google.crypto.tink.XChaCha20Poly1305Key",
 			},
 		},
 	} {

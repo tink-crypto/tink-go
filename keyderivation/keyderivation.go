@@ -23,6 +23,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+
+	_ "github.com/tink-crypto/tink-go/v2/keyderivation/prfbasedkeyderivation" // Register proto serialization and primitive constructor.
 )
 
 var (
