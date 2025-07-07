@@ -15,8 +15,6 @@
 package stubkeymanager_test
 
 import (
-	"bytes"
-	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -88,23 +86,5 @@ func TestStubPrivateKeyManager(t *testing.T) {
 	}
 	if !cmp.Equal(pubKeyData, km.PubKeyData, protocmp.Transform()) {
 		t.Errorf("PublicKeyData() = %v, want %v", pubKeyData, km.PubKeyData)
-	}
-}
-
-func TestStubDerivableKeyManager(t *testing.T) {
-	km := stubkeymanager.StubDerivableKeyManager{
-		KeyMatType: tpb.KeyData_SYMMETRIC,
-		DerKey:     &agpb.AesGcmKey{Version: 0, KeyValue: []byte("derived_key_value")},
-		DerErr:     errors.New("hiya"),
-	}
-	if km.KeyMaterialType() != km.KeyMatType {
-		t.Errorf("KeyMaterialType() = %d, want %d", km.KeyMaterialType(), tpb.KeyData_SYMMETRIC)
-	}
-	derivedKey, err := km.DeriveKey([]byte{}, &bytes.Buffer{})
-	if !cmp.Equal(derivedKey, km.DerKey, protocmp.Transform()) {
-		t.Errorf("DeriveKey() = %v, want %v", derivedKey, km.DerKey)
-	}
-	if err != km.DerErr {
-		t.Errorf("DeriveKey() err = %v, want %v", err, km.DerErr)
 	}
 }

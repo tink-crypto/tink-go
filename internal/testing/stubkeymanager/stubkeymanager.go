@@ -16,11 +16,8 @@
 package stubkeymanager
 
 import (
-	"io"
-
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -70,24 +67,4 @@ var _ (registry.PrivateKeyManager) = (*StubPrivateKeyManager)(nil)
 // PublicKeyData returns the stub public key data.
 func (skm *StubPrivateKeyManager) PublicKeyData(serializedKey []byte) (*tinkpb.KeyData, error) {
 	return skm.PubKeyData, nil
-}
-
-// StubDerivableKeyManager is a derivable key manager for testing.
-type StubDerivableKeyManager struct {
-	StubKeyManager
-	KeyMatType tinkpb.KeyData_KeyMaterialType
-	DerKey     proto.Message
-	DerErr     error
-}
-
-var _ (internalregistry.DerivableKeyManager) = (*StubDerivableKeyManager)(nil)
-
-// KeyMaterialType returns the stub key material type.
-func (dkm *StubDerivableKeyManager) KeyMaterialType() tinkpb.KeyData_KeyMaterialType {
-	return dkm.KeyMatType
-}
-
-// DeriveKey returns the stub derived key and error.
-func (dkm *StubDerivableKeyManager) DeriveKey(serializedKeyFormat []byte, pseudorandomness io.Reader) (proto.Message, error) {
-	return dkm.DerKey, dkm.DerErr
 }

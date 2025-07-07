@@ -93,14 +93,10 @@ func (p *prfBasedDeriver) DeriveKey(salt []byte) (key.Key, error) {
 
 	// We can rely on protoserialization to have the correct key parser already
 	// registered for two reasons:
-	//  1. While Tink users can register key managers, key derivation requires
-	//     marking a typeURL as derivable using
-	// 		 internalregistry.AllowKeyDerivation(), which is not exported.
-	//  2. Calls to this assume that internalregistry.AllowKeyDerivation was
-	//     called, which happens when a key package such as `aesgcm` is imported,
-	//     which is the case when users import any primitive package, such as
-	//     `aead`, `daead`, etc. On key package import, the `init` function
-	//     registers proto serializations as well.
+	//  1. While Tink users can register key managers, there is no public API
+	//     to add key derivers.
+	//  2. When imported, keyderivers will register all protoserialization
+	//     parsers/serializers.
 	keySerialization, err := protoserialization.SerializeKey(key)
 	if err != nil {
 		return nil, fmt.Errorf("create key serialization failed: %v", err)

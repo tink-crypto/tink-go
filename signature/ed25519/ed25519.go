@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
@@ -28,9 +27,6 @@ import (
 
 func init() {
 	if err := registry.RegisterKeyManager(new(signerKeyManager)); err != nil {
-		panic(fmt.Sprintf("ed25519.init() failed: %v", err))
-	}
-	if err := internalregistry.AllowKeyDerivation(signerTypeURL); err != nil {
 		panic(fmt.Sprintf("ed25519.init() failed: %v", err))
 	}
 	if err := registry.RegisterKeyManager(new(verifierKeyManager)); err != nil {
