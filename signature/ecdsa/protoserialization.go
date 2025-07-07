@@ -27,6 +27,13 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
+const (
+	signerKeyVersion   = 0
+	signerTypeURL      = "type.googleapis.com/google.crypto.tink.EcdsaPrivateKey"
+	verifierKeyVersion = 0
+	verifierTypeURL    = "type.googleapis.com/google.crypto.tink.EcdsaPublicKey"
+)
+
 // padBigIntBytesToFixedSizeBuffer pads the given big integer bytes to the given size.
 func padBigIntBytesToFixedSizeBuffer(bigIntBytes []byte, size int) ([]byte, error) {
 	if len(bigIntBytes) > size {

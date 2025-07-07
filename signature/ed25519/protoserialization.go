@@ -37,6 +37,9 @@ const (
 	//
 	// Currently, only version 0 is supported; other versions are rejected.
 	privateKeyProtoVersion = 0
+
+	signerTypeURL   = "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey"
+	verifierTypeURL = "type.googleapis.com/google.crypto.tink.Ed25519PublicKey"
 )
 
 type publicKeySerializer struct{}
