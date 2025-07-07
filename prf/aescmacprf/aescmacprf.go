@@ -19,15 +19,17 @@ package aescmacprf
 import (
 	"fmt"
 
+	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
+	cmacprfpb "github.com/tink-crypto/tink-go/v2/proto/aes_cmac_prf_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func init() {
-	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
-		panic(fmt.Sprintf("aescmacprf.init() failed: %v", err))
-	}
 	if err := protoserialization.RegisterKeySerializer[*Key](new(keySerializer)); err != nil {
 		panic(fmt.Sprintf("aescmacprf.init() failed: %v", err))
 	}
@@ -41,6 +43,18 @@ func init() {
 		panic(fmt.Sprintf("aescmacprf.init() failed: %v", err))
 	}
 	if err := registryconfig.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
+		panic(fmt.Sprintf("aescmacprf.init() failed: %v", err))
+	}
+	if err := keygenregistry.RegisterKeyCreator[*Parameters](createKey); err != nil {
+		panic(fmt.Sprintf("aescmacprf.init() failed: %v", err))
+	}
+	if err := registry.RegisterKeyManager(legacykeymanager.New(typeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_SYMMETRIC, func(b []byte) (proto.Message, error) {
+		protoKey := &cmacprfpb.AesCmacPrfKey{}
+		if err := proto.Unmarshal(b, protoKey); err != nil {
+			return nil, err
+		}
+		return protoKey, nil
+	})); err != nil {
 		panic(fmt.Sprintf("aescmacprf.init() failed: %v", err))
 	}
 }

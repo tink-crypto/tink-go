@@ -28,6 +28,8 @@ import (
 
 type keySerializer struct{}
 
+const typeURL = "type.googleapis.com/google.crypto.tink.AesCmacPrfKey"
+
 var _ protoserialization.KeySerializer = (*keySerializer)(nil)
 
 func (s *keySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {

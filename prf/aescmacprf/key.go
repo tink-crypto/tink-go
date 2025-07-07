@@ -73,3 +73,19 @@ func primitiveConstructor(key key.Key) (any, error) {
 	}
 	return subtle.NewAESCMACPRF(actualKey.KeyBytes().Data(insecuresecretdataaccess.Token{}))
 }
+
+func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	aesCMACPPRFarams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: %T", p)
+	}
+	err := subtle.ValidateAESCMACPRFParams(uint32(aesCMACPPRFarams.KeySizeInBytes()))
+	if err != nil {
+		return nil, err
+	}
+	keyBytes, err := secretdata.NewBytesFromRand(uint32(aesCMACPPRFarams.KeySizeInBytes()))
+	if err != nil {
+		return nil, err
+	}
+	return NewKey(keyBytes)
+}
