@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/mldsa"
@@ -1022,4 +1024,56 @@ func getTestKeyPair(t *testing.T, instance mldsa.Instance) ([]byte, []byte) {
 		t.Fatalf("unsupported instance: %v", instance)
 	}
 	return nil, nil
+}
+
+func TestKeyCreator(t *testing.T) {
+	params, err := mldsa.NewParameters(mldsa.MLDSA65, mldsa.VariantTink)
+	if err != nil {
+		t.Fatalf("mldsa.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keygenregistry.CreateKey(params, 0x1234)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) err = %v, want nil", params, err)
+	}
+	mldsaPrivateKey, ok := key.(*mldsa.PrivateKey)
+	if !ok {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) returned key of type %T, want %T", params, key, (*mldsa.PrivateKey)(nil))
+	}
+	idRequirement, hasIDRequirement := mldsaPrivateKey.IDRequirement()
+	if !hasIDRequirement || idRequirement != 0x1234 {
+		t.Errorf("mldsaPrivateKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 123, true)
+	}
+	if diff := cmp.Diff(mldsaPrivateKey.Parameters(), params); diff != "" {
+		t.Errorf("mldsaPrivateKey.Parameters() diff (-want +got):\n%s", diff)
+	}
+}
+
+func TestPrivateKeyCreator_Fails(t *testing.T) {
+	paramsNoPrefix, err := mldsa.NewParameters(mldsa.MLDSA65, mldsa.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("mldsa.NewParameters() err = %v, want nil", err)
+	}
+	for _, tc := range []struct {
+		name          string
+		params        *mldsa.Parameters
+		idRequirement uint32
+	}{
+		{
+			name:          "invalid id requirement",
+			params:        paramsNoPrefix,
+			idRequirement: 0x1234,
+		},
+		{
+			name:          "invalid parameters",
+			params:        &mldsa.Parameters{},
+			idRequirement: 0x1234,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := keygenregistry.CreateKey(tc.params, tc.idRequirement); err == nil {
+				t.Errorf("keygenregistry.CreateKey(%v, %v) err = nil, want error", tc.params, tc.idRequirement)
+			}
+		})
+	}
 }

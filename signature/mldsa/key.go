@@ -298,3 +298,19 @@ func (k *PrivateKey) Equal(other key.Key) bool {
 		k.keyBytes.Equal(that.keyBytes) &&
 		k.expandedKeyBytes.Equal(that.expandedKeyBytes)
 }
+
+func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	mlDSAParams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: %T", p)
+	}
+	// Make sure the parameters are not "empty"; only MLDSA65 is supported.
+	if mlDSAParams.Instance() != MLDSA65 {
+		return nil, fmt.Errorf("invalid parameters")
+	}
+	seed, err := secretdata.NewBytesFromRand(mldsa.SecretKeySeedSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random seed: %w", err)
+	}
+	return NewPrivateKey(seed, idRequirement, mlDSAParams)
+}
