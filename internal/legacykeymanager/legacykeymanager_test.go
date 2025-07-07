@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -73,34 +74,98 @@ func (p *fakeParameters) Equal(other key.Parameters) bool { return false }
 func (p *fakeParameters) KeyType() string                 { return p.keyTypeURL }
 
 func TestDoesSupport(t *testing.T) {
-	km := New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil)
-	if !km.DoesSupport(fakeKeyTypeURL) {
-		t.Errorf("DoesSupport(%q) = false, want true", fakeKeyTypeURL)
-	}
-	if km.DoesSupport("some other type url") {
-		t.Error("DoesSupport(\"some other type url\") = true, want false")
+	for _, tc := range []struct {
+		name    string
+		km      registry.KeyManager
+		typeURL string
+		want    bool
+	}{
+		{
+			name:    "KeyManager",
+			km:      New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil),
+			typeURL: fakeKeyTypeURL,
+			want:    true,
+		},
+		{
+			name:    "PrivateKeyManager",
+			km:      NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil),
+			typeURL: fakeKeyTypeURL,
+			want:    true,
+		},
+		{
+			name:    "KeyManager_invalidTypeURL",
+			km:      New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil),
+			typeURL: "invalid type URL",
+			want:    false,
+		},
+		{
+			name:    "PrivateKeyManager_invalidTypeURL",
+			km:      NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil),
+			typeURL: "invalid type URL",
+			want:    false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.km.DoesSupport(tc.typeURL); got != tc.want {
+				t.Errorf("DoesSupport(%q) = %v, want %v", tc.typeURL, got, tc.want)
+			}
+		})
 	}
 }
 
 func TestTypeURL(t *testing.T) {
-	km := New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil)
-	if got, want := km.TypeURL(), fakeKeyTypeURL; got != want {
-		t.Errorf("TypeURL() = %q, want %q", got, want)
+	for _, tc := range []struct {
+		name string
+		km   registry.KeyManager
+		want string
+	}{
+		{
+			name: "KeyManager",
+			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil),
+			want: fakeKeyTypeURL,
+		},
+		{
+			name: "PrivateKeyManager",
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil),
+			want: fakeKeyTypeURL,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.km.TypeURL(); got != tc.want {
+				t.Errorf("TypeURL() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
 func TestPrimitive_Success(t *testing.T) {
-	wantPrimitive := "primitive"
-	km := New(fakeKeyTypeURL, &fakeConfig{primitive: wantPrimitive}, tinkpb.KeyData_SYMMETRIC, nil)
+	for _, tc := range []struct {
+		name          string
+		km            registry.KeyManager
+		wantPrimitive any
+	}{
+		{
+			name:          "KeyManager",
+			km:            New(fakeKeyTypeURL, &fakeConfig{primitive: "primitive"}, tinkpb.KeyData_SYMMETRIC, nil),
+			wantPrimitive: "primitive",
+		},
+		{
+			name:          "PrivateKeyManager",
+			km:            NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{primitive: "primitive"}, tinkpb.KeyData_SYMMETRIC, nil),
+			wantPrimitive: "primitive",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			serializedKey := random.GetRandomBytes(16)
 
-	serializedKey := random.GetRandomBytes(16)
-
-	gotPrimitive, err := km.Primitive(serializedKey)
-	if err != nil {
-		t.Fatalf("Primitive() err = %v, want nil", err)
-	}
-	if gotPrimitive != wantPrimitive {
-		t.Errorf("Primitive() = %v, want %v", gotPrimitive, wantPrimitive)
+			gotPrimitive, err := tc.km.Primitive(serializedKey)
+			if err != nil {
+				t.Fatalf("Primitive() err = %v, want nil", err)
+			}
+			if gotPrimitive != tc.wantPrimitive {
+				t.Errorf("Primitive() = %v, want %v", gotPrimitive, tc.wantPrimitive)
+			}
+		})
 	}
 }
 
@@ -141,8 +206,6 @@ func (p *fakeParametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Param
 }
 
 func TestPrimitive_FailsIfConfigFails(t *testing.T) {
-	km := New(fakeKeyTypeURL, &fakeConfig{err: errFake}, tinkpb.KeyData_SYMMETRIC, nil)
-
 	defer protoserialization.UnregisterKeyParser(fakeKeyTypeURL)
 	defer protoserialization.UnregisterKeySerializer[*fakeKey]()
 
@@ -152,8 +215,24 @@ func TestPrimitive_FailsIfConfigFails(t *testing.T) {
 	if err := protoserialization.RegisterKeySerializer[*fakeKey](&fakeKeySerializer{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v", err)
 	}
-	if _, err := km.Primitive(random.GetRandomBytes(16)); !errors.Is(err, errFake) {
-		t.Errorf("Primitive() err = %v, want %v", err, errFake)
+	for _, tc := range []struct {
+		name string
+		km   registry.KeyManager
+	}{
+		{
+			name: "KeyManager",
+			km:   New(fakeKeyTypeURL, &fakeConfig{err: errFake}, tinkpb.KeyData_SYMMETRIC, nil),
+		},
+		{
+			name: "PrivateKeyManager",
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{err: errFake}, tinkpb.KeyData_SYMMETRIC, nil),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := tc.km.Primitive(random.GetRandomBytes(16)); !errors.Is(err, errFake) {
+				t.Errorf("Primitive() err = %v, want %v", err, errFake)
+			}
+		})
 	}
 }
 
@@ -190,33 +269,51 @@ func TestNewKeyAndNewKeyData_Success(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v", err)
 	}
 
-	km := New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) {
-		return &aesgcmpb.AesGcmKey{}, nil
-	})
-
-	t.Run("NewKey", func(t *testing.T) {
-		gotKey, err := km.NewKey([]byte("key format"))
-		if err != nil {
-			t.Fatalf("NewKey() err = %v, want nil", err)
-		}
-		if !proto.Equal(gotKey, &aesgcmpb.AesGcmKey{}) {
-			t.Errorf("NewKey() = %v, want %v", gotKey, &aesgcmpb.AesGcmKey{})
-		}
-	})
-	t.Run("NewKeyData", func(t *testing.T) {
-		gotKeyData, err := km.NewKeyData([]byte("key format"))
-		if err != nil {
-			t.Fatalf("NewKeyData() err = %v, want nil", err)
-		}
-		want := &tinkpb.KeyData{
-			TypeUrl:         fakeKeyTypeURL,
-			Value:           []byte("key format"),
-			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
-		}
-		if diff := cmp.Diff(want, gotKeyData, protocmp.Transform()); diff != "" {
-			t.Errorf("NewKeyData() returned unexpected diff (-want +got):\n%s", diff)
-		}
-	})
+	for _, tc := range []struct {
+		name            string
+		km              registry.KeyManager
+		keyMaterialType tinkpb.KeyData_KeyMaterialType
+		wantKey         proto.Message
+	}{
+		{
+			name:            "KeyManager",
+			km:              New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			keyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			wantKey:         &aesgcmpb.AesGcmKey{},
+		},
+		{
+			name:            "PrivateKeyManager",
+			km:              NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			keyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			wantKey:         &aesgcmpb.AesGcmKey{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("NewKey", func(t *testing.T) {
+				gotKey, err := tc.km.NewKey([]byte("key format"))
+				if err != nil {
+					t.Fatalf("NewKey() err = %v, want nil", err)
+				}
+				if !proto.Equal(gotKey, tc.wantKey) {
+					t.Errorf("NewKey() = %v, want %v", gotKey, tc.wantKey)
+				}
+			})
+			t.Run("NewKeyData", func(t *testing.T) {
+				gotKeyData, err := tc.km.NewKeyData([]byte("key format"))
+				if err != nil {
+					t.Fatalf("NewKeyData() err = %v, want nil", err)
+				}
+				want := &tinkpb.KeyData{
+					TypeUrl:         fakeKeyTypeURL,
+					Value:           []byte("key format"),
+					KeyMaterialType: tc.keyMaterialType,
+				}
+				if diff := cmp.Diff(want, gotKeyData, protocmp.Transform()); diff != "" {
+					t.Errorf("NewKeyData() returned unexpected diff (-want +got):\n%s", diff)
+				}
+			})
+		})
+	}
 }
 
 func TestNewKeyAndNewKeyData_FailsIfNoParametersParserRegistered(t *testing.T) {
@@ -233,19 +330,32 @@ func TestNewKeyAndNewKeyData_FailsIfNoParametersParserRegistered(t *testing.T) {
 	defer protoserialization.UnregisterKeyParser(fakeKeyTypeURL)
 	defer protoserialization.UnregisterKeySerializer[*fakeKey]()
 
-	km := New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) {
-		return &aesgcmpb.AesGcmKey{}, nil
-	})
-	t.Run("NewKey", func(t *testing.T) {
-		if _, err := km.NewKey([]byte("key format")); err == nil {
-			t.Error("NewKey() err = nil, want error")
-		}
-	})
-	t.Run("NewKeyData", func(t *testing.T) {
-		if _, err := km.NewKeyData([]byte("key format")); err == nil {
-			t.Error("NewKeyData() err = nil, want error")
-		}
-	})
+	for _, tc := range []struct {
+		name string
+		km   registry.KeyManager
+	}{
+		{
+			name: "KeyManager",
+			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+		},
+		{
+			name: "PrivateKeyManager",
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("NewKey", func(t *testing.T) {
+				if _, err := tc.km.NewKey([]byte("key format")); err == nil {
+					t.Error("NewKey() err = nil, want error")
+				}
+			})
+			t.Run("NewKeyData", func(t *testing.T) {
+				if _, err := tc.km.NewKeyData([]byte("key format")); err == nil {
+					t.Error("NewKeyData() err = nil, want error")
+				}
+			})
+		})
+	}
 }
 
 func TestNewKeyAndNewKeyData_FailsIfParametersParserFails(t *testing.T) {
@@ -281,19 +391,33 @@ func TestNewKeyAndNewKeyData_FailsIfParametersParserFails(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v", err)
 	}
 
-	km := New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) {
-		return &aesgcmpb.AesGcmKey{}, nil
-	})
-	t.Run("NewKey", func(t *testing.T) {
-		if _, err := km.NewKey([]byte("key format")); !errors.Is(err, errFake) {
-			t.Errorf("NewKey() err = %v, want %v", err, errFake)
-		}
-	})
-	t.Run("NewKeyData", func(t *testing.T) {
-		if _, err := km.NewKeyData([]byte("key format")); !errors.Is(err, errFake) {
-			t.Errorf("NewKeyData() err = %v, want %v", err, errFake)
-		}
-	})
+	for _, tc := range []struct {
+		name         string
+		km           registry.KeyManager
+		keyMashaller func([]byte) (proto.Message, error)
+	}{
+		{
+			name: "KeyManager",
+			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+		},
+		{
+			name: "PrivateKeyManager",
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("NewKey", func(t *testing.T) {
+				if _, err := tc.km.NewKey([]byte("key format")); !errors.Is(err, errFake) {
+					t.Errorf("NewKey() err = %v, want %v", err, errFake)
+				}
+			})
+			t.Run("NewKeyData", func(t *testing.T) {
+				if _, err := tc.km.NewKeyData([]byte("key format")); !errors.Is(err, errFake) {
+					t.Errorf("NewKeyData() err = %v, want %v", err, errFake)
+				}
+			})
+		})
+	}
 }
 
 func TestNewKeyAndNewKeyData_FailsIfNoKeyCreatorRegistered(t *testing.T) {
@@ -319,20 +443,32 @@ func TestNewKeyAndNewKeyData_FailsIfNoKeyCreatorRegistered(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v", err)
 	}
 
-	km := New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) {
-		return &aesgcmpb.AesGcmKey{}, nil
-	})
-
-	t.Run("NewKey", func(t *testing.T) {
-		if _, err := km.NewKey([]byte("key format")); err == nil {
-			t.Error("NewKey() err = nil, want error")
-		}
-	})
-	t.Run("NewKeyData", func(t *testing.T) {
-		if _, err := km.NewKeyData([]byte("key format")); err == nil {
-			t.Error("NewKeyData() err = nil, want error")
-		}
-	})
+	for _, tc := range []struct {
+		name string
+		km   registry.KeyManager
+	}{
+		{
+			name: "KeyManager",
+			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+		},
+		{
+			name: "PrivateKeyManager",
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("NewKey", func(t *testing.T) {
+				if _, err := tc.km.NewKey([]byte("key format")); err == nil {
+					t.Error("NewKey() err = nil, want error")
+				}
+			})
+			t.Run("NewKeyData", func(t *testing.T) {
+				if _, err := tc.km.NewKeyData([]byte("key format")); err == nil {
+					t.Error("NewKeyData() err = nil, want error")
+				}
+			})
+		})
+	}
 }
 
 func TestNewKeyAndNewKeyData_FailsIfKeyCreatorFails(t *testing.T) {
@@ -365,20 +501,32 @@ func TestNewKeyAndNewKeyData_FailsIfKeyCreatorFails(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v", err)
 	}
 
-	km := New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) {
-		return &aesgcmpb.AesGcmKey{}, nil
-	})
-
-	t.Run("NewKey", func(t *testing.T) {
-		if _, err := km.NewKey([]byte("key format")); !errors.Is(err, errFake) {
-			t.Errorf("NewKey() err = %v, want %v", err, errFake)
-		}
-	})
-	t.Run("NewKeyData", func(t *testing.T) {
-		if _, err := km.NewKeyData([]byte("key format")); !errors.Is(err, errFake) {
-			t.Errorf("NewKeyData() err = %v, want %v", err, errFake)
-		}
-	})
+	for _, tc := range []struct {
+		name string
+		km   registry.KeyManager
+	}{
+		{
+			name: "KeyManager",
+			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+		},
+		{
+			name: "PrivateKeyManager",
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("NewKey", func(t *testing.T) {
+				if _, err := tc.km.NewKey([]byte("key format")); !errors.Is(err, errFake) {
+					t.Errorf("NewKey() err = %v, want %v", err, errFake)
+				}
+			})
+			t.Run("NewKeyData", func(t *testing.T) {
+				if _, err := tc.km.NewKeyData([]byte("key format")); !errors.Is(err, errFake) {
+					t.Errorf("NewKeyData() err = %v, want %v", err, errFake)
+				}
+			})
+		})
+	}
 }
 
 func TestNewKeyAndNewKeyData_FailsIfNoKeySerializerRegistered(t *testing.T) {
@@ -405,20 +553,32 @@ func TestNewKeyAndNewKeyData_FailsIfNoKeySerializerRegistered(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v", err)
 	}
 
-	km := New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) {
-		return &aesgcmpb.AesGcmKey{}, nil
-	})
-
-	t.Run("NewKey", func(t *testing.T) {
-		if _, err := km.NewKey([]byte("key format")); err == nil {
-			t.Error("NewKey() err = nil, want error")
-		}
-	})
-	t.Run("NewKeyData", func(t *testing.T) {
-		if _, err := km.NewKeyData([]byte("key format")); err == nil {
-			t.Error("NewKeyData() err = nil, want error")
-		}
-	})
+	for _, tc := range []struct {
+		name string
+		km   registry.KeyManager
+	}{
+		{
+			name: "KeyManager",
+			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+		},
+		{
+			name: "PrivateKeyManager",
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("NewKey", func(t *testing.T) {
+				if _, err := tc.km.NewKey([]byte("key format")); err == nil {
+					t.Error("NewKey() err = nil, want error")
+				}
+			})
+			t.Run("NewKeyData", func(t *testing.T) {
+				if _, err := tc.km.NewKeyData([]byte("key format")); err == nil {
+					t.Error("NewKeyData() err = nil, want error")
+				}
+			})
+		})
+	}
 }
 
 func TestNewKeyAndNewKeyData_FailsIfKeySerializerFails(t *testing.T) {
@@ -450,20 +610,32 @@ func TestNewKeyAndNewKeyData_FailsIfKeySerializerFails(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v", err)
 	}
 
-	km := New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) {
-		return &aesgcmpb.AesGcmKey{}, nil
-	})
-
-	t.Run("NewKey", func(t *testing.T) {
-		if _, err := km.NewKey([]byte("key format")); !errors.Is(err, errFake) {
-			t.Errorf("NewKey() err = %v, want %v", err, errFake)
-		}
-	})
-	t.Run("NewKeyData", func(t *testing.T) {
-		if _, err := km.NewKeyData([]byte("key format")); !errors.Is(err, errFake) {
-			t.Errorf("NewKeyData() err = %v, want %v", err, errFake)
-		}
-	})
+	for _, tc := range []struct {
+		name string
+		km   registry.KeyManager
+	}{
+		{
+			name: "KeyManager",
+			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+		},
+		{
+			name: "PrivateKeyManager",
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("NewKey", func(t *testing.T) {
+				if _, err := tc.km.NewKey([]byte("key format")); !errors.Is(err, errFake) {
+					t.Errorf("NewKey() err = %v, want %v", err, errFake)
+				}
+			})
+			t.Run("NewKeyData", func(t *testing.T) {
+				if _, err := tc.km.NewKeyData([]byte("key format")); !errors.Is(err, errFake) {
+					t.Errorf("NewKeyData() err = %v, want %v", err, errFake)
+				}
+			})
+		})
+	}
 }
 
 func TestNewKey_FailsIfKeyMashallerFails(t *testing.T) {
@@ -499,16 +671,117 @@ func TestNewKey_FailsIfKeyMashallerFails(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v", err)
 	}
 
-	km := New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) {
-		return nil, errFake // Causes an error when unmarshalling the key.
-	})
+	for _, tc := range []struct {
+		name string
+		km   registry.KeyManager
+	}{
+		{
+			name: "KeyManager",
+			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return nil, errFake }),
+		},
+		{
+			name: "PrivateKeyManager",
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return nil, errFake }),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("NewKey", func(t *testing.T) {
+				if _, err := tc.km.NewKey([]byte("key format")); !errors.Is(err, errFake) {
+					t.Errorf("NewKey() err = %v, want %v", err, errFake)
+				}
+			})
+			t.Run("NewKeyData", func(t *testing.T) {
+				// Make sure NewKeyData doesn't fail.
+				if _, err := tc.km.NewKeyData([]byte("key format")); err != nil {
+					t.Errorf("NewKeyData() err = %v, want nil", err)
+				}
+			})
+		})
+	}
+}
 
-	if _, err := km.NewKey([]byte("key format")); !errors.Is(err, errFake) {
-		t.Errorf("NewKey() err = %v, want %v", err, errFake)
+type fakePublicKey = fakeKey
+
+type fakePrivateKey struct{}
+
+var _ key.Key = (*fakePrivateKey)(nil)
+
+func (k *fakePrivateKey) IDRequirement() (uint32, bool) { return 0, false }
+func (k *fakePrivateKey) Equal(other key.Key) bool      { return false }
+func (k *fakePrivateKey) Parameters() key.Parameters    { return &fakeParameters{} }
+func (k *fakePrivateKey) PublicKey() (key.Key, error)   { return &fakePublicKey{}, nil }
+
+func TestPublicKeyData_Success(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(fakeKeyTypeURL)
+	defer protoserialization.UnregisterKeySerializer[*fakePublicKey]()
+
+	if err := protoserialization.RegisterKeyParser(fakeKeyTypeURL, &fakeKeyParser{key: &fakePrivateKey{}}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*fakePublicKey](&fakeKeySerializer{
+		keyData: &tinkpb.KeyData{
+			TypeUrl:         fakeKeyTypeURL,
+			Value:           []byte("public key format"),
+			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+		},
+	}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v", err)
 	}
 
-	// Make sure NewKeyData doesn't fail.
-	if _, err := km.NewKeyData([]byte("key format")); err != nil {
-		t.Errorf("NewKeyData() err = %v, want nil", err)
+	km := NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil })
+	got, err := km.PublicKeyData([]byte("private key format"))
+	if err != nil {
+		t.Errorf("PublicKeyData() err = %v, want nil", err)
+	}
+	want := &tinkpb.KeyData{
+		TypeUrl:         fakeKeyTypeURL,
+		Value:           []byte("public key format"),
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+	}
+	if diff := cmp.Diff(want, got, protocmp.Transform()); diff != "" {
+		t.Errorf("NewKeyData() returned unexpected diff (-want +got):\n%s", diff)
+	}
+}
+
+func TestPublicKeyData_FailsIfNoKeyParserRegistered(t *testing.T) {
+	km := NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil })
+	if _, err := km.PublicKeyData([]byte("private key format")); err == nil {
+		t.Errorf("NewKeyData() err = nil, want error")
+	}
+}
+
+func TestPublicKeyData_FailsIfKeyNotPrivateKey(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(fakeKeyTypeURL)
+	defer protoserialization.UnregisterKeySerializer[*fakeKey]()
+
+	if err := protoserialization.RegisterKeyParser(fakeKeyTypeURL, &fakeKeyParser{key: &fakeKey{}}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*fakeKey](&fakeKeySerializer{
+		keyData: &tinkpb.KeyData{
+			TypeUrl:         fakeKeyTypeURL,
+			Value:           []byte("some key format"),
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+		},
+	}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v", err)
+	}
+
+	km := NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil })
+	if _, err := km.PublicKeyData([]byte("private key format")); err == nil {
+		t.Errorf("NewKeyData() err = nil, want error")
+	}
+}
+
+func TestPublicKeyData_FailsIfNoPublicKeySerializerRegistered(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(fakeKeyTypeURL)
+
+	if err := protoserialization.RegisterKeyParser(fakeKeyTypeURL, &fakeKeyParser{key: &fakePrivateKey{}}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v", err)
+	}
+
+	km := NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil })
+	if _, err := km.PublicKeyData([]byte("private key format")); err == nil {
+		t.Errorf("NewKeyData() err = nil, want error")
 	}
 }

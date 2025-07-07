@@ -17,6 +17,8 @@
 package legacykeymanager
 
 import (
+	"fmt"
+
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -110,4 +112,59 @@ func (m *KeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, er
 		return nil, err
 	}
 	return keySerialization.KeyData(), nil
+}
+
+// privateKey represents a key with a public key. Matches [keyset.privateKey].
+type privateKey interface {
+	PublicKey() (key.Key, error)
+}
+
+// PrivateKeyManager is a type of [KeyManager] that understands private key
+// types. It implements the [registry.PrivateKeyManager] interface.
+type PrivateKeyManager struct {
+	KeyManager
+}
+
+var _ registry.PrivateKeyManager = (*PrivateKeyManager)(nil)
+
+// NewPrivateKeyManager creates a new [PrivateKeyManager].
+func NewPrivateKeyManager(typeURL string, config config, keyMaterialType tinkpb.KeyData_KeyMaterialType, protoKeyUnmashaller func([]byte) (proto.Message, error)) *PrivateKeyManager {
+	return &PrivateKeyManager{
+		KeyManager: KeyManager{
+			typeURL:             typeURL,
+			config:              config,
+			protoKeyUnmashaller: protoKeyUnmashaller,
+			keyMaterialType:     keyMaterialType,
+		},
+	}
+}
+
+// PublicKeyData extracts the public key as [tinkpb.KeyData] from the private
+// key.
+func (m *PrivateKeyManager) PublicKeyData(serializedPrivKey []byte) (*tinkpb.KeyData, error) {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         m.typeURL,
+		Value:           serializedPrivKey,
+		KeyMaterialType: m.keyMaterialType,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
+		return nil, err
+	}
+	key, err := protoserialization.ParseKey(keySerialization)
+	if err != nil {
+		return nil, err
+	}
+	privateKey, ok := key.(privateKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type: got %T, want a key implementing PublicKey() (key.Key, error)", key)
+	}
+	publicKey, err := privateKey.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	publicKeySerialization, err := protoserialization.SerializeKey(publicKey)
+	if err != nil {
+		return nil, err
+	}
+	return publicKeySerialization.KeyData(), nil
 }
