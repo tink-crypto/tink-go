@@ -19,7 +19,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
@@ -159,5 +161,28 @@ func TestNotEqualIfDifferentParams(t *testing.T) {
 	}
 	if key1.Equal(key2) {
 		t.Errorf("Equal() = true, want false")
+	}
+}
+
+func TestKeyCreator(t *testing.T) {
+	params, err := hmacprf.NewParameters(32, hmacprf.SHA256)
+	if err != nil {
+		t.Fatalf("hmacprf.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keygenregistry.CreateKey(params, 0x1234)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) err = %v, want nil", &params, err)
+	}
+	aescmacKey, ok := key.(*hmacprf.Key)
+	if !ok {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) returned key of type %T, want %T", params, key, (*hmacprf.Key)(nil))
+	}
+	idRequirement, hasIDRequirement := aescmacKey.IDRequirement()
+	if hasIDRequirement || idRequirement != 0 {
+		t.Errorf("aescmacKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 0, false)
+	}
+	if diff := cmp.Diff(aescmacKey.Parameters(), params); diff != "" {
+		t.Errorf("aescmacKey.Parameters() diff (-want +got):\n%s", diff)
 	}
 }

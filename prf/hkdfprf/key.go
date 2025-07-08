@@ -34,7 +34,8 @@ var _ key.Key = (*Key)(nil)
 // NewKey creates a new [Key] from key bytes.
 func NewKey(keyBytes secretdata.Bytes, parameters *Parameters) (*Key, error) {
 	if parameters.KeySizeInBytes() != keyBytes.Len() {
-		return nil, fmt.Errorf("key size %d does not match parameters key size %d", keyBytes.Len(), parameters.KeySizeInBytes())
+		return nil, fmt.Errorf("key size %d does not match parameters key size %d",
+			keyBytes.Len(), parameters.KeySizeInBytes())
 	}
 	return &Key{parameters: parameters, keyBytes: keyBytes}, nil
 }
@@ -72,4 +73,20 @@ func primitiveConstructor(key key.Key) (any, error) {
 		return nil, err
 	}
 	return subtle.NewHKDFPRF(params.HashType().String(), actualKey.KeyBytes().Data(insecuresecretdataaccess.Token{}), params.Salt())
+}
+
+func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	hkdfPRFarams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: %T", p)
+	}
+	err := subtle.ValidateHKDFPRFParams(hkdfPRFarams.HashType().String(), uint32(hkdfPRFarams.KeySizeInBytes()), hkdfPRFarams.Salt())
+	if err != nil {
+		return nil, err
+	}
+	keyBytes, err := secretdata.NewBytesFromRand(uint32(hkdfPRFarams.KeySizeInBytes()))
+	if err != nil {
+		return nil, err
+	}
+	return NewKey(keyBytes, hkdfPRFarams)
 }

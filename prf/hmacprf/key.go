@@ -73,3 +73,19 @@ func primitiveConstructor(key key.Key) (any, error) {
 	}
 	return subtle.NewHMACPRF(params.HashType().String(), actualKey.KeyBytes().Data(insecuresecretdataaccess.Token{}))
 }
+
+func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	hmacPRFarams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: %T", p)
+	}
+	err := subtle.ValidateHMACPRFParams(hmacPRFarams.HashType().String(), uint32(hmacPRFarams.KeySizeInBytes()))
+	if err != nil {
+		return nil, err
+	}
+	keyBytes, err := secretdata.NewBytesFromRand(uint32(hmacPRFarams.KeySizeInBytes()))
+	if err != nil {
+		return nil, err
+	}
+	return NewKey(keyBytes, hmacPRFarams)
+}
