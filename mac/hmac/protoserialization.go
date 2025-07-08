@@ -32,6 +32,8 @@ const (
 	//
 	// Currently, only version 0 is supported; other versions are rejected.
 	protoVersion = 0
+
+	typeURL = "type.googleapis.com/google.crypto.tink.HmacKey"
 )
 
 type keySerializer struct{}

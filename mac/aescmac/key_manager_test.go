@@ -24,6 +24,7 @@ import (
 	subtleMac "github.com/tink-crypto/tink-go/v2/mac/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	cmacpb "github.com/tink-crypto/tink-go/v2/proto/aes_cmac_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -301,7 +302,10 @@ func validateCMACKey(format *cmacpb.AesCmacKeyFormat, key *cmacpb.AesCmacKey) er
 
 // validateCMACPrimitive checks whether the given primitive matches the given AESCMACKey
 func validateCMACPrimitive(p any, key *cmacpb.AesCmacKey) error {
-	cmacPrimitive := p.(*subtleMac.AESCMAC)
+	cmacPrimitive, ok := p.(tink.MAC)
+	if !ok {
+		return fmt.Errorf("invalid primitive type: %T, want %T", p, (tink.MAC)(nil))
+	}
 	keyPrimitive, err := subtleMac.NewAESCMAC(key.KeyValue, key.Params.TagSize)
 	if err != nil {
 		return fmt.Errorf("Could not create AES CMAC with key material %q and tag size %d: %s", hex.EncodeToString(key.KeyValue), key.Params.TagSize, err)

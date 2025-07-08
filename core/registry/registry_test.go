@@ -21,9 +21,9 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/mac"
-	"github.com/tink-crypto/tink-go/v2/mac/subtle"
 	"github.com/tink-crypto/tink-go/v2/testing/fakekms"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_go_proto"
@@ -124,7 +124,9 @@ func TestPrimitiveFromKeyData(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}
-	var _ *subtle.HMAC = p.(*subtle.HMAC)
+	if _, ok := p.(tink.MAC); !ok {
+		t.Errorf("registry.PrimitiveFromKeyData() e, _ = %T, want tink.MAC", p)
+	}
 	// unregistered url
 	keyData.TypeUrl = "some url"
 	if _, err := registry.PrimitiveFromKeyData(keyData); err == nil {
@@ -152,8 +154,8 @@ func TestPrimitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("registry.Primitive() err = %s, want nil", err)
 	}
-	if _, ok := p.(*subtle.HMAC); !ok {
-		t.Error("object returned by registry.Primitive() does not implement *subtle.HMAC")
+	if _, ok := p.(tink.MAC); !ok {
+		t.Errorf("registry.Primitive() e, _ = %T, want tink.MAC", p)
 	}
 	// unregistered url
 	if _, err := registry.Primitive("some url", serializedKey); err == nil {

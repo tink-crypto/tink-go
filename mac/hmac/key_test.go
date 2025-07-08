@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -267,6 +268,59 @@ func TestKeyEqualFalseIfDifferent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.key1.Equal(tc.key2) {
 				t.Errorf("key1.Equal(key2) = true, want false")
+			}
+		})
+	}
+}
+
+func TestKeyCreator(t *testing.T) {
+	params, err := hmac.NewParameters(hmac.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 16,
+		HashType:       hmac.SHA256,
+		Variant:        hmac.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keygenregistry.CreateKey(params, 0x1234)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) err = %v, want nil", params, err)
+	}
+	hmacKey, ok := key.(*hmac.Key)
+	if !ok {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) returned key of type %T, want %T", params, key, (*hmac.Key)(nil))
+	}
+	idRequirement, hasIDRequirement := hmacKey.IDRequirement()
+	if !hasIDRequirement || idRequirement != 0x1234 {
+		t.Errorf("hmacKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 123, true)
+	}
+	if diff := cmp.Diff(hmacKey.Parameters(), params); diff != "" {
+		t.Errorf("hmacKey.Parameters() diff (-want +got):\n%s", diff)
+	}
+}
+
+func TestKeyCreator_FailsWithInvalidParameters(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		params        *hmac.Parameters
+		idRequirement uint32
+	}{
+		{
+			name: "invalid id requirement",
+			params: mustCreateParameters(t, hmac.ParametersOpts{
+				KeySizeInBytes: 32,
+				TagSizeInBytes: 16,
+				HashType:       hmac.SHA256,
+				Variant:        hmac.VariantNoPrefix,
+			}),
+			idRequirement: 0x1234,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := keygenregistry.CreateKey(tc.params, tc.idRequirement); err == nil {
+				t.Errorf("keygenregistry.CreateKey(%v, %v) err = nil, want error", tc.params, tc.idRequirement)
 			}
 		})
 	}

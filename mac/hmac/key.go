@@ -21,6 +21,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/mac/subtle"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
@@ -97,4 +98,20 @@ func primitiveConstructor(k key.Key) (any, error) {
 		return nil, fmt.Errorf("key is of type %T, want %T", k, (*Key)(nil))
 	}
 	return NewMAC(that, internalapi.Token{})
+}
+
+func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	hmacParams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: %T", p)
+	}
+	err := subtle.ValidateHMACParams(hmacParams.HashType().String(), uint32(hmacParams.KeySizeInBytes()), uint32(hmacParams.tagSizeInBytes))
+	if err != nil {
+		return nil, err
+	}
+	keyBytes, err := secretdata.NewBytesFromRand(uint32(hmacParams.KeySizeInBytes()))
+	if err != nil {
+		return nil, err
+	}
+	return NewKey(keyBytes, hmacParams, idRequirement)
 }
