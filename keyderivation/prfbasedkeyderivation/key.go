@@ -40,13 +40,13 @@ var _ key.Key = (*Key)(nil)
 //     - [hkdfprf.Key]
 //     - [hmacprf.Key]
 //  2. prfKey.Parameters() must be equal to parameters.PRFParameters()
-//  3. idRequirement must be zero if and only if parameters.HasIDRequirement() is false.
+//  3. If parameters.HasIDRequirement() is false, idRequirement must be 0.
 func NewKey(parameters *Parameters, prfKey key.Key, idRequirement uint32) (*Key, error) {
 	if parameters == nil {
-		return nil, fmt.Errorf("parameters must not be nil")
+		return nil, fmt.Errorf("prfbasedkeyderivation.NewKey: parameters must not be nil")
 	}
 	if prfKey == nil {
-		return nil, fmt.Errorf("prfKey must not be nil")
+		return nil, fmt.Errorf("prfbasedkeyderivation.NewKey: prfKey must not be nil")
 	}
 
 	// 1.
@@ -56,18 +56,15 @@ func NewKey(parameters *Parameters, prfKey key.Key, idRequirement uint32) (*Key,
 	case *hmacprf.Key:
 		// Do nothing.
 	default:
-		return nil, fmt.Errorf("unknown PRF key type: %T", prfKey)
+		return nil, fmt.Errorf("prfbasedkeyderivation.NewKey: unknown PRF key type: %T", prfKey)
 	}
 	// 2.
 	if !parameters.PRFParameters().Equal(prfKey.Parameters()) {
-		return nil, fmt.Errorf("prfKey.Parameters() is not equal to parameters.PrfParameters()")
+		return nil, fmt.Errorf("prfbasedkeyderivation.NewKey: prfKey.Parameters() is not equal to parameters.PrfParameters()")
 	}
 	// 3.
-	if idRequirement != 0 && !parameters.HasIDRequirement() {
-		return nil, fmt.Errorf("idRequirement != 0 but parameters.HasIDRequirement() is false")
-	}
-	if idRequirement == 0 && parameters.HasIDRequirement() {
-		return nil, fmt.Errorf("idRequirement == 0 but parameters.HasIDRequirement() is true")
+	if !parameters.HasIDRequirement() && idRequirement != 0 {
+		return nil, fmt.Errorf("prfbasedkeyderivation.NewKey: idRequirement = %v and parameters.HasIDRequirement() = false, want 0", idRequirement)
 	}
 
 	return &Key{

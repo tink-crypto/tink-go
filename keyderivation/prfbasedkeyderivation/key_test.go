@@ -66,16 +66,6 @@ func TestNewKey_Invalid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() failed: %v", err)
 	}
-	derivedKeyParametersTinkPrefix, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
-		KeySizeInBytes: 32,
-		TagSizeInBytes: 16,
-		IVSizeInBytes:  12,
-		Variant:        aesgcm.VariantTink,
-	})
-	if err != nil {
-		t.Fatalf("aesgcm.NewParameters() failed: %v", err)
-	}
-
 	for _, tc := range []struct {
 		name                 string
 		prfParameters        key.Parameters
@@ -99,13 +89,6 @@ func TestNewKey_Invalid(t *testing.T) {
 		},
 		{
 			name:                 "invalid_idRequirement",
-			prfParameters:        aesCMACPRFParams,
-			prfKey:               aesCMACPRFKey,
-			derivedKeyParameters: derivedKeyParametersTinkPrefix,
-			idRequirement:        0,
-		},
-		{
-			name:                 "invalid_idRequirement2",
 			prfParameters:        aesCMACPRFParams,
 			prfKey:               aesCMACPRFKey,
 			derivedKeyParameters: derivedKeyParametersNoPrefix,
@@ -207,6 +190,13 @@ func TestNewKey_Valid(t *testing.T) {
 			prfParameters:        hmacPRFParams,
 			prfKey:               hmacPRFKey,
 			derivedKeyParameters: derivedKeyParametersNoPrefix,
+			idRequirement:        0,
+		},
+		{
+			name:                 "AES-CMAC-PRF_AES-GCM-Tink-WithZeroIDRequirement",
+			prfParameters:        aesCMACPRFParams,
+			prfKey:               aesCMACPRFKey,
+			derivedKeyParameters: derivedKeyParametersTinkPrefix,
 			idRequirement:        0,
 		},
 		{
