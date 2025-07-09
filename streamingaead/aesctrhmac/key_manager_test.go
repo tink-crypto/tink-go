@@ -22,11 +22,11 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	_ "github.com/tink-crypto/tink-go/v2/streamingaead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
-	_ "github.com/tink-crypto/tink-go/v2/streamingaead/aesctrhmac"
 	ctrhmacpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_streaming_go_proto"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -59,15 +59,55 @@ func TestGetPrimitiveWithInvalidInput(t *testing.T) {
 		t.Fatalf("cannot obtain AES-CTR-HMAC key manager: %s", err)
 	}
 
-	testKeys := genInvalidAESCTRHMACKeys()
-	for i := 0; i < len(testKeys); i++ {
-		serializedKey, err := proto.Marshal(testKeys[i])
-		if err != nil {
-			t.Fatalf("failed to marshal key: %s", err)
-		}
-		if _, err := keyManager.Primitive(serializedKey); err == nil {
-			t.Fatalf("expect an error in test case %d", i)
-		}
+	for _, tc := range []struct {
+		name     string
+		protoKey proto.Message
+	}{
+		{
+			name:     "not a AESCTRHMACKey",
+			protoKey: testutil.NewAESCTRHMACKeyFormat(32, commonpb.HashType_SHA256, 32, commonpb.HashType_SHA256, 16, 4096),
+		},
+		{
+			name:     "bad key size",
+			protoKey: testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 17, commonpb.HashType_SHA256, 16, commonpb.HashType_SHA256, 16, 4096),
+		},
+		{
+			name:     "bad derived key size",
+			protoKey: testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 16, commonpb.HashType_SHA256, 17, commonpb.HashType_SHA256, 16, 4096),
+		},
+		{
+			name:     "bad keys size",
+			protoKey: testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 33, commonpb.HashType_SHA256, 33, commonpb.HashType_SHA256, 16, 4096),
+		},
+		{
+			name:     "bad version",
+			protoKey: testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion+1, 16, commonpb.HashType_SHA256, 16, commonpb.HashType_SHA256, 16, 4096),
+		},
+		{
+			name:     "bad ciphertext_segment_size",
+			protoKey: testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 16, commonpb.HashType_SHA256, 16, commonpb.HashType_SHA256, 16, 2147483648)},
+		{
+			name:     "bad hmac params hash type",
+			protoKey: testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 16, commonpb.HashType_SHA256, 16, commonpb.HashType_SHA224, 16, 4096)},
+		{
+			name:     "bad hmac params hash type",
+			protoKey: testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 16, commonpb.HashType_SHA256, 16, commonpb.HashType_SHA384, 16, 4096)},
+		{
+			name:     "bad hkdf hash type",
+			protoKey: testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 16, commonpb.HashType_SHA224, 16, commonpb.HashType_SHA256, 16, 4096)},
+		{
+			name:     "bad hkdf hash type",
+			protoKey: testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 16, commonpb.HashType_SHA384, 16, commonpb.HashType_SHA256, 16, 4096)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			serializedKey, err := proto.Marshal(tc.protoKey)
+			if err != nil {
+				t.Fatalf("proto.Marshal(tc.protoKey) err = %v, want nil", err)
+			}
+			if _, err := keyManager.Primitive(serializedKey); err == nil {
+				t.Errorf("keyManager.Primitive(serializedKey) err = nil, want non-nil")
+			}
+		})
 	}
 
 	if _, err := keyManager.Primitive(nil); err == nil {
@@ -265,32 +305,6 @@ func TestTypeURL(t *testing.T) {
 	}
 	if keyManager.TypeURL() != testutil.AESCTRHMACTypeURL {
 		t.Errorf("incorrect key type")
-	}
-}
-
-func genInvalidAESCTRHMACKeys() []proto.Message {
-	return []proto.Message{
-		// not a AESCTRHMACKey
-		testutil.NewAESCTRHMACKeyFormat(32, commonpb.HashType_SHA256, 32, commonpb.HashType_SHA256, 16, 4096),
-
-		// bad key size
-		testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 17, commonpb.HashType_SHA256, 16, commonpb.HashType_SHA256, 16, 4096),
-		testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 16, commonpb.HashType_SHA256, 17, commonpb.HashType_SHA256, 16, 4096),
-		testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 33, commonpb.HashType_SHA256, 33, commonpb.HashType_SHA256, 16, 4096),
-
-		// bad version
-		testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion+1, 16, commonpb.HashType_SHA256, 16, commonpb.HashType_SHA256, 16, 4096),
-
-		// bad ciphertext_segment_size
-		testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 16, commonpb.HashType_SHA256, 16, commonpb.HashType_SHA256, 16, 2147483648),
-
-		// bad hmac params hash type
-		testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 16, commonpb.HashType_SHA256, 16, commonpb.HashType_SHA224, 16, 4096),
-		testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 16, commonpb.HashType_SHA256, 16, commonpb.HashType_SHA384, 16, 4096),
-
-		// bad hkdf hash type
-		testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 16, commonpb.HashType_SHA224, 16, commonpb.HashType_SHA256, 16, 4096),
-		testutil.NewAESCTRHMACKey(testutil.AESCTRHMACKeyVersion, 16, commonpb.HashType_SHA384, 16, commonpb.HashType_SHA256, 16, 4096),
 	}
 }
 

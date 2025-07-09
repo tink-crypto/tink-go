@@ -82,3 +82,45 @@ func primitiveConstructor(k key.Key) (any, error) {
 		int(params.SegmentSizeInBytes()),
 		0)
 }
+
+// validateHashType checks if the given hash type is supported for key
+// generation.
+//
+// We only support a subset of the hash types: SHA256 and SHA512.
+func validateHashType(hashType HashType) error {
+	switch hashType {
+	case SHA256:
+	case SHA512:
+		// Do nothing.
+	default:
+		return fmt.Errorf("unsupported hash type: %v", hashType)
+	}
+	return nil
+}
+
+func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	aesCTRHMACParams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("parameters is not a aesctrhmac.Parameters")
+	}
+	if idRequirement != 0 {
+		return nil, fmt.Errorf("ID requirements are not supported")
+	}
+
+	if err := aead.ValidateAESKeySize(uint32(aesCTRHMACParams.KeySizeInBytes())); err != nil {
+		return nil, fmt.Errorf("invalid key size: %v", err)
+	}
+
+	if err := validateHashType(aesCTRHMACParams.HkdfHashType()); err != nil {
+		return nil, fmt.Errorf("invalid HKDF hash type: %v", err)
+	}
+	if err := validateHashType(aesCTRHMACParams.HmacHashType()); err != nil {
+		return nil, fmt.Errorf("invalid HMAC hash type: %v", err)
+	}
+
+	keyBytes, err := secretdata.NewBytesFromRand(uint32(aesCTRHMACParams.KeySizeInBytes()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random key material: %v", err)
+	}
+	return NewKey(aesCTRHMACParams, keyBytes)
+}

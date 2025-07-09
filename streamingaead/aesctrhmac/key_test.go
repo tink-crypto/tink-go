@@ -15,13 +15,19 @@
 package aesctrhmac_test
 
 import (
+	"bytes"
+	"io"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/aesctrhmac"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 func TestNewKey_Fails(t *testing.T) {
@@ -167,6 +173,124 @@ func TestKeyEqual_FalseIfDifferent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if diff := cmp.Diff(tc.key, k); diff == "" {
 				t.Errorf("k.Equal(k2) = true, want false, diff: %v", diff)
+			}
+		})
+	}
+}
+
+func TestKeyCreator(t *testing.T) {
+	params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
+		KeySizeInBytes:        32,
+		DerivedKeySizeInBytes: 32,
+		HkdfHashType:          aesctrhmac.SHA256,
+		HmacHashType:          aesctrhmac.SHA256,
+		HmacTagSizeInBytes:    32,
+		SegmentSizeInBytes:    4096,
+	})
+	if err != nil {
+		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keygenregistry.CreateKey(params, 0)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0) err = %v, want nil", params, err)
+	}
+	aesGCMKey, ok := key.(*aesctrhmac.Key)
+	if !ok {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0) returned key of type %T, want %T", params, key, (*aesctrhmac.Key)(nil))
+	}
+
+	idRequirement, hasIDRequirement := aesGCMKey.IDRequirement()
+	if hasIDRequirement || idRequirement != 0 {
+		t.Errorf("aesGCMKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 0, true)
+	}
+	if got := aesGCMKey.KeyBytes().Len(); got != params.KeySizeInBytes() {
+		t.Errorf("aesGCMKey.KeyBytes().Len() = %d, want 32", aesGCMKey.KeyBytes().Len())
+	}
+	if diff := cmp.Diff(aesGCMKey.Parameters(), params); diff != "" {
+		t.Errorf("aesGCMKey.Parameters() diff (-want +got):\n%s", diff)
+	}
+
+	config := &registryconfig.RegistryConfig{}
+	p, err := config.PrimitiveFromKey(key, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("config.PrimitiveFromKey(%v, %v) err = %v, want nil", key, internalapi.Token{}, err)
+	}
+	streamingAEAD, ok := p.(tink.StreamingAEAD)
+	if !ok {
+		t.Errorf("config.PrimitiveFromKey(%v, %v) did not return a AESCTRHMAC primitive", key, internalapi.Token{})
+	}
+
+	// Encrypt and decrypt some data.
+	plaintext := []byte("plaintext")
+	ciphertextBuffer := bytes.NewBuffer(nil)
+	writer, err := streamingAEAD.NewEncryptingWriter(ciphertextBuffer, []byte("aad"))
+	if err != nil {
+		t.Fatalf("streamingAEAD.NewEncryptingWriter() err = %v, want nil", err)
+	}
+	if _, err := io.Copy(writer, bytes.NewBuffer(plaintext)); err != nil {
+		t.Fatalf("io.Copy() err = %v, want nil", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer.Close() err = %v, want nil", err)
+	}
+	reader, err := streamingAEAD.NewDecryptingReader(ciphertextBuffer, []byte("aad"))
+	if err != nil {
+		t.Fatalf("streamingAEAD.NewDecryptingReader() err = %v, want nil", err)
+	}
+	decryptedBuffer := bytes.NewBuffer(nil)
+	if _, err := io.Copy(decryptedBuffer, reader); err != nil {
+		t.Fatalf("io.Copy() err = %v, want nil", err)
+	}
+	if diff := cmp.Diff(plaintext, decryptedBuffer.Bytes()); diff != "" {
+		t.Errorf("decryptedBuffer.Bytes() diff (-want +got):\n%s", diff)
+	}
+}
+
+func TestKeyCreator_FailsIfUnsupportedParamValues(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		parameters *aesctrhmac.Parameters
+	}{
+		{
+			name: "unsupported key size",
+			parameters: mustCreateParameters(t, aesctrhmac.ParametersOpts{
+				KeySizeInBytes:        33,
+				DerivedKeySizeInBytes: 32,
+				HkdfHashType:          aesctrhmac.SHA256,
+				HmacHashType:          aesctrhmac.SHA256,
+				HmacTagSizeInBytes:    32,
+				SegmentSizeInBytes:    4096,
+			}),
+		},
+		{
+			name: "unsupported HKDF hash type",
+			parameters: mustCreateParameters(t, aesctrhmac.ParametersOpts{
+				KeySizeInBytes:        32,
+				DerivedKeySizeInBytes: 32,
+				HkdfHashType:          aesctrhmac.SHA1,
+				HmacHashType:          aesctrhmac.SHA256,
+				HmacTagSizeInBytes:    32,
+				SegmentSizeInBytes:    4096,
+			}),
+		},
+		{
+			name: "unsupported HMAC hash type",
+			parameters: mustCreateParameters(t, aesctrhmac.ParametersOpts{
+				KeySizeInBytes:        32,
+				DerivedKeySizeInBytes: 32,
+				HkdfHashType:          aesctrhmac.SHA256,
+				HmacHashType:          aesctrhmac.SHA1,
+				HmacTagSizeInBytes:    20,
+				SegmentSizeInBytes:    4096,
+			}),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := keygenregistry.CreateKey(tc.parameters, 0); err == nil {
+				t.Fatalf("keygenregistry.CreateKey(%v, 0) err = nil, want error", tc.parameters)
+			} else {
+				t.Logf("keygenregistry.CreateKey(%v, 0) err = %v", tc.parameters, err)
 			}
 		})
 	}
