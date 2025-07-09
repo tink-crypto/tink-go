@@ -49,8 +49,11 @@ var _ tink.StreamingAEAD = (*wrappedStreamingAEAD)(nil)
 // as associated authenticated data. The associated data is not included in the ciphertext
 // and has to be passed in as parameter for decryption.
 func (s *wrappedStreamingAEAD) NewEncryptingWriter(w io.Writer, aad []byte) (io.WriteCloser, error) {
-	primary := s.ps.Primary
-	return primary.Primitive.NewEncryptingWriter(w, aad)
+	primary := s.ps.Primary.Primitive
+	if primary == nil {
+		primary = s.ps.Primary.FullPrimitive
+	}
+	return primary.NewEncryptingWriter(w, aad)
 }
 
 // NewDecryptingReader returns a wrapper around underlying io.Reader, such that any read-operation

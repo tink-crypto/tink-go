@@ -17,8 +17,11 @@ package aesctrhmac
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/aead"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle"
 )
 
 // Key represents an AES-CTR-HMAC Streaming AEAD key.
@@ -57,4 +60,25 @@ func (k *Key) IDRequirement() (uint32, bool) { return 0, false }
 func (k *Key) Equal(other key.Key) bool {
 	that, ok := other.(*Key)
 	return ok && k.parameters.Equal(that.parameters) && k.keyBytes.Equal(that.keyBytes)
+}
+
+func primitiveConstructor(k key.Key) (any, error) {
+	that, ok := k.(*Key)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T, want %T", k, (*Key)(nil))
+	}
+
+	if err := aead.ValidateAESKeySize(uint32(that.keyBytes.Len())); err != nil {
+		return nil, fmt.Errorf("invalid key size: %v", err)
+	}
+
+	params := k.Parameters().(*Parameters)
+	return subtle.NewAESCTRHMAC(
+		that.keyBytes.Data(insecuresecretdataaccess.Token{}),
+		params.HkdfHashType().String(),
+		params.DerivedKeySizeInBytes(),
+		params.HmacHashType().String(),
+		params.HmacTagSizeInBytes(),
+		int(params.SegmentSizeInBytes()),
+		0)
 }
