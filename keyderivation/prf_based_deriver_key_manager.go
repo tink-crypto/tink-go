@@ -17,10 +17,15 @@ package keyderivation
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderivers"
+	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
+	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
+	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	prfderpb "github.com/tink-crypto/tink-go/v2/proto/prf_based_deriver_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -31,7 +36,6 @@ const (
 )
 
 var (
-	errInvalidPRFBasedDeriverKey       = errors.New("prf_based_deriver_key_manager: invalid key")
 	errInvalidPRFBasedDeriverKeyFormat = errors.New("prf_based_deriver_key_manager: invalid key format")
 )
 
@@ -40,17 +44,7 @@ type prfBasedDeriverKeyManager struct{}
 var _ registry.KeyManager = (*prfBasedDeriverKeyManager)(nil)
 
 func (km *prfBasedDeriverKeyManager) Primitive(serializedKey []byte) (any, error) {
-	if len(serializedKey) == 0 {
-		return nil, errInvalidPRFBasedDeriverKey
-	}
-	key := &prfderpb.PrfBasedDeriverKey{}
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
-		return nil, errInvalidPRFBasedDeriverKey
-	}
-	if keyset.ValidateKeyVersion(key.GetVersion(), prfBasedDeriverKeyVersion) != nil {
-		return nil, errInvalidPRFBasedDeriverKey
-	}
-	return newPRFBasedDeriver(key.GetPrfKey(), key.GetParams().GetDerivedKeyTemplate())
+	return nil, errors.New("prf_based_deriver_key_manager: not implemented; users should obtain an keyset.Handle and the primtive with keyderivation.New")
 }
 
 func (km *prfBasedDeriverKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
@@ -64,14 +58,17 @@ func (km *prfBasedDeriverKeyManager) NewKey(serializedKeyFormat []byte) (proto.M
 	if keyFormat.GetParams() == nil {
 		return nil, errors.New("prf_based_deriver_key_manager: nil PRF-Based Deriver params")
 	}
+	if err := validatePRFKeyTemplate(keyFormat.GetPrfKeyTemplate()); err != nil {
+		return nil, fmt.Errorf("prf_based_deriver_key_manager: %v", err)
+	}
+	if err := validateDerivedKeyTemplate(keyFormat.GetParams().GetDerivedKeyTemplate()); err != nil {
+		return nil, fmt.Errorf("prf_based_deriver_key_manager: %v", err)
+	}
 	prfKey, err := registry.NewKeyData(keyFormat.GetPrfKeyTemplate())
 	if err != nil {
 		return nil, errors.New("prf_based_deriver_key_manager: failed to generate key from PRF key template")
 	}
-	// Validate PRF key data and derived key template.
-	if _, err := newPRFBasedDeriver(prfKey, keyFormat.GetParams().GetDerivedKeyTemplate()); err != nil {
-		return nil, fmt.Errorf("prf_based_deriver_key_manager: %v", err)
-	}
+
 	return &prfderpb.PrfBasedDeriverKey{
 		Version: prfBasedDeriverKeyVersion,
 		PrfKey:  prfKey,
@@ -101,4 +98,31 @@ func (km *prfBasedDeriverKeyManager) DoesSupport(typeURL string) bool {
 
 func (km *prfBasedDeriverKeyManager) TypeURL() string {
 	return prfBasedDeriverTypeURL
+}
+
+func validatePRFKeyTemplate(prfKeyTemplate *tinkpb.KeyTemplate) error {
+	params, err := protoserialization.ParseParameters(prfKeyTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to create parameters from key template: %v", err)
+	}
+	switch prfKeyTemplateType := params.(type) {
+	case *aescmacprf.Parameters:
+	case *hkdfprf.Parameters:
+	case *hmacprf.Parameters:
+		// Do nothing.
+	default:
+		return fmt.Errorf("invalid PRF key template type: %T", prfKeyTemplateType)
+	}
+	return nil
+}
+
+func validateDerivedKeyTemplate(derivedKeyTemplate *tinkpb.KeyTemplate) error {
+	params, err := protoserialization.ParseParameters(derivedKeyTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to create parameters from key template: %v", err)
+	}
+	if !keyderivers.CanDeriveKey(reflect.TypeOf(params)) {
+		return fmt.Errorf("derived key template is not a derivable key type")
+	}
+	return nil
 }

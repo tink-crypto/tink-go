@@ -23,10 +23,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
-	"github.com/tink-crypto/tink-go/v2/keyderivation"
 	"github.com/tink-crypto/tink-go/v2/prf"
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	aesgcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
 	prfderpb "github.com/tink-crypto/tink-go/v2/proto/prf_based_deriver_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -37,224 +34,22 @@ const (
 	prfBasedDeriverTypeURL    = "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey"
 )
 
-func TestPRFBasedDeriverKeyManagerPrimitive(t *testing.T) {
+func TestPRFBasedDeriverKeyManagerPrimitive_Unimplemented(t *testing.T) {
 	km, err := registry.GetKeyManager(prfBasedDeriverTypeURL)
 	if err != nil {
 		t.Fatalf("GetKeyManager(%q) err = %v, want nil", prfBasedDeriverTypeURL, err)
 	}
-	prfs := []struct {
-		name     string
-		template *tinkpb.KeyTemplate
-	}{
-		{
-			name:     "HKDF-SHA256",
-			template: prf.HKDFSHA256PRFKeyTemplate(),
-		},
+	if _, err := km.Primitive(nil); err == nil {
+		t.Error("km.Primitive() err = nil, want non-nil")
 	}
-	derivations := []struct {
-		name     string
-		template *tinkpb.KeyTemplate
-	}{
-		{
-			name:     "AES128GCM",
-			template: aead.AES128GCMKeyTemplate(),
-		},
-		{
-			name:     "AES256GCM",
-			template: aead.AES256GCMKeyTemplate(),
-		},
-		{
-			name:     "AES256GCMNoPrefix",
-			template: aead.AES256GCMNoPrefixKeyTemplate(),
-		},
+	if _, err := km.Primitive([]byte("some key serialization")); err == nil {
+		t.Error("km.Primitive() err = nil, want non-nil")
 	}
-	for _, prf := range prfs {
-		for _, der := range derivations {
-			for _, salt := range [][]byte{nil, []byte("salt")} {
-				name := fmt.Sprintf("%s_%s", prf.name, der.name)
-				if salt != nil {
-					name += "_with_salt"
-				}
-				t.Run(name, func(t *testing.T) {
-					prfKey, err := registry.NewKeyData(prf.template)
-					if err != nil {
-						t.Fatalf("registry.NewKeyData() err = %v, want nil", err)
-					}
-					key := &prfderpb.PrfBasedDeriverKey{
-						Version: 0,
-						PrfKey:  prfKey,
-						Params: &prfderpb.PrfBasedDeriverParams{
-							DerivedKeyTemplate: der.template,
-						},
-					}
-					serializedKey, err := proto.Marshal(key)
-					if err != nil {
-						t.Fatalf("proto.Marshal(%v) err = %v, want nil", key, err)
-					}
-					p, err := km.Primitive(serializedKey)
-					if err != nil {
-						t.Fatalf("Primitive() err = %v, want nil", err)
-					}
-					d, ok := p.(keyderiver.KeyDeriver)
-					if !ok {
-						t.Fatalf("primitive is not %T", (keyderiver.KeyDeriver)(nil))
-					}
-
-					derivedKey, err := d.DeriveKey(salt)
-					if err != nil {
-						t.Fatalf("DeriveKey() err = %v, want nil", err)
-					}
-
-					keysetDeriver, ok := p.(keyderivation.KeysetDeriver)
-					if !ok {
-						t.Fatalf("primitive is not %T", (keyderivation.KeysetDeriver)(nil))
-					}
-					derivedKeyset, err := keysetDeriver.DeriveKeyset(salt)
-					if err != nil {
-						t.Fatalf("DeriveKeyset() err = %v, want nil", err)
-					}
-					if derivedKeyset.Len() != 1 {
-						t.Fatalf("derivedKeyset.Len() = %d, want 1", derivedKeyset.Len())
-					}
-
-					entry, err := derivedKeyset.Entry(0)
-					if err != nil {
-						t.Fatalf("derivedKeyset.Entry() err = %v, want nil", err)
-					}
-					if diff := cmp.Diff(entry.Key(), derivedKey, protocmp.Transform()); diff != "" {
-						t.Errorf("derivedKeyset.Entry().Key() diff = %s", diff)
-					}
-
-					// We cannot test the derived keyset handle because, at this point, it
-					// is filled with placeholder values for the key ID, status, and
-					// output prefix type fields.
-				})
-			}
-		}
+	if _, err := registry.Primitive(prfBasedDeriverTypeURL, nil); err == nil {
+		t.Error("registry.Primitive() err = nil, want non-nil")
 	}
-}
-
-func TestPRFBasedDeriverKeyManagerPrimitiveRejectsIncorrectKeys(t *testing.T) {
-	km, err := registry.GetKeyManager(prfBasedDeriverTypeURL)
-	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", prfBasedDeriverTypeURL, err)
-	}
-	prfKey, err := registry.NewKeyData(prf.HKDFSHA256PRFKeyTemplate())
-	if err != nil {
-		t.Fatalf("registry.NewKeyData() err = %v, want nil", err)
-	}
-	missingParamsKey := &prfderpb.PrfBasedDeriverKey{
-		Version: prfBasedDeriverKeyVersion,
-		PrfKey:  prfKey,
-	}
-	serializedMissingParamsKey, err := proto.Marshal(missingParamsKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", serializedMissingParamsKey, err)
-	}
-	aesGCMKey := &aesgcmpb.AesGcmKey{Version: 0, KeyValue: random.GetRandomBytes(32)}
-	serializedAESGCMKey, err := proto.Marshal(aesGCMKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", aesGCMKey, err)
-	}
-	for _, test := range []struct {
-		name          string
-		serializedKey []byte
-	}{
-		{
-			name: "nil key",
-		},
-		{
-			name:          "zero-length key",
-			serializedKey: []byte{},
-		},
-		{
-			name:          "missing params",
-			serializedKey: serializedMissingParamsKey,
-		},
-		{
-			name:          "wrong key type",
-			serializedKey: serializedAESGCMKey,
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			if _, err := km.Primitive(test.serializedKey); err == nil {
-				t.Error("Primitive() err = nil, want non-nil")
-			}
-		})
-	}
-}
-
-func TestPRFBasedDeriverKeyManagerPrimitiveRejectsInvalidKeys(t *testing.T) {
-	km, err := registry.GetKeyManager(prfBasedDeriverTypeURL)
-	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", prfBasedDeriverTypeURL, err)
-	}
-
-	validPRFKey, err := registry.NewKeyData(prf.HKDFSHA256PRFKeyTemplate())
-	if err != nil {
-		t.Fatalf("registry.NewKeyData() err = %v, want nil", err)
-	}
-	validKey := &prfderpb.PrfBasedDeriverKey{
-		Version: 0,
-		PrfKey:  validPRFKey,
-		Params: &prfderpb.PrfBasedDeriverParams{
-			DerivedKeyTemplate: aead.AES128GCMKeyTemplate(),
-		},
-	}
-	serializedValidKey, err := proto.Marshal(validKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", validKey, err)
-	}
-	if _, err := km.Primitive(serializedValidKey); err != nil {
-		t.Errorf("Primitive() err = %v, want nil", err)
-	}
-
-	invalidPRFKey, err := registry.NewKeyData(aead.AES128GCMKeyTemplate())
-	if err != nil {
-		t.Fatalf("registry.NewKeyData() err = %v, want nil", err)
-	}
-
-	for _, test := range []struct {
-		name           string
-		version        uint32
-		prfKey         *tinkpb.KeyData
-		derKeyTemplate *tinkpb.KeyTemplate
-	}{
-		{
-			name:           "invalid version",
-			version:        100,
-			prfKey:         validKey.GetPrfKey(),
-			derKeyTemplate: validKey.GetParams().GetDerivedKeyTemplate(),
-		},
-		{
-			name:           "invalid PRF key",
-			version:        validKey.GetVersion(),
-			prfKey:         invalidPRFKey,
-			derKeyTemplate: validKey.GetParams().GetDerivedKeyTemplate(),
-		},
-		{
-			name:           "invalid derived key template",
-			version:        validKey.GetVersion(),
-			prfKey:         validKey.GetPrfKey(),
-			derKeyTemplate: aead.AES128CTRHMACSHA256KeyTemplate(),
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			key := &prfderpb.PrfBasedDeriverKey{
-				Version: test.version,
-				PrfKey:  test.prfKey,
-				Params: &prfderpb.PrfBasedDeriverParams{
-					DerivedKeyTemplate: test.derKeyTemplate,
-				},
-			}
-			serializedKey, err := proto.Marshal(key)
-			if err != nil {
-				t.Fatalf("proto.Marshal(%v) err = %v, want nil", key, err)
-			}
-			if _, err := km.Primitive(serializedKey); err == nil {
-				t.Error("Primitive() err = nil, want non-nil")
-			}
-		})
+	if _, err := registry.Primitive(prfBasedDeriverTypeURL, []byte("some key serialization")); err == nil {
+		t.Error("registry.Primitive() err = nil, want non-nil")
 	}
 }
 
@@ -481,7 +276,7 @@ func TestPRFBasedDeriverKeyManagerNewKeyAndNewKeyDataRejectsInvalidKeyFormats(t 
 		t.Fatalf("proto.Marshal(%v) err = %v, want nil", validKeyFormat, err)
 	}
 	if _, err := km.NewKey(serializedValidKeyFormat); err != nil {
-		t.Errorf("Primitive() err = %v, want nil", err)
+		t.Errorf("km.NewKey() err = %v, want nil", err)
 	}
 
 	for _, test := range []struct {
