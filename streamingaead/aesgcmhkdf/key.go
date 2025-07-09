@@ -85,3 +85,23 @@ func primitiveConstructor(k key.Key) (any, error) {
 		0, // no first segment offset
 	)
 }
+
+func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	aesGCMHKDFParams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("parameters is not a aesctrhmac.Parameters")
+	}
+	if idRequirement != 0 {
+		return nil, fmt.Errorf("ID requirements are not supported")
+	}
+
+	if err := aead.ValidateAESKeySize(uint32(aesGCMHKDFParams.KeySizeInBytes())); err != nil {
+		return nil, fmt.Errorf("invalid key size: %v", err)
+	}
+
+	keyBytes, err := secretdata.NewBytesFromRand(uint32(aesGCMHKDFParams.KeySizeInBytes()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random key material: %v", err)
+	}
+	return NewKey(aesGCMHKDFParams, keyBytes)
+}

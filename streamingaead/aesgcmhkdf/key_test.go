@@ -15,13 +15,19 @@
 package aesgcmhkdf_test
 
 import (
+	"bytes"
+	"io"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/aesgcmhkdf"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 var (
@@ -289,5 +295,72 @@ func TestKeyEqual_FalseIfDifferent(t *testing.T) {
 				t.Errorf("firstKey.Equal(secondKey) = true, want false")
 			}
 		})
+	}
+}
+
+func TestKeyCreator(t *testing.T) {
+	params, err := aesgcmhkdf.NewParameters(aesgcmhkdf.ParametersOpts{
+		KeySizeInBytes:        32,
+		DerivedKeySizeInBytes: 32,
+		HKDFHashType:          aesgcmhkdf.SHA256,
+		SegmentSizeInBytes:    4096,
+	})
+	if err != nil {
+		t.Fatalf("aesgcmhkdf.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keygenregistry.CreateKey(params, 0)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0) err = %v, want nil", params, err)
+	}
+	aesGCMHKDFKey, ok := key.(*aesgcmhkdf.Key)
+	if !ok {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0) returned key of type %T, want %T", params, key, (*aesgcmhkdf.Key)(nil))
+	}
+
+	idRequirement, hasIDRequirement := aesGCMHKDFKey.IDRequirement()
+	if hasIDRequirement || idRequirement != 0 {
+		t.Errorf("aesGCMHKDFKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 0, true)
+	}
+	if got := aesGCMHKDFKey.KeyBytes().Len(); got != params.KeySizeInBytes() {
+		t.Errorf("aesGCMHKDFKey.KeyBytes().Len() = %d, want 32", aesGCMHKDFKey.KeyBytes().Len())
+	}
+	if diff := cmp.Diff(aesGCMHKDFKey.Parameters(), params); diff != "" {
+		t.Errorf("aesGCMHKDFKey.Parameters() diff (-want +got):\n%s", diff)
+	}
+
+	config := &registryconfig.RegistryConfig{}
+	p, err := config.PrimitiveFromKey(key, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("config.PrimitiveFromKey(%v, %v) err = %v, want nil", key, internalapi.Token{}, err)
+	}
+	streamingAEAD, ok := p.(tink.StreamingAEAD)
+	if !ok {
+		t.Errorf("config.PrimitiveFromKey(%v, %v) did not return a AESCTRHMAC primitive", key, internalapi.Token{})
+	}
+
+	// Encrypt and decrypt some data.
+	plaintext := []byte("plaintext")
+	ciphertextBuffer := bytes.NewBuffer(nil)
+	writer, err := streamingAEAD.NewEncryptingWriter(ciphertextBuffer, []byte("aad"))
+	if err != nil {
+		t.Fatalf("streamingAEAD.NewEncryptingWriter() err = %v, want nil", err)
+	}
+	if _, err := io.Copy(writer, bytes.NewBuffer(plaintext)); err != nil {
+		t.Fatalf("io.Copy() err = %v, want nil", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer.Close() err = %v, want nil", err)
+	}
+	reader, err := streamingAEAD.NewDecryptingReader(ciphertextBuffer, []byte("aad"))
+	if err != nil {
+		t.Fatalf("streamingAEAD.NewDecryptingReader() err = %v, want nil", err)
+	}
+	decryptedBuffer := bytes.NewBuffer(nil)
+	if _, err := io.Copy(decryptedBuffer, reader); err != nil {
+		t.Fatalf("io.Copy() err = %v, want nil", err)
+	}
+	if diff := cmp.Diff(plaintext, decryptedBuffer.Bytes()); diff != "" {
+		t.Errorf("decryptedBuffer.Bytes() diff (-want +got):\n%s", diff)
 	}
 }

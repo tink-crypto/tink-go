@@ -27,6 +27,8 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
+const typeURL = "type.googleapis.com/google.crypto.tink.AesGcmHkdfStreamingKey"
+
 type keySerializer struct{}
 
 var _ protoserialization.KeySerializer = (*keySerializer)(nil)
