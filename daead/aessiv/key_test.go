@@ -19,11 +19,16 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 var (
@@ -401,5 +406,67 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 				t.Errorf("firstKey.Equal(secondKey) = true, want false")
 			}
 		})
+	}
+}
+
+func TestKeyCreator(t *testing.T) {
+	params, err := aessiv.NewParameters(64, aessiv.VariantTink)
+	if err != nil {
+		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keygenregistry.CreateKey(params, 123)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 123) err = %v, want nil", params, err)
+	}
+	aesSIVKey, ok := key.(*aessiv.Key)
+	if !ok {
+		t.Fatalf("keygenregistry.CreateKey(%v, 123) returned key of type %T, want %T", params, key, (*aessiv.Key)(nil))
+	}
+
+	idRequirement, hasIDRequirement := aesSIVKey.IDRequirement()
+	if !hasIDRequirement || idRequirement != 123 {
+		t.Errorf("aesSIVKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 123, true)
+	}
+	if got := aesSIVKey.KeyBytes().Len(); got != params.KeySizeInBytes() {
+		t.Errorf("aesSIVKey.KeyBytes().Len() = %d, want 32", aesSIVKey.KeyBytes().Len())
+	}
+	if diff := cmp.Diff(aesSIVKey.Parameters(), params); diff != "" {
+		t.Errorf("aesSIVKey.Parameters() diff (-want +got):\n%s", diff)
+	}
+
+	// Try to encrypt/decrypt with the key.
+	config := &registryconfig.RegistryConfig{}
+
+	p, err := config.PrimitiveFromKey(key, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("config.PrimitiveFromKey(key, internalapi.Token{}) err = %v, want nil", err)
+	}
+	daead, ok := p.(tink.DeterministicAEAD)
+	if !ok {
+		t.Fatalf("config.PrimitiveFromKey(key, internalapi.Token{}) returned primitive of type %T, want %T", p, (tink.DeterministicAEAD)(nil))
+	}
+
+	ciphertext, err := daead.EncryptDeterministically([]byte("plaintext"), []byte("associated data"))
+	if err != nil {
+		t.Fatalf("daead.EncryptDeterministically() err = %v, want nil", err)
+	}
+	plaintext, err := daead.DecryptDeterministically(ciphertext, []byte("associated data"))
+	if err != nil {
+		t.Fatalf("daead.DecryptDeterministically() err = %v, want nil", err)
+	}
+	if diff := cmp.Diff(plaintext, []byte("plaintext")); diff != "" {
+		t.Errorf("plaintext diff (-want +got):\n%s", diff)
+	}
+}
+
+func TestKeyCreator_FailsIfInvalidKeySize(t *testing.T) {
+	// Only 64 bytes keys are supported.
+	params, err := aessiv.NewParameters(48, aessiv.VariantTink)
+	if err != nil {
+		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
+	}
+	if _, err := keygenregistry.CreateKey(params, 123); err == nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 123) err = nil, want error", params)
 	}
 }

@@ -164,6 +164,9 @@ func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameter
 	if keyTemplate.GetTypeUrl() != typeURL {
 		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyTemplate.GetTypeUrl(), typeURL)
 	}
+	if keyTemplate.GetValue() == nil {
+		return nil, fmt.Errorf("key template value is nil")
+	}
 	format := new(aessivpb.AesSivKeyFormat)
 	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
 		return nil, err

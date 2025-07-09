@@ -36,30 +36,35 @@ func TestKeyManagerPrimitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot obtain AESSIV key manager: %s", err)
 	}
-	m, err := km.NewKey(nil)
+
+	protoKey := mustMarshal(t, &aspb.AesSivKeyFormat{
+		Version: testutil.AESSIVKeyVersion,
+		KeySize: subtle.AESSIVKeySize,
+	})
+	m, err := km.NewKey(protoKey)
 	if err != nil {
-		t.Errorf("km.NewKey(nil) = _, %v; want _, nil", err)
+		t.Fatalf("km.NewKey(protoKey) = _, %v; want _, nil", err)
 	}
 	key, ok := m.(*aspb.AesSivKey)
 	if !ok {
-		t.Errorf("m is not *aspb.AesSivKey")
+		t.Fatalf("m is not *aspb.AesSivKey")
 	}
 	serializedKey, err := proto.Marshal(key)
 	if err != nil {
-		t.Errorf("proto.Marshal() = %q; want nil", err)
+		t.Fatalf("proto.Marshal() = %q; want nil", err)
 	}
 	p, err := km.Primitive(serializedKey)
 	if err != nil {
-		t.Errorf("km.Primitive(%v) = %v; want nil", serializedKey, err)
+		t.Fatalf("km.Primitive(%v) = %v; want nil", serializedKey, err)
 	}
 
 	keyManagerPrimitive, ok := p.(tink.DeterministicAEAD)
 	if !ok {
-		t.Errorf("Primitive() = %T, want tink.AEAD", p)
+		t.Fatalf("Primitive() = %T, want tink.AEAD", p)
 	}
 	expectedPrimitive, err := subtle.NewAESSIV(key.GetKeyValue())
 	if err != nil {
-		t.Errorf("subtle.NewAESSIV() err = %q, want nil", err)
+		t.Fatalf("subtle.NewAESSIV() err = %q, want nil", err)
 	}
 	if err := encryptDecrypt(keyManagerPrimitive, expectedPrimitive); err != nil {
 		t.Errorf("encryptDecrypt(keyManagerPrimitive, expectedPrimitive) err = %v, want nil", err)
@@ -101,7 +106,7 @@ func TestKeyManagerPrimitiveWithInvalidKeys(t *testing.T) {
 	for _, key := range invalidKeys {
 		serializedKey, err := proto.Marshal(key)
 		if err != nil {
-			t.Errorf("proto.Marshal() = %q; want nil", err)
+			t.Fatalf("proto.Marshal() = %q; want nil", err)
 		}
 		if _, err := km.Primitive(serializedKey); err == nil {
 			t.Errorf("km.Primitive(%v) = _, nil; want _, err", serializedKey)
@@ -112,15 +117,19 @@ func TestKeyManagerPrimitiveWithInvalidKeys(t *testing.T) {
 func TestKeyManagerNewKey(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AESSIV key manager: %s", err)
+		t.Fatalf("cannot obtain AESSIV key manager: %s", err)
 	}
-	m, err := km.NewKey(nil)
+	protoKey := mustMarshal(t, &aspb.AesSivKeyFormat{
+		Version: testutil.AESSIVKeyVersion,
+		KeySize: subtle.AESSIVKeySize,
+	})
+	m, err := km.NewKey(protoKey)
 	if err != nil {
-		t.Errorf("km.NewKey(nil) = _, %v; want _, nil", err)
+		t.Fatalf("km.NewKey(protoKey) = _, %v; want _, nil", err)
 	}
 	key, ok := m.(*aspb.AesSivKey)
 	if !ok {
-		t.Errorf("m is not *aspb.AesSivKey")
+		t.Fatalf("m is not *aspb.AesSivKey")
 	}
 	if err := validateAESSIVKey(key); err != nil {
 		t.Errorf("validateAESSIVKey(%v) = %v; want nil", key, err)
@@ -130,21 +139,25 @@ func TestKeyManagerNewKey(t *testing.T) {
 func TestKeyManagerNewKeyData(t *testing.T) {
 	km, err := registry.GetKeyManager(testutil.AESSIVTypeURL)
 	if err != nil {
-		t.Errorf("cannot obtain AESSIV key manager: %s", err)
+		t.Fatalf("cannot obtain AESSIV key manager: %s", err)
 	}
-	kd, err := km.NewKeyData(nil)
+	protoKey := mustMarshal(t, &aspb.AesSivKeyFormat{
+		Version: testutil.AESSIVKeyVersion,
+		KeySize: subtle.AESSIVKeySize,
+	})
+	kd, err := km.NewKeyData(protoKey)
 	if err != nil {
-		t.Errorf("km.NewKeyData(nil) = _, %v; want _, nil", err)
+		t.Fatalf("km.NewKeyData(protoKey) = _, %v; want _, nil", err)
 	}
 	if kd.TypeUrl != testutil.AESSIVTypeURL {
-		t.Errorf("TypeUrl: %v != %v", kd.TypeUrl, testutil.AESSIVTypeURL)
+		t.Fatalf("TypeUrl: %v != %v", kd.TypeUrl, testutil.AESSIVTypeURL)
 	}
 	if kd.KeyMaterialType != tpb.KeyData_SYMMETRIC {
-		t.Errorf("KeyMaterialType: %v != SYMMETRIC", kd.KeyMaterialType)
+		t.Fatalf("KeyMaterialType: %v != SYMMETRIC", kd.KeyMaterialType)
 	}
 	key := new(aspb.AesSivKey)
 	if err := proto.Unmarshal(kd.Value, key); err != nil {
-		t.Errorf("proto.Unmarshal(%v, key) = %v; want nil", kd.Value, err)
+		t.Fatalf("proto.Unmarshal(%v, key) = %v; want nil", kd.Value, err)
 	}
 	if err := validateAESSIVKey(key); err != nil {
 		t.Errorf("validateAESSIVKey(%v) = %v; want nil", key, err)
@@ -167,7 +180,7 @@ func TestKeyManagerNewKeyInvalid(t *testing.T) {
 	// MSB unset, so 0x80 is invalid.
 	invalidSerialization, err := hex.DecodeString("80")
 	if err != nil {
-		t.Errorf("hex.DecodeString() err = %v, want nil", err)
+		t.Fatalf("hex.DecodeString() err = %v, want nil", err)
 	}
 	for _, test := range []struct {
 		name      string

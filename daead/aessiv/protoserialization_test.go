@@ -444,6 +444,14 @@ func TestParseParametersFailsWithWrongKeyTemplate(t *testing.T) {
 			keyTemplate: &tinkpb.KeyTemplate{},
 		},
 		{
+			name: "nil value",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.AesSivKey",
+				Value:            nil,
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
 			name: "empty format",
 			keyTemplate: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.AesSivKey",

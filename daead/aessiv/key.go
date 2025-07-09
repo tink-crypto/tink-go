@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/daead/subtle"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -104,4 +105,24 @@ func (k *Key) Equal(other key.Key) bool {
 		k.idRequirement == that.idRequirement &&
 		k.keyBytes.Equal(that.keyBytes) &&
 		bytes.Equal(k.outputPrefix, that.outputPrefix)
+}
+
+func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	if p == nil {
+		return nil, fmt.Errorf("parameters is nil")
+	}
+	aesSIVParams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T; needed %T", p, (*Parameters)(nil))
+	}
+
+	if aesSIVParams.KeySizeInBytes() != subtle.AESSIVKeySize {
+		return nil, fmt.Errorf("key size %d is not supported", aesSIVParams.KeySizeInBytes())
+	}
+
+	keyBytes, err := secretdata.NewBytesFromRand(uint32(aesSIVParams.KeySizeInBytes()))
+	if err != nil {
+		return nil, err
+	}
+	return NewKey(keyBytes, idRequirement, aesSIVParams)
 }
