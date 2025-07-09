@@ -121,3 +121,72 @@ func (p *keyParser) ParseKey(keySerialization *protoserialization.KeySerializati
 	keyID, _ := keySerialization.IDRequirement()
 	return NewKey(params, prfKey, keyID)
 }
+
+type parametersSerializer struct{}
+
+var _ protoserialization.ParametersSerializer = (*parametersSerializer)(nil)
+
+// Serialize converts a [prfbasedkeyderivation.Parameters] into its proto serialized form.
+func (s *parametersSerializer) Serialize(params key.Parameters) (*tinkpb.KeyTemplate, error) {
+	p, ok := params.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("unexpected parameters type: got %T, want %T", params, (*Parameters)(nil))
+	}
+	prfKeyTemplate, err := protoserialization.SerializeParameters(p.prfParameters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize prf parameters: %w", err)
+	}
+	derivedKeyTemplate, err := protoserialization.SerializeParameters(p.derivedKeyParameters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize derived key parameters: %w", err)
+	}
+
+	format := &prfderpb.PrfBasedDeriverKeyFormat{
+		PrfKeyTemplate: prfKeyTemplate,
+		Params: &prfderpb.PrfBasedDeriverParams{
+			DerivedKeyTemplate: derivedKeyTemplate,
+		},
+	}
+
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		return nil, fmt.Errorf("prfbasedkeyderivation: failed to marshal parameters proto: %w", err)
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          typeURL,
+		Value:            serializedFormat,
+		OutputPrefixType: derivedKeyTemplate.GetOutputPrefixType(),
+	}, nil
+}
+
+type parametersParser struct{}
+
+var _ protoserialization.ParametersParser = (*parametersParser)(nil)
+
+// Parse converts a proto serialized parameters into a [prfbasedkeyderivation.Parameters] object.
+func (p *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	if keyTemplate.GetTypeUrl() != typeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyTemplate.GetTypeUrl(), typeURL)
+	}
+
+	format := new(prfderpb.PrfBasedDeriverKeyFormat)
+	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal parameters proto: %w", err)
+	}
+
+	// Force the output prefix type to be consistent with the one of the derived
+	// key template.
+	if got, want := keyTemplate.GetOutputPrefixType(), format.GetParams().GetDerivedKeyTemplate().GetOutputPrefixType(); got != want {
+		return nil, fmt.Errorf("invalid output prefix type for the key derivation key template: got %v, want %v", got, want)
+	}
+
+	prfParams, err := protoserialization.ParseParameters(format.GetPrfKeyTemplate())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse prf parameters: %w", err)
+	}
+	derivedKeyParams, err := protoserialization.ParseParameters(format.GetParams().GetDerivedKeyTemplate())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse derived key parameters: %w", err)
+	}
+	return NewParameters(prfParams, derivedKeyParams)
+}

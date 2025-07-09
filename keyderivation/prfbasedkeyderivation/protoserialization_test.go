@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -32,6 +33,7 @@ import (
 	aesgcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	hkdfprfpb "github.com/tink-crypto/tink-go/v2/proto/hkdf_prf_go_proto"
+	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_prf_go_proto"
 	hmacprfpb "github.com/tink-crypto/tink-go/v2/proto/hmac_prf_go_proto"
 	prfderpb "github.com/tink-crypto/tink-go/v2/proto/prf_based_deriver_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -538,6 +540,433 @@ func TestSerializeKey_Failure(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := protoserialization.SerializeKey(tc.key); err == nil {
 				t.Errorf("protoserialization.SerializeKey(%v) err = nil, want error", tc.key)
+			}
+		})
+	}
+}
+
+func mustCreateParameters(t *testing.T, prfParams key.Parameters, derivedKeyParams key.Parameters) *prfbasedkeyderivation.Parameters {
+	t.Helper()
+	params, err := prfbasedkeyderivation.NewParameters(prfParams, derivedKeyParams)
+	if err != nil {
+		t.Fatalf("prfbasedkeyderivation.NewParameters(%v, %v) failed: %v", prfParams, derivedKeyParams, err)
+	}
+	return params
+}
+
+type paramsParsingTestCase struct {
+	name     string
+	template *tinkpb.KeyTemplate
+	params   key.Parameters
+}
+
+func paramsParsingTestCases(t *testing.T) []paramsParsingTestCase {
+	aesCMACPRFParams, err := aescmacprf.NewParameters(32)
+	if err != nil {
+		t.Fatalf("aescmacprf.NewParameters(32) failed: %v", err)
+	}
+
+	hmacPRFParams, err := hmacprf.NewParameters(32, hmacprf.SHA256)
+	if err != nil {
+		t.Fatalf("hmacprf.NewParameters(32, hmacprf.SHA256) failed: %v", err)
+	}
+
+	hkdfPRFParams, err := hkdfprf.NewParameters(32, hkdfprf.SHA256, []byte("salt"))
+	if err != nil {
+		t.Fatalf("hkdfprf.NewParameters(32, hkdfprf.SHA25, []byte(\"salt\")) failed: %v", err)
+	}
+
+	// Derived key parameters.
+	derivedKeyParametersNoPrefix, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 16,
+		IVSizeInBytes:  12,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() failed: %v", err)
+	}
+	derivedKeyParametersTinkPrefix, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 16,
+		IVSizeInBytes:  12,
+		Variant:        aesgcm.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() failed: %v", err)
+	}
+	return []paramsParsingTestCase{
+		{
+			name: "AES-CMAC-PRF_with_tink_prefix",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshal(t, &prfderpb.PrfBasedDeriverKeyFormat{
+					PrfKeyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCmacPrfKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value: mustMarshal(t, &aescmacprfpb.AesCmacPrfKeyFormat{
+							KeySize: 32,
+						}),
+					},
+					Params: &prfderpb.PrfBasedDeriverParams{
+						DerivedKeyTemplate: &tinkpb.KeyTemplate{
+							TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmKey",
+							OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+							Value: mustMarshal(t, &aesgcmpb.AesGcmKeyFormat{
+								KeySize: 32,
+							}),
+						},
+					},
+				}),
+			},
+			params: mustCreateParameters(t, &aesCMACPRFParams, derivedKeyParametersTinkPrefix),
+		},
+		{
+			name: "AES-CMAC-PRF_no_prefix",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+				Value: mustMarshal(t, &prfderpb.PrfBasedDeriverKeyFormat{
+					PrfKeyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCmacPrfKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value: mustMarshal(t, &aescmacprfpb.AesCmacPrfKeyFormat{
+							KeySize: 32,
+						}),
+					},
+					Params: &prfderpb.PrfBasedDeriverParams{
+						DerivedKeyTemplate: &tinkpb.KeyTemplate{
+							TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmKey",
+							OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+							Value: mustMarshal(t, &aesgcmpb.AesGcmKeyFormat{
+								KeySize: 32,
+							}),
+						},
+					},
+				}),
+			},
+			params: mustCreateParameters(t, &aesCMACPRFParams, derivedKeyParametersNoPrefix),
+		},
+		{
+			name: "HKDF_with_tink_prefix",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshal(t, &prfderpb.PrfBasedDeriverKeyFormat{
+					PrfKeyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.HkdfPrfKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value: mustMarshal(t, &hkdfprfpb.HkdfPrfKeyFormat{
+							Params: &hkdfprfpb.HkdfPrfParams{
+								Hash: commonpb.HashType_SHA256,
+								Salt: []byte("salt"),
+							},
+							KeySize: 32,
+							Version: 0,
+						}),
+					},
+					Params: &prfderpb.PrfBasedDeriverParams{
+						DerivedKeyTemplate: &tinkpb.KeyTemplate{
+							TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmKey",
+							OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+							Value: mustMarshal(t, &aesgcmpb.AesGcmKeyFormat{
+								KeySize: 32,
+							}),
+						},
+					},
+				}),
+			},
+			params: mustCreateParameters(t, hkdfPRFParams, derivedKeyParametersTinkPrefix),
+		},
+		{
+			name: "HKDF_no_prefix",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+				Value: mustMarshal(t, &prfderpb.PrfBasedDeriverKeyFormat{
+					PrfKeyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.HkdfPrfKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value: mustMarshal(t, &hkdfprfpb.HkdfPrfKeyFormat{
+							Params: &hkdfprfpb.HkdfPrfParams{
+								Hash: commonpb.HashType_SHA256,
+								Salt: []byte("salt"),
+							},
+							KeySize: 32,
+							Version: 0,
+						}),
+					},
+					Params: &prfderpb.PrfBasedDeriverParams{
+						DerivedKeyTemplate: &tinkpb.KeyTemplate{
+							TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmKey",
+							OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+							Value: mustMarshal(t, &aesgcmpb.AesGcmKeyFormat{
+								KeySize: 32,
+							}),
+						},
+					},
+				}),
+			},
+			params: mustCreateParameters(t, hkdfPRFParams, derivedKeyParametersNoPrefix),
+		},
+		{
+			name: "HMAC_with_tink_prefix",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshal(t, &prfderpb.PrfBasedDeriverKeyFormat{
+					PrfKeyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.HmacPrfKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value: mustMarshal(t, &hmacpb.HmacPrfKeyFormat{
+							Params: &hmacpb.HmacPrfParams{
+								Hash: commonpb.HashType_SHA256,
+							},
+							KeySize: 32,
+							Version: 0,
+						}),
+					},
+					Params: &prfderpb.PrfBasedDeriverParams{
+						DerivedKeyTemplate: &tinkpb.KeyTemplate{
+							TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmKey",
+							OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+							Value: mustMarshal(t, &aesgcmpb.AesGcmKeyFormat{
+								KeySize: 32,
+							}),
+						},
+					},
+				}),
+			},
+			params: mustCreateParameters(t, hmacPRFParams, derivedKeyParametersTinkPrefix),
+		},
+		{
+			name: "HMAC_no_prefix",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+				Value: mustMarshal(t, &prfderpb.PrfBasedDeriverKeyFormat{
+					PrfKeyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.HmacPrfKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value: mustMarshal(t, &hmacpb.HmacPrfKeyFormat{
+							Params: &hmacpb.HmacPrfParams{
+								Hash: commonpb.HashType_SHA256,
+							},
+							KeySize: 32,
+							Version: 0,
+						}),
+					},
+					Params: &prfderpb.PrfBasedDeriverParams{
+						DerivedKeyTemplate: &tinkpb.KeyTemplate{
+							TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmKey",
+							OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+							Value: mustMarshal(t, &aesgcmpb.AesGcmKeyFormat{
+								KeySize: 32,
+							}),
+						},
+					},
+				}),
+			},
+			params: mustCreateParameters(t, hmacPRFParams, derivedKeyParametersNoPrefix),
+		},
+	}
+}
+
+func TestParametersSerialization(t *testing.T) {
+	for _, tc := range paramsParsingTestCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.SerializeParameters(tc.params)
+			if err != nil {
+				t.Errorf("protoserialization.SerializeParameters(%v) err = %p, want nil", tc.params, err)
+			}
+			if diff := cmp.Diff(tc.template, got, protocmp.Transform()); diff != "" {
+				t.Errorf("protoserialization.SerializeParameters(%v) returned diff (-want +got):\n%s", tc.template, diff)
+			}
+		})
+	}
+}
+
+func TestParametersParsing(t *testing.T) {
+	for _, tc := range paramsParsingTestCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseParameters(tc.template)
+			if err != nil {
+				t.Errorf("protoserialization.ParseParameters(%v) err = %p, want nil", tc.template, err)
+			}
+			if diff := cmp.Diff(tc.params, got, protocmp.Transform()); diff != "" {
+				t.Errorf("protoserialization.ParseParameters(%v) returned diff (-want +got):\n%s", tc.template, diff)
+			}
+		})
+	}
+}
+
+func TestParametersParsing_Fails(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		template *tinkpb.KeyTemplate
+	}{
+		{
+			name: "invalid_aescmac_prf_key_format",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshal(t, &prfderpb.PrfBasedDeriverKeyFormat{
+					PrfKeyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCmacPrfKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value: mustMarshal(t, &aescmacprfpb.AesCmacPrfKeyFormat{
+							KeySize: 1,
+						}),
+					},
+					Params: &prfderpb.PrfBasedDeriverParams{
+						DerivedKeyTemplate: &tinkpb.KeyTemplate{
+							TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmKey",
+							OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+							Value: mustMarshal(t, &aesgcmpb.AesGcmKeyFormat{
+								KeySize: 32,
+							}),
+						},
+					},
+				}),
+			},
+		},
+		{
+			name: "invalid_hkdf_prf_key_format",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshal(t, &prfderpb.PrfBasedDeriverKeyFormat{
+					PrfKeyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.HkdfPrfKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value: mustMarshal(t, &hkdfprfpb.HkdfPrfKeyFormat{
+							Params: &hkdfprfpb.HkdfPrfParams{
+								Hash: commonpb.HashType_UNKNOWN_HASH,
+								Salt: []byte("salt"),
+							},
+							KeySize: 32,
+						}),
+					},
+					Params: &prfderpb.PrfBasedDeriverParams{
+						DerivedKeyTemplate: &tinkpb.KeyTemplate{
+							TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmKey",
+							OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+							Value: mustMarshal(t, &aesgcmpb.AesGcmKeyFormat{
+								KeySize: 32,
+							}),
+						},
+					},
+				}),
+			},
+		},
+		{
+			name: "invalid_hmac_prf_key_format",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshal(t, &prfderpb.PrfBasedDeriverKeyFormat{
+					PrfKeyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.HmacPrfKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value: mustMarshal(t, &hmacpb.HmacPrfKeyFormat{
+							Params: &hmacpb.HmacPrfParams{
+								Hash: commonpb.HashType_UNKNOWN_HASH,
+							},
+							KeySize: 32,
+						}),
+					},
+					Params: &prfderpb.PrfBasedDeriverParams{
+						DerivedKeyTemplate: &tinkpb.KeyTemplate{
+							TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmKey",
+							OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+							Value: mustMarshal(t, &aesgcmpb.AesGcmKeyFormat{
+								KeySize: 32,
+							}),
+						},
+					},
+				}),
+			},
+		},
+		{
+			name: "invalid_derived_key_template",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshal(t, &prfderpb.PrfBasedDeriverKeyFormat{
+					PrfKeyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCmacPrfKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value: mustMarshal(t, &aescmacprfpb.AesCmacPrfKeyFormat{
+							KeySize: 32,
+						}),
+					},
+					Params: &prfderpb.PrfBasedDeriverParams{
+						DerivedKeyTemplate: &tinkpb.KeyTemplate{
+							TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmKey",
+							OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+							Value: mustMarshal(t, &aesgcmpb.AesGcmKeyFormat{
+								KeySize: 1,
+							}),
+						},
+					},
+				}),
+			},
+		},
+		{
+			name: "invalid_output_prefix_type",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
+				Value: mustMarshal(t, &prfderpb.PrfBasedDeriverKeyFormat{
+					PrfKeyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCmacPrfKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value: mustMarshal(t, &aescmacprfpb.AesCmacPrfKeyFormat{
+							KeySize: 32,
+						}),
+					},
+					Params: &prfderpb.PrfBasedDeriverParams{
+						DerivedKeyTemplate: &tinkpb.KeyTemplate{
+							TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmKey",
+							OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+							Value: mustMarshal(t, &aesgcmpb.AesGcmKeyFormat{
+								KeySize: 32,
+							}),
+						},
+					},
+				}),
+			},
+		},
+		{
+			name: "inconsistent_output_prefix_type",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+				Value: mustMarshal(t, &prfderpb.PrfBasedDeriverKeyFormat{
+					PrfKeyTemplate: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCmacPrfKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value: mustMarshal(t, &aescmacprfpb.AesCmacPrfKeyFormat{
+							KeySize: 32,
+						}),
+					},
+					Params: &prfderpb.PrfBasedDeriverParams{
+						DerivedKeyTemplate: &tinkpb.KeyTemplate{
+							TypeUrl:          "type.googleapis.com/google.crypto.tink.AesGcmKey",
+							OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+							Value: mustMarshal(t, &aesgcmpb.AesGcmKeyFormat{
+								KeySize: 32,
+							}),
+						},
+					},
+				}),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseParameters(tc.template); err == nil {
+				t.Errorf("protoserialization.ParseParameters(%v) err = nil, want error", tc.template)
 			}
 		})
 	}

@@ -38,7 +38,7 @@ func CreatePRFBasedKeyTemplate(prfKeyTemplate, derivedKeyTemplate *tinkpb.KeyTem
 		return nil, fmt.Errorf("failed to marshal key format: %s", err)
 	}
 	template := &tinkpb.KeyTemplate{
-		TypeUrl:          prfBasedDeriverTypeURL,
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
 		OutputPrefixType: derivedKeyTemplate.GetOutputPrefixType(),
 		Value:            serializedFormat,
 	}

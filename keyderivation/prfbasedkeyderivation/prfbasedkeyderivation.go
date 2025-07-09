@@ -32,4 +32,10 @@ func init() {
 	if err := registryconfig.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
 	}
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](new(parametersSerializer)); err != nil {
+		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(typeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
+	}
 }
