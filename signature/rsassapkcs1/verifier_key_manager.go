@@ -64,7 +64,8 @@ func validatePublicKey(pubKey *rsassapkcs1pb.RsaSsaPkcs1PublicKey) error {
 	if err := keyset.ValidateKeyVersion(pubKey.GetVersion(), verifierKeyVersion); err != nil {
 		return err
 	}
-	return internal.ValidateRSAPublicKeyParams(pubKey.GetParams().GetHashType(), new(big.Int).SetBytes(pubKey.GetN()).BitLen(), pubKey.GetE())
+	hashAlg := hashName(pubKey.GetParams().GetHashType())
+	return internal.ValidateRSAPublicKeyParams(hashAlg, new(big.Int).SetBytes(pubKey.GetN()).BitLen(), pubKey.GetE())
 }
 
 func (km *verifierKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {

@@ -93,7 +93,9 @@ func (km *signerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, e
 	if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
 		return nil, err
 	}
-	if err := signature.ValidateRSAPublicKeyParams(keyFormat.GetParams().GetHashType(), int(keyFormat.GetModulusSizeInBits()), keyFormat.GetPublicExponent()); err != nil {
+
+	hashAlg := hashName(keyFormat.GetParams().GetHashType())
+	if err := signature.ValidateRSAPublicKeyParams(hashAlg, int(keyFormat.GetModulusSizeInBits()), keyFormat.GetPublicExponent()); err != nil {
 		return nil, err
 	}
 	rsaKey, err := rsa.GenerateKey(rand.Reader, int(keyFormat.GetModulusSizeInBits()))

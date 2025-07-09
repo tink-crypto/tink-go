@@ -16,6 +16,7 @@ package rsassapkcs1
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
 	"math/big"
@@ -23,6 +24,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
+	"github.com/tink-crypto/tink-go/v2/internal/signature"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
@@ -364,4 +366,33 @@ func (k *PrivateKey) OutputPrefix() []byte { return k.publicKey.OutputPrefix() }
 func (k *PrivateKey) Equal(other key.Key) bool {
 	that, ok := other.(*PrivateKey)
 	return ok && k.publicKey.Equal(that.publicKey) && k.privateKey.Equal(that.privateKey)
+}
+
+func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	rsaSSAPKCS1Params, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: %T", p)
+	}
+
+	hashAlg := rsaSSAPKCS1Params.HashType().String()
+	exp := new(big.Int).SetUint64(uint64(rsaSSAPKCS1Params.PublicExponent())).Bytes()
+	if err := signature.ValidateRSAPublicKeyParams(hashAlg, rsaSSAPKCS1Params.ModulusSizeBits(), exp); err != nil {
+		return nil, fmt.Errorf("invalid parameters: %w", err)
+	}
+
+	rsaKey, err := rsa.GenerateKey(rand.Reader, int(rsaSSAPKCS1Params.ModulusSizeBits()))
+	if err != nil {
+		return nil, fmt.Errorf("generating RSA key: %s", err)
+	}
+
+	rsaSSAPKCS1PublicKey, err := NewPublicKey(rsaKey.PublicKey.N.Bytes(), idRequirement, rsaSSAPKCS1Params)
+	if err != nil {
+		return nil, fmt.Errorf("creating public key: %s", err)
+	}
+
+	return NewPrivateKey(rsaSSAPKCS1PublicKey, PrivateKeyValues{
+		P: secretdata.NewBytesFromData(rsaKey.Primes[0].Bytes(), insecuresecretdataaccess.Token{}),
+		Q: secretdata.NewBytesFromData(rsaKey.Primes[1].Bytes(), insecuresecretdataaccess.Token{}),
+		D: secretdata.NewBytesFromData(rsaKey.D.Bytes(), insecuresecretdataaccess.Token{}),
+	})
 }

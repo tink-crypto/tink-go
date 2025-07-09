@@ -19,7 +19,6 @@ import (
 	"testing"
 
 	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
-	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 )
 
 func TestValidatePublicExponent(t *testing.T) {
@@ -81,42 +80,42 @@ func TestValidateRSAPublicKeyParams(t *testing.T) {
 	publicExponentTooLarge[0] = 0xff
 	for _, tc := range []struct {
 		name            string
-		hashType        commonpb.HashType
+		hashType        string
 		modulusSizeBits int
 		pubExponent     []byte
 		wantErr         bool
 	}{
 		{
 			name:            "valid",
-			hashType:        commonpb.HashType_SHA256,
+			hashType:        "SHA256",
 			modulusSizeBits: 2048,
 			pubExponent:     f4,
 			wantErr:         false,
 		},
 		{
 			name:            "hash unsafe for signature",
-			hashType:        commonpb.HashType_SHA1,
+			hashType:        "SHA1",
 			modulusSizeBits: 2048,
 			pubExponent:     f4,
 			wantErr:         true,
 		},
 		{
 			name:            "modulus size too small",
-			hashType:        commonpb.HashType_SHA256,
+			hashType:        "SHA256",
 			modulusSizeBits: 1024,
 			pubExponent:     f4,
 			wantErr:         true,
 		},
 		{
 			name:            "public exponent not F4",
-			hashType:        commonpb.HashType_SHA256,
+			hashType:        "SHA256",
 			modulusSizeBits: 2048,
 			pubExponent:     invalidPubExponent,
 			wantErr:         true,
 		},
 		{
 			name:            "public exponent too large",
-			hashType:        commonpb.HashType_SHA256,
+			hashType:        "SHA256",
 			modulusSizeBits: 2048,
 			pubExponent:     publicExponentTooLarge,
 			wantErr:         true,

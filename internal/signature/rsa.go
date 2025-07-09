@@ -22,7 +22,6 @@ import (
 	"math/big"
 
 	"github.com/tink-crypto/tink-go/v2/subtle"
-	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 )
 
 const (
@@ -59,8 +58,8 @@ func HashSafeForSignature(hashAlg string) error {
 }
 
 // ValidateRSAPublicKeyParams validates a public RSA key parameters.
-func ValidateRSAPublicKeyParams(hashAlg commonpb.HashType, modSizeBits int, pubExponent []byte) error {
-	if err := HashSafeForSignature(commonpb.HashType_name[int32(hashAlg)]); err != nil {
+func ValidateRSAPublicKeyParams(hashAlg string, modSizeBits int, pubExponent []byte) error {
+	if err := HashSafeForSignature(hashAlg); err != nil {
 		return err
 	}
 	if err := RSAValidModulusSizeInBits(modSizeBits); err != nil {

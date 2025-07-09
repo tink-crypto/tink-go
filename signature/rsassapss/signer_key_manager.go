@@ -117,7 +117,9 @@ func (km *signerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, e
 	if params.GetSaltLength() < 0 {
 		return nil, fmt.Errorf("rsassapss_signer_key_manager: salt length can't be negative")
 	}
-	if err := internal.ValidateRSAPublicKeyParams(params.GetSigHash(), int(keyFormat.GetModulusSizeInBits()), keyFormat.GetPublicExponent()); err != nil {
+
+	hashAlg := hashName(params.GetSigHash())
+	if err := internal.ValidateRSAPublicKeyParams(hashAlg, int(keyFormat.GetModulusSizeInBits()), keyFormat.GetPublicExponent()); err != nil {
 		return nil, err
 	}
 	privKey, err := rsa.GenerateKey(rand.Reader, int(keyFormat.GetModulusSizeInBits()))

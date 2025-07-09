@@ -22,8 +22,11 @@ import (
 	"math/bits"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
 )
@@ -1219,6 +1222,93 @@ func TestNewPrivateKeyEqualFailsIfKeysAreDifferent(t *testing.T) {
 			}
 			if tc.that.Equal(tc.this) {
 				t.Errorf("tc.that.Equal(tc.this) = true, want false")
+			}
+		})
+	}
+}
+
+func TestPrivateKeyCreator(t *testing.T) {
+	params, err := rsassapss.NewParameters(rsassapss.ParametersValues{
+		ModulusSizeBits: 4096,
+		SigHashType:     rsassapss.SHA256,
+		MGF1HashType:    rsassapss.SHA256,
+		PublicExponent:  f4,
+		SaltLengthBytes: 12,
+	}, rsassapss.VariantTink)
+	if err != nil {
+		t.Fatalf("rsassapss.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keygenregistry.CreateKey(params, 0x1234)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) err = %v, want nil", params, err)
+	}
+	rsaSSAPSSPrivateKey, ok := key.(*rsassapss.PrivateKey)
+	if !ok {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) returned key of type %T, want %T", params, key, (*rsassapss.PrivateKey)(nil))
+	}
+	idRequirement, hasIDRequirement := rsaSSAPSSPrivateKey.IDRequirement()
+	if !hasIDRequirement || idRequirement != 0x1234 {
+		t.Errorf("rsaSSAPSSPrivateKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 123, true)
+	}
+	if diff := cmp.Diff(rsaSSAPSSPrivateKey.Parameters(), params); diff != "" {
+		t.Errorf("rsaSSAPSSPrivateKey.Parameters() diff (-want +got):\n%s", diff)
+	}
+
+	// Make sure we can sign/verify with the key.
+	signer, err := rsassapss.NewSigner(rsaSSAPSSPrivateKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("rsassapss.NewSigner(%v) err = %v, want nil", key, err)
+	}
+	signature, err := signer.Sign([]byte("hello world"))
+	if err != nil {
+		t.Fatalf("signer.Sign() err = %v, want nil", err)
+	}
+	publicKey, err := rsaSSAPSSPrivateKey.PublicKey()
+	if err != nil {
+		t.Fatalf("rsaSSAPSSPrivateKey.PublicKey() err = %v, want nil", err)
+	}
+	verifier, err := rsassapss.NewVerifier(publicKey.(*rsassapss.PublicKey), internalapi.Token{})
+	if err != nil {
+		t.Fatalf("rsassapss.NewVerifier(%v) err = %v, want nil", publicKey, err)
+	}
+	if err := verifier.Verify(signature, []byte("hello world")); err != nil {
+		t.Errorf("verifier.Verify() err = %v, want nil", err)
+	}
+}
+
+func TestPrivateKeyCreator_FailsWithInvalidParameters(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		params        *rsassapss.Parameters
+		idRequirement uint32
+	}{
+		{
+			name: "invalid id requirement",
+			params: mustCreateParameters(t, rsassapss.ParametersValues{
+				ModulusSizeBits: 4096,
+				SigHashType:     rsassapss.SHA256,
+				MGF1HashType:    rsassapss.SHA256,
+				PublicExponent:  f4,
+				SaltLengthBytes: 12,
+			}, rsassapss.VariantNoPrefix),
+			idRequirement: 0x1234,
+		},
+		{
+			name: "invalid exponent",
+			params: mustCreateParameters(t, rsassapss.ParametersValues{
+				ModulusSizeBits: 4096,
+				SigHashType:     rsassapss.SHA256,
+				MGF1HashType:    rsassapss.SHA256,
+				PublicExponent:  f4 + 2,
+				SaltLengthBytes: 12,
+			}, rsassapss.VariantTink),
+			idRequirement: 0x1234,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := keygenregistry.CreateKey(tc.params, tc.idRequirement); err == nil {
+				t.Errorf("keygenregistry.CreateKey(%v, %v) err = nil, want error", tc.params, tc.idRequirement)
 			}
 		})
 	}
