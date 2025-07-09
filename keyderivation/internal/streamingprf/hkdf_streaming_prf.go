@@ -26,23 +26,23 @@ import (
 // minHKDFStreamingPRFKeySize is the minimum allowed key size in bytes.
 const minHKDFStreamingPRFKeySize = 32
 
-// hkdfStreamingPRF is a HKDF Streaming PRF that implements StreamingPRF.
-type hkdfStreamingPRF struct {
+// HKDFStreamingPRF is a HKDF Streaming PRF that implements StreamingPRF.
+type HKDFStreamingPRF struct {
 	h    func() hash.Hash
 	key  []byte
 	salt []byte
 }
 
-// Asserts that hkdfStreamingPRF implements the StreamingPRF interface.
-var _ StreamingPRF = (*hkdfStreamingPRF)(nil)
+// Asserts that HKDFStreamingPRF implements the StreamingPRF interface.
+var _ StreamingPRF = (*HKDFStreamingPRF)(nil)
 
-// newHKDFStreamingPRF constructs a new hkdfStreamingPRF using hashName, key,
+// NewHKDFStreamingPRF constructs a new hkdfStreamingPRF using hashName, key,
 // and salt. Salt can be nil.
-func newHKDFStreamingPRF(hashName string, key, salt []byte) (*hkdfStreamingPRF, error) {
+func NewHKDFStreamingPRF(hashName string, key, salt []byte) (*HKDFStreamingPRF, error) {
 	if err := validateHKDFStreamingPRFParams(hashName, len(key)); err != nil {
 		return nil, err
 	}
-	return &hkdfStreamingPRF{
+	return &HKDFStreamingPRF{
 		h:    subtle.GetHashFunc(hashName),
 		key:  key,
 		salt: salt,
@@ -50,7 +50,7 @@ func newHKDFStreamingPRF(hashName string, key, salt []byte) (*hkdfStreamingPRF, 
 }
 
 // Compute computes and returns the HKDF as a Reader.
-func (h *hkdfStreamingPRF) Compute(data []byte) (io.Reader, error) {
+func (h *HKDFStreamingPRF) Compute(data []byte) (io.Reader, error) {
 	return hkdf.New(h.h, h.key, h.salt, data), nil
 }
 

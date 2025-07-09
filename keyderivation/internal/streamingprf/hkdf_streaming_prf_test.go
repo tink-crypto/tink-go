@@ -53,9 +53,9 @@ func TestNewHKDFStreamingPRF(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			key := random.GetRandomBytes(32)
-			h, err := newHKDFStreamingPRF(test.hash, key, test.salt)
+			h, err := NewHKDFStreamingPRF(test.hash, key, test.salt)
 			if err != nil {
-				t.Fatalf("newHKDFStreamingPRF() err = %v, want nil", err)
+				t.Fatalf("NewHKDFStreamingPRF() err = %v, want nil", err)
 			}
 			if !bytes.Equal(h.key, key) {
 				t.Errorf("key = %v, want %v", h.key, key)
@@ -85,8 +85,8 @@ func TestNewHKDFStreamingPRFFails(t *testing.T) {
 		},
 	} {
 		t.Run(test.hash, func(t *testing.T) {
-			if _, err := newHKDFStreamingPRF(test.hash, random.GetRandomBytes(test.keySize), nil); err == nil {
-				t.Error("newHKDFStreamingPRF() err = nil, want non-nil")
+			if _, err := NewHKDFStreamingPRF(test.hash, random.GetRandomBytes(test.keySize), nil); err == nil {
+				t.Error("NewHKDFStreamingPRF() err = nil, want non-nil")
 			}
 		})
 	}
@@ -124,9 +124,9 @@ func TestHKDFStreamingPRFWithRFCVector(t *testing.T) {
 		t.Fatalf("hex.DecodeString err = %v, want nil", err)
 	}
 
-	h, err := newHKDFStreamingPRF(vec.hash, key, salt)
+	h, err := NewHKDFStreamingPRF(vec.hash, key, salt)
 	if err != nil {
-		t.Fatalf("newHKDFStreamingPRF() err = %v, want nil", err)
+		t.Fatalf("NewHKDFStreamingPRF() err = %v, want nil", err)
 	}
 	r, err := h.Compute(info)
 	if err != nil {
@@ -177,17 +177,17 @@ func TestHKDFStreamingPRFWithWycheproof(t *testing.T) {
 					}
 					count++
 
-					h, err := newHKDFStreamingPRF(hash, test.IKM, test.Salt)
+					h, err := NewHKDFStreamingPRF(hash, test.IKM, test.Salt)
 					switch test.Result {
 					case "valid":
 						if len(test.IKM) < minHKDFStreamingPRFKeySize {
 							if err == nil {
-								t.Error("newHKDFStreamingPRF err = nil, want non-nil")
+								t.Error("NewHKDFStreamingPRF err = nil, want non-nil")
 							}
 							return
 						}
 						if err != nil {
-							t.Fatalf("newHKDFStreamingPRF err = %v, want nil", err)
+							t.Fatalf("NewHKDFStreamingPRF err = %v, want nil", err)
 						}
 						r, err := h.Compute(test.Info)
 						if err != nil {

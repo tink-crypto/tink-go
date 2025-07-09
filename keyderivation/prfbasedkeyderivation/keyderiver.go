@@ -19,7 +19,6 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderivers"
@@ -43,22 +42,12 @@ func NewKeyDeriver(key *Key, _ internalapi.Token) (keyderiver.KeyDeriver, error)
 	}
 	prfKey, ok := key.PRFKey().(*hkdfprf.Key)
 	if !ok {
-		return nil, fmt.Errorf("prfbasedkeyderivation: key is not a HKDF PRF key. Got %T, want %T", key.PRFKey(), (*hkdfprf.Key)(nil))
+		return nil, fmt.Errorf("prfbasedkeyderivation: unsupported PRF key type: got %T, want %T", key.PRFKey(), (*hkdfprf.Key)(nil))
 	}
-	// Construct a StreamingPRF RAW primitive from the PRF key.
-	prfKeyProtoSerialization, err := protoserialization.SerializeKey(prfKey)
-	if err != nil {
-		return nil, fmt.Errorf("prfbasedkeyderivation: could not serialize prf key: %v", err)
-	}
-	hkdfStreamingPRFKeyManager := streamingprf.HKDFStreamingPRFKeyManager{}
-	p, err := hkdfStreamingPRFKeyManager.Primitive(prfKeyProtoSerialization.KeyData().GetValue())
+	prfKeyParams := prfKey.Parameters().(*hkdfprf.Parameters)
+	prf, err := streamingprf.NewHKDFStreamingPRF(prfKeyParams.HashType().String(), prfKey.KeyBytes().Data(insecuresecretdataaccess.Token{}), prfKeyParams.Salt())
 	if err != nil {
 		return nil, fmt.Errorf("prfbasedkeyderivation: %v", err)
-	}
-	prf, ok := p.(streamingprf.StreamingPRF)
-	if !ok {
-		// This should never happen.
-		return nil, fmt.Errorf("primitive is not StreamingPRF")
 	}
 	return &keyDeriver{
 		key:          key,
