@@ -16,8 +16,11 @@ package prfbasedkeyderivation
 
 import (
 	"fmt"
+	"reflect"
 
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderivers"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
@@ -92,4 +95,32 @@ func (k *Key) Equal(other key.Key) bool {
 	return ok && k.parameters.Equal(that.parameters) &&
 		k.prfKey.Equal(that.prfKey) &&
 		k.idRequirement == that.idRequirement
+}
+
+func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	prfbasedKeyDerivationParams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: %T", p)
+	}
+
+	switch prfKeyTemplateType := prfbasedKeyDerivationParams.PRFParameters().(type) {
+	case *hkdfprf.Parameters:
+		// Only HKDF PRF is supported.
+	default:
+		return nil, fmt.Errorf("invalid PRF key template type: got %T, want %T", prfKeyTemplateType, (*hkdfprf.Parameters)(nil))
+	}
+
+	// We are sure this is a PRF-based key derivation parameters object, as
+	// this is checked in the constructor.
+	prfKey, err := keygenregistry.CreateKey(prfbasedKeyDerivationParams.PRFParameters(), idRequirement)
+	if err != nil {
+		return nil, err
+	}
+
+	// We reject key templates for which we cannot derive a key.
+	if !keyderivers.CanDeriveKey(reflect.TypeOf(prfbasedKeyDerivationParams.DerivedKeyParameters())) {
+		return nil, fmt.Errorf("PRF key parameters are not supported: %T", prfbasedKeyDerivationParams.DerivedKeyParameters())
+	}
+
+	return NewKey(prfbasedKeyDerivationParams, prfKey, idRequirement)
 }

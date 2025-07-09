@@ -17,14 +17,21 @@ package prfbasedkeyderivation_test
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/prfbasedkeyderivation"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 type stubKey struct{}
@@ -338,6 +345,135 @@ func TestKeyNotEqual(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.key1.Equal(tc.key2) {
 				t.Errorf("tc.key1.Equal(tc.key2) = true, want false")
+			}
+		})
+	}
+}
+
+func TestKeyCreator(t *testing.T) {
+	prfParams, err := hkdfprf.NewParameters(32, hkdfprf.SHA256, []byte("salt"))
+	if err != nil {
+		t.Fatalf("hkdfprf.NewParameters(32) failed: %v", err)
+	}
+
+	derivedKeyParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 16,
+		IVSizeInBytes:  12,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() failed: %v", err)
+	}
+
+	params, err := prfbasedkeyderivation.NewParameters(prfParams, derivedKeyParams)
+	if err != nil {
+		t.Fatalf("prfbasedkeyderivation.NewParameters(%v, %v) failed: %v", prfParams, derivedKeyParams, err)
+	}
+
+	key, err := keygenregistry.CreateKey(params, 0)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0) failed: %v", params, err)
+	}
+	keyDerivationKey, ok := key.(*prfbasedkeyderivation.Key)
+	if !ok {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0) returned key of type %T, want %T", params, key, (*prfbasedkeyderivation.Key)(nil))
+	}
+
+	idRequirement, hasIDRequirement := keyDerivationKey.IDRequirement()
+	if hasIDRequirement || idRequirement != 0 {
+		t.Errorf("keyDerivationKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 0, true)
+	}
+	if diff := cmp.Diff(keyDerivationKey.Parameters(), params); diff != "" {
+		t.Errorf("keyDerivationKey.Parameters() diff (-want +got):\n%s", diff)
+	}
+
+	config := &registryconfig.RegistryConfig{}
+	p, err := config.PrimitiveFromKey(key, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("config.PrimitiveFromKey(%v, %v) err = %v, want nil", key, internalapi.Token{}, err)
+	}
+	keyDeriverPrimitive, ok := p.(keyderiver.KeyDeriver)
+	if !ok {
+		t.Errorf("config.PrimitiveFromKey(%v, %v) p, _ = %T, want %T", key, internalapi.Token{}, p, (keyderiver.KeyDeriver)(nil))
+	}
+
+	// Derive an AESGCM key.
+	generatedKey, err := keyDeriverPrimitive.DeriveKey(nil)
+	if err != nil {
+		t.Fatalf("keyDeriverPrimitive.DeriveKey() err = %v, want nil", err)
+	}
+	generatedAESGCMKey, ok := generatedKey.(*aesgcm.Key)
+	if !ok {
+		t.Errorf("keyDeriverPrimitive.DeriveKey() returned key of type %T, want %T", generatedKey, (*aesgcm.Key)(nil))
+	}
+
+	// Encrypt/decrypt.
+	aeadPrimitive, err := config.PrimitiveFromKey(generatedKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("config.PrimitiveFromKey(%v, %v) err = %v, want nil", generatedAESGCMKey, internalapi.Token{}, err)
+	}
+	aead, ok := aeadPrimitive.(tink.AEAD)
+	if !ok {
+		t.Errorf("config.PrimitiveFromKey(%v, %v) p, _ = %T, want %T", generatedAESGCMKey, internalapi.Token{}, p, (tink.AEAD)(nil))
+	}
+	ciphertext, err := aead.Encrypt([]byte("plaintext"), []byte("associated data"))
+	if err != nil {
+		t.Fatalf("aead.Encrypt() err = %v, want nil", err)
+	}
+	plaintext, err := aead.Decrypt(ciphertext, []byte("associated data"))
+	if err != nil {
+		t.Fatalf("aead.Decrypt() err = %v, want nil", err)
+	}
+	if diff := cmp.Diff(plaintext, []byte("plaintext")); diff != "" {
+		t.Errorf("aead.Decrypt() diff (-want +got):\n%s", diff)
+	}
+}
+
+func TestKeyCreator_FailsIfUnsupportedParamValues(t *testing.T) {
+	unsupportedPRFParams, err := aescmacprf.NewParameters(32)
+	if err != nil {
+		t.Fatalf("aescmacprf.NewParameters(32) failed: %v", err)
+	}
+
+	derivedKeyParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 16,
+		IVSizeInBytes:  12,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() failed: %v", err)
+	}
+
+	prfParams, err := hkdfprf.NewParameters(32, hkdfprf.SHA256, []byte("salt"))
+	if err != nil {
+		t.Fatalf("hkdfprf.NewParameters(32) failed: %v", err)
+	}
+
+	nonDerivableKeyParams, err := rsassapkcs1.NewParameters(2048, rsassapkcs1.SHA256, 65537, rsassapkcs1.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("rsassapkcs1.NewParameters() failed: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name       string
+		parameters *prfbasedkeyderivation.Parameters
+	}{
+		{
+			name:       "unsupported PRF parameters",
+			parameters: mustCreateParameters(t, &unsupportedPRFParams, derivedKeyParams),
+		},
+		{
+			name:       "unsupported derived key parameters",
+			parameters: mustCreateParameters(t, prfParams, nonDerivableKeyParams),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := keygenregistry.CreateKey(tc.parameters, 0); err == nil {
+				t.Fatalf("keygenregistry.CreateKey(%v, 0) err = nil, want error", tc.parameters)
+			} else {
+				t.Logf("keygenregistry.CreateKey(%v, 0) err = %v", tc.parameters, err)
 			}
 		})
 	}
