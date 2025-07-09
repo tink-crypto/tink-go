@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package keyderivation
+package prfbasedkeyderivation
 
 import (
 	"errors"
@@ -30,24 +30,19 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-const (
-	prfBasedDeriverKeyVersion = 0
-	prfBasedDeriverTypeURL    = "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey"
-)
-
 var (
 	errInvalidPRFBasedDeriverKeyFormat = errors.New("prf_based_deriver_key_manager: invalid key format")
 )
 
-type prfBasedDeriverKeyManager struct{}
+type keyManager struct{}
 
-var _ registry.KeyManager = (*prfBasedDeriverKeyManager)(nil)
+var _ registry.KeyManager = (*keyManager)(nil)
 
-func (km *prfBasedDeriverKeyManager) Primitive(serializedKey []byte) (any, error) {
+func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
 	return nil, errors.New("prf_based_deriver_key_manager: not implemented; users should obtain an keyset.Handle and the primtive with keyderivation.New")
 }
 
-func (km *prfBasedDeriverKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+func (km *keyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
 	if len(serializedKeyFormat) == 0 {
 		return nil, errInvalidPRFBasedDeriverKeyFormat
 	}
@@ -70,13 +65,13 @@ func (km *prfBasedDeriverKeyManager) NewKey(serializedKeyFormat []byte) (proto.M
 	}
 
 	return &prfderpb.PrfBasedDeriverKey{
-		Version: prfBasedDeriverKeyVersion,
+		Version: 0,
 		PrfKey:  prfKey,
 		Params:  keyFormat.GetParams(),
 	}, nil
 }
 
-func (km *prfBasedDeriverKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+func (km *keyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
 	key, err := km.NewKey(serializedKeyFormat)
 	if err != nil {
 		return nil, err
@@ -86,19 +81,15 @@ func (km *prfBasedDeriverKeyManager) NewKeyData(serializedKeyFormat []byte) (*ti
 		return nil, errInvalidPRFBasedDeriverKeyFormat
 	}
 	return &tinkpb.KeyData{
-		TypeUrl:         prfBasedDeriverTypeURL,
+		TypeUrl:         typeURL,
 		Value:           serializedKey,
 		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 	}, nil
 }
 
-func (km *prfBasedDeriverKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == prfBasedDeriverTypeURL
-}
+func (km *keyManager) DoesSupport(typeURL string) bool { return typeURL == km.TypeURL() }
 
-func (km *prfBasedDeriverKeyManager) TypeURL() string {
-	return prfBasedDeriverTypeURL
-}
+func (km *keyManager) TypeURL() string { return typeURL }
 
 func validatePRFKeyTemplate(prfKeyTemplate *tinkpb.KeyTemplate) error {
 	params, err := protoserialization.ParseParameters(prfKeyTemplate)

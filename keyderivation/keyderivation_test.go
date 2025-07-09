@@ -37,7 +37,7 @@ func TestDeriveKeyset_CreateKeysetFailsWithInconsistentOutputPrefixTypes(t *test
 		t.Fatalf("proto.Marshal() err = %v, want nil", err)
 	}
 	template := &tinkpb.KeyTemplate{
-		TypeUrl:          prfBasedDeriverTypeURL,
+		TypeUrl:          "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey",
 		OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 		Value:            serializedFormat,
 	}

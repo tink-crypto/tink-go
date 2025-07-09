@@ -18,6 +18,7 @@ package prfbasedkeyderivation
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 )
@@ -36,6 +37,9 @@ func init() {
 		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterParametersParser(typeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
+	}
+	if err := registry.RegisterKeyManager(new(keyManager)); err != nil {
 		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
 	}
 }

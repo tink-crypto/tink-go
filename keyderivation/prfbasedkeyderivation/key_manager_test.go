@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package keyderivation_test
+package prfbasedkeyderivation_test
 
 import (
 	"fmt"
@@ -27,17 +27,16 @@ import (
 	aesgcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
 	prfderpb "github.com/tink-crypto/tink-go/v2/proto/prf_based_deriver_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+
+	_ "github.com/tink-crypto/tink-go/v2/keyderivation/prfbasedkeyderivation" // Register the key manager.
 )
 
-const (
-	prfBasedDeriverKeyVersion = 0
-	prfBasedDeriverTypeURL    = "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey"
-)
+const typeURL = "type.googleapis.com/google.crypto.tink.PrfBasedDeriverKey"
 
-func TestPRFBasedDeriverKeyManagerPrimitive_Unimplemented(t *testing.T) {
-	km, err := registry.GetKeyManager(prfBasedDeriverTypeURL)
+func TestKeyManagerPrimitive_Unimplemented(t *testing.T) {
+	km, err := registry.GetKeyManager(typeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", prfBasedDeriverTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", typeURL, err)
 	}
 	if _, err := km.Primitive(nil); err == nil {
 		t.Error("km.Primitive() err = nil, want non-nil")
@@ -45,18 +44,18 @@ func TestPRFBasedDeriverKeyManagerPrimitive_Unimplemented(t *testing.T) {
 	if _, err := km.Primitive([]byte("some key serialization")); err == nil {
 		t.Error("km.Primitive() err = nil, want non-nil")
 	}
-	if _, err := registry.Primitive(prfBasedDeriverTypeURL, nil); err == nil {
+	if _, err := registry.Primitive(typeURL, nil); err == nil {
 		t.Error("registry.Primitive() err = nil, want non-nil")
 	}
-	if _, err := registry.Primitive(prfBasedDeriverTypeURL, []byte("some key serialization")); err == nil {
+	if _, err := registry.Primitive(typeURL, []byte("some key serialization")); err == nil {
 		t.Error("registry.Primitive() err = nil, want non-nil")
 	}
 }
 
-func TestPRFBasedDeriverKeyManagerNewKey(t *testing.T) {
-	km, err := registry.GetKeyManager(prfBasedDeriverTypeURL)
+func TestKeyManagerNewKey(t *testing.T) {
+	km, err := registry.GetKeyManager(typeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", prfBasedDeriverTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", typeURL, err)
 	}
 	prfs := []struct {
 		name     string
@@ -110,7 +109,7 @@ func TestPRFBasedDeriverKeyManagerNewKey(t *testing.T) {
 					if !ok {
 						t.Fatal("key is not PrfBasedDeriverKey")
 					}
-					if key.GetVersion() != prfBasedDeriverKeyVersion {
+					if key.GetVersion() != 0 {
 						t.Errorf("GetVersion() = %d, want 0", key.GetVersion())
 					}
 					prfKeyData := key.GetPrfKey()
@@ -129,10 +128,10 @@ func TestPRFBasedDeriverKeyManagerNewKey(t *testing.T) {
 	}
 }
 
-func TestPRFBasedDeriverKeyManagerNewKeyData(t *testing.T) {
-	km, err := registry.GetKeyManager(prfBasedDeriverTypeURL)
+func TestKeyManagerNewKeyData(t *testing.T) {
+	km, err := registry.GetKeyManager(typeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", prfBasedDeriverTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", typeURL, err)
 	}
 	prfs := []struct {
 		name     string
@@ -182,8 +181,8 @@ func TestPRFBasedDeriverKeyManagerNewKeyData(t *testing.T) {
 					if err != nil {
 						t.Errorf("NewKeyData() err = %v, want nil", err)
 					}
-					if keyData.GetTypeUrl() != prfBasedDeriverTypeURL {
-						t.Errorf("GetTypeUrl() = %s, want %s", keyData.GetTypeUrl(), prfBasedDeriverTypeURL)
+					if keyData.GetTypeUrl() != typeURL {
+						t.Errorf("GetTypeUrl() = %s, want %s", keyData.GetTypeUrl(), typeURL)
 					}
 					if keyData.GetKeyMaterialType() != tinkpb.KeyData_SYMMETRIC {
 						t.Errorf("GetKeyMaterialType() = %s, want %s", keyData.GetKeyMaterialType(), tinkpb.KeyData_SYMMETRIC)
@@ -192,8 +191,8 @@ func TestPRFBasedDeriverKeyManagerNewKeyData(t *testing.T) {
 					if err := proto.Unmarshal(keyData.GetValue(), key); err != nil {
 						t.Fatalf("proto.Unmarshal() err = %v, want nil", err)
 					}
-					if key.GetVersion() != prfBasedDeriverKeyVersion {
-						t.Errorf("GetVersion() = %d, want %d", key.GetVersion(), prfBasedDeriverKeyVersion)
+					if key.GetVersion() != 0 {
+						t.Errorf("GetVersion() = %d, want %d", key.GetVersion(), 0)
 					}
 					prfKeyData := key.GetPrfKey()
 					if got, want := prfKeyData.GetTypeUrl(), prf.template.GetTypeUrl(); got != want {
@@ -211,10 +210,10 @@ func TestPRFBasedDeriverKeyManagerNewKeyData(t *testing.T) {
 	}
 }
 
-func TestPRFBasedDeriverKeyManagerNewKeyAndNewKeyDataRejectsIncorrectKeyFormats(t *testing.T) {
-	km, err := registry.GetKeyManager(prfBasedDeriverTypeURL)
+func TestKeyManagerNewKeyAndNewKeyDataRejectsIncorrectKeyFormats(t *testing.T) {
+	km, err := registry.GetKeyManager(typeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", prfBasedDeriverTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", typeURL, err)
 	}
 	missingParamsKeyFormat := &prfderpb.PrfBasedDeriverKeyFormat{
 		PrfKeyTemplate: prf.HKDFSHA256PRFKeyTemplate(),
@@ -259,10 +258,10 @@ func TestPRFBasedDeriverKeyManagerNewKeyAndNewKeyDataRejectsIncorrectKeyFormats(
 	}
 }
 
-func TestPRFBasedDeriverKeyManagerNewKeyAndNewKeyDataRejectsInvalidKeyFormats(t *testing.T) {
-	km, err := registry.GetKeyManager(prfBasedDeriverTypeURL)
+func TestKeyManagerNewKeyAndNewKeyDataRejectsInvalidKeyFormats(t *testing.T) {
+	km, err := registry.GetKeyManager(typeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", prfBasedDeriverTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", typeURL, err)
 	}
 
 	validKeyFormat := &prfderpb.PrfBasedDeriverKeyFormat{
@@ -316,25 +315,25 @@ func TestPRFBasedDeriverKeyManagerNewKeyAndNewKeyDataRejectsInvalidKeyFormats(t 
 	}
 }
 
-func TestPRFBasedDeriverKeyManagerDoesSupport(t *testing.T) {
-	km, err := registry.GetKeyManager(prfBasedDeriverTypeURL)
+func TestKeyManagerDoesSupport(t *testing.T) {
+	km, err := registry.GetKeyManager(typeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", prfBasedDeriverTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", typeURL, err)
 	}
-	if !km.DoesSupport(prfBasedDeriverTypeURL) {
-		t.Errorf("DoesSupport(%q) = false, want true", prfBasedDeriverTypeURL)
+	if !km.DoesSupport(typeURL) {
+		t.Errorf("DoesSupport(%q) = false, want true", typeURL)
 	}
 	if unsupported := "unsupported.key.type"; km.DoesSupport(unsupported) {
 		t.Errorf("DoesSupport(%q) = true, want false", unsupported)
 	}
 }
 
-func TestPRFBasedDeriverKeyManagerTypeURL(t *testing.T) {
-	km, err := registry.GetKeyManager(prfBasedDeriverTypeURL)
+func TestKeyManagerTypeURL(t *testing.T) {
+	km, err := registry.GetKeyManager(typeURL)
 	if err != nil {
-		t.Fatalf("GetKeyManager(%q) err = %v, want nil", prfBasedDeriverTypeURL, err)
+		t.Fatalf("GetKeyManager(%q) err = %v, want nil", typeURL, err)
 	}
-	if km.TypeURL() != prfBasedDeriverTypeURL {
-		t.Errorf("TypeURL() = %q, want %q", km.TypeURL(), prfBasedDeriverTypeURL)
+	if km.TypeURL() != typeURL {
+		t.Errorf("TypeURL() = %q, want %q", km.TypeURL(), typeURL)
 	}
 }
