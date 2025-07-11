@@ -16,11 +16,11 @@ package hpke
 
 import (
 	"crypto/subtle"
-	"errors"
 	"fmt"
 	"math/big"
 
-	pb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
 type context struct {
@@ -34,11 +34,8 @@ type context struct {
 
 // newSenderContext creates the HPKE sender context as per KeySchedule()
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-5.1-10.
-func newSenderContext(recipientPubKey *pb.HpkePublicKey, kem kem, kdf kdf, aead aead, info []byte) (*context, error) {
-	if recipientPubKey.GetPublicKey() == nil {
-		return nil, errors.New("HpkePublicKey has an empty PublicKey")
-	}
-	sharedSecret, encapsulatedKey, err := kem.encapsulate(recipientPubKey.GetPublicKey())
+func newSenderContext(recipientPubKey []byte, kem kem, kdf kdf, aead aead, info []byte) (*context, error) {
+	sharedSecret, encapsulatedKey, err := kem.encapsulate(recipientPubKey)
 	if err != nil {
 		return nil, fmt.Errorf("encapsulate: %v", err)
 	}
@@ -47,11 +44,8 @@ func newSenderContext(recipientPubKey *pb.HpkePublicKey, kem kem, kdf kdf, aead 
 
 // newRecipientContext creates the HPKE recipient context as per KeySchedule()
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-5.1-10.
-func newRecipientContext(encapsulatedKey []byte, recipientPrivKey *pb.HpkePrivateKey, kem kem, kdf kdf, aead aead, info []byte) (*context, error) {
-	if recipientPrivKey.GetPrivateKey() == nil {
-		return nil, errors.New("HpkePrivateKey has an empty PrivateKey")
-	}
-	sharedSecret, err := kem.decapsulate(encapsulatedKey, recipientPrivKey.GetPrivateKey())
+func newRecipientContext(encapsulatedKey []byte, privateKeyBytes secretdata.Bytes, kem kem, kdf kdf, aead aead, info []byte) (*context, error) {
+	sharedSecret, err := kem.decapsulate(encapsulatedKey, privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
 	if err != nil {
 		return nil, fmt.Errorf("decapsulate: %v", err)
 	}
@@ -100,7 +94,7 @@ func maxSequenceNumber(nonceLength int) *big.Int {
 func (c *context) incrementSequenceNumber() error {
 	c.sequenceNumber.Add(c.sequenceNumber, big.NewInt(1))
 	if c.sequenceNumber.Cmp(c.maxSequenceNumber) > 0 {
-		return errors.New("message limit reached")
+		return fmt.Errorf("message limit reached")
 	}
 	return nil
 }

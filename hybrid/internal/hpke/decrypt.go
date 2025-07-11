@@ -18,6 +18,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	pb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
@@ -54,7 +56,8 @@ func (d *Decrypt) Decrypt(ciphertext, contextInfo []byte) ([]byte, error) {
 	encapsulatedKey := ciphertext[:d.encapsulatedKeyLen]
 	aeadCiphertext := ciphertext[d.encapsulatedKeyLen:]
 
-	ctx, err := newRecipientContext(encapsulatedKey, d.recipientPrivKey, d.kem, d.kdf, d.aead, contextInfo)
+	keyBytes := secretdata.NewBytesFromData(d.recipientPrivKey.GetPrivateKey(), insecuresecretdataaccess.Token{})
+	ctx, err := newRecipientContext(encapsulatedKey, keyBytes, d.kem, d.kdf, d.aead, contextInfo)
 	if err != nil {
 		return nil, fmt.Errorf("newRecipientContext: %v", err)
 	}

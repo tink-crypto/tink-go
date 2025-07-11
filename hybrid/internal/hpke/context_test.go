@@ -19,8 +19,9 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle"
-	pb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
 // TODO: b/201070904 - Write tests using baseModeX25519HKDFSHA256Vectors.
@@ -42,8 +43,7 @@ func TestContextSender(t *testing.T) {
 		t.Fatalf("newAEAD(%d): err %q", id.aeadID, err)
 	}
 
-	recipientPubKey := &pb.HpkePublicKey{PublicKey: vec.recipientPubKey}
-	senderCtx, err := newSenderContext(recipientPubKey, kem, kdf, aead, vec.info)
+	senderCtx, err := newSenderContext(vec.recipientPubKey, kem, kdf, aead, vec.info)
 	if err != nil {
 		t.Fatalf("newSenderContext: err %q", err)
 	}
@@ -90,7 +90,7 @@ func TestContextRecipient(t *testing.T) {
 		t.Fatalf("newAEAD(%d): err %q", id.aeadID, err)
 	}
 
-	recipientPrivKey := &pb.HpkePrivateKey{PrivateKey: vec.recipientPrivKey}
+	recipientPrivKey := secretdata.NewBytesFromData(vec.recipientPrivKey, insecuresecretdataaccess.Token{})
 	recipientCtx, err := newRecipientContext(vec.encapsulatedKey, recipientPrivKey, kem, kdf, aead, vec.info)
 	if err != nil {
 		t.Fatalf("newRecipientContext: err %q", err)
@@ -147,7 +147,7 @@ func TestComputeNonce(t *testing.T) {
 		t.Fatalf("newAEAD(%d): err %q", id.aeadID, err)
 	}
 
-	recipientPrivKey := &pb.HpkePrivateKey{PrivateKey: vec.recipientPrivKey}
+	recipientPrivKey := secretdata.NewBytesFromData(vec.recipientPrivKey, insecuresecretdataaccess.Token{})
 	ctx, err := newRecipientContext(vec.encapsulatedKey, recipientPrivKey, kem, kdf, aead, vec.info)
 	if err != nil {
 		t.Fatalf("newRecipientContext: err %q", err)

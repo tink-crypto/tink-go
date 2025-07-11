@@ -46,7 +46,7 @@ func NewEncrypt(recipientPubKey *pb.HpkePublicKey) (*Encrypt, error) {
 
 // Encrypt encrypts plaintext, binding contextInfo to the resulting ciphertext.
 func (e *Encrypt) Encrypt(plaintext, contextInfo []byte) ([]byte, error) {
-	ctx, err := newSenderContext(e.recipientPubKey, e.kem, e.kdf, e.aead, contextInfo)
+	ctx, err := newSenderContext(e.recipientPubKey.GetPublicKey(), e.kem, e.kdf, e.aead, contextInfo)
 	if err != nil {
 		return nil, fmt.Errorf("newSenderContext: %v", err)
 	}
