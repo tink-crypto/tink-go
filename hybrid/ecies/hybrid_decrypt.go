@@ -18,8 +18,10 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/hybrid/internal/ecies"
+	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -30,21 +32,46 @@ type hybridDecrypt struct {
 	variant          Variant
 }
 
+func pointFormatToSubtleString(pointFormat PointFormat) string {
+	switch pointFormat {
+	case CompressedPointFormat:
+		return "COMPRESSED"
+	case UncompressedPointFormat:
+		return "UNCOMPRESSED"
+	case LegacyUncompressedPointFormat:
+		return "DO_NOT_USE_CRUNCHY_UNCOMPRESSED"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 // NewHybridDecrypt creates a new instance of [tink.HybridDecrypt] from a
 // [PrivateKey].
 //
 // This is an internal API.
 func NewHybridDecrypt(privateKey *PrivateKey, _ internalapi.Token) (tink.HybridDecrypt, error) {
-	serializedPrivateKey, err := protoserialization.SerializeKey(privateKey)
+	if privateKey == nil {
+		return nil, fmt.Errorf("privateKey is nil")
+	}
+	params := privateKey.Parameters().(*Parameters)
+	curve, err := subtle.GetCurve(privateKey.Parameters().(*Parameters).CurveType().String())
 	if err != nil {
 		return nil, err
 	}
-	rawHybridDecrypt, err := (&privateKeyKeyManager{}).Primitive(serializedPrivateKey.KeyData().GetValue())
+	pvt := subtle.GetECPrivateKey(curve, privateKey.PrivateKeyBytes().Data(insecuresecretdataaccess.Token{}))
+	rDem, err := ecies.NewDEMHelper(params.DEMParameters())
+	if err != nil {
+		return nil, err
+	}
+	salt := params.Salt()
+	hash := params.HashType().String()
+	pointFormat := pointFormatToSubtleString(params.NISTCurvePointFormat())
+	rawHybridDecrypt, err := subtle.NewECIESAEADHKDFHybridDecrypt(pvt, salt, hash, pointFormat, rDem)
 	if err != nil {
 		return nil, err
 	}
 	return &hybridDecrypt{
-		rawHybridDecrypt: rawHybridDecrypt.(tink.HybridDecrypt),
+		rawHybridDecrypt: rawHybridDecrypt,
 		prefix:           privateKey.OutputPrefix(),
 		variant:          privateKey.Parameters().(*Parameters).Variant(),
 	}, nil

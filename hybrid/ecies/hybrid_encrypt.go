@@ -16,10 +16,12 @@ package ecies
 
 import (
 	"fmt"
+	"math/big"
 	"slices"
 
+	"github.com/tink-crypto/tink-go/v2/hybrid/internal/ecies"
+	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -35,16 +37,38 @@ type hybridEncrypt struct {
 //
 // This is an internal API.
 func NewHybridEncrypt(publicKey *PublicKey, _ internalapi.Token) (tink.HybridEncrypt, error) {
-	serializedPublicKey, err := protoserialization.SerializeKey(publicKey)
+	if publicKey == nil {
+		return nil, fmt.Errorf("publicKey is nil")
+	}
+	params := publicKey.Parameters().(*Parameters)
+	curve, err := subtle.GetCurve(params.CurveType().String())
 	if err != nil {
 		return nil, err
 	}
-	rawHybridEncrypt, err := (&publicKeyKeyManager{}).Primitive(serializedPublicKey.KeyData().GetValue())
+	salt := params.Salt()
+	hash := params.HashType().String()
+	pointFormat := pointFormatToSubtleString(params.NISTCurvePointFormat())
+	xy := publicKey.PublicKeyBytes()[1:]
+	coordinateSize, err := coordinateSizeForCurve(params.CurveType())
+	if err != nil {
+		return nil, err
+	}
+	rDem, err := ecies.NewDEMHelper(params.DEMParameters())
+	if err != nil {
+		return nil, err
+	}
+	rawHybridEncrypt, err := subtle.NewECIESAEADHKDFHybridEncrypt(&subtle.ECPublicKey{
+		Curve: curve,
+		Point: subtle.ECPoint{
+			X: new(big.Int).SetBytes(xy[:coordinateSize]),
+			Y: new(big.Int).SetBytes(xy[coordinateSize:]),
+		},
+	}, salt, hash, pointFormat, rDem)
 	if err != nil {
 		return nil, err
 	}
 	return &hybridEncrypt{
-		rawHybridEncrypt: rawHybridEncrypt.(tink.HybridEncrypt),
+		rawHybridEncrypt: rawHybridEncrypt,
 		prefix:           publicKey.OutputPrefix(),
 		variant:          publicKey.Parameters().(*Parameters).Variant(),
 	}, nil
