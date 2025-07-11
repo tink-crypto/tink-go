@@ -23,43 +23,49 @@ import (
 	"github.com/tink-crypto/tink-go/v2/daead"
 	"github.com/tink-crypto/tink-go/v2/hybrid/internal/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func modifyDecrypt(t *testing.T, c string, k *tinkpb.KeyTemplate) {
+func modifyDecrypt(t *testing.T, c string, keyTemplate *tinkpb.KeyTemplate) {
 	t.Helper()
 	curve, err := subtle.GetCurve(c)
 	if err != nil {
-		t.Fatalf("error getting %s curve: %s ", c, err)
+		t.Fatalf("subtle.GetCurve(%s) err = %v, want nil", c, err)
 	}
 	pvt, err := subtle.GenerateECDHKeyPair(curve)
 	if err != nil {
-		t.Fatalf("error generating ECDH key pair: %s", err)
+		t.Fatalf("subtle.GenerateECDHKeyPair() err = %v, want nil", err)
 	}
 	salt := random.GetRandomBytes(8)
 	pt := random.GetRandomBytes(4)
 	context := random.GetRandomBytes(4)
-	rDem, err := ecies.NewDEMHelper(k)
+
+	parameters, err := protoserialization.ParseParameters(keyTemplate)
 	if err != nil {
-		t.Fatalf("error generating a DEM helper :%s", err)
+		t.Fatalf("protoserialization.ParseParameters() err = %v, want nil", err)
+	}
+	rDem, err := ecies.NewDEMHelper(parameters)
+	if err != nil {
+		t.Fatalf("ecies.NewDEMHelper() err = %v, want nil", err)
 	}
 	e, err := subtle.NewECIESAEADHKDFHybridEncrypt(&pvt.PublicKey, salt, "SHA256", "UNCOMPRESSED", rDem)
 	if err != nil {
-		t.Fatalf("error generating an encryption construct :%s", err)
+		t.Fatalf("subtle.NewECIESAEADHKDFHybridEncrypt() err = %v, want nil", err)
 	}
 	d, err := subtle.NewECIESAEADHKDFHybridDecrypt(pvt, salt, "SHA256", "UNCOMPRESSED", rDem)
 	if err != nil {
-		t.Fatalf("error generating an decryption construct :%s", err)
+		t.Fatalf("subtle.NewECIESAEADHKDFHybridDecrypt() err = %v, want nil", err)
 	}
 	ct, err := e.Encrypt(pt, context)
 	if err != nil {
-		t.Fatalf("encryption error :%s", err)
+		t.Fatalf("e.Encrypt() err = %v, want nil", err)
 	}
 	dt, err := d.Decrypt(ct, context)
 	if err != nil {
-		t.Fatalf("decryption error :%s", err)
+		t.Fatalf("d.Decrypt() err = %v, want nil", err)
 	}
 	if !bytes.Equal(dt, pt) {
 		t.Fatalf("decryption not inverse of encryption")
@@ -83,7 +89,7 @@ func modifyDecrypt(t *testing.T, c string, k *tinkpb.KeyTemplate) {
 			mSalt[i] ^= (1 << uint8(j))
 			d, err = subtle.NewECIESAEADHKDFHybridDecrypt(pvt, mSalt, "SHA256", "UNCOMPRESSED", rDem)
 			if err != nil {
-				t.Fatalf("subtle.NewECIESAEADHKDFHybridDecrypt:%v", err)
+				t.Fatalf("subtle.NewECIESAEADHKDFHybridDecrypt() err = %v, want nil", err)
 			}
 			if _, err := d.Decrypt(ct, context); err == nil {
 				t.Fatalf("invalid salt should throw exception")
@@ -123,6 +129,12 @@ func TestECAESSIVDecrypt(t *testing.T) {
 	modifyDecrypt(t, "NIST_P224", daead.AESSIVKeyTemplate())
 }
 
+func aesSIVKeyTemplateNoPrefix() *tinkpb.KeyTemplate {
+	kt := daead.AESSIVKeyTemplate()
+	kt.OutputPrefixType = tinkpb.OutputPrefixType_RAW
+	return kt
+}
+
 func TestECAESSIVTestVectors(t *testing.T) {
 	// These are the same test vectors used to test the c++ implementation in
 	// //third_party/tink/cc/hybrid/ecies_aead_hkdf_hybrid_decrypt_test.cc.
@@ -155,11 +167,11 @@ func TestECAESSIVTestVectors(t *testing.T) {
 		t.Run(tv.name, func(t *testing.T) {
 			key, err := hex.DecodeString(tv.key)
 			if err != nil {
-				t.Fatalf("error decoding test vector key :%s", err)
+				t.Fatalf("hex.DecodeString(tv.key) err = %v, want nil", err)
 			}
 			ct, err := hex.DecodeString(tv.ciphertext)
 			if err != nil {
-				t.Fatalf("error decoding test vector ciphertext :%s", err)
+				t.Fatalf("hex.DecodeString(tv.ciphertext) err = %v, want nil", err)
 			}
 			ctx := []byte(tv.context)
 			pt := []byte(tv.plaintext)
@@ -170,17 +182,22 @@ func TestECAESSIVTestVectors(t *testing.T) {
 			}
 			pvt := subtle.GetECPrivateKey(curve, key)
 			var salt []byte
-			helper, err := ecies.NewDEMHelper(daead.AESSIVKeyTemplate())
+
+			parameters, err := protoserialization.ParseParameters(aesSIVKeyTemplateNoPrefix())
 			if err != nil {
-				t.Fatalf("error generating a DEM helper :%s", err)
+				t.Fatalf("protoserialization.ParseParameters() err = %v, want nil", err)
+			}
+			helper, err := ecies.NewDEMHelper(parameters)
+			if err != nil {
+				t.Fatalf("ecies.NewDEMHelper() err = %v, want nil", err)
 			}
 			d, err := subtle.NewECIESAEADHKDFHybridDecrypt(pvt, salt, "SHA256", "UNCOMPRESSED", helper)
 			if err != nil {
-				t.Fatalf("error generating an decryption construct :%s", err)
+				t.Fatalf("subtle.NewECIESAEADHKDFHybridDecrypt() err = %v, want nil", err)
 			}
 			dt, err := d.Decrypt(ct, ctx)
 			if err != nil {
-				t.Fatalf("decryption error :%s", err)
+				t.Fatalf("d.Decrypt() err = %v, want nil", err)
 			}
 
 			if !bytes.Equal(dt, pt) {

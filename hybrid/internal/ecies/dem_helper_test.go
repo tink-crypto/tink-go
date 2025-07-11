@@ -16,72 +16,102 @@ package ecies_test
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/v2/aead"
-	"github.com/tink-crypto/tink-go/v2/daead"
+	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/hybrid/internal/ecies"
-	"github.com/tink-crypto/tink-go/v2/mac"
-	"github.com/tink-crypto/tink-go/v2/signature"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-const (
-	aesGCMTypeURL         = "type.googleapis.com/google.crypto.tink.AesGcmKey"
-	aesCTRHMACAEADTypeURL = "type.googleapis.com/google.crypto.tink.AesCtrHmacAeadKey"
-	aesSIVTypeURL         = "type.googleapis.com/google.crypto.tink.AesSivKey"
-)
+type testCase struct {
+	name    string
+	params  key.Parameters
+	keySize uint32
+}
 
-type eciesAEADHKDFDEMHelperTestCase struct {
-	name     string
-	template *tinkpb.KeyTemplate
-	keySize  uint32
+func newAESGCMParameters(keySizeInBytes uint32) *aesgcm.Parameters {
+	params, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: int(keySizeInBytes),
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("aesgcm.NewParameters() err = %v, want nil", err))
+	}
+	return params
+}
+
+func newAESCTRHMACParameters(aesKeySizeInBytes, hmacKeySizeInBytes uint32, hashType aesctrhmac.HashType) *aesctrhmac.Parameters {
+	params, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
+		AESKeySizeInBytes:  int(aesKeySizeInBytes),
+		HMACKeySizeInBytes: int(hmacKeySizeInBytes),
+		HashType:           hashType,
+		IVSizeInBytes:      12,
+		TagSizeInBytes:     16,
+		Variant:            aesctrhmac.VariantNoPrefix,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("aesctrhmac.NewParameters() err = %v, want nil", err))
+	}
+	return params
+}
+
+func newAESSIVParameters(keySizeInBytes uint32) *aessiv.Parameters {
+	params, err := aessiv.NewParameters(int(keySizeInBytes), aessiv.VariantNoPrefix)
+	if err != nil {
+		panic(fmt.Sprintf("aesctrhmac.NewParameters() err = %v, want nil", err))
+	}
+	return params
 }
 
 var (
-	eciesAEADHKDFDEMHelperSupportedAEADs = []eciesAEADHKDFDEMHelperTestCase{
+	supportedAEADTestCases = []testCase{
 		{
-			name:     "AESCTRHMACSHA256",
-			template: aead.AES256CTRHMACSHA256KeyTemplate(),
-			keySize:  64,
+			name:    "AESCTRHMACSHA256",
+			params:  newAESCTRHMACParameters(32, 32, aesctrhmac.SHA256),
+			keySize: 64, // 32 + 32
 		},
 		{
-			name:     "AES128CTRHMACSHA256",
-			template: aead.AES128CTRHMACSHA256KeyTemplate(),
-			keySize:  48,
+			name:    "AES128CTRHMACSHA256",
+			params:  newAESCTRHMACParameters(16, 32, aesctrhmac.SHA256),
+			keySize: 48, // 16 + 32
 		},
 		{
-			name:     "AES256GCM",
-			template: aead.AES256GCMKeyTemplate(),
-			keySize:  32,
+			name:    "AES256GCM",
+			params:  newAESGCMParameters(32),
+			keySize: 32,
 		},
 		{
-			name:     "AES128GCM",
-			template: aead.AES128GCMKeyTemplate(),
-			keySize:  16,
+			name:    "AES128GCM",
+			params:  newAESGCMParameters(16),
+			keySize: 16,
 		},
 	}
 
-	eciesAEADHKDFDEMHelperSupportedDAEADs = []eciesAEADHKDFDEMHelperTestCase{
+	supportedDAEADTestCases = []testCase{
 		{
-			name:     "AESSIV",
-			template: daead.AESSIVKeyTemplate(),
-			keySize:  64,
+			name:    "AESSIV",
+			params:  newAESSIVParameters(64),
+			keySize: 64,
 		},
 	}
 )
 
-func TestECIESAEADHKDFDEMHelper_AEADKeyTemplates(t *testing.T) {
+func TestDEMHelper_AEADKeyTemplates(t *testing.T) {
 	plaintext := random.GetRandomBytes(20)
 	associatedData := random.GetRandomBytes(20)
 
-	for _, tc := range eciesAEADHKDFDEMHelperSupportedAEADs {
+	for _, tc := range supportedAEADTestCases {
 		t.Run(tc.name, func(t *testing.T) {
-			dem, err := ecies.NewDEMHelper(tc.template)
+			dem, err := ecies.NewDEMHelper(tc.params)
 			if err != nil {
-				t.Fatalf("ecies.NewDEMHelper(tc.template) err = %s, want nil", err)
+				t.Fatalf("ecies.NewDEMHelper(tc.params) err = %s, want nil", err)
 			}
 
 			sk := random.GetRandomBytes(dem.GetSymmetricKeySize())
@@ -112,15 +142,15 @@ func TestECIESAEADHKDFDEMHelper_AEADKeyTemplates(t *testing.T) {
 	}
 }
 
-func TestECIESAEADHKDFDEMHelper_DAEADKeyTemplates(t *testing.T) {
+func TestDEMHelper_DAEADKeyTemplates(t *testing.T) {
 	plaintext := random.GetRandomBytes(20)
 	associatedData := random.GetRandomBytes(20)
 
-	for _, tc := range eciesAEADHKDFDEMHelperSupportedDAEADs {
+	for _, tc := range supportedDAEADTestCases {
 		t.Run(tc.name, func(t *testing.T) {
-			dem, err := ecies.NewDEMHelper(tc.template)
+			dem, err := ecies.NewDEMHelper(tc.params)
 			if err != nil {
-				t.Fatalf("ecies.NewDEMHelper(tc.template) err = %s, want nil", err)
+				t.Fatalf("ecies.NewDEMHelper(tc.params) err = %s, want nil", err)
 			}
 
 			sk := random.GetRandomBytes(dem.GetSymmetricKeySize())
@@ -151,16 +181,16 @@ func TestECIESAEADHKDFDEMHelper_DAEADKeyTemplates(t *testing.T) {
 	}
 }
 
-func TestECIESAEADHKDFDEMHelper_KeySizes(t *testing.T) {
-	var testCases []eciesAEADHKDFDEMHelperTestCase
-	testCases = append(testCases, eciesAEADHKDFDEMHelperSupportedAEADs...)
-	testCases = append(testCases, eciesAEADHKDFDEMHelperSupportedDAEADs...)
+func TestDEMHelper_KeySizes(t *testing.T) {
+	var testCases []testCase
+	testCases = append(testCases, supportedAEADTestCases...)
+	testCases = append(testCases, supportedDAEADTestCases...)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			dem, err := ecies.NewDEMHelper(tc.template)
+			dem, err := ecies.NewDEMHelper(tc.params)
 			if err != nil {
-				t.Fatalf("ecies.NewDEMHelper(tc.template): %s", err)
+				t.Fatalf("ecies.NewDEMHelper(tc.params): %s", err)
 			}
 			if dem.GetSymmetricKeySize() != tc.keySize {
 				t.Errorf("dem.GetSymmetricKeySize() = %d, want: %d", dem.GetSymmetricKeySize(), tc.keySize)
@@ -179,40 +209,30 @@ func TestECIESAEADHKDFDEMHelper_KeySizes(t *testing.T) {
 	}
 }
 
-func TestECIESAEADHKDFDEMHelper_UnsupportedKeyTemplates(t *testing.T) {
+type stubParameters struct{}
+
+var _ key.Parameters = (*stubParameters)(nil)
+
+func (stubParameters) HasIDRequirement() bool      { return false }
+func (stubParameters) Equal(_ key.Parameters) bool { return false }
+
+func TestNewDEMHelper_UnsupportedParameters(t *testing.T) {
 	testCases := []struct {
-		name     string
-		template *tinkpb.KeyTemplate
+		name   string
+		params key.Parameters
 	}{
 		{
-			name:     "signature",
-			template: signature.ECDSAP256KeyTemplate(),
+			name:   "unsupported_parameters",
+			params: &stubParameters{},
 		},
 		{
-			name:     "mac",
-			template: mac.HMACSHA256Tag256KeyTemplate(),
-		},
-		{
-			name:     "invalid_type_and_value",
-			template: &tinkpb.KeyTemplate{TypeUrl: "some url", Value: []byte{0}},
-		},
-		{
-			name:     "aesctrhmac_empty_value",
-			template: &tinkpb.KeyTemplate{TypeUrl: aesCTRHMACAEADTypeURL},
-		},
-		{
-			name:     "aesgcm_empty_value",
-			template: &tinkpb.KeyTemplate{TypeUrl: aesGCMTypeURL},
-		},
-		{
-			name:     "aessiv_empty_value",
-			template: &tinkpb.KeyTemplate{TypeUrl: aesSIVTypeURL},
+			name:   "nil",
+			params: nil,
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := ecies.NewDEMHelper(tc.template); err == nil {
+			if _, err := ecies.NewDEMHelper(tc.params); err == nil {
 				t.Errorf("ecies.NewDEMHelper() err = nil, want non-nil")
 			}
 		})

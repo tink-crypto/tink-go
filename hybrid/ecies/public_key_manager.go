@@ -23,6 +23,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/hybrid/internal/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	eahpb "github.com/tink-crypto/tink-go/v2/proto/ecies_aead_hkdf_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -36,6 +38,30 @@ type publicKeyKeyManager struct{}
 
 // Assert that publicKeyKeyManager implements the KeyManager interface.
 var _ registry.KeyManager = (*publicKeyKeyManager)(nil)
+
+// getDEMParams returns the DEM parameters from the serialized ECIES public key.
+//
+// Parsing the serialized key makes sure that the DEM parameters get the correct
+// variant.
+func getDEMParamsFromSerializedPublicKey(serializedKey []byte) (key.Parameters, error) {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         publicKeyTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
+		return nil, err
+	}
+	privateKey, err := protoserialization.ParseKey(keySerialization)
+	if err != nil {
+		return nil, err
+	}
+	eciesPublicKey, ok := privateKey.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T, want %T", privateKey, (*PublicKey)(nil))
+	}
+	return eciesPublicKey.Parameters().(*Parameters).DEMParameters(), nil
+}
 
 // Primitive creates an ECIESAEADHKDFPublicKey subtle for the given serialized ECIESAEADHKDFPublicKey proto.
 func (km *publicKeyKeyManager) Primitive(serializedKey []byte) (any, error) {
@@ -61,7 +87,11 @@ func (km *publicKeyKeyManager) Primitive(serializedKey []byte) (any, error) {
 			Y: new(big.Int).SetBytes(key.GetY()),
 		},
 	}
-	rDem, err := ecies.NewDEMHelper(params.GetDemParams().GetAeadDem())
+	demParams, err := getDEMParamsFromSerializedPublicKey(serializedKey)
+	if err != nil {
+		return nil, err
+	}
+	rDem, err := ecies.NewDEMHelper(demParams)
 	if err != nil {
 		return nil, err
 	}

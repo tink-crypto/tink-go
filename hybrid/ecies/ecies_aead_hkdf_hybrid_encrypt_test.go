@@ -22,40 +22,46 @@ import (
 	"github.com/tink-crypto/tink-go/v2/daead"
 	"github.com/tink-crypto/tink-go/v2/hybrid/internal/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func basicMultipleEncrypts(t *testing.T, c string, k *tinkpb.KeyTemplate) {
+func basicMultipleEncrypts(t *testing.T, c string, keyTemplate *tinkpb.KeyTemplate) {
 	t.Helper()
 	curve, err := subtle.GetCurve(c)
 	if err != nil {
-		t.Fatalf("error getting %s curve: %s ", c, err)
+		t.Fatalf("subtle.GetCurve(%s) err = %v, want nil", c, err)
 	}
 	pvt, err := subtle.GenerateECDHKeyPair(curve)
 	if err != nil {
-		t.Fatalf("error generating ECDH key pair: %s", err)
+		t.Fatalf("subtle.GenerateECDHKeyPair() err = %v, want nil", err)
 	}
 	salt := []byte("some salt")
 	pt := random.GetRandomBytes(20)
 	context := []byte("context info")
-	rDem, err := ecies.NewDEMHelper(k)
+
+	parameters, err := protoserialization.ParseParameters(keyTemplate)
 	if err != nil {
-		t.Fatalf("error generating a DEM helper :%s", err)
+		t.Fatalf("protoserialization.ParseParameters() err = %v, want nil", err)
+	}
+	rDem, err := ecies.NewDEMHelper(parameters)
+	if err != nil {
+		t.Fatalf("ecies.NewDEMHelper() err = %v, want nil", err)
 	}
 	e, err := subtle.NewECIESAEADHKDFHybridEncrypt(&pvt.PublicKey, salt, "SHA256", "UNCOMPRESSED", rDem)
 	if err != nil {
-		t.Fatalf("error generating an encryption construct :%s", err)
+		t.Fatalf("subtle.NewECIESAEADHKDFHybridEncrypt() err = %v, want nil", err)
 	}
 	d, err := subtle.NewECIESAEADHKDFHybridDecrypt(pvt, salt, "SHA256", "UNCOMPRESSED", rDem)
 	if err != nil {
-		t.Fatalf("error generating an decryption construct :%s", err)
+		t.Fatalf("subtle.NewECIESAEADHKDFHybridDecrypt() err = %v, want nil", err)
 	}
 	cl := [][]byte{}
 	for i := 0; i < 8; i++ {
 		ct, err := e.Encrypt(pt, context)
 		if err != nil {
-			t.Fatalf("encryption error :%s", err)
+			t.Fatalf("e.Encrypt() err = %v, want nil", err)
 		}
 		for _, c := range cl {
 			if bytes.Equal(ct, c) {
@@ -65,14 +71,14 @@ func basicMultipleEncrypts(t *testing.T, c string, k *tinkpb.KeyTemplate) {
 		cl = append(cl, ct)
 		dt, err := d.Decrypt(ct, context)
 		if err != nil {
-			t.Fatalf("decryption error :%s", err)
+			t.Fatalf("d.Decrypt() err = %v, want nil", err)
 		}
 		if !bytes.Equal(dt, pt) {
-			t.Fatalf("decryption not inverse of encryption")
+			t.Fatalf("d.Decrypt() = %v, want %v", dt, pt)
 		}
 	}
 	if len(cl) != 8 {
-		t.Errorf("randomized encryption check failed")
+		t.Errorf("len(cl) = %v, want 8", len(cl))
 	}
 }
 

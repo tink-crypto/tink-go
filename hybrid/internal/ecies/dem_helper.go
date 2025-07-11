@@ -12,161 +12,95 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package ecies provides a helper for creating [tink.AEAD] or
+// [tink.DeterministicAEAD] primitives for the specified [tink.Parameters] and
+// key material.
 package ecies
 
 import (
-	"errors"
 	"fmt"
-	"strings"
 
-	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
+	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/tink"
-	ctrhmacpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
-	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
-	sivpb "github.com/tink-crypto/tink-go/v2/proto/aes_siv_go_proto"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-const (
-	aesGCMTypeURL         = "type.googleapis.com/google.crypto.tink.AesGcmKey"
-	aesCTRHMACAEADTypeURL = "type.googleapis.com/google.crypto.tink.AesCtrHmacAeadKey"
-	aesSIVTypeURL         = "type.googleapis.com/google.crypto.tink.AesSivKey"
-)
-
-// DEMHelper generates AEAD or DeterministicAEAD primitives for the specified KeyTemplate and key material.
-// in order to implement the EciesAEADHKDFDEMHelper interface.
+// DEMHelper provides a helper for creating [tink.AEAD] or
+// [tink.DeterministicAEAD] primitives for the specified [tink.Parameters] and
+// key material.
+//
+// Implements [subtle.EciesAEADHKDFDEMHelper].
 type DEMHelper struct {
-	demKeyURL        string
-	keyData          []byte
-	symmetricKeySize uint32
-	aesCTRSize       uint32
+	params                     key.Parameters
+	wantKeyMaterialSizeInBytes uint32
 }
 
 var _ subtle.EciesAEADHKDFDEMHelper = (*DEMHelper)(nil)
 
 // NewDEMHelper initializes and returns a RegisterECIESAEADHKDFDemHelper
-func NewDEMHelper(k *tinkpb.KeyTemplate) (*DEMHelper, error) {
-	var len uint32
-	var aesCTRSize uint32
-	var keyFormat []byte
-
-	if strings.Compare(k.TypeUrl, aesGCMTypeURL) == 0 {
-		gcmKeyFormat := new(gcmpb.AesGcmKeyFormat)
-		var err error
-		if err = proto.Unmarshal(k.Value, gcmKeyFormat); err != nil {
-			return nil, err
-		}
-		len = gcmKeyFormat.KeySize
-		keyFormat, err = proto.Marshal(gcmKeyFormat)
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize key format, error :%v", err)
-		}
-	} else if strings.Compare(k.TypeUrl, aesCTRHMACAEADTypeURL) == 0 {
-		aeadKeyFormat := new(ctrhmacpb.AesCtrHmacAeadKeyFormat)
-		var err error
-		if err = proto.Unmarshal(k.Value, aeadKeyFormat); err != nil {
-			return nil, err
-		}
-		if aeadKeyFormat.AesCtrKeyFormat == nil || aeadKeyFormat.HmacKeyFormat == nil {
-			return nil, fmt.Errorf("failed to deserialize key format")
-		}
-		aesCTRSize = aeadKeyFormat.AesCtrKeyFormat.KeySize
-		len = aesCTRSize + aeadKeyFormat.HmacKeyFormat.KeySize
-		keyFormat, err = proto.Marshal(aeadKeyFormat)
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize key format, error :%v", err)
-		}
-	} else if strings.Compare(k.TypeUrl, aesSIVTypeURL) == 0 {
-		daeadKeyFormat := new(sivpb.AesSivKeyFormat)
-		var err error
-		if err = proto.Unmarshal(k.Value, daeadKeyFormat); err != nil {
-			return nil, err
-		}
-		len = daeadKeyFormat.KeySize
-		keyFormat, err = proto.Marshal(daeadKeyFormat)
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize key format, error :%v", err)
-		}
-	} else {
-		return nil, fmt.Errorf("unsupported AEAD DEM key type: %s", k.TypeUrl)
-	}
-	km, err := registry.GetKeyManager(k.TypeUrl)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch KeyManager, error: %v", err)
-	}
-
-	key, err := km.NewKey(keyFormat)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch key, error: %v", err)
-	}
-	sk, err := proto.Marshal(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize key, error: %v", err)
+func NewDEMHelper(p key.Parameters) (*DEMHelper, error) {
+	var wantKeyMaterialSizeInBytes uint32
+	switch params := p.(type) {
+	case *aesgcm.Parameters:
+		wantKeyMaterialSizeInBytes = uint32(params.KeySizeInBytes())
+	case *aessiv.Parameters:
+		wantKeyMaterialSizeInBytes = uint32(params.KeySizeInBytes())
+	case *aesctrhmac.Parameters:
+		wantKeyMaterialSizeInBytes = uint32(params.AESKeySizeInBytes() + params.HMACKeySizeInBytes())
+	default:
+		return nil, fmt.Errorf("unsupported AEAD DEM key type: %T", p)
 	}
 
 	return &DEMHelper{
-		demKeyURL:        k.TypeUrl,
-		keyData:          sk,
-		symmetricKeySize: len,
-		aesCTRSize:       aesCTRSize,
+		params:                     p,
+		wantKeyMaterialSizeInBytes: wantKeyMaterialSizeInBytes,
 	}, nil
 }
 
 // GetSymmetricKeySize returns the symmetric key size
-func (r *DEMHelper) GetSymmetricKeySize() uint32 {
-	return r.symmetricKeySize
-}
+func (r *DEMHelper) GetSymmetricKeySize() uint32 { return r.wantKeyMaterialSizeInBytes }
 
 // GetAEADOrDAEAD returns the AEAD or deterministic AEAD primitive from the DEM
 func (r *DEMHelper) GetAEADOrDAEAD(symmetricKeyValue []byte) (any, error) {
-	var sk []byte
 	if uint32(len(symmetricKeyValue)) != r.GetSymmetricKeySize() {
-		return nil, errors.New("symmetric key has incorrect length")
-	}
-	if strings.Compare(r.demKeyURL, aesGCMTypeURL) == 0 {
-		gcmKey := new(gcmpb.AesGcmKey)
-		var err error
-		if err := proto.Unmarshal(r.keyData, gcmKey); err != nil {
-			return nil, err
-		}
-		gcmKey.KeyValue = symmetricKeyValue
-		sk, err = proto.Marshal(gcmKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize key, error: %v", err)
-		}
-
-	} else if strings.Compare(r.demKeyURL, aesCTRHMACAEADTypeURL) == 0 {
-		aesCTR := new(ctrhmacpb.AesCtrHmacAeadKey)
-		var err error
-		if err := proto.Unmarshal(r.keyData, aesCTR); err != nil {
-			return nil, err
-		}
-		aesCTR.AesCtrKey.KeyValue = symmetricKeyValue[:r.aesCTRSize]
-		aesCTR.HmacKey.KeyValue = symmetricKeyValue[r.aesCTRSize:]
-		sk, err = proto.Marshal(aesCTR)
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize key, error: %v", err)
-		}
-
-	} else if strings.Compare(r.demKeyURL, aesSIVTypeURL) == 0 {
-		sivKey := new(sivpb.AesSivKey)
-		var err error
-		if err := proto.Unmarshal(r.keyData, sivKey); err != nil {
-			return nil, err
-		}
-		sivKey.KeyValue = symmetricKeyValue
-		sk, err = proto.Marshal(sivKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize key, error: %v", err)
-		}
-
-	} else {
-		return nil, fmt.Errorf("unsupported AEAD DEM key type: %s", r.demKeyURL)
+		return nil, fmt.Errorf("symmetric key has incorrect length: got %d, want %d", len(symmetricKeyValue), r.GetSymmetricKeySize())
 	}
 
-	p, err := registry.Primitive(r.demKeyURL, sk)
+	var k key.Key
+	var err error
+	switch params := r.params.(type) {
+	case *aesgcm.Parameters:
+		k, err = aesgcm.NewKey(secretdata.NewBytesFromData(symmetricKeyValue, insecuresecretdataaccess.Token{}), 0, params)
+		if err != nil {
+			return nil, err
+		}
+	case *aessiv.Parameters:
+		k, err = aessiv.NewKey(secretdata.NewBytesFromData(symmetricKeyValue, insecuresecretdataaccess.Token{}), 0, params)
+		if err != nil {
+			return nil, err
+		}
+	case *aesctrhmac.Parameters:
+		k, err = aesctrhmac.NewKey(aesctrhmac.KeyOpts{
+			AESKeyBytes:   secretdata.NewBytesFromData(symmetricKeyValue[:params.AESKeySizeInBytes()], insecuresecretdataaccess.Token{}),
+			HMACKeyBytes:  secretdata.NewBytesFromData(symmetricKeyValue[params.AESKeySizeInBytes():], insecuresecretdataaccess.Token{}),
+			IDRequirement: 0,
+			Parameters:    params,
+		})
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported AEAD DEM key type: %T", r.params)
+	}
+
+	p, err := (&registryconfig.RegistryConfig{}).PrimitiveFromKey(k, internalapi.Token{})
 	if err != nil {
 		return nil, err
 	}

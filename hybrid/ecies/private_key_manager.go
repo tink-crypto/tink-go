@@ -22,6 +22,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/hybrid/internal/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	eciespb "github.com/tink-crypto/tink-go/v2/proto/ecies_aead_hkdf_go_proto"
@@ -39,26 +41,55 @@ type privateKeyKeyManager struct{}
 
 var _ registry.PrivateKeyManager = (*privateKeyKeyManager)(nil)
 
+// getDEMParams returns the DEM parameters from the serialized ECIES private key.
+//
+// Parsing the serialized key makes sure that the DEM parameters get the correct
+// variant.
+func getDEMParamsFromSerializedPrivateKey(serializedKey []byte) (key.Parameters, error) {
+	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         privateKeyTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
+		return nil, err
+	}
+	privateKey, err := protoserialization.ParseKey(keySerialization)
+	if err != nil {
+		return nil, err
+	}
+	eciesPrivateKey, ok := privateKey.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T, want %T", privateKey, (*PrivateKey)(nil))
+	}
+	return eciesPrivateKey.Parameters().(*Parameters).DEMParameters(), nil
+}
+
 // Primitive creates a [subtle.ECIESAEADHKDFHybridDecrypt] subtle for the given
 // serialized [eciespb.ECIESAEADHKDFPrivateKey] proto.
 func (km *privateKeyKeyManager) Primitive(serializedKey []byte) (any, error) {
 	if len(serializedKey) == 0 {
 		return nil, fmt.Errorf("ecies_aead_hkdf_private_key_manager: invalid key size")
 	}
-	key := new(eciespb.EciesAeadHkdfPrivateKey)
-	if err := proto.Unmarshal(serializedKey, key); err != nil {
+	protoKey := new(eciespb.EciesAeadHkdfPrivateKey)
+	if err := proto.Unmarshal(serializedKey, protoKey); err != nil {
 		return nil, fmt.Errorf("ecies_aead_hkdf_private_key_manager: %v", err)
 	}
-	if err := km.validateKey(key); err != nil {
+	if err := km.validateKey(protoKey); err != nil {
 		return nil, fmt.Errorf("ecies_aead_hkdf_private_key_manager: %v", err)
 	}
-	params := key.GetPublicKey().GetParams()
+	params := protoKey.GetPublicKey().GetParams()
 	curve, err := subtle.GetCurve(params.GetKemParams().GetCurveType().String())
 	if err != nil {
 		return nil, err
 	}
-	pvt := subtle.GetECPrivateKey(curve, key.GetKeyValue())
-	rDem, err := ecies.NewDEMHelper(params.GetDemParams().GetAeadDem())
+	pvt := subtle.GetECPrivateKey(curve, protoKey.GetKeyValue())
+
+	demParams, err := getDEMParamsFromSerializedPrivateKey(serializedKey)
+	if err != nil {
+		return nil, err
+	}
+	rDem, err := ecies.NewDEMHelper(demParams)
 	if err != nil {
 		return nil, err
 	}
