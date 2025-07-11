@@ -26,6 +26,11 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
+const (
+	privateKeyTypeURL = "type.googleapis.com/google.crypto.tink.HpkePrivateKey"
+	publicKeyTypeURL  = "type.googleapis.com/google.crypto.tink.HpkePublicKey"
+)
+
 func serializeKEMID(kemID KEMID) (hpkepb.HpkeKem, error) {
 	switch kemID {
 	case DHKEM_X25519_HKDF_SHA256:

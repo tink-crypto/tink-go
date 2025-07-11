@@ -25,6 +25,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/hybrid/internal/hpke"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/subtle"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
@@ -158,7 +159,7 @@ func TestPublicKeyManagerPrimitiveEncryptDecrypt(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Primitive() err = %v, want nil", err)
 				}
-				enc, ok := e.(*hpke.Encrypt)
+				enc, ok := e.(tink.HybridEncrypt)
 				if !ok {
 					t.Fatal("primitive is not Encrypt")
 				}

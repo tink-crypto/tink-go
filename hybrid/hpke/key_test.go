@@ -20,9 +20,12 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/hybrid/hpke"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
@@ -747,6 +750,89 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 			}
 			if privateKey1.Equal(privateKey2) {
 				t.Errorf("privateKey1.Equal(privateKey2) = true, want false")
+			}
+		})
+	}
+}
+
+func TestPrivateKeyCreator(t *testing.T) {
+	params, err := hpke.NewParameters(hpke.ParametersOpts{
+		KEMID:   hpke.DHKEM_P256_HKDF_SHA256,
+		KDFID:   hpke.HKDFSHA256,
+		AEADID:  hpke.AES256GCM,
+		Variant: hpke.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("hpke.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keygenregistry.CreateKey(params, 0x1234)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) err = %v, want nil", params, err)
+	}
+	hpkePrivateKey, ok := key.(*hpke.PrivateKey)
+	if !ok {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) returned key of type %T, want %T", params, key, (*hpke.PrivateKey)(nil))
+	}
+	idRequirement, hasIDRequirement := hpkePrivateKey.IDRequirement()
+	if !hasIDRequirement || idRequirement != 0x1234 {
+		t.Errorf("hpkePrivateKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 123, true)
+	}
+	if diff := cmp.Diff(hpkePrivateKey.Parameters(), params); diff != "" {
+		t.Errorf("hpkePrivateKey.Parameters() diff (-want +got):\n%s", diff)
+	}
+
+	publicKey, err := hpkePrivateKey.PublicKey()
+	if err != nil {
+		t.Fatalf("hpkePrivateKey.PublicKey() err = %v, want nil", err)
+	}
+	hpkePublicKey, ok := publicKey.(*hpke.PublicKey)
+	if !ok {
+		t.Fatalf("hpkePrivateKey.PublicKey() returned key of type %T, want %T", publicKey, (*hpke.PublicKey)(nil))
+	}
+
+	// Make sure we can encrypt/decrypt with the key.
+	encrypter, err := hpke.NewHybridEncrypt(hpkePublicKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("hpke.NewHybridEncrypt() err = %v, want nil", err)
+	}
+	ciphertext, err := encrypter.Encrypt([]byte("hello world"), []byte("hello world"))
+	if err != nil {
+		t.Fatalf("encrypter.Encrypt() err = %v, want nil", err)
+	}
+	decrypter, err := hpke.NewHybridDecrypt(hpkePrivateKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("hpke.NewHybridDecrypt() err = %v, want nil", err)
+	}
+	got, err := decrypter.Decrypt(ciphertext, []byte("hello world"))
+	if err != nil {
+		t.Fatalf("decrypter.Decrypt() err = %v, want nil", err)
+	}
+	if diff := cmp.Diff(got, []byte("hello world")); diff != "" {
+		t.Errorf("decrypter.Decrypt() diff (-want +got):\n%s", diff)
+	}
+}
+
+func TestPrivateKeyCreator_FailsWithInvalidParameters(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		params        *hpke.Parameters
+		idRequirement uint32
+	}{
+		{
+			name: "invalid id requirement",
+			params: mustCreateParameters(t, hpke.ParametersOpts{
+				KEMID:   hpke.DHKEM_P256_HKDF_SHA256,
+				KDFID:   hpke.HKDFSHA256,
+				AEADID:  hpke.AES256GCM,
+				Variant: hpke.VariantNoPrefix,
+			}),
+			idRequirement: 0x1234,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := keygenregistry.CreateKey(tc.params, tc.idRequirement); err == nil {
+				t.Errorf("keygenregistry.CreateKey(%v, %v) err = nil, want error", tc.params, tc.idRequirement)
 			}
 		})
 	}

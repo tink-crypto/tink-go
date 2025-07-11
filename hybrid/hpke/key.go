@@ -17,6 +17,7 @@ package hpke
 import (
 	"bytes"
 	"crypto/ecdh"
+	"crypto/rand"
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
@@ -204,4 +205,20 @@ func (k *PrivateKey) Equal(other key.Key) bool {
 	otherKey, ok := other.(*PrivateKey)
 	return ok && k.publicKey.Equal(otherKey.publicKey) &&
 		k.privateKeyBytes.Equal(otherKey.privateKeyBytes)
+}
+
+func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	hpkeParams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: %T, want %T", p, (*Parameters)(nil))
+	}
+	curve, err := ecdhCurveFromKEMID(hpkeParams.KEMID())
+	if err != nil {
+		return nil, err
+	}
+	privKeyBytes, err := curve.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	return NewPrivateKey(secretdata.NewBytesFromData(privKeyBytes.Bytes(), insecuresecretdataaccess.Token{}), idRequirement, hpkeParams)
 }

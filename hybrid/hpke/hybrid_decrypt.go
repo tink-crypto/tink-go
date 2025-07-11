@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 
+	internalhpke "github.com/tink-crypto/tink-go/v2/hybrid/internal/hpke"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -39,12 +40,16 @@ func NewHybridDecrypt(privateKey *PrivateKey, _ internalapi.Token) (tink.HybridD
 	if err != nil {
 		return nil, err
 	}
-	rawHybridDecrypt, err := (&privateKeyManager{}).Primitive(serializedPrivateKey.KeyData().GetValue())
+	protoPrivateKey, err := unmarshalHpkePrivateKey(serializedPrivateKey.KeyData().GetValue())
+	if err != nil {
+		return nil, err
+	}
+	rawHybridDecrypt, err := internalhpke.NewDecrypt(protoPrivateKey)
 	if err != nil {
 		return nil, err
 	}
 	return &hybridDecrypt{
-		rawHybridDecrypt: rawHybridDecrypt.(tink.HybridDecrypt),
+		rawHybridDecrypt: rawHybridDecrypt,
 		prefix:           privateKey.OutputPrefix(),
 		variant:          privateKey.Parameters().(*Parameters).Variant(),
 	}, nil

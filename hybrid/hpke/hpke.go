@@ -18,18 +18,33 @@ package hpke
 import (
 	"fmt"
 
+	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
+	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
+func unmarshalHpkePublicKey(b []byte) (*hpkepb.HpkePublicKey, error) {
+	protoKey := &hpkepb.HpkePublicKey{}
+	if err := proto.Unmarshal(b, protoKey); err != nil {
+		return nil, err
+	}
+	return protoKey, nil
+}
+
+func unmarshalHpkePrivateKey(b []byte) (*hpkepb.HpkePrivateKey, error) {
+	protoKey := &hpkepb.HpkePrivateKey{}
+	if err := proto.Unmarshal(b, protoKey); err != nil {
+		return nil, err
+	}
+	return protoKey, nil
+}
+
 func init() {
-	if err := registry.RegisterKeyManager(new(publicKeyManager)); err != nil {
-		panic(fmt.Sprintf("hpke.init() failed: %v", err))
-	}
-	if err := registry.RegisterKeyManager(new(privateKeyManager)); err != nil {
-		panic(fmt.Sprintf("hpke.init() failed: %v", err))
-	}
 	if err := protoserialization.RegisterKeySerializer[*PublicKey](&publicKeySerializer{}); err != nil {
 		panic(fmt.Sprintf("hpke.init() failed: %v", err))
 	}
@@ -52,6 +67,19 @@ func init() {
 		panic(fmt.Sprintf("hpke.init() failed: %v", err))
 	}
 	if err := registryconfig.RegisterPrimitiveConstructor[*PrivateKey](hybridDecryptConstructor); err != nil {
+		panic(fmt.Sprintf("hpke.init() failed: %v", err))
+	}
+	if err := keygenregistry.RegisterKeyCreator[*Parameters](createPrivateKey); err != nil {
+		panic(fmt.Sprintf("hpke.init() failed: %v", err))
+	}
+	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManager(privateKeyTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func(b []byte) (proto.Message, error) {
+		return unmarshalHpkePrivateKey(b)
+	})); err != nil {
+		panic(fmt.Sprintf("hpke.init() failed: %v", err))
+	}
+	if err := registry.RegisterKeyManager(legacykeymanager.New(publicKeyTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PUBLIC, func(b []byte) (proto.Message, error) {
+		return unmarshalHpkePublicKey(b)
+	})); err != nil {
 		panic(fmt.Sprintf("hpke.init() failed: %v", err))
 	}
 }

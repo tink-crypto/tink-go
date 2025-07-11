@@ -25,6 +25,7 @@ import (
 	_ "github.com/tink-crypto/tink-go/v2/hybrid/hpke" // Import to register the HPKE key managers.
 	"github.com/tink-crypto/tink-go/v2/hybrid/internal/hpke"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -171,7 +172,7 @@ func TestPrivateKeyManagerPrimitiveEncryptDecrypt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Primitive() err = %v, want nil", err)
 		}
-		dec, ok := d.(*hpke.Decrypt)
+		dec, ok := d.(tink.HybridDecrypt)
 		if !ok {
 			t.Fatal("primitive is not Decrypt")
 		}
@@ -313,7 +314,7 @@ func TestPrivateKeyManagerNewKeyEncryptDecrypt(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Primitive() err = %v, want nil", err)
 				}
-				dec, ok := d.(*hpke.Decrypt)
+				dec, ok := d.(tink.HybridDecrypt)
 				if !ok {
 					t.Fatal("primitive is not Decrypt")
 				}
