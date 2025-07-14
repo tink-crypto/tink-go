@@ -29,15 +29,15 @@ func TestX25519KEMEncapsulateBoringSSLVectors(t *testing.T) {
 	vecs := hpkeBaseModeVectors(t)
 	for key, vec := range vecs {
 		if key.mode != baseMode ||
-			key.kemID != x25519HKDFSHA256 ||
-			key.kdfID != hkdfSHA256 ||
-			(key.aeadID != aes128GCM && key.aeadID != aes256GCM && key.aeadID != chaCha20Poly1305) {
+			key.kemID != X25519HKDFSHA256 ||
+			key.kdfID != HKDFSHA256 ||
+			(key.aeadID != AES128GCM && key.aeadID != AES256GCM && key.aeadID != ChaCha20Poly1305) {
 			continue
 		}
 
 		i++
 		t.Run(fmt.Sprintf("%d", key.id), func(t *testing.T) {
-			kem, err := newKEM(x25519HKDFSHA256)
+			kem, err := newKEM(X25519HKDFSHA256)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -67,7 +67,7 @@ func TestX25519KEMEncapsulateBoringSSLVectors(t *testing.T) {
 
 func TestX25519KEMEncapsulateBadRecipientPubKey(t *testing.T) {
 	_, v := rfcVectorA1(t)
-	kem, err := newKEM(x25519HKDFSHA256)
+	kem, err := newKEM(X25519HKDFSHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestX25519KEMEncapsulateBadRecipientPubKey(t *testing.T) {
 
 func TestX25519KEMEncapsulateBadSenderPrivKey(t *testing.T) {
 	_, v := rfcVectorA1(t)
-	kem, err := newKEM(x25519HKDFSHA256)
+	kem, err := newKEM(X25519HKDFSHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,15 +98,15 @@ func TestX25519KEMDecapsulateBoringSSLVectors(t *testing.T) {
 	vecs := hpkeBaseModeVectors(t)
 	for key, vec := range vecs {
 		if key.mode != baseMode ||
-			key.kemID != x25519HKDFSHA256 ||
-			key.kdfID != hkdfSHA256 ||
-			(key.aeadID != aes128GCM && key.aeadID != aes256GCM && key.aeadID != chaCha20Poly1305) {
+			key.kemID != X25519HKDFSHA256 ||
+			key.kdfID != HKDFSHA256 ||
+			(key.aeadID != AES128GCM && key.aeadID != AES256GCM && key.aeadID != ChaCha20Poly1305) {
 			continue
 		}
 
 		i++
 		t.Run(fmt.Sprintf("%d", key.id), func(t *testing.T) {
-			kem, err := newKEM(x25519HKDFSHA256)
+			kem, err := newKEM(X25519HKDFSHA256)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -132,7 +132,7 @@ func TestX25519KEMDecapsulateBoringSSLVectors(t *testing.T) {
 // --that decapsulate does not modify the larger slice.
 func TestX25519KEMDecapsulateEncapsulatedKeyPrefixesLargerSlice(t *testing.T) {
 	_, v := rfcVectorA1(t)
-	kem, err := newKEM(x25519HKDFSHA256)
+	kem, err := newKEM(X25519HKDFSHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestX25519KEMDecapsulateEncapsulatedKeyPrefixesLargerSlice(t *testing.T) {
 
 func TestX25519KEMDecapsulateBadEncapsulatedKey(t *testing.T) {
 	_, v := rfcVectorA1(t)
-	kem, err := newKEM(x25519HKDFSHA256)
+	kem, err := newKEM(X25519HKDFSHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestX25519KEMDecapsulateBadEncapsulatedKey(t *testing.T) {
 
 func TestX25519KEMDecapsulateBadRecipientPrivKey(t *testing.T) {
 	_, v := rfcVectorA1(t)
-	kem, err := newKEM(x25519HKDFSHA256)
+	kem, err := newKEM(X25519HKDFSHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,11 +183,11 @@ func TestX25519KEMDecapsulateBadRecipientPrivKey(t *testing.T) {
 }
 
 func TestX25519KEMEncapsulatedKeyLength(t *testing.T) {
-	kem, err := newKEM(x25519HKDFSHA256)
+	kem, err := newKEM(X25519HKDFSHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if kem.encapsulatedKeyLength() != kemLengths[x25519HKDFSHA256].nEnc {
-		t.Errorf("encapsulatedKeyLength: got %d, want %d", kem.encapsulatedKeyLength(), kemLengths[x25519HKDFSHA256].nEnc)
+	if kem.encapsulatedKeyLength() != kemLengths[X25519HKDFSHA256].nEnc {
+		t.Errorf("encapsulatedKeyLength: got %d, want %d", kem.encapsulatedKeyLength(), kemLengths[X25519HKDFSHA256].nEnc)
 	}
 }

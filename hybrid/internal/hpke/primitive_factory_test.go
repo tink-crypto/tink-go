@@ -24,12 +24,12 @@ import (
 var kems = []struct {
 	name  string
 	proto pb.HpkeKem
-	id    uint16
+	id    KEMID
 }{
-	{name: "DHKEM_P256_HKDF_SHA256", proto: pb.HpkeKem_DHKEM_P256_HKDF_SHA256, id: p256HKDFSHA256},
-	{name: "DHKEM_P384_HKDF_SHA384", proto: pb.HpkeKem_DHKEM_P384_HKDF_SHA384, id: p384HKDFSHA384},
-	{name: "DHKEM_P521_HKDF_SHA512", proto: pb.HpkeKem_DHKEM_P521_HKDF_SHA512, id: p521HKDFSHA512},
-	{name: "DHKEM_X25519_HKDF_SHA256", proto: pb.HpkeKem_DHKEM_X25519_HKDF_SHA256, id: x25519HKDFSHA256},
+	{name: "DHKEM_P256_HKDF_SHA256", proto: pb.HpkeKem_DHKEM_P256_HKDF_SHA256, id: P256HKDFSHA256},
+	{name: "DHKEM_P384_HKDF_SHA384", proto: pb.HpkeKem_DHKEM_P384_HKDF_SHA384, id: P384HKDFSHA384},
+	{name: "DHKEM_P521_HKDF_SHA512", proto: pb.HpkeKem_DHKEM_P521_HKDF_SHA512, id: P521HKDFSHA512},
+	{name: "DHKEM_X25519_HKDF_SHA256", proto: pb.HpkeKem_DHKEM_X25519_HKDF_SHA256, id: X25519HKDFSHA256},
 }
 
 func TestNewKEM(t *testing.T) {
@@ -69,11 +69,11 @@ func TestKEMIDFromProtoUnsupportedID(t *testing.T) {
 var kdfs = []struct {
 	name  string
 	proto pb.HpkeKdf
-	id    uint16
+	id    KDFID
 }{
-	{name: "HKDF_SHA256", proto: pb.HpkeKdf_HKDF_SHA256, id: hkdfSHA256},
-	{name: "HKDF_SHA384", proto: pb.HpkeKdf_HKDF_SHA384, id: hkdfSHA384},
-	{name: "HKDF_SHA512", proto: pb.HpkeKdf_HKDF_SHA512, id: hkdfSHA512},
+	{name: "HKDF_SHA256", proto: pb.HpkeKdf_HKDF_SHA256, id: HKDFSHA256},
+	{name: "HKDF_SHA384", proto: pb.HpkeKdf_HKDF_SHA384, id: HKDFSHA384},
+	{name: "HKDF_SHA512", proto: pb.HpkeKdf_HKDF_SHA512, id: HKDFSHA512},
 }
 
 func TestNewKDF(t *testing.T) {
@@ -113,11 +113,11 @@ func TestKDFIDFromProtoUnsupportedID(t *testing.T) {
 var aeads = []struct {
 	name  string
 	proto pb.HpkeAead
-	id    uint16
+	id    AEADID
 }{
-	{name: "AES-128-GCM", proto: pb.HpkeAead_AES_128_GCM, id: aes128GCM},
-	{name: "AES-256-GCM", proto: pb.HpkeAead_AES_256_GCM, id: aes256GCM},
-	{name: "ChaCha20Poly1305", proto: pb.HpkeAead_CHACHA20_POLY1305, id: chaCha20Poly1305},
+	{name: "AES-128-GCM", proto: pb.HpkeAead_AES_128_GCM, id: AES128GCM},
+	{name: "AES-256-GCM", proto: pb.HpkeAead_AES_256_GCM, id: AES256GCM},
+	{name: "ChaCha20Poly1305", proto: pb.HpkeAead_CHACHA20_POLY1305, id: ChaCha20Poly1305},
 }
 
 func TestNewAEAD(t *testing.T) {

@@ -24,7 +24,7 @@ func TestChaCha20Poly1305AEADSealOpen(t *testing.T) {
 	i := 0
 	vecs := aeadRFCVectors(t)
 	for k, v := range vecs {
-		if k.aeadID != chaCha20Poly1305 {
+		if k.aeadID != ChaCha20Poly1305 {
 			continue
 		}
 

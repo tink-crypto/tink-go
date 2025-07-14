@@ -32,20 +32,20 @@ import (
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-7.3.
 var aeadIDs = []struct {
 	name      string
-	aeadID    uint16
+	aeadID    AEADID
 	keyLength int
 }{
-	{"AES128GCM", aes128GCM, 16},
-	{"AES256GCM", aes256GCM, 32},
-	{"ChaCha20Poly1305", chaCha20Poly1305, 32},
+	{"AES128GCM", AES128GCM, 16},
+	{"AES256GCM", AES256GCM, 32},
+	{"ChaCha20Poly1305", ChaCha20Poly1305, 32},
 }
 
 type hpkeID struct {
 	id     int
 	mode   uint8
-	kemID  uint16
-	kdfID  uint16
-	aeadID uint16
+	kemID  KEMID
+	kdfID  KDFID
+	aeadID AEADID
 }
 
 type vector struct {
@@ -83,7 +83,9 @@ type encryptionString struct {
 
 type hpkeRFCTestVector struct {
 	mode                                                                                    uint8
-	kemID, kdfID, aeadID                                                                    uint16
+	kemID                                                                                   KEMID
+	kdfID                                                                                   KDFID
+	aeadID                                                                                  AEADID
 	info, pkEm, skEm, pkRm, skRm, enc, sharedSecret, keyScheduleCtx, secret, key, baseNonce string
 	consecutiveEncryptions, otherEncryptions                                                []encryptionString
 }
@@ -395,7 +397,9 @@ func aeadRFCVectors(t *testing.T) map[hpkeID]encryptionVector {
 
 	vecs := []struct {
 		mode                                              uint8
-		kemID, kdfID, aeadID                              uint16
+		kemID                                             KEMID
+		kdfID                                             KDFID
+		aeadID                                            AEADID
 		key, plaintext, associatedData, nonce, ciphertext string
 	}{
 		// https://www.rfc-editor.org/rfc/rfc9180.html#appendix-A.1.1.1
@@ -531,9 +535,9 @@ func hpkeBaseModeVectors(t *testing.T) map[hpkeID]vector {
 
 	var vecs []struct {
 		Mode             uint8             `json:"mode"`
-		KEMID            uint16            `json:"kem_id"`
-		KDFID            uint16            `json:"kdf_id"`
-		AEADID           uint16            `json:"aead_id"`
+		KEMID            KEMID             `json:"kem_id"`
+		KDFID            KDFID             `json:"kdf_id"`
+		AEADID           AEADID            `json:"aead_id"`
 		Info             testutil.HexBytes `json:"info"`
 		SenderPubKey     testutil.HexBytes `json:"pkEm"`
 		SenderPrivKey    testutil.HexBytes `json:"skEm"`
@@ -620,7 +624,7 @@ func TestValidatePrivateKeyLength(t *testing.T) {
 						Kem: hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
 					},
 				},
-				PrivateKey: make([]byte, kemLengths[p256HKDFSHA256].nSK),
+				PrivateKey: make([]byte, kemLengths[P256HKDFSHA256].nSK),
 			},
 		},
 		{
@@ -631,7 +635,7 @@ func TestValidatePrivateKeyLength(t *testing.T) {
 						Kem: hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384,
 					},
 				},
-				PrivateKey: make([]byte, kemLengths[p384HKDFSHA384].nSK),
+				PrivateKey: make([]byte, kemLengths[P384HKDFSHA384].nSK),
 			},
 		},
 		{
@@ -642,7 +646,7 @@ func TestValidatePrivateKeyLength(t *testing.T) {
 						Kem: hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512,
 					},
 				},
-				PrivateKey: make([]byte, kemLengths[p521HKDFSHA512].nSK),
+				PrivateKey: make([]byte, kemLengths[P521HKDFSHA512].nSK),
 			},
 		},
 		{
@@ -653,7 +657,7 @@ func TestValidatePrivateKeyLength(t *testing.T) {
 						Kem: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
 					},
 				},
-				PrivateKey: make([]byte, kemLengths[x25519HKDFSHA256].nSK),
+				PrivateKey: make([]byte, kemLengths[X25519HKDFSHA256].nSK),
 			},
 		},
 	}
@@ -707,7 +711,7 @@ func TestValidatePrivateKeyLengthErrors(t *testing.T) {
 						Kem: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
 					},
 				},
-				PrivateKey: make([]byte, kemLengths[x25519HKDFSHA256].nSK+1),
+				PrivateKey: make([]byte, kemLengths[X25519HKDFSHA256].nSK+1),
 			},
 		},
 		{
@@ -718,7 +722,7 @@ func TestValidatePrivateKeyLengthErrors(t *testing.T) {
 						Kem: hpkepb.HpkeKem_KEM_UNKNOWN,
 					},
 				},
-				PrivateKey: make([]byte, kemLengths[x25519HKDFSHA256].nSK),
+				PrivateKey: make([]byte, kemLengths[X25519HKDFSHA256].nSK),
 			},
 		},
 	}
@@ -743,7 +747,7 @@ func TestValidatePublicKeyLength(t *testing.T) {
 				Params: &hpkepb.HpkeParams{
 					Kem: hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
 				},
-				PublicKey: make([]byte, kemLengths[p256HKDFSHA256].nPK),
+				PublicKey: make([]byte, kemLengths[P256HKDFSHA256].nPK),
 			},
 		},
 		{
@@ -752,7 +756,7 @@ func TestValidatePublicKeyLength(t *testing.T) {
 				Params: &hpkepb.HpkeParams{
 					Kem: hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384,
 				},
-				PublicKey: make([]byte, kemLengths[p384HKDFSHA384].nPK),
+				PublicKey: make([]byte, kemLengths[P384HKDFSHA384].nPK),
 			},
 		},
 		{
@@ -761,7 +765,7 @@ func TestValidatePublicKeyLength(t *testing.T) {
 				Params: &hpkepb.HpkeParams{
 					Kem: hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512,
 				},
-				PublicKey: make([]byte, kemLengths[p521HKDFSHA512].nPK),
+				PublicKey: make([]byte, kemLengths[P521HKDFSHA512].nPK),
 			},
 		},
 		{
@@ -770,7 +774,7 @@ func TestValidatePublicKeyLength(t *testing.T) {
 				Params: &hpkepb.HpkeParams{
 					Kem: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
 				},
-				PublicKey: make([]byte, kemLengths[x25519HKDFSHA256].nPK),
+				PublicKey: make([]byte, kemLengths[X25519HKDFSHA256].nPK),
 			},
 		},
 	}
@@ -812,7 +816,7 @@ func TestValidatePublicKeyLengthErrors(t *testing.T) {
 				Params: &hpkepb.HpkeParams{
 					Kem: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
 				},
-				PublicKey: make([]byte, kemLengths[x25519HKDFSHA256].nPK+1),
+				PublicKey: make([]byte, kemLengths[X25519HKDFSHA256].nPK+1),
 			},
 		},
 		{
@@ -821,7 +825,7 @@ func TestValidatePublicKeyLengthErrors(t *testing.T) {
 				Params: &hpkepb.HpkeParams{
 					Kem: hpkepb.HpkeKem_KEM_UNKNOWN,
 				},
-				PublicKey: make([]byte, kemLengths[x25519HKDFSHA256].nPK),
+				PublicKey: make([]byte, kemLengths[X25519HKDFSHA256].nPK),
 			},
 		},
 	}

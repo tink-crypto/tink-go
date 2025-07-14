@@ -29,18 +29,18 @@ var (
 // interface kem.
 type x25519KEM struct {
 	// HPKE KEM algorithm identifier.
-	kemID  uint16
-	macAlg string
+	kemID   KEMID
+	hashAlg HashType
 }
 
 var _ kem = (*x25519KEM)(nil)
 
-// newX25519KEM constructs a X25519 HPKE KEM using macAlg.
-func newX25519KEM(macAlg string) (*x25519KEM, error) {
-	if macAlg == sha256 {
-		return &x25519KEM{kemID: x25519HKDFSHA256, macAlg: sha256}, nil
+// newX25519KEM constructs a X25519 HPKE KEM using hashAlg.
+func newX25519KEM(hashAlg HashType) (*x25519KEM, error) {
+	if hashAlg == SHA256 {
+		return &x25519KEM{kemID: X25519HKDFSHA256, hashAlg: SHA256}, nil
 	}
-	return nil, fmt.Errorf("MAC algorithm %s is not supported", macAlg)
+	return nil, fmt.Errorf("HASH algorithm %s is not supported", hashAlg)
 }
 
 func (x *x25519KEM) encapsulate(recipientPubKey []byte) (sharedSecret, senderPubKey []byte, err error) {
@@ -75,13 +75,9 @@ func (x *x25519KEM) decapsulate(encapsulatedKey, recipientPrivKey []byte) ([]byt
 	return x.deriveKEMSharedSecret(dh, encapsulatedKey, recipientPubKey)
 }
 
-func (x *x25519KEM) id() uint16 {
-	return x.kemID
-}
+func (x *x25519KEM) id() KEMID { return x.kemID }
 
-func (x *x25519KEM) encapsulatedKeyLength() int {
-	return kemLengths[x.kemID].nEnc
-}
+func (x *x25519KEM) encapsulatedKeyLength() int { return kemLengths[x.kemID].nEnc }
 
 // deriveKEMSharedSecret returns a pseudorandom key obtained via HKDF SHA256.
 func (x *x25519KEM) deriveKEMSharedSecret(dh, senderPubKey, recipientPubKey []byte) ([]byte, error) {
@@ -89,12 +85,12 @@ func (x *x25519KEM) deriveKEMSharedSecret(dh, senderPubKey, recipientPubKey []by
 	ctx = append(ctx, senderPubKey...)
 	ctx = append(ctx, recipientPubKey...)
 
-	suiteID := kemSuiteID(x25519HKDFSHA256)
-	macLength, err := subtle.GetHashDigestSize(x.macAlg)
+	suiteID := kemSuiteID(X25519HKDFSHA256)
+	macLength, err := subtle.GetHashDigestSize(x.hashAlg.String())
 	if err != nil {
 		return nil, err
 	}
-	hkdfKDF, err := newHKDFKDF(x.macAlg)
+	hkdfKDF, err := newHKDFKDF(x.hashAlg)
 	if err != nil {
 		return nil, err
 	}

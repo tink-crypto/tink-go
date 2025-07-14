@@ -27,9 +27,9 @@ import (
 // nistCurvesKEM implements the `kem` interface for the NIST-curve HPKE KEMs from RFC 9180.
 type nistCurvesKEM struct {
 	// kemID is an HPKE KEM algorithm identifier.
-	kemID uint16
+	kemID KEMID
 	// hmacHashAlg is an HMAC hash algorithm name.
-	hmacHashAlg string
+	hmacHashAlg HashType
 	// curve is a NIST curve.
 	curve ecdh.Curve
 	// generatePrivateKey is a function to generate a random private key for the NIST curve.
@@ -39,26 +39,26 @@ type nistCurvesKEM struct {
 var _ kem = (*nistCurvesKEM)(nil)
 
 // newNISTCurvesKEM constructs a NIST-curve HPKE KEM.
-func newNISTCurvesKEM(kemID uint16) (*nistCurvesKEM, error) {
+func newNISTCurvesKEM(kemID KEMID) (*nistCurvesKEM, error) {
 	switch kemID {
-	case p256HKDFSHA256:
+	case P256HKDFSHA256:
 		return &nistCurvesKEM{
-			kemID:              p256HKDFSHA256,
-			hmacHashAlg:        sha256,
+			kemID:              P256HKDFSHA256,
+			hmacHashAlg:        SHA256,
 			curve:              ecdh.P256(),
 			generatePrivateKey: ecdh.P256().GenerateKey,
 		}, nil
-	case p384HKDFSHA384:
+	case P384HKDFSHA384:
 		return &nistCurvesKEM{
-			kemID:              p384HKDFSHA384,
-			hmacHashAlg:        sha384,
+			kemID:              P384HKDFSHA384,
+			hmacHashAlg:        SHA384,
 			curve:              ecdh.P384(),
 			generatePrivateKey: ecdh.P384().GenerateKey,
 		}, nil
-	case p521HKDFSHA512:
+	case P521HKDFSHA512:
 		return &nistCurvesKEM{
-			kemID:              p521HKDFSHA512,
-			hmacHashAlg:        sha512,
+			kemID:              P521HKDFSHA512,
+			hmacHashAlg:        SHA512,
 			curve:              ecdh.P521(),
 			generatePrivateKey: ecdh.P521().GenerateKey,
 		}, nil
@@ -105,19 +105,15 @@ func (x *nistCurvesKEM) decapsulate(senderPubKeyBytes, recipientPrivKeyBytes []b
 	return x.deriveKEMSharedSecret(dh, senderPubKeyBytes, recipientPubKeyBytes)
 }
 
-func (x *nistCurvesKEM) id() uint16 {
-	return x.kemID
-}
+func (x *nistCurvesKEM) id() KEMID { return x.kemID }
 
-func (x *nistCurvesKEM) encapsulatedKeyLength() int {
-	return kemLengths[x.kemID].nEnc
-}
+func (x *nistCurvesKEM) encapsulatedKeyLength() int { return kemLengths[x.kemID].nEnc }
 
 // deriveKEMSharedSecret returns a pseudorandom key obtained via the HKDF.
 func (x *nistCurvesKEM) deriveKEMSharedSecret(dh, senderPubKey, recipientPubKey []byte) ([]byte, error) {
 	ctx := slices.Concat(senderPubKey, recipientPubKey)
 	suiteID := kemSuiteID(x.kemID)
-	hmacHashLength, err := subtle.GetHashDigestSize(x.hmacHashAlg)
+	hmacHashLength, err := subtle.GetHashDigestSize(x.hmacHashAlg.String())
 	if err != nil {
 		return nil, err
 	}

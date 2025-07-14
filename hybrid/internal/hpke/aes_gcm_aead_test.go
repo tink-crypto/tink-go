@@ -24,7 +24,7 @@ func TestAESGCMAEADSealOpen(t *testing.T) {
 	i := 0
 	vecs := aeadRFCVectors(t)
 	for k, v := range vecs {
-		if k.aeadID != aes128GCM && k.aeadID != aes256GCM {
+		if k.aeadID != AES128GCM && k.aeadID != AES256GCM {
 			continue
 		}
 
@@ -57,12 +57,12 @@ func TestAESGCMAEADSealOpen(t *testing.T) {
 			// length that does not match the length of the key passed into seal and
 			// open.
 			{
-				var wrongID uint16
+				var wrongID AEADID
 				switch k.aeadID {
-				case aes128GCM:
-					wrongID = aes256GCM
-				case aes256GCM:
-					wrongID = aes128GCM
+				case AES128GCM:
+					wrongID = AES256GCM
+				case AES256GCM:
+					wrongID = AES128GCM
 				default:
 					t.Fatalf("AEAD ID %d is not supported", k.aeadID)
 				}

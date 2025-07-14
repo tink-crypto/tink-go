@@ -23,43 +23,94 @@ import (
 	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
+// Mode identifiers.
 const (
-	// All identifier values are specified in
-	// https://www.rfc-editor.org/rfc/rfc9180.html.
-	// Mode identifiers.
+	// BaseMode is the base mode identifier.
 	baseMode uint8 = 0x00
-
-	// KEM algorithm identifiers.
-	p256HKDFSHA256   uint16 = 0x0010
-	p384HKDFSHA384   uint16 = 0x0011
-	p521HKDFSHA512   uint16 = 0x0012
-	x25519HKDFSHA256 uint16 = 0x0020
-
-	// KDF algorithm identifiers.
-	hkdfSHA256 uint16 = 0x0001
-	hkdfSHA384 uint16 = 0x0002
-	hkdfSHA512 uint16 = 0x0003
-
-	// AEAD algorithm identifiers.
-	aes128GCM        uint16 = 0x0001
-	aes256GCM        uint16 = 0x0002
-	chaCha20Poly1305 uint16 = 0x0003
-
-	sha256 = "SHA256"
-	sha384 = "SHA384"
-	sha512 = "SHA512"
-	hpkeV1 = "HPKE-v1"
 )
+
+// KEMID is the key encapsulation mechanism identifier.
+type KEMID int
+
+// All identifier values are specified in
+// https://www.rfc-editor.org/rfc/rfc9180.html.
+
+// KEM algorithm identifiers.
+const (
+	// P256HKDFSHA256 is the KEM identifier for NIST P-256 with HKDF-SHA-256.
+	P256HKDFSHA256 KEMID = 0x0010
+	// P384HKDFSHA384 is the KEM identifier for NIST P-384 with HKDF-SHA-384.
+	P384HKDFSHA384 KEMID = 0x0011
+	// P521HKDFSHA512 is the KEM identifier for NIST P-521 with HKDF-SHA-512.
+	P521HKDFSHA512 KEMID = 0x0012
+	// X25519HKDFSHA256 is the KEM identifier for Curve25519 with HKDF-SHA-256.
+	X25519HKDFSHA256 KEMID = 0x0020
+)
+
+// KDFID is the key derivation function identifier.
+type KDFID int
+
+// KDF algorithm identifiers.
+const (
+	// HKDFSHA256 is the KDF identifier for HKDF-SHA-256.
+	HKDFSHA256 KDFID = 0x0001
+	// HKDFSHA384 is the KDF identifier for HKDF-SHA-384.
+	HKDFSHA384 KDFID = 0x0002
+	// HKDFSHA512 is the KDF identifier for HKDF-SHA-512.
+	HKDFSHA512 KDFID = 0x0003
+)
+
+// AEADID is the authenticated encryption with associated data identifier.
+type AEADID int
+
+// AEAD algorithm identifiers.
+const (
+	// AES128GCM is the AEAD identifier for AES-128-GCM.
+	AES128GCM AEADID = 0x0001
+	// AES256GCM is the AEAD identifier for AES-256-GCM.
+	AES256GCM AEADID = 0x0002
+	// ChaCha20Poly1305 is the AEAD identifier for ChaCha20-Poly1305.
+	ChaCha20Poly1305 AEADID = 0x0003
+)
+
+// HashType is the hash function identifier.
+type HashType int
+
+// Hash function identifiers.
+const (
+	// SHA256 is the identifier for the SHA-256 hash function.
+	SHA256 HashType = iota
+	// SHA384 is the identifier for the SHA-384 hash function.
+	SHA384
+	// SHA512 is the identifier for the SHA-512 hash function.
+	SHA512
+)
+
+// String returns a string representation of the hash type.
+func (h HashType) String() string {
+	switch h {
+	case SHA256:
+		return "SHA256"
+	case SHA384:
+		return "SHA384"
+	case SHA512:
+		return "SHA512"
+	default:
+		return fmt.Sprintf("unknown HashType: %d", h)
+	}
+}
+
+const hpkeV1 = "HPKE-v1"
 
 var (
 	// KEM lengths from https://www.rfc-editor.org/rfc/rfc9180.html#section-7.1
-	kemLengths = map[uint16]struct {
+	kemLengths = map[KEMID]struct {
 		nSecret, nEnc, nPK, nSK int
 	}{
-		p256HKDFSHA256:   {nSecret: 32, nEnc: 65, nPK: 65, nSK: 32},
-		p384HKDFSHA384:   {nSecret: 48, nEnc: 97, nPK: 97, nSK: 48},
-		p521HKDFSHA512:   {nSecret: 64, nEnc: 133, nPK: 133, nSK: 66},
-		x25519HKDFSHA256: {nSecret: 32, nEnc: 32, nPK: 32, nSK: 32},
+		P256HKDFSHA256:   {nSecret: 32, nEnc: 65, nPK: 65, nSK: 32},
+		P384HKDFSHA384:   {nSecret: 48, nEnc: 97, nPK: 97, nSK: 48},
+		P521HKDFSHA512:   {nSecret: 64, nEnc: 133, nPK: 133, nSK: 66},
+		X25519HKDFSHA256: {nSecret: 32, nEnc: 32, nPK: 32, nSK: 32},
 	}
 
 	errInvalidHPKEParams           = errors.New("invalid HPKE parameters")
@@ -73,19 +124,19 @@ var (
 
 // kemSuiteID generates the KEM suite ID from kemID according to
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-4.1-5.
-func kemSuiteID(kemID uint16) []byte {
-	return binary.BigEndian.AppendUint16([]byte("KEM"), kemID)
+func kemSuiteID(kemID KEMID) []byte {
+	return binary.BigEndian.AppendUint16([]byte("KEM"), uint16(kemID))
 }
 
 // hpkeSuiteID generates the HPKE suite ID according to
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-5.1-8.
-func hpkeSuiteID(kemID, kdfID, aeadID uint16) []byte {
+func hpkeSuiteID(kemID KEMID, kdfID KDFID, aeadID AEADID) []byte {
 	// Allocate memory for the return value with the exact amount of bytes needed.
 	res := make([]byte, 0, 4+2+2+2)
 	res = append(res, "HPKE"...)
-	res = binary.BigEndian.AppendUint16(res, kemID)
-	res = binary.BigEndian.AppendUint16(res, kdfID)
-	res = binary.BigEndian.AppendUint16(res, aeadID)
+	res = binary.BigEndian.AppendUint16(res, uint16(kemID))
+	res = binary.BigEndian.AppendUint16(res, uint16(kdfID))
+	res = binary.BigEndian.AppendUint16(res, uint16(aeadID))
 	return res
 }
 
@@ -136,7 +187,7 @@ func ValidatePrivateKeyLength(key *hpkepb.HpkePrivateKey) error {
 	if err != nil {
 		return err
 	}
-	lengths, ok := kemLengths[kemID]
+	lengths, ok := kemLengths[KEMID(kemID)]
 	if !ok {
 		return errInvalidHPKEParams
 	}
@@ -152,7 +203,7 @@ func ValidatePublicKeyLength(key *hpkepb.HpkePublicKey) error {
 	if err != nil {
 		return err
 	}
-	lengths, ok := kemLengths[kemID]
+	lengths, ok := kemLengths[KEMID(kemID)]
 	if !ok {
 		return errInvalidHPKEParams
 	}

@@ -27,7 +27,7 @@ import (
 // aead.
 type aesGCMAEAD struct {
 	// HPKE AEAD algorithm identifier.
-	aeadID uint16
+	aeadID AEADID
 	keyLen int
 }
 
@@ -37,9 +37,9 @@ var _ aead = (*aesGCMAEAD)(nil)
 func newAESGCMAEAD(keyLength int) (*aesGCMAEAD, error) {
 	switch keyLength {
 	case 16:
-		return &aesGCMAEAD{aeadID: aes128GCM, keyLen: 16}, nil
+		return &aesGCMAEAD{aeadID: AES128GCM, keyLen: 16}, nil
 	case 32:
-		return &aesGCMAEAD{aeadID: aes256GCM, keyLen: 32}, nil
+		return &aesGCMAEAD{aeadID: AES256GCM, keyLen: 32}, nil
 	default:
 		return nil, fmt.Errorf("key length %d is not supported", keyLength)
 	}
@@ -91,7 +91,7 @@ func (a *aesGCMAEAD) open(key, nonce, ciphertext, associatedData []byte) ([]byte
 	return c.Open(nil, nonce, ciphertext, associatedData)
 }
 
-func (a *aesGCMAEAD) id() uint16 { return a.aeadID }
+func (a *aesGCMAEAD) id() AEADID { return a.aeadID }
 
 func (a *aesGCMAEAD) keyLength() int { return a.keyLen }
 

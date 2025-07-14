@@ -26,9 +26,9 @@ import (
 
 // TODO: b/201070904 - Write tests using baseModeX25519HKDFSHA256Vectors.
 func TestHKDFKDFLabeledExtract(t *testing.T) {
-	kdf, err := newKDF(hkdfSHA256)
+	kdf, err := newKDF(HKDFSHA256)
 	if err != nil {
-		t.Fatalf("newKDF(hkdfSHA256): got err %q, want success", err)
+		t.Fatalf("newKDF(HKDFSHA256): got err %q, want success", err)
 	}
 	id, v := rfcVectorA1(t)
 	suiteID := hpkeSuiteID(id.kemID, id.kdfID, id.aeadID)
@@ -49,9 +49,9 @@ func TestHKDFKDFLabeledExtract(t *testing.T) {
 }
 
 func TestHKDFKDFLabeledExpand(t *testing.T) {
-	kdf, err := newKDF(hkdfSHA256)
+	kdf, err := newKDF(HKDFSHA256)
 	if err != nil {
-		t.Fatalf("newKDF(hkdfSHA256): got err %q, want success", err)
+		t.Fatalf("newKDF(HKDFSHA256): got err %q, want success", err)
 	}
 	id, v := rfcVectorA1(t)
 	suiteID := hpkeSuiteID(id.kemID, id.kdfID, id.aeadID)
@@ -88,15 +88,15 @@ func TestHKDFKDFLabeledExpand(t *testing.T) {
 }
 
 func TestHKDFKDFLabeledExpandRFCVectors(t *testing.T) {
-	kdf, err := newKDF(hkdfSHA256)
+	kdf, err := newKDF(HKDFSHA256)
 	if err != nil {
-		t.Fatalf("newKDF(hkdfSHA256): got err %q, want success", err)
+		t.Fatalf("newKDF(HKDFSHA256): got err %q, want success", err)
 	}
-	suiteID := hpkeSuiteID(x25519HKDFSHA256, hkdfSHA256, aes128GCM)
+	suiteID := hpkeSuiteID(X25519HKDFSHA256, HKDFSHA256, AES128GCM)
 
 	// Vectors are defined at
 	// https://datatracker.ietf.org/doc/html/rfc5869#appendix-A.
-	var tests = []struct {
+	tests := []struct {
 		name   string
 		info   string
 		prk    string
@@ -152,9 +152,9 @@ func TestHKDFKDFLabeledExpandRFCVectors(t *testing.T) {
 }
 
 func TestHKDFKDFExtractAndExpand(t *testing.T) {
-	kdf, err := newKDF(hkdfSHA256)
+	kdf, err := newKDF(HKDFSHA256)
 	if err != nil {
-		t.Fatalf("newKDF(hkdfSHA256): got err %q, want success", err)
+		t.Fatalf("newKDF(HKDFSHA256): got err %q, want success", err)
 	}
 	_, v := rfcVectorA1(t)
 
@@ -183,7 +183,7 @@ func TestHKDFKDFExtractAndExpand(t *testing.T) {
 				"eae_prk",
 				kemCtx,
 				"shared_secret",
-				kemSuiteID(x25519HKDFSHA256),
+				kemSuiteID(X25519HKDFSHA256),
 				test.length)
 			if test.wantErr {
 				if err == nil {

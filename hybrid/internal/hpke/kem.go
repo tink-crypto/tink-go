@@ -34,7 +34,7 @@ type kem interface {
 	// implementation.
 	//
 	// https://www.rfc-editor.org/rfc/rfc9180.html#section-7.1
-	id() uint16
+	id() KEMID
 
 	// encapsulatedKeyLength returns the length of the encapsulated key,
 	// corresponding to Nenc in the following table.

@@ -25,24 +25,24 @@ import (
 // hkdfKDF is a HKDF HPKE KDF variant that implements interface kdf.
 type hkdfKDF struct {
 	// HPKE KDF algorithm identifier.
-	kdfID        uint16
+	kdfID        KDFID
 	hashFunction crypto.Hash
 }
 
 var _ kdf = (*hkdfKDF)(nil)
 
 // newHKDFKDF constructs a HKDF HPKE KDF using hashFunction.
-func newHKDFKDF(hashFunction string) (*hkdfKDF, error) {
-	if hashFunction == sha256 {
-		return &hkdfKDF{kdfID: hkdfSHA256, hashFunction: crypto.SHA256}, nil
+func newHKDFKDF(hashFunction HashType) (*hkdfKDF, error) {
+	switch hashFunction {
+	case SHA256:
+		return &hkdfKDF{kdfID: HKDFSHA256, hashFunction: crypto.SHA256}, nil
+	case SHA384:
+		return &hkdfKDF{kdfID: HKDFSHA384, hashFunction: crypto.SHA384}, nil
+	case SHA512:
+		return &hkdfKDF{kdfID: HKDFSHA512, hashFunction: crypto.SHA512}, nil
+	default:
+		return nil, fmt.Errorf("hash function %s is not supported", hashFunction)
 	}
-	if hashFunction == sha384 {
-		return &hkdfKDF{kdfID: hkdfSHA384, hashFunction: crypto.SHA384}, nil
-	}
-	if hashFunction == sha512 {
-		return &hkdfKDF{kdfID: hkdfSHA512, hashFunction: crypto.SHA512}, nil
-	}
-	return nil, fmt.Errorf("hash function %s is not supported", hashFunction)
 }
 
 func (h *hkdfKDF) labeledExtract(salt, ikm []byte, ikmLabel string, suiteID []byte) []byte {
@@ -67,6 +67,4 @@ func (h *hkdfKDF) extractAndExpand(salt, ikm []byte, ikmLabel string, info []byt
 	return h.labeledExpand(prk, info, infoLabel, suiteID, length)
 }
 
-func (h *hkdfKDF) id() uint16 {
-	return h.kdfID
-}
+func (h *hkdfKDF) id() KDFID { return h.kdfID }

@@ -28,9 +28,9 @@ func TestKEMEncapsulateBoringSSLVectors(t *testing.T) {
 	vecs := hpkeBaseModeVectors(t)
 	for key, vec := range vecs {
 		if key.mode != baseMode ||
-			(key.kemID != p256HKDFSHA256 && key.kemID != p384HKDFSHA384 && key.kemID != p521HKDFSHA512) ||
-			(key.kdfID != hkdfSHA256 && key.kdfID != hkdfSHA384 && key.kdfID != hkdfSHA512) ||
-			(key.aeadID != aes128GCM && key.aeadID != aes256GCM && key.aeadID != chaCha20Poly1305) {
+			(key.kemID != P256HKDFSHA256 && key.kemID != P384HKDFSHA384 && key.kemID != P521HKDFSHA512) ||
+			(key.kdfID != HKDFSHA256 && key.kdfID != HKDFSHA384 && key.kdfID != HKDFSHA512) ||
+			(key.aeadID != AES128GCM && key.aeadID != AES256GCM && key.aeadID != ChaCha20Poly1305) {
 			continue
 		}
 
@@ -65,7 +65,7 @@ func TestKEMEncapsulateBoringSSLVectors(t *testing.T) {
 
 func rfcVectorTestCases(t *testing.T) []struct {
 	name   string
-	kemID  uint16
+	kemID  KEMID
 	vector vector
 } {
 	t.Helper()
@@ -74,7 +74,7 @@ func rfcVectorTestCases(t *testing.T) []struct {
 	p521HPKEID, p521Vector := rfcVectorA6(t)
 	return []struct {
 		name   string
-		kemID  uint16
+		kemID  KEMID
 		vector vector
 	}{
 		{
@@ -111,9 +111,9 @@ func TestKEMDecapsulateBoringSSLVectors(t *testing.T) {
 	vecs := hpkeBaseModeVectors(t)
 	for key, vec := range vecs {
 		if key.mode != baseMode ||
-			(key.kemID != p256HKDFSHA256 && key.kemID != p384HKDFSHA384 && key.kemID != p521HKDFSHA512) ||
-			(key.kdfID != hkdfSHA256 && key.kdfID != hkdfSHA384 && key.kdfID != hkdfSHA512) ||
-			(key.aeadID != aes128GCM && key.aeadID != aes256GCM && key.aeadID != chaCha20Poly1305) {
+			(key.kemID != P256HKDFSHA256 && key.kemID != P384HKDFSHA384 && key.kemID != P521HKDFSHA512) ||
+			(key.kdfID != HKDFSHA256 && key.kdfID != HKDFSHA384 && key.kdfID != HKDFSHA512) ||
+			(key.aeadID != AES128GCM && key.aeadID != AES256GCM && key.aeadID != ChaCha20Poly1305) {
 			continue
 		}
 
@@ -207,23 +207,23 @@ func TestKEMDecapsulateBadRecipientPrivKey(t *testing.T) {
 func TestKEMEncapsulatedKeyLength(t *testing.T) {
 	tests := []struct {
 		name  string
-		kemID uint16
+		kemID KEMID
 		want  int
 	}{
 		{
 			name:  "P-256",
-			kemID: p256HKDFSHA256,
-			want:  kemLengths[p256HKDFSHA256].nEnc,
+			kemID: P256HKDFSHA256,
+			want:  kemLengths[P256HKDFSHA256].nEnc,
 		},
 		{
 			name:  "P-384",
-			kemID: p384HKDFSHA384,
-			want:  kemLengths[p384HKDFSHA384].nEnc,
+			kemID: P384HKDFSHA384,
+			want:  kemLengths[P384HKDFSHA384].nEnc,
 		},
 		{
 			name:  "P-521",
-			kemID: p521HKDFSHA512,
-			want:  kemLengths[p521HKDFSHA512].nEnc,
+			kemID: P521HKDFSHA512,
+			want:  kemLengths[P521HKDFSHA512].nEnc,
 		},
 	}
 	for _, test := range tests {

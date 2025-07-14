@@ -43,5 +43,5 @@ type kdf interface {
 	// implementation.
 	//
 	// https://www.rfc-editor.org/rfc/rfc9180.html#section-7.2
-	id() uint16
+	id() KDFID
 }

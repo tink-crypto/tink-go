@@ -49,14 +49,8 @@ func (c *chaCha20Poly1305AEAD) open(key, nonce, ciphertext, associatedData []byt
 	return cc.Decrypt(nonce, ciphertext, associatedData)
 }
 
-func (c *chaCha20Poly1305AEAD) id() uint16 {
-	return chaCha20Poly1305
-}
+func (c *chaCha20Poly1305AEAD) id() AEADID { return ChaCha20Poly1305 }
 
-func (c *chaCha20Poly1305AEAD) keyLength() int {
-	return chacha20poly1305.KeySize
-}
+func (c *chaCha20Poly1305AEAD) keyLength() int { return chacha20poly1305.KeySize }
 
-func (c *chaCha20Poly1305AEAD) nonceLength() int {
-	return chacha20poly1305.NonceSize
-}
+func (c *chaCha20Poly1305AEAD) nonceLength() int { return chacha20poly1305.NonceSize }

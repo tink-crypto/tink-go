@@ -54,16 +54,16 @@ func newPrimitivesFromProto(params *pb.HpkeParams) (kem, kdf, aead, error) {
 
 // newKEM constructs a HPKE KEM using kemID, which are specified at
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-7.1.
-func newKEM(kemID uint16) (kem, error) {
+func newKEM(kemID KEMID) (kem, error) {
 	switch kemID {
-	case p256HKDFSHA256:
-		return newNISTCurvesKEM(p256HKDFSHA256)
-	case p384HKDFSHA384:
-		return newNISTCurvesKEM(p384HKDFSHA384)
-	case p521HKDFSHA512:
-		return newNISTCurvesKEM(p521HKDFSHA512)
-	case x25519HKDFSHA256:
-		return newX25519KEM(sha256)
+	case P256HKDFSHA256:
+		return newNISTCurvesKEM(P256HKDFSHA256)
+	case P384HKDFSHA384:
+		return newNISTCurvesKEM(P384HKDFSHA384)
+	case P521HKDFSHA512:
+		return newNISTCurvesKEM(P521HKDFSHA512)
+	case X25519HKDFSHA256:
+		return newX25519KEM(SHA256)
 	default:
 		return nil, fmt.Errorf("KEM ID %d is not supported", kemID)
 	}
@@ -72,16 +72,16 @@ func newKEM(kemID uint16) (kem, error) {
 // kemIDFromProto returns the KEM ID from the HpkeKem enum value. KEM IDs are
 // specified at
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-7.1.
-func kemIDFromProto(enum pb.HpkeKem) (uint16, error) {
+func kemIDFromProto(enum pb.HpkeKem) (KEMID, error) {
 	switch enum {
 	case pb.HpkeKem_DHKEM_P256_HKDF_SHA256:
-		return p256HKDFSHA256, nil
+		return P256HKDFSHA256, nil
 	case pb.HpkeKem_DHKEM_P384_HKDF_SHA384:
-		return p384HKDFSHA384, nil
+		return P384HKDFSHA384, nil
 	case pb.HpkeKem_DHKEM_P521_HKDF_SHA512:
-		return p521HKDFSHA512, nil
+		return P521HKDFSHA512, nil
 	case pb.HpkeKem_DHKEM_X25519_HKDF_SHA256:
-		return x25519HKDFSHA256, nil
+		return X25519HKDFSHA256, nil
 	default:
 		return 0, fmt.Errorf("HpkeKem enum value %d is not supported", enum)
 	}
@@ -89,44 +89,44 @@ func kemIDFromProto(enum pb.HpkeKem) (uint16, error) {
 
 // newKDF constructs a HPKE KDF using kdfID, which are specified at
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-7.2.
-func newKDF(kdfID uint16) (kdf, error) {
-	if kdfID == hkdfSHA256 {
-		return newHKDFKDF(sha256)
+func newKDF(kdfID KDFID) (kdf, error) {
+	switch kdfID {
+	case HKDFSHA256:
+		return newHKDFKDF(SHA256)
+	case HKDFSHA384:
+		return newHKDFKDF(SHA384)
+	case HKDFSHA512:
+		return newHKDFKDF(SHA512)
+	default:
+		return nil, fmt.Errorf("KDF ID %d is not supported", kdfID)
 	}
-	if kdfID == hkdfSHA384 {
-		return newHKDFKDF(sha384)
-	}
-	if kdfID == hkdfSHA512 {
-		return newHKDFKDF(sha512)
-	}
-	return nil, fmt.Errorf("KDF ID %d is not supported", kdfID)
 }
 
 // kdfIDFromProto returns the KDF ID from the HpkeKdf enum value. KDF IDs are
 // specified at
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-7.2.
-func kdfIDFromProto(enum pb.HpkeKdf) (uint16, error) {
+func kdfIDFromProto(enum pb.HpkeKdf) (KDFID, error) {
 	if enum == pb.HpkeKdf_HKDF_SHA256 {
-		return hkdfSHA256, nil
+		return HKDFSHA256, nil
 	}
 	if enum == pb.HpkeKdf_HKDF_SHA384 {
-		return hkdfSHA384, nil
+		return HKDFSHA384, nil
 	}
 	if enum == pb.HpkeKdf_HKDF_SHA512 {
-		return hkdfSHA512, nil
+		return HKDFSHA512, nil
 	}
 	return 0, fmt.Errorf("HpkeKdf enum value %d is not supported", enum)
 }
 
 // newAEAD constructs a HPKE AEAD using aeadID, which are specified at
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-7.3.
-func newAEAD(aeadID uint16) (aead, error) {
+func newAEAD(aeadID AEADID) (aead, error) {
 	switch aeadID {
-	case aes128GCM:
+	case AES128GCM:
 		return newAESGCMAEAD(16)
-	case aes256GCM:
+	case AES256GCM:
 		return newAESGCMAEAD(32)
-	case chaCha20Poly1305:
+	case ChaCha20Poly1305:
 		return &chaCha20Poly1305AEAD{}, nil
 	default:
 		return nil, fmt.Errorf("AEAD ID %d is not supported", aeadID)
@@ -136,14 +136,14 @@ func newAEAD(aeadID uint16) (aead, error) {
 // aeadIDFromProto returns the AEAD ID from the HpkeAead enum value. AEAD IDs
 // are specified at
 // https://www.rfc-editor.org/rfc/rfc9180.html#section-7.3.
-func aeadIDFromProto(enum pb.HpkeAead) (uint16, error) {
+func aeadIDFromProto(enum pb.HpkeAead) (AEADID, error) {
 	switch enum {
 	case pb.HpkeAead_AES_128_GCM:
-		return aes128GCM, nil
+		return AES128GCM, nil
 	case pb.HpkeAead_AES_256_GCM:
-		return aes256GCM, nil
+		return AES256GCM, nil
 	case pb.HpkeAead_CHACHA20_POLY1305:
-		return chaCha20Poly1305, nil
+		return ChaCha20Poly1305, nil
 	default:
 		return 0, fmt.Errorf("HpkeAead enum value %d is not supported", enum)
 	}

@@ -36,7 +36,7 @@ type aead interface {
 	// implementation.
 	//
 	// https://www.rfc-editor.org/rfc/rfc9180.html#section-7.3
-	id() uint16
+	id() AEADID
 
 	// keyLength returns the length of the key.
 	keyLength() int
