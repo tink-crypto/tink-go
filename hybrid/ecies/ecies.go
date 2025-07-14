@@ -32,10 +32,14 @@ package ecies
 import (
 	"fmt"
 
+	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
+	eciespb "github.com/tink-crypto/tink-go/v2/proto/ecies_aead_hkdf_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func init() {
@@ -57,12 +61,6 @@ func init() {
 	if err := protoserialization.RegisterParametersParser(privateKeyTypeURL, &parametersParser{}); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
-	if err := registry.RegisterKeyManager(new(privateKeyKeyManager)); err != nil {
-		panic(fmt.Sprintf("ecies.init() failed: %v", err))
-	}
-	if err := registry.RegisterKeyManager(new(publicKeyKeyManager)); err != nil {
-		panic(fmt.Sprintf("ecies.init() failed: %v", err))
-	}
 	if err := registryconfig.RegisterPrimitiveConstructor[*PublicKey](hybridEncryptConstructor); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
@@ -70,6 +68,24 @@ func init() {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
 	if err := keygenregistry.RegisterKeyCreator[*Parameters](createPrivateKey); err != nil {
+		panic(fmt.Sprintf("ecies.init() failed: %v", err))
+	}
+	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManager(privateKeyTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func(b []byte) (proto.Message, error) {
+		protoKey := &eciespb.EciesAeadHkdfPrivateKey{}
+		if err := proto.Unmarshal(b, protoKey); err != nil {
+			return nil, err
+		}
+		return protoKey, nil
+	})); err != nil {
+		panic(fmt.Sprintf("ecies.init() failed: %v", err))
+	}
+	if err := registry.RegisterKeyManager(legacykeymanager.New(publicKeyTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PUBLIC, func(b []byte) (proto.Message, error) {
+		protoKey := &eciespb.EciesAeadHkdfPublicKey{}
+		if err := proto.Unmarshal(b, protoKey); err != nil {
+			return nil, err
+		}
+		return protoKey, nil
+	})); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
 }

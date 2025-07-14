@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	eahpb "github.com/tink-crypto/tink-go/v2/proto/ecies_aead_hkdf_go_proto"
 )
@@ -39,8 +39,8 @@ func TestPublicKeyManagerPrimitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("km.Primitive(serilizedPublicKey) err = %v, want nil", err)
 	}
-	if _, ok := primitive.(*subtle.ECIESAEADHKDFHybridEncrypt); !ok {
-		t.Errorf("primitive is not ECIESAEADHKDFHybridEncrypt")
+	if _, ok := primitive.(tink.HybridEncrypt); !ok {
+		t.Errorf("primitive is of type %T, want %T", primitive, (tink.HybridEncrypt)(nil))
 	}
 }
 
