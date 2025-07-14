@@ -33,6 +33,7 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 )
@@ -66,6 +67,9 @@ func init() {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
 	if err := registryconfig.RegisterPrimitiveConstructor[*PrivateKey](hybridDecryptConstructor); err != nil {
+		panic(fmt.Sprintf("ecies.init() failed: %v", err))
+	}
+	if err := keygenregistry.RegisterKeyCreator[*Parameters](createPrivateKey); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
 }

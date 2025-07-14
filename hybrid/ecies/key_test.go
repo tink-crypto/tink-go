@@ -20,11 +20,14 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
@@ -885,6 +888,109 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 			}
 			if privateKey1.Equal(privateKey2) {
 				t.Errorf("privateKey1.Equal(privateKey2) = true, want false")
+			}
+		})
+	}
+}
+
+func TestPrivateKeyCreator(t *testing.T) {
+	aesGCMDEMParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	params, err := ecies.NewParameters(ecies.ParametersOpts{
+		CurveType:            ecies.NISTP256,
+		HashType:             ecies.SHA256,
+		NISTCurvePointFormat: ecies.CompressedPointFormat,
+		DEMParameters:        aesGCMDEMParams,
+		Variant:              ecies.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("ecies.NewParameters() err = %v, want nil", err)
+	}
+
+	key, err := keygenregistry.CreateKey(params, 0x1234)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) err = %v, want nil", params, err)
+	}
+	eciesPrivateKey, ok := key.(*ecies.PrivateKey)
+	if !ok {
+		t.Fatalf("keygenregistry.CreateKey(%v, 0x1234) returned key of type %T, want %T", params, key, (*ecies.PrivateKey)(nil))
+	}
+	idRequirement, hasIDRequirement := eciesPrivateKey.IDRequirement()
+	if !hasIDRequirement || idRequirement != 0x1234 {
+		t.Errorf("eciesPrivateKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 123, true)
+	}
+	if diff := cmp.Diff(eciesPrivateKey.Parameters(), params); diff != "" {
+		t.Errorf("eciesPrivateKey.Parameters() diff (-want +got):\n%s", diff)
+	}
+
+	publicKey, err := eciesPrivateKey.PublicKey()
+	if err != nil {
+		t.Fatalf("eciesPrivateKey.PublicKey() err = %v, want nil", err)
+	}
+	eciesPublicKey, ok := publicKey.(*ecies.PublicKey)
+	if !ok {
+		t.Fatalf("eciesPrivateKey.PublicKey() returned key of type %T, want %T", publicKey, (*ecies.PublicKey)(nil))
+	}
+
+	// Make sure we can encrypt/decrypt with the key.
+	encrypter, err := ecies.NewHybridEncrypt(eciesPublicKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("ecies.NewHybridEncrypt() err = %v, want nil", err)
+	}
+	ciphertext, err := encrypter.Encrypt([]byte("hello world"), []byte("hello world"))
+	if err != nil {
+		t.Fatalf("encrypter.Encrypt() err = %v, want nil", err)
+	}
+	decrypter, err := ecies.NewHybridDecrypt(eciesPrivateKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("ecies.NewHybridDecrypt() err = %v, want nil", err)
+	}
+	got, err := decrypter.Decrypt(ciphertext, []byte("hello world"))
+	if err != nil {
+		t.Fatalf("decrypter.Decrypt() err = %v, want nil", err)
+	}
+	if diff := cmp.Diff(got, []byte("hello world")); diff != "" {
+		t.Errorf("decrypter.Decrypt() diff (-want +got):\n%s", diff)
+	}
+}
+
+func TestPrivateKeyCreator_FailsWithInvalidParameters(t *testing.T) {
+	aesGCMDEMParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	for _, tc := range []struct {
+		name          string
+		params        *ecies.Parameters
+		idRequirement uint32
+	}{
+		{
+			name: "invalid id requirement",
+			params: mustCreateParameters(t, ecies.ParametersOpts{
+				CurveType:            ecies.NISTP256,
+				HashType:             ecies.SHA256,
+				NISTCurvePointFormat: ecies.CompressedPointFormat,
+				DEMParameters:        aesGCMDEMParams,
+				Variant:              ecies.VariantNoPrefix,
+			}),
+			idRequirement: 0x1234,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := keygenregistry.CreateKey(tc.params, tc.idRequirement); err == nil {
+				t.Errorf("keygenregistry.CreateKey(%v, %v) err = nil, want error", tc.params, tc.idRequirement)
 			}
 		})
 	}
