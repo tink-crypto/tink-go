@@ -28,47 +28,53 @@ const (
 )
 
 // KEMID is the key encapsulation mechanism identifier.
-type KEMID int
+type KEMID uint16
 
 // All identifier values are specified in
 // https://www.rfc-editor.org/rfc/rfc9180.html.
 
 // KEM algorithm identifiers.
 const (
+	// UnknownKEMID is the KEM identifier for unknown KEM algorithms.
+	UnknownKEMID KEMID = 0
 	// P256HKDFSHA256 is the KEM identifier for NIST P-256 with HKDF-SHA-256.
-	P256HKDFSHA256 KEMID = 0x0010
+	P256HKDFSHA256 = 0x0010
 	// P384HKDFSHA384 is the KEM identifier for NIST P-384 with HKDF-SHA-384.
-	P384HKDFSHA384 KEMID = 0x0011
+	P384HKDFSHA384 = 0x0011
 	// P521HKDFSHA512 is the KEM identifier for NIST P-521 with HKDF-SHA-512.
-	P521HKDFSHA512 KEMID = 0x0012
+	P521HKDFSHA512 = 0x0012
 	// X25519HKDFSHA256 is the KEM identifier for Curve25519 with HKDF-SHA-256.
-	X25519HKDFSHA256 KEMID = 0x0020
+	X25519HKDFSHA256 = 0x0020
 )
 
 // KDFID is the key derivation function identifier.
-type KDFID int
+type KDFID uint16
 
 // KDF algorithm identifiers.
 const (
+	// UnknownKDFID is the KDF identifier for unknown KDF algorithms.
+	UnknownKDFID KDFID = 0
 	// HKDFSHA256 is the KDF identifier for HKDF-SHA-256.
-	HKDFSHA256 KDFID = 0x0001
+	HKDFSHA256 = 0x0001
 	// HKDFSHA384 is the KDF identifier for HKDF-SHA-384.
-	HKDFSHA384 KDFID = 0x0002
+	HKDFSHA384 = 0x0002
 	// HKDFSHA512 is the KDF identifier for HKDF-SHA-512.
-	HKDFSHA512 KDFID = 0x0003
+	HKDFSHA512 = 0x0003
 )
 
 // AEADID is the authenticated encryption with associated data identifier.
-type AEADID int
+type AEADID uint16
 
 // AEAD algorithm identifiers.
 const (
+	// UnknownAEADID is the AEAD identifier for unknown AEAD algorithms.
+	UnknownAEADID AEADID = 0
 	// AES128GCM is the AEAD identifier for AES-128-GCM.
-	AES128GCM AEADID = 0x0001
+	AES128GCM = 0x0001
 	// AES256GCM is the AEAD identifier for AES-256-GCM.
-	AES256GCM AEADID = 0x0002
+	AES256GCM = 0x0002
 	// ChaCha20Poly1305 is the AEAD identifier for ChaCha20-Poly1305.
-	ChaCha20Poly1305 AEADID = 0x0003
+	ChaCha20Poly1305 = 0x0003
 )
 
 // String returns a string representation of the AEAD ID.
@@ -90,8 +96,10 @@ type HashType int
 
 // Hash function identifiers.
 const (
+	// UnknownHashType is the hash function identifier for unknown hash functions.
+	UnknownHashType HashType = iota
 	// SHA256 is the identifier for the SHA-256 hash function.
-	SHA256 HashType = iota
+	SHA256
 	// SHA384 is the identifier for the SHA-384 hash function.
 	SHA384
 	// SHA512 is the identifier for the SHA-512 hash function.

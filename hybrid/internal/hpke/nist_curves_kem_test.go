@@ -238,3 +238,9 @@ func TestKEMEncapsulatedKeyLength(t *testing.T) {
 		})
 	}
 }
+
+func TestNewNISTCurvesKEM_UnknownKEMID(t *testing.T) {
+	if _, err := newNISTCurvesKEM(UnknownKEMID); err == nil {
+		t.Errorf("newPrimitives() err = nil, want error")
+	}
+}

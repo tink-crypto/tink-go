@@ -201,3 +201,9 @@ func TestHKDFKDFExtractAndExpand(t *testing.T) {
 		})
 	}
 }
+
+func TestNewHKDFKDF_UnknownHashType(t *testing.T) {
+	if _, err := newHKDFKDF(UnknownHashType); err == nil {
+		t.Errorf("newHKDFKDF() err = nil, want error")
+	}
+}

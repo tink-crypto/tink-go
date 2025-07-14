@@ -191,3 +191,16 @@ func TestX25519KEMEncapsulatedKeyLength(t *testing.T) {
 		t.Errorf("encapsulatedKeyLength: got %d, want %d", kem.encapsulatedKeyLength(), kemLengths[X25519HKDFSHA256].nEnc)
 	}
 }
+
+func TestNewX25519KEM_InvalidIDs(t *testing.T) {
+	t.Run("Unknown Hash Type", func(t *testing.T) {
+		if _, err := newX25519KEM(UnknownHashType); err == nil {
+			t.Errorf("newPrimitives() err = nil, want error")
+		}
+	})
+	t.Run("Unsupported Hash Type", func(t *testing.T) {
+		if _, err := newX25519KEM(SHA384); err == nil {
+			t.Errorf("newPrimitives() err = nil, want error")
+		}
+	})
+}

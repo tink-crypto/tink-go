@@ -107,7 +107,7 @@ func TestNewAEADUnsupportedID(t *testing.T) {
 	}
 }
 
-func TestNewPrimitivesFromProto(t *testing.T) {
+func TestNewPrimitives(t *testing.T) {
 	for _, kem := range kems {
 		for _, kdf := range kdfs {
 			for _, aead := range aeads {
@@ -129,4 +129,22 @@ func TestNewPrimitivesFromProto(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestNewPrimitives_InvalidIDs(t *testing.T) {
+	t.Run("Invalid KEM ID", func(t *testing.T) {
+		if _, _, _, err := newPrimitives(UnknownKEMID, HKDFSHA256, AES256GCM); err == nil {
+			t.Errorf("newPrimitives() err = nil, want error")
+		}
+	})
+	t.Run("Invalid KDF ID", func(t *testing.T) {
+		if _, _, _, err := newPrimitives(X25519HKDFSHA256, UnknownKDFID, AES256GCM); err == nil {
+			t.Errorf("newPrimitives() err = nil, want error")
+		}
+	})
+	t.Run("Invalid AEAD ID", func(t *testing.T) {
+		if _, _, _, err := newPrimitives(X25519HKDFSHA256, HKDFSHA256, UnknownAEADID); err == nil {
+			t.Errorf("newPrimitives() err = nil, want error")
+		}
+	})
 }

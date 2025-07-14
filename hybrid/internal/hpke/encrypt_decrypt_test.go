@@ -204,3 +204,31 @@ func flipRandByte(t *testing.T, b []byte) []byte {
 	ret[randByte] = ret[randByte] ^ 255
 	return ret
 }
+
+func TestNewEncryptNewDecrypt_InvalidIDs(t *testing.T) {
+	pub, priv := pubPrivKeys(t)
+	t.Run("Invalid KEM ID", func(t *testing.T) {
+		if _, err := NewEncrypt(pub, UnknownKEMID, HKDFSHA256, AES256GCM); err == nil {
+			t.Error("NewEncrypt() err = nil, want err")
+		}
+		if _, err := NewDecrypt(priv, UnknownKEMID, HKDFSHA256, AES256GCM); err == nil {
+			t.Error("NewDecrypt() err = nil, want err")
+		}
+	})
+	t.Run("Invalid KDF ID", func(t *testing.T) {
+		if _, err := NewEncrypt(pub, X25519HKDFSHA256, UnknownKDFID, AES256GCM); err == nil {
+			t.Error("NewEncrypt() err = nil, want err")
+		}
+		if _, err := NewDecrypt(priv, X25519HKDFSHA256, UnknownKDFID, AES256GCM); err == nil {
+			t.Error("NewDecrypt() err = nil, want err")
+		}
+	})
+	t.Run("Invalid AEAD ID", func(t *testing.T) {
+		if _, err := NewEncrypt(pub, X25519HKDFSHA256, HKDFSHA256, UnknownAEADID); err == nil {
+			t.Error("NewEncrypt() err = nil, want err")
+		}
+		if _, err := NewDecrypt(priv, X25519HKDFSHA256, HKDFSHA256, UnknownAEADID); err == nil {
+			t.Error("NewDecrypt() err = nil, want err")
+		}
+	})
+}
