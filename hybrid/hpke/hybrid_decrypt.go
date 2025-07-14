@@ -20,7 +20,6 @@ import (
 
 	internalhpke "github.com/tink-crypto/tink-go/v2/hybrid/internal/hpke"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -31,27 +30,73 @@ type hybridDecrypt struct {
 	variant          Variant
 }
 
+func kemIDFromParams(params *Parameters) (internalhpke.KEMID, error) {
+	switch params.KEMID() {
+	case DHKEM_P256_HKDF_SHA256:
+		return internalhpke.P256HKDFSHA256, nil
+	case DHKEM_P384_HKDF_SHA384:
+		return internalhpke.P384HKDFSHA384, nil
+	case DHKEM_P521_HKDF_SHA512:
+		return internalhpke.P521HKDFSHA512, nil
+	case DHKEM_X25519_HKDF_SHA256:
+		return internalhpke.X25519HKDFSHA256, nil
+	default:
+		return 0, fmt.Errorf("unsupported variant: %v", params.KEMID())
+	}
+}
+
+func kdfIDFromParams(params *Parameters) (internalhpke.KDFID, error) {
+	switch params.KDFID() {
+	case HKDFSHA256:
+		return internalhpke.HKDFSHA256, nil
+	case HKDFSHA384:
+		return internalhpke.HKDFSHA384, nil
+	case HKDFSHA512:
+		return internalhpke.HKDFSHA512, nil
+	default:
+		return 0, fmt.Errorf("unsupported variant: %v", params.KDFID())
+	}
+}
+
+func aeadIDFromParams(params *Parameters) (internalhpke.AEADID, error) {
+	switch params.AEADID() {
+	case AES128GCM:
+		return internalhpke.AES128GCM, nil
+	case AES256GCM:
+		return internalhpke.AES256GCM, nil
+	case ChaCha20Poly1305:
+		return internalhpke.ChaCha20Poly1305, nil
+	default:
+		return 0, fmt.Errorf("unsupported variant: %v", params.AEADID())
+	}
+}
+
 // NewHybridDecrypt creates a new instance of [tink.HybridDecrypt] from a
 // [PrivateKey].
 //
 // This is an internal API.
 func NewHybridDecrypt(privateKey *PrivateKey, _ internalapi.Token) (tink.HybridDecrypt, error) {
-	serializedPrivateKey, err := protoserialization.SerializeKey(privateKey)
+	params := privateKey.Parameters().(*Parameters)
+	kemID, err := kemIDFromParams(params)
 	if err != nil {
 		return nil, err
 	}
-	protoPrivateKey, err := unmarshalHpkePrivateKey(serializedPrivateKey.KeyData().GetValue())
+	kdfID, err := kdfIDFromParams(params)
 	if err != nil {
 		return nil, err
 	}
-	rawHybridDecrypt, err := internalhpke.NewDecrypt(protoPrivateKey)
+	aeadID, err := aeadIDFromParams(params)
+	if err != nil {
+		return nil, err
+	}
+	rawHybridDecrypt, err := internalhpke.NewDecrypt(privateKey.PrivateKeyBytes(), kemID, kdfID, aeadID)
 	if err != nil {
 		return nil, err
 	}
 	return &hybridDecrypt{
 		rawHybridDecrypt: rawHybridDecrypt,
 		prefix:           privateKey.OutputPrefix(),
-		variant:          privateKey.Parameters().(*Parameters).Variant(),
+		variant:          params.Variant(),
 	}, nil
 }
 

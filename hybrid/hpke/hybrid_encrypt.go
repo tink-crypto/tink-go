@@ -20,7 +20,6 @@ import (
 
 	internalhpke "github.com/tink-crypto/tink-go/v2/hybrid/internal/hpke"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -36,22 +35,27 @@ type hybridEncrypt struct {
 //
 // This is an internal API.
 func NewHybridEncrypt(publicKey *PublicKey, _ internalapi.Token) (tink.HybridEncrypt, error) {
-	serializedPublicKey, err := protoserialization.SerializeKey(publicKey)
+	params := publicKey.Parameters().(*Parameters)
+	kemID, err := kemIDFromParams(params)
 	if err != nil {
 		return nil, err
 	}
-	protoPublicKey, err := unmarshalHpkePublicKey(serializedPublicKey.KeyData().GetValue())
+	kdfID, err := kdfIDFromParams(params)
 	if err != nil {
 		return nil, err
 	}
-	rawHybridEncrypt, err := internalhpke.NewEncrypt(protoPublicKey)
+	aeadID, err := aeadIDFromParams(params)
+	if err != nil {
+		return nil, err
+	}
+	rawHybridEncrypt, err := internalhpke.NewEncrypt(publicKey.PublicKeyBytes(), kemID, kdfID, aeadID)
 	if err != nil {
 		return nil, err
 	}
 	return &hybridEncrypt{
 		rawHybridEncrypt: rawHybridEncrypt,
 		prefix:           publicKey.OutputPrefix(),
-		variant:          publicKey.Parameters().(*Parameters).Variant(),
+		variant:          params.Variant(),
 	}, nil
 }
 

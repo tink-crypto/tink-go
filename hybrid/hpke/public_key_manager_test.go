@@ -23,6 +23,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/hybrid/internal/hpke"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/subtle"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -34,23 +36,62 @@ const (
 	publicKeyTypeURL = "type.googleapis.com/google.crypto.tink.HpkePublicKey"
 )
 
-var hpkeKEMs = []hpkepb.HpkeKem{
-	hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
-	hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384,
-	hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512,
-	hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+var hpkeKEMs = []struct {
+	protoID hpkepb.HpkeKem
+	hpkeID  hpke.KEMID
+}{
+	{
+		protoID: hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+		hpkeID:  hpke.P256HKDFSHA256,
+	},
+	{
+		protoID: hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384,
+		hpkeID:  hpke.P384HKDFSHA384,
+	},
+	{
+		protoID: hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512,
+		hpkeID:  hpke.P521HKDFSHA512,
+	},
+	{
+		protoID: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
+		hpkeID:  hpke.X25519HKDFSHA256,
+	},
 }
 
-var hpkeKDFs = []hpkepb.HpkeKdf{
-	hpkepb.HpkeKdf_HKDF_SHA256,
-	hpkepb.HpkeKdf_HKDF_SHA384,
-	hpkepb.HpkeKdf_HKDF_SHA512,
+var hpkeKDFs = []struct {
+	protoID hpkepb.HpkeKdf
+	hpkeID  hpke.KDFID
+}{
+	{
+		protoID: hpkepb.HpkeKdf_HKDF_SHA256,
+		hpkeID:  hpke.HKDFSHA256,
+	},
+	{
+		protoID: hpkepb.HpkeKdf_HKDF_SHA384,
+		hpkeID:  hpke.HKDFSHA384,
+	},
+	{
+		protoID: hpkepb.HpkeKdf_HKDF_SHA512,
+		hpkeID:  hpke.HKDFSHA512,
+	},
 }
 
-var hpkeAEADs = []hpkepb.HpkeAead{
-	hpkepb.HpkeAead_AES_128_GCM,
-	hpkepb.HpkeAead_AES_256_GCM,
-	hpkepb.HpkeAead_CHACHA20_POLY1305,
+var hpkeAEADs = []struct {
+	protoID hpkepb.HpkeAead
+	hpkeID  hpke.AEADID
+}{
+	{
+		protoID: hpkepb.HpkeAead_AES_128_GCM,
+		hpkeID:  hpke.AES128GCM,
+	},
+	{
+		protoID: hpkepb.HpkeAead_AES_256_GCM,
+		hpkeID:  hpke.AES256GCM,
+	},
+	{
+		protoID: hpkepb.HpkeAead_CHACHA20_POLY1305,
+		hpkeID:  hpke.ChaCha20Poly1305,
+	},
 }
 
 func TestPublicKeyManagerPrimitiveRejectsInvalidKeyVersion(t *testing.T) {
@@ -141,13 +182,13 @@ func TestPublicKeyManagerPrimitiveEncryptDecrypt(t *testing.T) {
 	wantPT := random.GetRandomBytes(200)
 	ctxInfo := random.GetRandomBytes(100)
 
-	for _, kemID := range hpkeKEMs {
-		for _, kdfID := range hpkeKDFs {
-			for _, aeadID := range hpkeAEADs {
+	for _, kem := range hpkeKEMs {
+		for _, kdf := range hpkeKDFs {
+			for _, aead := range hpkeAEADs {
 				params := &hpkepb.HpkeParams{
-					Kem:  kemID,
-					Kdf:  kdfID,
-					Aead: aeadID,
+					Kem:  kem.protoID,
+					Kdf:  kdf.protoID,
+					Aead: aead.protoID,
 				}
 				pubKey, privKey := pubPrivKeys(t, params)
 				serializedPubKey, err := proto.Marshal(pubKey)
@@ -163,7 +204,9 @@ func TestPublicKeyManagerPrimitiveEncryptDecrypt(t *testing.T) {
 				if !ok {
 					t.Fatal("primitive is not Encrypt")
 				}
-				dec, err := hpke.NewDecrypt(privKey)
+
+				privateKeyBytes := secretdata.NewBytesFromData(privKey.GetPrivateKey(), insecuresecretdataaccess.Token{})
+				dec, err := hpke.NewDecrypt(privateKeyBytes, kem.hpkeID, kdf.hpkeID, aead.hpkeID)
 				if err != nil {
 					t.Fatalf("hpke.NewDecrypt() err = %v, want nil", err)
 				}

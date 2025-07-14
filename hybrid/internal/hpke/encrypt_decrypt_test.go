@@ -19,140 +19,81 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/subtle"
-	pb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
-func TestNewEncryptDecryptUnknownKEM(t *testing.T) {
-	params := validParams(t)
-	params.Kem = pb.HpkeKem_KEM_UNKNOWN
-	pubKey, privKey := pubPrivKeys(t, params)
-
-	if _, err := NewEncrypt(pubKey); err == nil {
-		t.Error("NewEncrypt(unknown KEM): got success, want err")
-	}
-	if _, err := NewDecrypt(privKey); err == nil {
-		t.Error("NewDecrypt(unknown KEM): got success, want err")
-	}
-}
-
-func TestNewEncryptDecryptUnknownKDF(t *testing.T) {
-	params := validParams(t)
-	params.Kdf = pb.HpkeKdf_KDF_UNKNOWN
-	pubKey, privKey := pubPrivKeys(t, params)
-
-	if _, err := NewEncrypt(pubKey); err == nil {
-		t.Error("NewEncrypt(unknown KDF): got success, want err")
-	}
-	if _, err := NewDecrypt(privKey); err == nil {
-		t.Error("NewDecrypt(unknown KDF): got success, want err")
-	}
-}
-
-func TestNewEncryptDecryptUnknownAEAD(t *testing.T) {
-	params := validParams(t)
-	params.Aead = pb.HpkeAead_AEAD_UNKNOWN
-	pubKey, privKey := pubPrivKeys(t, params)
-
-	if _, err := NewEncrypt(pubKey); err == nil {
-		t.Error("NewEncrypt(unknown AEAD): got success, want err")
-	}
-	if _, err := NewDecrypt(privKey); err == nil {
-		t.Error("NewDecrypt(unknown AEAD): got success, want err")
-	}
-}
-
-func TestNewEncryptDecryptMissingParams(t *testing.T) {
-	pubKey, privKey := pubPrivKeys(t, nil)
-
-	if _, err := NewEncrypt(pubKey); err == nil {
-		t.Error("NewEncrypt(missing params): got success, want err")
-	}
-	if _, err := NewDecrypt(privKey); err == nil {
-		t.Error("NewDecrypt(missing params): got success, want err")
-	}
-}
-
 func TestNewEncryptMissingPubKeyBytes(t *testing.T) {
-	pubKey, _ := pubPrivKeys(t, validParams(t))
-	pubKey.PublicKey = nil
-	if _, err := NewEncrypt(pubKey); err == nil {
-		t.Error("NewEncrypt(nil pub key): got success, want err")
+	if _, err := NewEncrypt(nil, P256HKDFSHA256, HKDFSHA256, AES256GCM); err == nil {
+		t.Error("NewEncrypt() err = nil, want err")
 	}
-	pubKey.PublicKey = []byte{}
-	if _, err := NewEncrypt(pubKey); err == nil {
-		t.Error("NewEncrypt(zero-length pub key): got success, want err")
+	if _, err := NewEncrypt([]byte{}, P256HKDFSHA256, HKDFSHA256, AES256GCM); err == nil {
+		t.Error("NewEncrypt() err = nil, want err")
 	}
 }
 
 func TestNewDecryptMissingPrivKeyBytes(t *testing.T) {
-	_, privKey := pubPrivKeys(t, validParams(t))
-	privKey.PrivateKey = nil
-	if _, err := NewDecrypt(privKey); err == nil {
-		t.Error("NewDecrypt(nil priv key): got success, want err")
+	if _, err := NewDecrypt(secretdata.NewBytesFromData(nil, insecuresecretdataaccess.Token{}), P256HKDFSHA256, HKDFSHA256, AES256GCM); err == nil {
+		t.Error("NewDecrypt() err = nil, want err")
 	}
-	privKey.PrivateKey = []byte{}
-	if _, err := NewDecrypt(privKey); err == nil {
-		t.Error("NewDecrypt(zero-length priv key): got success, want err")
+	if _, err := NewDecrypt(secretdata.NewBytesFromData([]byte{}, insecuresecretdataaccess.Token{}), P256HKDFSHA256, HKDFSHA256, AES256GCM); err == nil {
+		t.Error("NewDecrypt() err = nil, want err")
 	}
 }
 
 func TestEncryptDecrypt(t *testing.T) {
-	aeadIDs := []pb.HpkeAead{pb.HpkeAead_AES_128_GCM, pb.HpkeAead_AES_256_GCM, pb.HpkeAead_CHACHA20_POLY1305}
+	aeadIDs := []AEADID{AES128GCM, AES256GCM, ChaCha20Poly1305}
 	for _, aeadID := range aeadIDs {
-		params := &pb.HpkeParams{
-			Kem:  pb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
-			Kdf:  pb.HpkeKdf_HKDF_SHA256,
-			Aead: aeadID,
-		}
-		pubKey, privKey := pubPrivKeys(t, params)
+		t.Run(aeadID.String(), func(t *testing.T) {
+			pubKey, privKey := pubPrivKeys(t)
+			enc, err := NewEncrypt(pubKey, X25519HKDFSHA256, HKDFSHA256, aeadID)
+			if err != nil {
+				t.Fatalf("NewEncrypt() err %q", err)
+			}
+			dec, err := NewDecrypt(privKey, X25519HKDFSHA256, HKDFSHA256, aeadID)
+			if err != nil {
+				t.Fatalf("NewDecrypt() err %q", err)
+			}
 
-		enc, err := NewEncrypt(pubKey)
-		if err != nil {
-			t.Fatalf("NewEncrypt: err %q", err)
-		}
-		dec, err := NewDecrypt(privKey)
-		if err != nil {
-			t.Fatalf("NewDecrypt: err %q", err)
-		}
-
-		wantPT := random.GetRandomBytes(200)
-		ctxInfo := random.GetRandomBytes(100)
-		ct, err := enc.Encrypt(wantPT, ctxInfo)
-		if err != nil {
-			t.Fatalf("Encrypt: err %q", err)
-		}
-		gotPT, err := dec.Decrypt(ct, ctxInfo)
-		if err != nil {
-			t.Fatalf("Decrypt: err %q", err)
-		}
-		if !bytes.Equal(gotPT, wantPT) {
-			t.Errorf("Decrypt: got %q, want %q", gotPT, wantPT)
-		}
+			wantPT := random.GetRandomBytes(200)
+			ctxInfo := random.GetRandomBytes(100)
+			ct, err := enc.Encrypt(wantPT, ctxInfo)
+			if err != nil {
+				t.Fatalf("Encrypt() err %q", err)
+			}
+			gotPT, err := dec.Decrypt(ct, ctxInfo)
+			if err != nil {
+				t.Fatalf("Decrypt() err %q", err)
+			}
+			if !bytes.Equal(gotPT, wantPT) {
+				t.Errorf("Decrypt: got %q, want %q", gotPT, wantPT)
+			}
+		})
 	}
 }
 
 func TestDecryptModifiedCiphertextOrContextInfo(t *testing.T) {
-	pubKey, privKey := pubPrivKeys(t, validParams(t))
-	enc, err := NewEncrypt(pubKey)
+	pubKey, privKey := pubPrivKeys(t)
+	enc, err := NewEncrypt(pubKey, X25519HKDFSHA256, HKDFSHA256, AES256GCM)
 	if err != nil {
-		t.Fatalf("NewEncrypt: err %q", err)
+		t.Fatalf("NewEncrypt() err %q", err)
 	}
-	dec, err := NewDecrypt(privKey)
+	dec, err := NewDecrypt(privKey, X25519HKDFSHA256, HKDFSHA256, AES256GCM)
 	if err != nil {
-		t.Fatalf("NewDecrypt: err %q", err)
+		t.Fatalf("NewDecrypt() err %q", err)
 	}
 
 	wantPT := random.GetRandomBytes(200)
 	ctxInfo := random.GetRandomBytes(100)
 	ct, err := enc.Encrypt(wantPT, ctxInfo)
 	if err != nil {
-		t.Fatalf("Encrypt: err %q", err)
+		t.Fatalf("Encrypt() err %q", err)
 	}
 	gotPT, err := dec.Decrypt(ct, ctxInfo)
 	if err != nil {
-		t.Fatalf("Decrypt: err %q", err)
+		t.Fatalf("Decrypt() err %q", err)
 	}
 	if !bytes.Equal(gotPT, wantPT) {
 		t.Errorf("Decrypt: got %q, want %q", gotPT, wantPT)
@@ -183,14 +124,14 @@ func TestDecryptModifiedCiphertextOrContextInfo(t *testing.T) {
 }
 
 func TestEncryptDecryptEmptyContextInfo(t *testing.T) {
-	pubKey, privKey := pubPrivKeys(t, validParams(t))
-	enc, err := NewEncrypt(pubKey)
+	pubKey, privKey := pubPrivKeys(t)
+	enc, err := NewEncrypt(pubKey, X25519HKDFSHA256, HKDFSHA256, AES256GCM)
 	if err != nil {
-		t.Fatalf("NewEncrypt: err %q", err)
+		t.Fatalf("NewEncrypt() err = %q", err)
 	}
-	dec, err := NewDecrypt(privKey)
+	dec, err := NewDecrypt(privKey, X25519HKDFSHA256, HKDFSHA256, AES256GCM)
 	if err != nil {
-		t.Fatalf("NewDecrypt: err %q", err)
+		t.Fatalf("NewDecrypt() err = %q", err)
 	}
 
 	wantPT := random.GetRandomBytes(200)
@@ -211,14 +152,14 @@ func TestEncryptDecryptEmptyContextInfo(t *testing.T) {
 // TestDecryptEncapsulatedKeyWithFlippedMSB checks that ciphertexts with its
 // encapsulated key MSB flipped fails to decrypt. See details at b/213886185.
 func TestDecryptEncapsulatedKeyWithFlippedMSB(t *testing.T) {
-	pubKey, privKey := pubPrivKeys(t, validParams(t))
-	enc, err := NewEncrypt(pubKey)
+	pubKey, privKey := pubPrivKeys(t)
+	enc, err := NewEncrypt(pubKey, X25519HKDFSHA256, HKDFSHA256, AES256GCM)
 	if err != nil {
-		t.Fatalf("NewEncrypt: err %q", err)
+		t.Fatalf("NewEncrypt() err = %q", err)
 	}
-	dec, err := NewDecrypt(privKey)
+	dec, err := NewDecrypt(privKey, X25519HKDFSHA256, HKDFSHA256, AES256GCM)
 	if err != nil {
-		t.Fatalf("NewDecrypt: err %q", err)
+		t.Fatalf("NewDecrypt() err = %q", err)
 	}
 
 	wantPT := random.GetRandomBytes(200)
@@ -242,18 +183,8 @@ func TestDecryptEncapsulatedKeyWithFlippedMSB(t *testing.T) {
 	}
 }
 
-func validParams(t *testing.T) *pb.HpkeParams {
+func pubPrivKeys(t *testing.T) ([]byte, secretdata.Bytes) {
 	t.Helper()
-	return &pb.HpkeParams{
-		Kem:  pb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
-		Kdf:  pb.HpkeKdf_HKDF_SHA256,
-		Aead: pb.HpkeAead_AES_256_GCM,
-	}
-}
-
-func pubPrivKeys(t *testing.T, params *pb.HpkeParams) (*pb.HpkePublicKey, *pb.HpkePrivateKey) {
-	t.Helper()
-
 	priv, err := subtle.GeneratePrivateKeyX25519()
 	if err != nil {
 		t.Fatalf("GeneratePrivateKeyX25519: err %q", err)
@@ -262,18 +193,7 @@ func pubPrivKeys(t *testing.T, params *pb.HpkeParams) (*pb.HpkePublicKey, *pb.Hp
 	if err != nil {
 		t.Fatalf("PublicFromPrivateX25519: err %q", err)
 	}
-
-	pubKey := &pb.HpkePublicKey{
-		Version:   0,
-		Params:    params,
-		PublicKey: pub,
-	}
-	privKey := &pb.HpkePrivateKey{
-		Version:    0,
-		PublicKey:  pubKey,
-		PrivateKey: priv,
-	}
-	return pubKey, privKey
+	return pub, secretdata.NewBytesFromData(priv, insecuresecretdataaccess.Token{})
 }
 
 func flipRandByte(t *testing.T, b []byte) []byte {

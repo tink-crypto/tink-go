@@ -156,7 +156,7 @@ func TestPrivateKeyManagerPrimitiveEncryptDecrypt(t *testing.T) {
 		params := &hpkepb.HpkeParams{
 			Kem:  hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
 			Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
-			Aead: aeadID,
+			Aead: aeadID.protoID,
 		}
 		pubKey, privKey := pubPrivKeys(t, params)
 		serializedPrivKey, err := proto.Marshal(privKey)
@@ -164,7 +164,7 @@ func TestPrivateKeyManagerPrimitiveEncryptDecrypt(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		enc, err := hpke.NewEncrypt(pubKey)
+		enc, err := hpke.NewEncrypt(pubKey.GetPublicKey(), hpke.X25519HKDFSHA256, hpke.HKDFSHA256, aeadID.hpkeID)
 		if err != nil {
 			t.Fatalf("hpke.NewEncrypt() err = %v, want nil", err)
 		}
@@ -266,9 +266,9 @@ func TestPrivateKeyManagerNewKeyEncryptDecrypt(t *testing.T) {
 			for _, aeadID := range hpkeAEADs {
 				keyFormat := &hpkepb.HpkeKeyFormat{
 					Params: &hpkepb.HpkeParams{
-						Kem:  kemID,
-						Kdf:  kdfID,
-						Aead: aeadID,
+						Kem:  kemID.protoID,
+						Kdf:  kdfID.protoID,
+						Aead: aeadID.protoID,
 					},
 				}
 				serializedKeyFormat, err := proto.Marshal(keyFormat)
@@ -302,7 +302,7 @@ func TestPrivateKeyManagerNewKeyEncryptDecrypt(t *testing.T) {
 					t.Error("public key is missing")
 				}
 
-				enc, err := hpke.NewEncrypt(pubKey)
+				enc, err := hpke.NewEncrypt(pubKey.GetPublicKey(), kemID.hpkeID, kdfID.hpkeID, aeadID.hpkeID)
 				if err != nil {
 					t.Fatalf("hpke.NewEncrypt() err = %v, want nil", err)
 				}
@@ -356,7 +356,7 @@ func TestPrivateKeyManagerNewKeyData(t *testing.T) {
 			Params: &hpkepb.HpkeParams{
 				Kem:  hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
 				Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
-				Aead: aeadID,
+				Aead: aeadID.protoID,
 			},
 		}
 		serializedKeyFormat, err := proto.Marshal(keyFormat)

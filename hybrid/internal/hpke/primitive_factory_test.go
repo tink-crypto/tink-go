@@ -17,38 +17,27 @@ package hpke
 import (
 	"fmt"
 	"testing"
-
-	pb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
 var kems = []struct {
 	name  string
-	proto pb.HpkeKem
-	id    KEMID
+	kemID KEMID
 }{
-	{name: "DHKEM_P256_HKDF_SHA256", proto: pb.HpkeKem_DHKEM_P256_HKDF_SHA256, id: P256HKDFSHA256},
-	{name: "DHKEM_P384_HKDF_SHA384", proto: pb.HpkeKem_DHKEM_P384_HKDF_SHA384, id: P384HKDFSHA384},
-	{name: "DHKEM_P521_HKDF_SHA512", proto: pb.HpkeKem_DHKEM_P521_HKDF_SHA512, id: P521HKDFSHA512},
-	{name: "DHKEM_X25519_HKDF_SHA256", proto: pb.HpkeKem_DHKEM_X25519_HKDF_SHA256, id: X25519HKDFSHA256},
+	{name: "DHKEM_P256_HKDF_SHA256", kemID: P256HKDFSHA256},
+	{name: "DHKEM_P384_HKDF_SHA384", kemID: P384HKDFSHA384},
+	{name: "DHKEM_P521_HKDF_SHA512", kemID: P521HKDFSHA512},
+	{name: "DHKEM_X25519_HKDF_SHA256", kemID: X25519HKDFSHA256},
 }
 
 func TestNewKEM(t *testing.T) {
 	for _, k := range kems {
 		t.Run(k.name, func(t *testing.T) {
-			kemID, err := kemIDFromProto(k.proto)
+			kem, err := newKEM(k.kemID)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if kemID != k.id {
-				t.Errorf("kemID: got %d, want %d", kemID, k.id)
-			}
-
-			kem, err := newKEM(k.id)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if kem.id() != k.id {
-				t.Errorf("id: got %d, want %d", kem.id(), k.id)
+			if kem.id() != k.kemID {
+				t.Errorf("id: got %d, want %d", kem.id(), k.kemID)
 			}
 		})
 	}
@@ -60,39 +49,24 @@ func TestNewKEMUnsupportedID(t *testing.T) {
 	}
 }
 
-func TestKEMIDFromProtoUnsupportedID(t *testing.T) {
-	if _, err := kemIDFromProto(pb.HpkeKem_KEM_UNKNOWN); err == nil {
-		t.Fatal("kemIDFromProto(unsupported ID): got success, want err")
-	}
-}
-
 var kdfs = []struct {
 	name  string
-	proto pb.HpkeKdf
-	id    KDFID
+	kdfID KDFID
 }{
-	{name: "HKDF_SHA256", proto: pb.HpkeKdf_HKDF_SHA256, id: HKDFSHA256},
-	{name: "HKDF_SHA384", proto: pb.HpkeKdf_HKDF_SHA384, id: HKDFSHA384},
-	{name: "HKDF_SHA512", proto: pb.HpkeKdf_HKDF_SHA512, id: HKDFSHA512},
+	{name: "HKDF_SHA256", kdfID: HKDFSHA256},
+	{name: "HKDF_SHA384", kdfID: HKDFSHA384},
+	{name: "HKDF_SHA512", kdfID: HKDFSHA512},
 }
 
 func TestNewKDF(t *testing.T) {
 	for _, k := range kdfs {
 		t.Run(k.name, func(t *testing.T) {
-			kdfID, err := kdfIDFromProto(k.proto)
+			kdf, err := newKDF(k.kdfID)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if kdfID != k.id {
-				t.Errorf("kdfID: got %d, want %d", kdfID, k.id)
-			}
-
-			kdf, err := newKDF(k.id)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if kdf.id() != k.id {
-				t.Errorf("id: got %d, want %d", kdf.id(), k.id)
+			if kdf.id() != k.kdfID {
+				t.Errorf("id: got %d, want %d", kdf.id(), k.kdfID)
 			}
 		})
 	}
@@ -104,39 +78,24 @@ func TestNewKDFUnsupportedID(t *testing.T) {
 	}
 }
 
-func TestKDFIDFromProtoUnsupportedID(t *testing.T) {
-	if _, err := kdfIDFromProto(pb.HpkeKdf_KDF_UNKNOWN); err == nil {
-		t.Fatal("kdfIDFromProto(unsupported ID): got success, want err")
-	}
-}
-
 var aeads = []struct {
-	name  string
-	proto pb.HpkeAead
-	id    AEADID
+	name   string
+	aeadID AEADID
 }{
-	{name: "AES-128-GCM", proto: pb.HpkeAead_AES_128_GCM, id: AES128GCM},
-	{name: "AES-256-GCM", proto: pb.HpkeAead_AES_256_GCM, id: AES256GCM},
-	{name: "ChaCha20Poly1305", proto: pb.HpkeAead_CHACHA20_POLY1305, id: ChaCha20Poly1305},
+	{name: "AES-128-GCM", aeadID: AES128GCM},
+	{name: "AES-256-GCM", aeadID: AES256GCM},
+	{name: "ChaCha20Poly1305", aeadID: ChaCha20Poly1305},
 }
 
 func TestNewAEAD(t *testing.T) {
 	for _, a := range aeads {
 		t.Run(a.name, func(t *testing.T) {
-			aeadID, err := aeadIDFromProto(a.proto)
+			aead, err := newAEAD(a.aeadID)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if aeadID != a.id {
-				t.Errorf("aeadID: got %d, want %d", aeadID, a.id)
-			}
-
-			aead, err := newAEAD(aeadID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if aead.id() != a.id {
-				t.Errorf("id: got %d, want %d", aead.id(), a.id)
+			if aead.id() != a.aeadID {
+				t.Errorf("id: got %d, want %d", aead.id(), a.aeadID)
 			}
 		})
 	}
@@ -148,76 +107,26 @@ func TestNewAEADUnsupportedID(t *testing.T) {
 	}
 }
 
-func TestAEADIDFromProtoUnsupportedID(t *testing.T) {
-	if _, err := aeadIDFromProto(pb.HpkeAead_AEAD_UNKNOWN); err == nil {
-		t.Fatal("aeadIDFromProto(unsupported ID): got success, want err")
-	}
-}
-
 func TestNewPrimitivesFromProto(t *testing.T) {
 	for _, kem := range kems {
 		for _, kdf := range kdfs {
 			for _, aead := range aeads {
 				t.Run(fmt.Sprintf("%s %s %s", kem.name, kdf.name, aead.name), func(t *testing.T) {
-					params := &pb.HpkeParams{
-						Kem:  kem.proto,
-						Kdf:  kdf.proto,
-						Aead: aead.proto,
-					}
-					gotKEM, gotKDF, gotAEAD, err := newPrimitivesFromProto(params)
+					gotKEM, gotKDF, gotAEAD, err := newPrimitives(kem.kemID, kdf.kdfID, aead.aeadID)
 					if err != nil {
-						t.Fatalf("newPrimitivesFromProto: %v", err)
+						t.Fatalf("newPrimitives: %v", err)
 					}
-
-					if gotKEM.id() != kem.id {
-						t.Errorf("kem.id: got %d, want %d", gotKEM.id(), kem.id)
+					if gotKEM.id() != kem.kemID {
+						t.Errorf("kem.id: got %d, want %d", gotKEM.id(), kem.kemID)
 					}
-					if gotKDF.id() != kdf.id {
-						t.Errorf("kdf.id: got %d, want %d", gotKDF.id(), kdf.id)
+					if gotKDF.id() != kdf.kdfID {
+						t.Errorf("kdf.id: got %d, want %d", gotKDF.id(), kdf.kdfID)
 					}
-					if gotAEAD.id() != aead.id {
-						t.Errorf("aead.id: got %d, want %d", gotAEAD.id(), aead.id)
+					if gotAEAD.id() != aead.aeadID {
+						t.Errorf("aead.id: got %d, want %d", gotAEAD.id(), aead.aeadID)
 					}
 				})
 			}
 		}
-	}
-}
-
-func TestNewPrimitivesFromProtoUnsupportedID(t *testing.T) {
-	tests := []struct {
-		name   string
-		params *pb.HpkeParams
-	}{
-		{
-			"KEM",
-			&pb.HpkeParams{
-				Kem:  pb.HpkeKem_KEM_UNKNOWN,
-				Kdf:  pb.HpkeKdf_HKDF_SHA256,
-				Aead: pb.HpkeAead_AES_256_GCM,
-			},
-		},
-		{"KDF",
-			&pb.HpkeParams{
-				Kem:  pb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
-				Kdf:  pb.HpkeKdf_KDF_UNKNOWN,
-				Aead: pb.HpkeAead_AES_256_GCM,
-			},
-		},
-		{"AEAD",
-			&pb.HpkeParams{
-				Kem:  pb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
-				Kdf:  pb.HpkeKdf_HKDF_SHA256,
-				Aead: pb.HpkeAead_AEAD_UNKNOWN,
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if _, _, _, err := newPrimitivesFromProto(test.params); err == nil {
-				t.Error("newPrimitivesFromProto: got success, want err")
-			}
-		})
 	}
 }

@@ -19,8 +19,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-
-	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
 // Mode identifiers.
@@ -72,6 +70,20 @@ const (
 	// ChaCha20Poly1305 is the AEAD identifier for ChaCha20-Poly1305.
 	ChaCha20Poly1305 AEADID = 0x0003
 )
+
+// String returns a string representation of the AEAD ID.
+func (a AEADID) String() string {
+	switch a {
+	case AES128GCM:
+		return "AES128GCM"
+	case AES256GCM:
+		return "AES256GCM"
+	case ChaCha20Poly1305:
+		return "ChaCha20Poly1305"
+	default:
+		return fmt.Sprintf("unknown AEADID: %d", a)
+	}
+}
 
 // HashType is the hash function identifier.
 type HashType int
@@ -179,36 +191,4 @@ func labelInfo(label string, info, suiteID []byte, length int) ([]byte, error) {
 	res = append(res, label...)
 	res = append(res, info...)
 	return res, nil
-}
-
-// ValidatePrivateKeyLength validates the length of the private key.
-func ValidatePrivateKeyLength(key *hpkepb.HpkePrivateKey) error {
-	kemID, err := kemIDFromProto(key.GetPublicKey().GetParams().GetKem())
-	if err != nil {
-		return err
-	}
-	lengths, ok := kemLengths[KEMID(kemID)]
-	if !ok {
-		return errInvalidHPKEParams
-	}
-	if lengths.nSK != len(key.GetPrivateKey()) {
-		return errInvalidHPKEPrivateKeyLength
-	}
-	return nil
-}
-
-// ValidatePublicKeyLength validates the length of the public key.
-func ValidatePublicKeyLength(key *hpkepb.HpkePublicKey) error {
-	kemID, err := kemIDFromProto(key.GetParams().GetKem())
-	if err != nil {
-		return err
-	}
-	lengths, ok := kemLengths[KEMID(kemID)]
-	if !ok {
-		return errInvalidHPKEParams
-	}
-	if lengths.nPK != len(key.GetPublicKey()) {
-		return errInvalidHPKEPublicKeyLength
-	}
-	return nil
 }

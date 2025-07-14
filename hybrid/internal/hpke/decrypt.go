@@ -15,36 +15,33 @@
 package hpke
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/tink"
-	pb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
 // Decrypt for HPKE implements interface HybridDecrypt.
 type Decrypt struct {
-	recipientPrivKey   *pb.HpkePrivateKey
-	kem                kem
-	kdf                kdf
-	aead               aead
-	encapsulatedKeyLen int
+	recipientPrivateKeyBytes secretdata.Bytes
+	kem                      kem
+	kdf                      kdf
+	aead                     aead
+	encapsulatedKeyLen       int
 }
 
 var _ tink.HybridDecrypt = (*Decrypt)(nil)
 
-// NewDecrypt constructs a Decrypt using HpkePrivateKey.
-func NewDecrypt(recipientPrivKey *pb.HpkePrivateKey) (*Decrypt, error) {
-	if recipientPrivKey.GetPrivateKey() == nil || len(recipientPrivKey.GetPrivateKey()) == 0 {
-		return nil, errors.New("HpkePrivateKey.PrivateKey bytes are missing")
+// NewDecrypt constructs a [Decrypt] object from private key bytes.
+func NewDecrypt(recipientPrivateKeyBytes secretdata.Bytes, kemID KEMID, kdfID KDFID, aeadID AEADID) (*Decrypt, error) {
+	if recipientPrivateKeyBytes.Len() == 0 {
+		return nil, fmt.Errorf("private key bytes are empty")
 	}
-	kem, kdf, aead, err := newPrimitivesFromProto(recipientPrivKey.GetPublicKey().GetParams())
+	kem, kdf, aead, err := newPrimitives(kemID, kdfID, aeadID)
 	if err != nil {
 		return nil, err
 	}
-	return &Decrypt{recipientPrivKey, kem, kdf, aead, kem.encapsulatedKeyLength()}, nil
+	return &Decrypt{recipientPrivateKeyBytes, kem, kdf, aead, kem.encapsulatedKeyLength()}, nil
 }
 
 // Decrypt decrypts ciphertext, verifying the integrity of contextInfo.
@@ -56,8 +53,7 @@ func (d *Decrypt) Decrypt(ciphertext, contextInfo []byte) ([]byte, error) {
 	encapsulatedKey := ciphertext[:d.encapsulatedKeyLen]
 	aeadCiphertext := ciphertext[d.encapsulatedKeyLen:]
 
-	keyBytes := secretdata.NewBytesFromData(d.recipientPrivKey.GetPrivateKey(), insecuresecretdataaccess.Token{})
-	ctx, err := newRecipientContext(encapsulatedKey, keyBytes, d.kem, d.kdf, d.aead, contextInfo)
+	ctx, err := newRecipientContext(encapsulatedKey, d.recipientPrivateKeyBytes, d.kem, d.kdf, d.aead, contextInfo)
 	if err != nil {
 		return nil, fmt.Errorf("newRecipientContext: %v", err)
 	}

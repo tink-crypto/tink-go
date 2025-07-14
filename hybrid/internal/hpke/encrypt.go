@@ -19,34 +19,33 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/tink"
-	pb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
 
 // Encrypt for HPKE implements interface HybridEncrypt.
 type Encrypt struct {
-	recipientPubKey *pb.HpkePublicKey
-	kem             kem
-	kdf             kdf
-	aead            aead
+	recipientPubKeyBytes []byte
+	kem                  kem
+	kdf                  kdf
+	aead                 aead
 }
 
 var _ tink.HybridEncrypt = (*Encrypt)(nil)
 
 // NewEncrypt constructs an Encrypt using HpkePublicKey.
-func NewEncrypt(recipientPubKey *pb.HpkePublicKey) (*Encrypt, error) {
-	if len(recipientPubKey.GetPublicKey()) == 0 {
-		return nil, errors.New("HpkePublicKey.PublicKey bytes are missing")
+func NewEncrypt(recipientPubKeyBytes []byte, kemID KEMID, kdfID KDFID, aeadID AEADID) (*Encrypt, error) {
+	if len(recipientPubKeyBytes) == 0 {
+		return nil, errors.New("empty recipient public key")
 	}
-	kem, kdf, aead, err := newPrimitivesFromProto(recipientPubKey.GetParams())
+	kem, kdf, aead, err := newPrimitives(kemID, kdfID, aeadID)
 	if err != nil {
 		return nil, err
 	}
-	return &Encrypt{recipientPubKey, kem, kdf, aead}, nil
+	return &Encrypt{recipientPubKeyBytes, kem, kdf, aead}, nil
 }
 
 // Encrypt encrypts plaintext, binding contextInfo to the resulting ciphertext.
 func (e *Encrypt) Encrypt(plaintext, contextInfo []byte) ([]byte, error) {
-	ctx, err := newSenderContext(e.recipientPubKey.GetPublicKey(), e.kem, e.kdf, e.aead, contextInfo)
+	ctx, err := newSenderContext(e.recipientPubKeyBytes, e.kem, e.kdf, e.aead, contextInfo)
 	if err != nil {
 		return nil, fmt.Errorf("newSenderContext: %v", err)
 	}
