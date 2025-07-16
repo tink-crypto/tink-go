@@ -39,6 +39,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -244,11 +245,9 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogsEncryptAndDecryptWithPrefi
 			NumBytes: len(data),
 		},
 		{
-			Context: monitoring.NewContext("hybrid_decrypt", "decrypt", wantDecryptKeysetInfo),
-			KeyID:   privHandle.KeysetInfo().GetPrimaryKeyId(),
-			// ciphertext was encrypted with a key that has a TINK output prefix. This adds a
-			// 5-byte prefix to the ciphertext. This prefix is not included in the `Log` call.
-			NumBytes: len(ct) - cryptofmt.NonRawPrefixSize,
+			Context:  monitoring.NewContext("hybrid_decrypt", "decrypt", wantDecryptKeysetInfo),
+			KeyID:    privHandle.KeysetInfo().GetPrimaryKeyId(),
+			NumBytes: len(ct),
 		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {

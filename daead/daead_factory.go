@@ -18,10 +18,10 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
+	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -91,7 +91,7 @@ func extractFullDAEAD(entry *primitiveset.Entry[tink.DeterministicAEAD]) (*daead
 // primitive set for deterministic encryption and decryption.
 type wrappedDAEAD struct {
 	primary    daeadAndKeyID
-	primitives map[string][]daeadAndKeyID
+	primitives *prefixmap.PrefixMap[daeadAndKeyID]
 
 	encLogger monitoring.Logger
 	decLogger monitoring.Logger
@@ -104,14 +104,14 @@ func newWrappedDeterministicAEAD(ps *primitiveset.PrimitiveSet[tink.Deterministi
 	if err != nil {
 		return nil, err
 	}
-	primitives := make(map[string][]daeadAndKeyID)
+	primitives := prefixmap.New[daeadAndKeyID]()
 	for _, entries := range ps.Entries {
 		for _, entry := range entries {
 			p, err := extractFullDAEAD(entry)
 			if err != nil {
 				return nil, err
 			}
-			primitives[entry.Prefix] = append(primitives[entry.Prefix], *p)
+			primitives.Insert(entry.Prefix, *p)
 		}
 	}
 
@@ -171,32 +171,14 @@ func (d *wrappedDAEAD) EncryptDeterministically(pt, aad []byte) ([]byte, error) 
 // additional authenticated data. It returns the corresponding plaintext if the
 // ciphertext is authenticated.
 func (d *wrappedDAEAD) DecryptDeterministically(ct, aad []byte) ([]byte, error) {
-	// Try non-raw keys
-	prefixSize := cryptofmt.NonRawPrefixSize
-	if len(ct) > prefixSize {
-		prefix := ct[:prefixSize]
-		primitivesForPrefix, ok := d.primitives[string(prefix)]
-		if ok {
-			for _, primitive := range primitivesForPrefix {
-				pt, err := primitive.DecryptDeterministically(ct, aad)
-				if err == nil {
-					numBytes := len(ct[prefixSize:])
-					d.decLogger.Log(primitive.keyID, numBytes)
-					return pt, nil
-				}
-			}
+	it := d.primitives.PrimitivesMatchingPrefix(ct)
+	for decrypter, ok := it.Next(); ok; decrypter, ok = it.Next() {
+		pt, err := decrypter.DecryptDeterministically(ct, aad)
+		if err != nil {
+			continue
 		}
-	}
-	// Try raw keys.
-	rawPrimitives, ok := d.primitives[cryptofmt.RawPrefix]
-	if ok {
-		for _, primitive := range rawPrimitives {
-			pt, err := primitive.DecryptDeterministically(ct, aad)
-			if err == nil {
-				d.decLogger.Log(primitive.keyID, len(ct))
-				return pt, nil
-			}
-		}
+		d.decLogger.Log(decrypter.keyID, len(ct))
+		return pt, nil
 	}
 	// Nothing worked.
 	d.decLogger.LogFailure()

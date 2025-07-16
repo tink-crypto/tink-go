@@ -242,10 +242,8 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsEncryptionDecryptionWithPr
 			Context:  monitoring.NewContext("daead", "encrypt", wantKeysetInfo),
 		},
 		{
-			KeyID: mh.KeysetInfo().GetPrimaryKeyId(),
-			// Ciphertext was encrypted with a key that has a TINK output prefix. This adds a 5-byte prefix
-			// to the ciphertext. This prefix is not included in `Log` call.
-			NumBytes: len(ct) - cryptofmt.NonRawPrefixSize,
+			KeyID:    mh.KeysetInfo().GetPrimaryKeyId(),
+			NumBytes: len(ct),
 			Context:  monitoring.NewContext("daead", "decrypt", wantKeysetInfo),
 		},
 	}
@@ -406,7 +404,7 @@ func TestFactoryWithMonitoringPrimitiveWithMultipleKeysLogsEncryptionDecryption(
 		},
 		{
 			KeyID:    kh.KeysetInfo().GetPrimaryKeyId(),
-			NumBytes: len(ct) - cryptofmt.NonRawPrefixSize,
+			NumBytes: len(ct),
 			Context: monitoring.NewContext(
 				"daead",
 				"decrypt",
