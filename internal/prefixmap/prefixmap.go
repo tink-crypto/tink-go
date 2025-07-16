@@ -17,8 +17,6 @@ package prefixmap
 
 import (
 	"fmt"
-	"iter"
-	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 )
@@ -40,27 +38,48 @@ func New[P any]() *PrefixMap[P] {
 	}
 }
 
-func concat[P any](seqs ...iter.Seq[P]) iter.Seq[P] {
-	return func(yield func(P) bool) {
-		for _, seq := range seqs {
-			for e := range seq {
-				if !yield(e) {
-					return
-				}
-			}
-		}
+// Iterator is an iterator over the primitives in [PrefixMap].
+//
+// The iterator returns the primitives in the following order:
+// 1. All primitives with a non-empty prefix.
+// 2. All primitives with an empty prefix.
+//
+// NOTE: We are using a custom iterator instead of [iter.Seq] for performance
+// reasons.
+type Iterator[P any] struct {
+	fiveBytePrefixedPrimitives []P
+	rawPrimitives              []P
+	index                      int
+}
+
+// Next returns the next primitive in the iterator.
+func (i *Iterator[P]) Next() (P, bool) {
+	if i.index < len(i.fiveBytePrefixedPrimitives) {
+		p := i.fiveBytePrefixedPrimitives[i.index]
+		i.index++
+		return p, true
 	}
+	if i.index < len(i.fiveBytePrefixedPrimitives)+len(i.rawPrimitives) {
+		p := i.rawPrimitives[i.index-len(i.fiveBytePrefixedPrimitives)]
+		i.index++
+		return p, true
+	}
+	return *new(P), false
 }
 
 // PrimitivesMatchingPrefix returns the primitive with the given prefix.
-func (m *PrefixMap[P]) PrimitivesMatchingPrefix(prefix []byte) iter.Seq[P] {
+func (m *PrefixMap[P]) PrimitivesMatchingPrefix(prefix []byte) *Iterator[P] {
 	var entriesWithPrefix []P
 	if len(prefix) >= cryptofmt.NonRawPrefixSize {
 		// Cap the prefix to the size of the non-raw prefix.
 		entriesWithPrefix = m.items[string(prefix[:cryptofmt.NonRawPrefixSize])]
 	}
 	entriesWithoutPrefix := m.items[EmptyPrefix]
-	return concat[P](slices.Values(entriesWithPrefix), slices.Values(entriesWithoutPrefix))
+	return &Iterator[P]{
+		fiveBytePrefixedPrimitives: entriesWithPrefix,
+		rawPrimitives:              entriesWithoutPrefix,
+		index:                      0,
+	}
 }
 
 // Insert adds the primitive with the given prefix.

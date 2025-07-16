@@ -31,11 +31,12 @@ func TestInsert_FailsWithInvalidPrefix(t *testing.T) {
 	}
 }
 
-func TestPrimitivesMatchingPrefix_Empty(t *testing.T) {
+func TestPrimitivesMatchingPrefix_EmptyMap(t *testing.T) {
 	t.Run("nil prefix", func(t *testing.T) {
 		var got []int
-		for e := range prefixmap.New[int]().PrimitivesMatchingPrefix(nil) {
-			got = append(got, e)
+		it := prefixmap.New[int]().PrimitivesMatchingPrefix(nil)
+		for p, ok := it.Next(); ok; p, ok = it.Next() {
+			got = append(got, p)
 		}
 		if len(got) != 0 {
 			t.Errorf("pm.PrimitivesMatchingPrefix(%q) = %v, want empty", "", got)
@@ -43,8 +44,9 @@ func TestPrimitivesMatchingPrefix_Empty(t *testing.T) {
 	})
 	t.Run("empty prefix", func(t *testing.T) {
 		var got []int
-		for e := range prefixmap.New[int]().PrimitivesMatchingPrefix([]byte("")) {
-			got = append(got, e)
+		it := prefixmap.New[int]().PrimitivesMatchingPrefix([]byte(""))
+		for p, ok := it.Next(); ok; p, ok = it.Next() {
+			got = append(got, p)
 		}
 		if len(got) != 0 {
 			t.Errorf("pm.PrimitivesMatchingPrefix(%q) = %v, want empty", "", got)
@@ -52,11 +54,55 @@ func TestPrimitivesMatchingPrefix_Empty(t *testing.T) {
 	})
 	t.Run("non-empty prefix", func(t *testing.T) {
 		var got []int
-		for e := range prefixmap.New[int]().PrimitivesMatchingPrefix([]byte("abcde")) {
-			got = append(got, e)
+		it := prefixmap.New[int]().PrimitivesMatchingPrefix([]byte("abcde"))
+		for p, ok := it.Next(); ok; p, ok = it.Next() {
+			got = append(got, p)
 		}
 		if len(got) != 0 {
 			t.Errorf("pm.PrimitivesMatchingPrefix(%q) = %v, want empty", "", got)
+		}
+	})
+}
+
+func TestPrimitivesMatchingPrefix_NullOrEmptySlices(t *testing.T) {
+	t.Run("empty_raw_keys", func(t *testing.T) {
+		pm := prefixmap.New[int]()
+		if err := pm.Insert("abcde", 1); err != nil {
+			t.Errorf("m.Insert(%v) err = %v, want nil", "abcde", err)
+		}
+		var got []int
+		it := pm.PrimitivesMatchingPrefix([]byte("abcde"))
+		for p, ok := it.Next(); ok; p, ok = it.Next() {
+			got = append(got, p)
+		}
+		if diff := cmp.Diff([]int{1}, got); diff != "" {
+			t.Errorf("pm.PrimitivesMatchingPrefix(%q) diff (-want +got):\n%s", "", diff)
+		}
+	})
+	t.Run("raw_only_keys", func(t *testing.T) {
+		pm := prefixmap.New[int]()
+		if err := pm.Insert(prefixmap.EmptyPrefix, 1); err != nil {
+			t.Errorf("m.Insert(%v) err = %v, want nil", "abcde", err)
+		}
+		{
+			var got []int
+			it := pm.PrimitivesMatchingPrefix([]byte(prefixmap.EmptyPrefix))
+			for p, ok := it.Next(); ok; p, ok = it.Next() {
+				got = append(got, p)
+			}
+			if diff := cmp.Diff([]int{1}, got); diff != "" {
+				t.Errorf("pm.PrimitivesMatchingPrefix(%q) diff (-want +got):\n%s", "", diff)
+			}
+		}
+		{
+			var got []int
+			it := pm.PrimitivesMatchingPrefix([]byte("fffff"))
+			for p, ok := it.Next(); ok; p, ok = it.Next() {
+				got = append(got, p)
+			}
+			if diff := cmp.Diff([]int{1}, got); diff != "" {
+				t.Errorf("pm.PrimitivesMatchingPrefix(%q) diff (-want +got):\n%s", "", diff)
+			}
 		}
 	})
 }
@@ -112,8 +158,9 @@ func TestPrimitivesMatchingPrefix(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var got []int
-			for e := range pm.PrimitivesMatchingPrefix(tc.prefix) {
-				got = append(got, e)
+			it := pm.PrimitivesMatchingPrefix(tc.prefix)
+			for p, ok := it.Next(); ok; p, ok = it.Next() {
+				got = append(got, p)
 			}
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Errorf("pm.PrimitivesMatchingPrefix(%q) diff (-want +got):\n%s", tc.prefix, diff)
