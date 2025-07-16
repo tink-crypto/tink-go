@@ -31,7 +31,7 @@ type keyManager struct{}
 var _ registry.KeyManager = (*keyManager)(nil)
 
 func (km *keyManager) Primitive(serializedKey []byte) (any, error) {
-	return nil, errors.New("prf_based_deriver_key_manager: not implemented; users should obtain an keyset.Handle and the primtive with keyderivation.New")
+	return nil, errors.New("prf_based_deriver_key_manager: not implemented; users should obtain a keyset.Handle and the primitive with keyderivation.New")
 }
 
 func (km *keyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
