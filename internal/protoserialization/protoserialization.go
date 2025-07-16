@@ -18,12 +18,14 @@
 package protoserialization
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"sync"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -115,6 +117,7 @@ func (k *KeySerialization) clone() *KeySerialization {
 type FallbackProtoKey struct {
 	protoKeySerialization *KeySerialization
 	parameters            *fallbackProtoKeyParams
+	outputPrefix          []byte
 }
 
 // Parameters returns the parameters of this key.
@@ -132,14 +135,36 @@ func (k *FallbackProtoKey) IDRequirement() (uint32, bool) {
 	return k.protoKeySerialization.IDRequirement()
 }
 
+// OutputPrefix returns the output prefix of the key.
+func (k *FallbackProtoKey) OutputPrefix() []byte { return bytes.Clone(k.outputPrefix) }
+
+// calculateOutputPrefix calculates the output prefix from keyID.
+func calculateOutputPrefix(outputPrefixType tinkpb.OutputPrefixType, keyID uint32) ([]byte, error) {
+	switch outputPrefixType {
+	case tinkpb.OutputPrefixType_TINK:
+		return outputprefix.Tink(keyID), nil
+	case tinkpb.OutputPrefixType_LEGACY, tinkpb.OutputPrefixType_CRUNCHY:
+		return outputprefix.Legacy(keyID), nil
+	case tinkpb.OutputPrefixType_RAW:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("unknown output prefix type: %v", outputPrefixType)
+	}
+}
+
 // NewFallbackProtoKey creates a new FallbackProtoKey.
-func NewFallbackProtoKey(protoKeySerialization *KeySerialization) *FallbackProtoKey {
+func NewFallbackProtoKey(protoKeySerialization *KeySerialization) (*FallbackProtoKey, error) {
+	outputPrefix, err := calculateOutputPrefix(protoKeySerialization.OutputPrefixType(), protoKeySerialization.idRequirement)
+	if err != nil {
+		return nil, err
+	}
 	return &FallbackProtoKey{
 		protoKeySerialization: protoKeySerialization,
 		parameters: &fallbackProtoKeyParams{
 			hasIDRequirement: protoKeySerialization.HasIDRequirement(),
 		},
-	}
+		outputPrefix: outputPrefix,
+	}, nil
 }
 
 // FallbackProtoPrivateKey represents a fallback private key that wraps a proto
@@ -161,8 +186,12 @@ func NewFallbackProtoPrivateKey(protoKeySerialization *KeySerialization) (*Fallb
 	if protoKeySerialization.KeyData().GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PRIVATE {
 		return nil, fmt.Errorf("the key is not a private key")
 	}
+	fallbackProtoKey, err := NewFallbackProtoKey(protoKeySerialization)
+	if err != nil {
+		return nil, err
+	}
 	return &FallbackProtoPrivateKey{
-		FallbackProtoKey: *NewFallbackProtoKey(protoKeySerialization),
+		FallbackProtoKey: *fallbackProtoKey,
 	}, nil
 }
 
@@ -310,7 +339,7 @@ func ParseKey(keySerialization *KeySerialization) (key.Key, error) {
 		if keySerialization.KeyData().GetKeyMaterialType() == tinkpb.KeyData_ASYMMETRIC_PRIVATE {
 			return NewFallbackProtoPrivateKey(keySerialization)
 		}
-		return NewFallbackProtoKey(keySerialization), nil
+		return NewFallbackProtoKey(keySerialization)
 	}
 	return parser.ParseKey(keySerialization)
 }

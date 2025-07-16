@@ -18,11 +18,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
+	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -225,7 +227,16 @@ func TestKeySerializationEqual(t *testing.T) {
 	}
 }
 
-func TestFallbackKeyEqual(t *testing.T) {
+func mustCreateFallbackProtoKey(t *testing.T, keySerialization *protoserialization.KeySerialization) *protoserialization.FallbackProtoKey {
+	t.Helper()
+	key, err := protoserialization.NewFallbackProtoKey(keySerialization)
+	if err != nil {
+		t.Fatalf("protoserialization.NewFallbackProtoKey() err = %v, want nil", err)
+	}
+	return key
+}
+
+func TestFallbackProtoKeyEqual(t *testing.T) {
 	keyData1 := &tinkpb.KeyData{
 		TypeUrl:         testKeyURL,
 		Value:           []byte("123"),
@@ -244,26 +255,26 @@ func TestFallbackKeyEqual(t *testing.T) {
 	}{
 		{
 			name: "equal keys",
-			key1: protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
-			key2: protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
+			key1: mustCreateFallbackProtoKey(t, newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
+			key2: mustCreateFallbackProtoKey(t, newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
 			want: true,
 		},
 		{
 			name: "keys with different key IDs",
-			key1: protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 0)),
-			key2: protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
+			key1: mustCreateFallbackProtoKey(t, newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 0)),
+			key2: mustCreateFallbackProtoKey(t, newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
 			want: false,
 		},
 		{
 			name: "different key data",
-			key1: protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
-			key2: protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData2, tinkpb.OutputPrefixType_TINK, 1)),
+			key1: mustCreateFallbackProtoKey(t, newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
+			key2: mustCreateFallbackProtoKey(t, newKeySerialization(t, keyData2, tinkpb.OutputPrefixType_TINK, 1)),
 			want: false,
 		},
 		{
 			name: "different output prefix",
-			key1: protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_CRUNCHY, 1)),
-			key2: protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
+			key1: mustCreateFallbackProtoKey(t, newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_CRUNCHY, 1)),
+			key2: mustCreateFallbackProtoKey(t, newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
 			want: false,
 		},
 	}
@@ -338,7 +349,7 @@ func TestFallbackProtoPrivateKeyEqual(t *testing.T) {
 		{
 			name: "not a private key",
 			key1: privateKey1,
-			key2: protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
+			key2: mustCreateFallbackProtoKey(t, newKeySerialization(t, keyData1, tinkpb.OutputPrefixType_TINK, 1)),
 			want: false,
 		},
 	}
@@ -354,7 +365,7 @@ func TestFallbackProtoPrivateKeyEqual(t *testing.T) {
 	}
 }
 
-func TestFallbackKeyParametersEqual(t *testing.T) {
+func TestFallbackProtoKey_ParametersEqual(t *testing.T) {
 	keyData := &tinkpb.KeyData{
 		TypeUrl:         testKeyURL,
 		Value:           []byte("123"),
@@ -375,12 +386,12 @@ func TestFallbackKeyParametersEqual(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			key := protoserialization.NewFallbackProtoKey(tc.keySerialization)
+			key := mustCreateFallbackProtoKey(t, tc.keySerialization)
 			params := key.Parameters()
 			if params == nil {
 				t.Errorf("key.Parameters() = nil, want not nil")
 			}
-			otherParameters := protoserialization.NewFallbackProtoKey(tc.keySerialization).Parameters()
+			otherParameters := mustCreateFallbackProtoKey(t, tc.keySerialization).Parameters()
 			if otherParameters == nil {
 				t.Errorf("protoserialization.NewFallbackProtoKey(protoKey).Parameters() = nil, want not nil")
 			}
@@ -391,20 +402,108 @@ func TestFallbackKeyParametersEqual(t *testing.T) {
 	}
 }
 
-func TestFallbackKeyParametersNotEqual(t *testing.T) {
+func TestFallbackProtoKey_ParametersNotEqual(t *testing.T) {
 	keyData := &tinkpb.KeyData{
 		TypeUrl:         testKeyURL,
 		Value:           []byte("123"),
 		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 	}
-	key1 := protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData, tinkpb.OutputPrefixType_RAW, 0))
-	key2 := protoserialization.NewFallbackProtoKey(newKeySerialization(t, keyData, tinkpb.OutputPrefixType_TINK, 123))
+	key1 := mustCreateFallbackProtoKey(t, newKeySerialization(t, keyData, tinkpb.OutputPrefixType_RAW, 0))
+	key2 := mustCreateFallbackProtoKey(t, newKeySerialization(t, keyData, tinkpb.OutputPrefixType_TINK, 123))
 	if key1.Parameters().Equal(key2.Parameters()) {
 		t.Errorf("parameters.Equal(otherParameters) = true, want false")
 	}
 }
 
-func TestFallbackKeyIDRequirement(t *testing.T) {
+func TestFallbackProtoKey_OutputPrefix(t *testing.T) {
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}
+	for _, tc := range []struct {
+		name             string
+		ks               *protoserialization.KeySerialization
+		wantOutputPrefix []byte
+	}{
+		{
+			name:             "TINK",
+			ks:               newKeySerialization(t, keyData, tinkpb.OutputPrefixType_TINK, 0x01020304),
+			wantOutputPrefix: slices.Concat([]byte{cryptofmt.TinkStartByte}, []byte{0x01, 0x02, 0x03, 0x04}),
+		},
+		{
+			name:             "LEGACY",
+			ks:               newKeySerialization(t, keyData, tinkpb.OutputPrefixType_LEGACY, 0x01020304),
+			wantOutputPrefix: slices.Concat([]byte{cryptofmt.LegacyStartByte}, []byte{0x01, 0x02, 0x03, 0x04}),
+		},
+		{
+			name:             "CRUNCY",
+			ks:               newKeySerialization(t, keyData, tinkpb.OutputPrefixType_CRUNCHY, 0x01020304),
+			wantOutputPrefix: slices.Concat([]byte{cryptofmt.LegacyStartByte}, []byte{0x01, 0x02, 0x03, 0x04}),
+		},
+		{
+			name:             "RAW",
+			ks:               newKeySerialization(t, keyData, tinkpb.OutputPrefixType_RAW, 0),
+			wantOutputPrefix: nil,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			key, err := protoserialization.NewFallbackProtoKey(tc.ks)
+			if err != nil {
+				t.Fatalf("protoserialization.NewFallbackProtoKey(%v) err = %v, want nil", tc.ks, err)
+			}
+			if diff := cmp.Diff(tc.wantOutputPrefix, key.OutputPrefix()); diff != "" {
+				t.Errorf("key.OutputPrefix() diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestFallbackProtoPrivateKey_OutputPrefix(t *testing.T) {
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         testKeyURL,
+		Value:           []byte("123"),
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}
+	for _, tc := range []struct {
+		name             string
+		ks               *protoserialization.KeySerialization
+		wantOutputPrefix []byte
+	}{
+		{
+			name:             "TINK",
+			ks:               newKeySerialization(t, keyData, tinkpb.OutputPrefixType_TINK, 0x01020304),
+			wantOutputPrefix: slices.Concat([]byte{cryptofmt.TinkStartByte}, []byte{0x01, 0x02, 0x03, 0x04}),
+		},
+		{
+			name:             "LEGACY",
+			ks:               newKeySerialization(t, keyData, tinkpb.OutputPrefixType_LEGACY, 0x01020304),
+			wantOutputPrefix: slices.Concat([]byte{cryptofmt.LegacyStartByte}, []byte{0x01, 0x02, 0x03, 0x04}),
+		},
+		{
+			name:             "CRUNCY",
+			ks:               newKeySerialization(t, keyData, tinkpb.OutputPrefixType_CRUNCHY, 0x01020304),
+			wantOutputPrefix: slices.Concat([]byte{cryptofmt.LegacyStartByte}, []byte{0x01, 0x02, 0x03, 0x04}),
+		},
+		{
+			name:             "RAW",
+			ks:               newKeySerialization(t, keyData, tinkpb.OutputPrefixType_RAW, 0),
+			wantOutputPrefix: nil,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			key, err := protoserialization.NewFallbackProtoPrivateKey(tc.ks)
+			if err != nil {
+				t.Fatalf("protoserialization.NewFallbackProtoPrivateKey(%v) err = %v, want nil", tc.ks, err)
+			}
+			if diff := cmp.Diff(tc.wantOutputPrefix, key.OutputPrefix()); diff != "" {
+				t.Errorf("key.OutputPrefix() diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestFallbackProtoKeyIDRequirement(t *testing.T) {
 	keyData := &tinkpb.KeyData{
 		TypeUrl:         testKeyURL,
 		Value:           []byte("123"),
@@ -430,7 +529,10 @@ func TestFallbackKeyIDRequirement(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			key := protoserialization.NewFallbackProtoKey(tc.ks)
+			key, err := protoserialization.NewFallbackProtoKey(tc.ks)
+			if err != nil {
+				t.Fatalf("protoserialization.NewFallbackProtoKey(%v) err = %v, want nil", tc.ks, err)
+			}
 			idRequirement, hasIDRequirement := key.IDRequirement()
 			if hasIDRequirement != tc.wantHasIDRequirement || idRequirement != tc.wantIDRequirement {
 				t.Errorf("key.IDRequirement() = (%v, %v), want (%v, %v)", hasIDRequirement, idRequirement, tc.wantHasIDRequirement, tc.wantIDRequirement)
@@ -685,7 +787,10 @@ func TestSerializeKeyWithFallbackKey(t *testing.T) {
 		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 	}
 	keySerialization := newKeySerialization(t, keyData, tinkpb.OutputPrefixType_TINK, 123)
-	key := protoserialization.NewFallbackProtoKey(keySerialization)
+	key, err := protoserialization.NewFallbackProtoKey(keySerialization)
+	if err != nil {
+		t.Fatalf("protoserialization.NewFallbackProtoKey(keySerialization) err = %v, want nil", err)
+	}
 	gotKeySerialization, err := protoserialization.SerializeKey(key)
 	if err != nil {
 		t.Fatalf("protoserialization.SerializeKey(key) err = %v, want nil", err)
