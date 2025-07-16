@@ -26,6 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
@@ -42,7 +43,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 
-	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	agpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -277,7 +277,7 @@ func TestNewWithConfig(t *testing.T) {
 				},
 				{
 					KeyID:    primaryEntry.KeyID(),
-					NumBytes: len(plaintext),
+					NumBytes: len(ct),
 					Context:  monitoring.NewContext("aead", "decrypt", nil), // KeysetInfo is not relevant for this test.
 				},
 			}
@@ -429,11 +429,8 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsEncryptionDecryptionWithPr
 			Context:  monitoring.NewContext("aead", "encrypt", wantKeysetInfo),
 		},
 		{
-			KeyID: mh.KeysetInfo().GetPrimaryKeyId(),
-			// ciphertext was encrypted with a key that has TINK output prefix. This
-			// adds a 5 bytes prefix to the ciphertext. This prefix is not included
-			// in `Log` call.
-			NumBytes: len(ct) - cryptofmt.NonRawPrefixSize,
+			KeyID:    mh.KeysetInfo().GetPrimaryKeyId(),
+			NumBytes: len(ct),
 			Context:  monitoring.NewContext("aead", "decrypt", wantKeysetInfo),
 		},
 	}

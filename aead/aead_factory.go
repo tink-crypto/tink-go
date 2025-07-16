@@ -18,10 +18,10 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
+	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -51,7 +51,7 @@ func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.AEAD, erro
 // and decryption.
 type wrappedAead struct {
 	primary    aeadAndKeyID
-	primitives map[string][]aeadAndKeyID
+	primitives *prefixmap.PrefixMap[aeadAndKeyID]
 
 	encLogger monitoring.Logger
 	decLogger monitoring.Logger
@@ -106,14 +106,14 @@ func newWrappedAead(ps *primitiveset.PrimitiveSet[tink.AEAD]) (*wrappedAead, err
 	if err != nil {
 		return nil, err
 	}
-	primitives := make(map[string][]aeadAndKeyID)
+	primitives := prefixmap.New[aeadAndKeyID]()
 	for _, entries := range ps.Entries {
 		for _, entry := range entries {
 			p, err := extractFullAEAD(entry)
 			if err != nil {
 				return nil, err
 			}
-			primitives[entry.Prefix] = append(primitives[entry.Prefix], *p)
+			primitives.Insert(entry.Prefix, *p)
 		}
 	}
 	encLogger, decLogger, err := createLoggers(ps)
@@ -172,32 +172,14 @@ func (a *wrappedAead) Encrypt(plaintext, associatedData []byte) ([]byte, error) 
 // associatedData. It returns the corresponding plaintext if the
 // ciphertext is authenticated.
 func (a *wrappedAead) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
-	// Try non-raw keys.
-	prefixSize := cryptofmt.NonRawPrefixSize
-	if len(ciphertext) > prefixSize {
-		prefix := ciphertext[:prefixSize]
-		primitivesForPrefix, ok := a.primitives[string(prefix)]
-		if ok {
-			for _, primitive := range primitivesForPrefix {
-				pt, err := primitive.Decrypt(ciphertext, associatedData)
-				if err == nil {
-					numBytes := len(ciphertext[prefixSize:])
-					a.decLogger.Log(primitive.keyID, numBytes)
-					return pt, nil
-				}
-			}
+	it := a.primitives.PrimitivesMatchingPrefix(ciphertext)
+	for primitive, ok := it.Next(); ok; primitive, ok = it.Next() {
+		pt, err := primitive.Decrypt(ciphertext, associatedData)
+		if err != nil {
+			continue
 		}
-	}
-	// Try raw keys.
-	rawPrimitives, ok := a.primitives[cryptofmt.RawPrefix]
-	if ok {
-		for _, primitive := range rawPrimitives {
-			pt, err := primitive.Decrypt(ciphertext, associatedData)
-			if err == nil {
-				a.decLogger.Log(primitive.keyID, len(ciphertext))
-				return pt, nil
-			}
-		}
+		a.decLogger.Log(primitive.keyID, len(ciphertext))
+		return pt, nil
 	}
 	// Nothing worked.
 	a.decLogger.LogFailure()
