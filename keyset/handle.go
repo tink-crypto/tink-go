@@ -21,7 +21,6 @@ import (
 
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
-
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
@@ -29,6 +28,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
+
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -171,11 +171,18 @@ func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
 	}
 	entries := make([]*Entry, len(ks.GetKey()))
 	var primaryKeyEntry *Entry = nil
+	hasSecrets := false
 	for i, protoKey := range ks.GetKey() {
 		protoKeyData := protoKey.GetKeyData()
 		keyID := protoKey.GetKeyId()
 		if protoKey.GetOutputPrefixType() == tinkpb.OutputPrefixType_RAW {
 			keyID = 0
+		}
+		if !hasSecrets {
+			switch protoKey.GetKeyData().GetKeyMaterialType() {
+			case tinkpb.KeyData_UNKNOWN_KEYMATERIAL, tinkpb.KeyData_ASYMMETRIC_PRIVATE, tinkpb.KeyData_SYMMETRIC:
+				hasSecrets = true
+			}
 		}
 		protoKeySerialization, err := protoserialization.NewKeySerialization(protoKeyData, protoKey.GetOutputPrefixType(), keyID)
 		if err != nil {
@@ -201,7 +208,7 @@ func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
 	}
 	h := &Handle{
 		entries:          entries,
-		keysetHasSecrets: hasSecrets(ks),
+		keysetHasSecrets: hasSecrets,
 		primaryKeyEntry:  primaryKeyEntry,
 	}
 	if err := applyOptions(h, opts...); err != nil {
@@ -564,23 +571,6 @@ func primitives[T any](h *Handle, km registry.KeyManager, opts ...PrimitivesOpti
 		}
 	}
 	return primitiveSet, nil
-}
-
-// hasSecrets tells whether the keyset contains key material considered secret.
-//
-// This includes symmetric keys, private keys of asymmetric crypto systems,
-// and keys of an unknown type.
-func hasSecrets(ks *tinkpb.Keyset) bool {
-	for _, k := range ks.GetKey() {
-		if k.GetKeyData() == nil {
-			continue
-		}
-		switch k.GetKeyData().GetKeyMaterialType() {
-		case tinkpb.KeyData_UNKNOWN_KEYMATERIAL, tinkpb.KeyData_ASYMMETRIC_PRIVATE, tinkpb.KeyData_SYMMETRIC:
-			return true
-		}
-	}
-	return false
 }
 
 func decrypt(encryptedKeyset *tinkpb.EncryptedKeyset, keyEncryptionAEAD tink.AEAD, associatedData []byte) (*tinkpb.Keyset, error) {
