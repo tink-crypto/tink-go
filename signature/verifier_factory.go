@@ -19,14 +19,15 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
+	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
+
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -42,7 +43,7 @@ func NewVerifier(handle *keyset.Handle) (tink.Verifier, error) {
 // verifierSet is a Verifier implementation that uses the
 // underlying primitive set for verifying.
 type wrappedVerifier struct {
-	verifiers map[string][]verifierAndID
+	verifiers *prefixmap.PrefixMap[verifierAndID]
 	logger    monitoring.Logger
 }
 
@@ -93,11 +94,11 @@ func extractFullVerifier(entry *primitiveset.Entry[tink.Verifier]) tink.Verifier
 }
 
 func newWrappedVerifier(ps *primitiveset.PrimitiveSet[tink.Verifier]) (*wrappedVerifier, error) {
-	verifiers := make(map[string][]verifierAndID)
+	verifiers := prefixmap.New[verifierAndID]()
 	for _, entries := range ps.Entries {
 		for _, entry := range entries {
 			verifier := extractFullVerifier(entry)
-			verifiers[entry.Prefix] = append(verifiers[entry.Prefix], verifierAndID{
+			verifiers.Insert(entry.Prefix, verifierAndID{
 				verifier: verifier,
 				keyID:    entry.KeyID,
 			})
@@ -131,25 +132,13 @@ func createVerifierLogger(ps *primitiveset.PrimitiveSet[tink.Verifier]) (monitor
 
 // Verify checks whether the given signature is a valid signature of the given data.
 func (v *wrappedVerifier) Verify(signature, data []byte) error {
-	prefixSize := cryptofmt.NonRawPrefixSize
-	if len(signature) < prefixSize {
-		return fmt.Errorf("verifier_factory: invalid signature; expected at least %d bytes, got %d", prefixSize, len(signature))
-	}
-	// Try to verify with non-raw keys.
-	verifiersByPrefix, _ := v.verifiers[string(signature[:prefixSize])]
-	for _, verifier := range verifiersByPrefix {
-		if err := verifier.Verify(signature, data); err == nil {
-			v.logger.Log(verifier.keyID, len(data))
-			return nil
+	it := v.verifiers.PrimitivesMatchingPrefix(signature)
+	for verifier, ok := it.Next(); ok; verifier, ok = it.Next() {
+		if err := verifier.Verify(signature, data); err != nil {
+			continue
 		}
-	}
-	// Try to verify with raw keys.
-	rawVerifiers, _ := v.verifiers[cryptofmt.RawPrefix]
-	for _, verifier := range rawVerifiers {
-		if err := verifier.Verify(signature, data); err == nil {
-			v.logger.Log(verifier.keyID, len(data))
-			return nil
-		}
+		v.logger.Log(verifier.keyID, len(data))
+		return nil
 	}
 	v.logger.LogFailure()
 	return fmt.Errorf("verifier_factory: invalid signature")
