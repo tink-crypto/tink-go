@@ -20,9 +20,11 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/ec"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	eciespb "github.com/tink-crypto/tink-go/v2/proto/ecies_aead_hkdf_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -147,27 +149,6 @@ func coordinateSizeForCurve(curveType CurveType) (int, error) {
 	}
 }
 
-// BigIntBytesToFixedSizeBuffer converts a big integer representation to a
-// fixed size buffer.
-func bigIntBytesToFixedSizeBuffer(bigIntBytes []byte, size int) ([]byte, error) {
-	// Nothing to do if the big integer representation is already of the given size.
-	if len(bigIntBytes) == size {
-		return bigIntBytes, nil
-	}
-	if len(bigIntBytes) < size {
-		// Pad the big integer representation with leading zeros to the given size.
-		buf := make([]byte, size-len(bigIntBytes), size)
-		return append(buf, bigIntBytes...), nil
-	}
-	// Remove the leading len(bigIntValue)-size bytes. Fail if any is not zero.
-	for i := 0; i < len(bigIntBytes)-size; i++ {
-		if bigIntBytes[i] != 0 {
-			return nil, fmt.Errorf("big int has invalid size: %v, want %v", len(bigIntBytes)-i, size)
-		}
-	}
-	return bigIntBytes[len(bigIntBytes)-size:], nil
-}
-
 func publicKeyToProtoPublicKey(publicKey *PublicKey) (*eciespb.EciesAeadHkdfPublicKey, error) {
 	if publicKey == nil {
 		return nil, fmt.Errorf("public key is nil")
@@ -205,11 +186,11 @@ func publicKeyToProtoPublicKey(publicKey *PublicKey) (*eciespb.EciesAeadHkdfPubl
 			return nil, fmt.Errorf("public key has invalid 1st byte: got %x, want %x", publicKey.PublicKeyBytes()[0], 0x04)
 		}
 		xy := publicKey.PublicKeyBytes()[1:]
-		protoPublicKey.X, err = bigIntBytesToFixedSizeBuffer(xy[:coordinateSize], coordinateSize+1)
+		protoPublicKey.X, err = ec.BigIntBytesToFixedSizeBuffer(xy[:coordinateSize], coordinateSize+1)
 		if err != nil {
 			return nil, err
 		}
-		protoPublicKey.Y, err = bigIntBytesToFixedSizeBuffer(xy[coordinateSize:], coordinateSize+1)
+		protoPublicKey.Y, err = ec.BigIntBytesToFixedSizeBuffer(xy[coordinateSize:], coordinateSize+1)
 		if err != nil {
 			return nil, err
 		}
@@ -385,11 +366,11 @@ func parsePublicKey(publicKey *eciespb.EciesAeadHkdfPublicKey, outputPrefixType 
 		// This is to support the case where the curve size in bytes + 1 is the
 		// length of the coordinate. This happens when Tink adds an extra leading
 		// 0x00 byte (see b/264525021).
-		x, err := bigIntBytesToFixedSizeBuffer(publicKey.GetX(), coordinateSize)
+		x, err := ec.BigIntBytesToFixedSizeBuffer(publicKey.GetX(), coordinateSize)
 		if err != nil {
 			return nil, err
 		}
-		y, err := bigIntBytesToFixedSizeBuffer(publicKey.GetY(), coordinateSize)
+		y, err := ec.BigIntBytesToFixedSizeBuffer(publicKey.GetY(), coordinateSize)
 		if err != nil {
 			return nil, err
 		}
@@ -448,7 +429,7 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 		if err != nil {
 			return nil, err
 		}
-		privateKeyValue, err = bigIntBytesToFixedSizeBuffer(eciesPrivateKey.PrivateKeyBytes().Data(insecuresecretdataaccess.Token{}), coordinateSize+1)
+		privateKeyValue, err = ec.BigIntBytesToFixedSizeBuffer(eciesPrivateKey.PrivateKeyBytes().Data(insecuresecretdataaccess.Token{}), coordinateSize+1)
 		if err != nil {
 			return nil, err
 		}
@@ -516,7 +497,7 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 		if err != nil {
 			return nil, err
 		}
-		privateKeyBytes, err = bigIntBytesToFixedSizeBuffer(privateKeyBytes, coordinateSize)
+		privateKeyBytes, err = ec.BigIntBytesToFixedSizeBuffer(privateKeyBytes, coordinateSize)
 		if err != nil {
 			return nil, err
 		}

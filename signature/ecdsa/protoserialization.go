@@ -19,9 +19,11 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/ec"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	ecdsapb "github.com/tink-crypto/tink-go/v2/proto/ecdsa_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -33,18 +35,6 @@ const (
 	verifierKeyVersion = 0
 	verifierTypeURL    = "type.googleapis.com/google.crypto.tink.EcdsaPublicKey"
 )
-
-// padBigIntBytesToFixedSizeBuffer pads the given big integer bytes to the given size.
-func padBigIntBytesToFixedSizeBuffer(bigIntBytes []byte, size int) ([]byte, error) {
-	if len(bigIntBytes) > size {
-		return nil, fmt.Errorf("big int has invali size: %d, want at most %d", len(bigIntBytes), size)
-	}
-	if len(bigIntBytes) == size {
-		return bigIntBytes, nil
-	}
-	buf := make([]byte, size-len(bigIntBytes), size)
-	return append(buf, bigIntBytes...), nil
-}
 
 type publicKeySerializer struct{}
 
@@ -141,11 +131,11 @@ func validateEncodingAndGetCoordinates(publicPoint []byte, curveType CurveType) 
 		return nil, nil, fmt.Errorf("public key has invalid 1st byte: got %x, want %x", publicPoint[0], 0x04)
 	}
 	xy := publicPoint[1:]
-	x, err := padBigIntBytesToFixedSizeBuffer(xy[:coordinateSize], coordinateSize+1)
+	x, err := ec.BigIntBytesToFixedSizeBuffer(xy[:coordinateSize], coordinateSize+1)
 	if err != nil {
 		return nil, nil, err
 	}
-	y, err := padBigIntBytesToFixedSizeBuffer(xy[coordinateSize:], coordinateSize+1)
+	y, err := ec.BigIntBytesToFixedSizeBuffer(xy[coordinateSize:], coordinateSize+1)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -302,25 +292,6 @@ func encodePoint(x, y []byte, coordinateSize int) []byte {
 	return encodedPoint
 }
 
-// removeLeftPaddingFromBigInt removes the leading zeros from the
-// given big integer representation.
-//
-// If bigIntValue is smaller than the given size, it is returned as is.
-// If the bytes representation of the big integer is longer than size, an error
-// is returned.
-func removeLeftPaddingFromBigInt(bigIntValue []byte, size int) ([]byte, error) {
-	if len(bigIntValue) <= size {
-		return bigIntValue, nil
-	}
-	// Remove the leading len(bigIntValue)-size bytes. Fail if any is not zero.
-	for i := 0; i < len(bigIntValue)-size; i++ {
-		if bigIntValue[i] != 0 {
-			return nil, fmt.Errorf("big int has invalid size: %v, want %v", len(bigIntValue)-i, size)
-		}
-	}
-	return bigIntValue[len(bigIntValue)-size:], nil
-}
-
 func parseParameters(protoParameters *ecdsapb.EcdsaParams, outputPrefixType tinkpb.OutputPrefixType) (*Parameters, error) {
 	curveType, err := curveTypeFromProto(protoParameters.GetCurve())
 	if err != nil {
@@ -362,11 +333,11 @@ func newPublicKeyFromProto(protoECDSAKey *ecdsapb.EcdsaPublicKey, outputPrefixTy
 	// This is to support the case where the curve size in bytes + 1 is the
 	// length of the coordinate. This happens when Tink adds an extra leading
 	// 0x00 byte (see b/264525021).
-	x, err := removeLeftPaddingFromBigInt(protoECDSAKey.GetX(), coordinateSize)
+	x, err := ec.BigIntBytesToFixedSizeBuffer(protoECDSAKey.GetX(), coordinateSize)
 	if err != nil {
 		return nil, err
 	}
-	y, err := removeLeftPaddingFromBigInt(protoECDSAKey.GetY(), coordinateSize)
+	y, err := ec.BigIntBytesToFixedSizeBuffer(protoECDSAKey.GetY(), coordinateSize)
 	if err != nil {
 		return nil, err
 	}
@@ -425,7 +396,7 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 	}
 	// Key value must be fixed size: 1 + coordinateSize (see b/264525021).
 	privateKeyValue := ecdsaPrivKey.PrivateKeyValue().Data(insecuresecretdataaccess.Token{})
-	privateKeyValue, err = padBigIntBytesToFixedSizeBuffer(privateKeyValue, coordinateSize+1)
+	privateKeyValue, err = ec.BigIntBytesToFixedSizeBuffer(privateKeyValue, coordinateSize+1)
 	if err != nil {
 		return nil, err
 	}
@@ -462,14 +433,14 @@ func privateKeyValue(curveType CurveType, keyBytes []byte) (secretdata.Bytes, er
 	var privateKeyBytes []byte
 	if coordinateSize > len(keyBytes) {
 		// Pad with zeros until coordinateSize.
-		privateKeyBytes, err = padBigIntBytesToFixedSizeBuffer(keyBytes, coordinateSize)
+		privateKeyBytes, err = ec.BigIntBytesToFixedSizeBuffer(keyBytes, coordinateSize)
 		if err != nil {
 			return secretdata.Bytes{}, err
 		}
 	} else {
 		// Remove leading zeros, if any. Fail if the value is larger than
 		// coordinateSize.
-		privateKeyBytes, err = removeLeftPaddingFromBigInt(keyBytes, coordinateSize)
+		privateKeyBytes, err = ec.BigIntBytesToFixedSizeBuffer(keyBytes, coordinateSize)
 		if err != nil {
 			return secretdata.Bytes{}, err
 		}
