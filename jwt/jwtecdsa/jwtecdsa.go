@@ -12,3 +12,12 @@
 
 // Package jwtecdsa defines JWT ECDSA keys and parameters.
 package jwtecdsa
+
+import (
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+)
+
+func init() {
+	protoserialization.RegisterParametersSerializer[*Parameters](new(parametersSerializer))
+	protoserialization.RegisterParametersParser(privateKeyTypeURL, new(parametersParser))
+}
