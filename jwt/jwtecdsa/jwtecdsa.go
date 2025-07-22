@@ -14,10 +14,22 @@
 package jwtecdsa
 
 import (
+	"fmt"
+
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
 
 func init() {
-	protoserialization.RegisterParametersSerializer[*Parameters](new(parametersSerializer))
-	protoserialization.RegisterParametersParser(privateKeyTypeURL, new(parametersParser))
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](new(parametersSerializer)); err != nil {
+		panic(fmt.Sprintf("jwtecdsa: failed to register parameters serializer: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(privateKeyTypeURL, new(parametersParser)); err != nil {
+		panic(fmt.Sprintf("jwtecdsa: failed to register parameters parser: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*PublicKey](new(publicKeySerializer)); err != nil {
+		panic(fmt.Sprintf("jwtecdsa: failed to register public key serializer: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(publicKeyTypeURL, new(publicKeyParser)); err != nil {
+		panic(fmt.Sprintf("jwtecdsa: failed to register public key parser: %v", err))
+	}
 }

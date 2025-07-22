@@ -14,8 +14,10 @@ package jwtecdsa
 
 import (
 	"fmt"
+	"slices"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/internal/ec"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 
@@ -23,7 +25,10 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-const privateKeyTypeURL = "type.googleapis.com/google.crypto.tink.JwtEcdsaPrivateKey"
+const (
+	privateKeyTypeURL = "type.googleapis.com/google.crypto.tink.JwtEcdsaPrivateKey"
+	publicKeyTypeURL  = "type.googleapis.com/google.crypto.tink.JwtEcdsaPublicKey"
+)
 
 type parametersSerializer struct{}
 
@@ -65,9 +70,12 @@ func outputPrefixTypeFromKIDStrategy(s KIDStrategy) tinkpb.OutputPrefixType {
 	return tinkpb.OutputPrefixType_UNKNOWN_PREFIX
 }
 
-func kidStrategyFromOutputPrefixType(s tinkpb.OutputPrefixType) KIDStrategy {
+func kidStrategyFromOutputPrefixType(s tinkpb.OutputPrefixType, hasCustomKID bool) KIDStrategy {
 	switch s {
 	case tinkpb.OutputPrefixType_RAW:
+		if hasCustomKID {
+			return CustomKID
+		}
 		return IgnoredKID
 	case tinkpb.OutputPrefixType_TINK:
 		return Base64EncodedKeyIDAsKID
@@ -116,6 +124,127 @@ func (s *parametersParser) Parse(kt *tinkpb.KeyTemplate) (key.Parameters, error)
 	if keyFormat.GetVersion() != 0 {
 		return nil, fmt.Errorf("invalid version: got %d, want 0", keyFormat.GetVersion())
 	}
-	kidStrategy := kidStrategyFromOutputPrefixType(kt.GetOutputPrefixType())
+	kidStrategy := kidStrategyFromOutputPrefixType(kt.GetOutputPrefixType(), false)
 	return NewParameters(kidStrategy, algorithmFromProto(keyFormat.GetAlgorithm()))
+}
+
+type publicKeySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*publicKeySerializer)(nil)
+
+func coordinateSizeFromAlgorithm(a Algorithm) (int, error) {
+	switch a {
+	case ES256:
+		return 32, nil
+	case ES384:
+		return 48, nil
+	case ES512:
+		return 66, nil
+	}
+	return 0, fmt.Errorf("unknown algorithm: %v", a)
+}
+
+func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	jwtECDSAPublicKey, ok := key.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T; needed *PublicKey", key)
+	}
+	xy := jwtECDSAPublicKey.PublicPoint()[1:]
+	coordinateSize, err := coordinateSizeFromAlgorithm(jwtECDSAPublicKey.parameters.Algorithm())
+	if err != nil {
+		return nil, err
+	}
+	paddedX, err := ec.BigIntBytesToFixedSizeBuffer(xy[:coordinateSize], coordinateSize+1)
+	if err != nil {
+		return nil, err
+	}
+	paddedY, err := ec.BigIntBytesToFixedSizeBuffer(xy[coordinateSize:], coordinateSize+1)
+	if err != nil {
+		return nil, err
+	}
+	protoPublicKey := &jwtecdsapb.JwtEcdsaPublicKey{
+		Algorithm: algorithmToProto(jwtECDSAPublicKey.parameters.Algorithm()),
+		X:         paddedX,
+		Y:         paddedY,
+	}
+	if jwtECDSAPublicKey.parameters.KIDStrategy() == CustomKID {
+		protoPublicKey.CustomKid = &jwtecdsapb.JwtEcdsaPublicKey_CustomKid{
+			Value: jwtECDSAPublicKey.kid,
+		}
+	}
+
+	serializedPublicKey, err := proto.Marshal(protoPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal JwtEcdsaPublicKey: %v", err)
+	}
+
+	idRequirement, _ := jwtECDSAPublicKey.IDRequirement()
+	return protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         publicKeyTypeURL,
+		Value:           serializedPublicKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+	}, outputPrefixTypeFromKIDStrategy(jwtECDSAPublicKey.parameters.KIDStrategy()), idRequirement)
+}
+
+type publicKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*publicKeyParser)(nil)
+
+func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	if keySerialization == nil {
+		return nil, fmt.Errorf("key serialization can't be nil")
+	}
+	if keySerialization.KeyData().GetTypeUrl() != publicKeyTypeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keySerialization.KeyData().GetTypeUrl(), publicKeyTypeURL)
+	}
+	if keySerialization.KeyData().GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PUBLIC {
+		return nil, fmt.Errorf("invalid key material type: got %v, want %v", keySerialization.KeyData().GetKeyMaterialType(), tinkpb.KeyData_ASYMMETRIC_PUBLIC)
+	}
+
+	publicKey := &jwtecdsapb.JwtEcdsaPublicKey{}
+	if err := proto.Unmarshal(keySerialization.KeyData().GetValue(), publicKey); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JwtEcdsaPublicKey: %v", err)
+	}
+	if publicKey.GetVersion() != 0 {
+		return nil, fmt.Errorf("invalid version: got %d, want 0", publicKey.GetVersion())
+	}
+
+	coordinateSize, err := coordinateSizeFromAlgorithm(algorithmFromProto(publicKey.GetAlgorithm()))
+	if err != nil {
+		return nil, err
+	}
+
+	// Tolerate arbitrary leading zeros in the coordinates.
+	// This is to support the case where the curve size in bytes + 1 is the
+	// length of the coordinate. This happens when Tink adds an extra leading
+	// 0x00 byte (see b/264525021).
+	x, err := ec.BigIntBytesToFixedSizeBuffer(publicKey.GetX(), coordinateSize)
+	if err != nil {
+		return nil, err
+	}
+	y, err := ec.BigIntBytesToFixedSizeBuffer(publicKey.GetY(), coordinateSize)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(x) != coordinateSize || len(y) != coordinateSize {
+		return nil, fmt.Errorf("invalid coordinate size: got (%d, %d) want (%d, %d)", len(x), len(y), coordinateSize, coordinateSize)
+	}
+
+	kidStrategy := kidStrategyFromOutputPrefixType(keySerialization.OutputPrefixType(), publicKey.GetCustomKid() != nil)
+	params, err := NewParameters(kidStrategy, algorithmFromProto(publicKey.GetAlgorithm()))
+	if err != nil {
+		return nil, err
+	}
+
+	uncompressedPoint := slices.Concat([]byte{0x04}, x, y)
+	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
+	keyID, _ := keySerialization.IDRequirement()
+	return NewPublicKey(PublicKeyOpts{
+		PublicPoint:   uncompressedPoint,
+		IDRequirement: keyID,
+		HasCustomKID:  publicKey.GetCustomKid() != nil,
+		CustomKID:     publicKey.GetCustomKid().GetValue(),
+		Parameters:    params,
+	})
 }
