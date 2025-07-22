@@ -20,8 +20,8 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 )
 
 func init() {
@@ -31,7 +31,7 @@ func init() {
 	if err := protoserialization.RegisterKeySerializer[*Key](new(keySerializer)); err != nil {
 		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
 	}
-	if err := registryconfig.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterParametersSerializer[*Parameters](new(parametersSerializer)); err != nil {

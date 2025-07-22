@@ -15,7 +15,6 @@
 package registryconfig_test
 
 import (
-	"fmt"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -167,75 +166,3 @@ type stubKey struct{}
 func (k *stubKey) Parameters() key.Parameters    { return nil }
 func (k *stubKey) Equal(other key.Key) bool      { return true }
 func (k *stubKey) IDRequirement() (uint32, bool) { return 123, true }
-
-// stubPrimitiveConstructor	creates a stubPrimitive from a stubKey.
-func stubPrimitiveConstructor(k key.Key) (any, error) {
-	_, ok := k.(*stubKey)
-	if !ok {
-		return nil, fmt.Errorf("key is of type %T; needed *stubKey", k)
-	}
-	return &stubPrimitive{}, nil
-}
-
-// anotherStubPrimitiveConstructor	creates a stubPrimitive from a stubKey.
-func anotherStubPrimitiveConstructor(k key.Key) (any, error) {
-	return stubPrimitiveConstructor(k)
-}
-
-func alwaysFailingStubPrimitiveConstructor(k key.Key) (any, error) {
-	return nil, fmt.Errorf("I always fail :(")
-}
-
-func TestRegisterPrimitiveConstructor(t *testing.T) {
-	defer registryconfig.UnregisterPrimitiveConstructor[*stubKey]()
-	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor); err != nil {
-		t.Errorf("registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor) err = %v, want nil", err)
-	}
-	rc := &registryconfig.RegistryConfig{}
-	primitive, err := rc.PrimitiveFromKey(new(stubKey), internalapi.Token{})
-	if err != nil {
-		t.Fatalf("rc.PrimitiveFromKey() err = %v, want nil", err)
-	}
-	if _, ok := primitive.(*stubPrimitive); !ok {
-		t.Error("primitive is not of type *stubPrimitive")
-	}
-}
-
-func stubPrimitiveConstructorFromFallbackProtoKey(k key.Key) (any, error) {
-	_, ok := k.(*protoserialization.FallbackProtoKey)
-	if !ok {
-		return nil, fmt.Errorf("key is of type %T; needed *protoserialization.FallbackProtoKey", k)
-	}
-	return &stubPrimitive{}, nil
-}
-
-func TestPrimitiveFromKeyFailsIfCreatorFails(t *testing.T) {
-	defer registryconfig.UnregisterPrimitiveConstructor[*stubKey]()
-	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](alwaysFailingStubPrimitiveConstructor); err != nil {
-		t.Errorf("registryconfig.RegisterPrimitiveConstructor[*stubKey](alwaysFailingStubPrimitiveConstructor) err = %v, want nil", err)
-	}
-	rc := &registryconfig.RegistryConfig{}
-	if _, err := rc.PrimitiveFromKey(new(stubKey), internalapi.Token{}); err == nil {
-		t.Errorf("rc.PrimitiveFromKey() err = nil, want error")
-	}
-}
-
-func TestRegisterPrimitiveConstructorSucceedsIfDoubleRegister(t *testing.T) {
-	defer registryconfig.UnregisterPrimitiveConstructor[*stubKey]()
-	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor); err != nil {
-		t.Fatalf("registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor) err = %v, want nil", err)
-	}
-	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor); err != nil {
-		t.Errorf("registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor) err = %v, want nil", err)
-	}
-}
-
-func TestRegisterPrimitiveConstructorFailsIfRegisterAnotherCreatorForSameKeyType(t *testing.T) {
-	defer registryconfig.UnregisterPrimitiveConstructor[*stubKey]()
-	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor); err != nil {
-		t.Fatalf("registryconfig.RegisterPrimitiveConstructor[*stubKey](stubPrimitiveConstructor) err = %v, want nil", err)
-	}
-	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](anotherStubPrimitiveConstructor); err == nil {
-		t.Errorf("registryconfig.RegisterPrimitiveConstructor[*stubKey](anotherStubPrimitiveConstructor) err = nil, want error")
-	}
-}

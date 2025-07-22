@@ -25,8 +25,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
 	"github.com/tink-crypto/tink-go/v2/keyderivation"
@@ -361,7 +361,7 @@ func TestPrimitiveFactory_UsesFullPrimitives(t *testing.T) {
 	defer protoserialization.UnregisterKeySerializer[*stubKeysetDeriverKey]()
 	defer protoserialization.UnregisterKeyParser(derivedKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*derivedKey]()
-	defer registryconfig.UnregisterPrimitiveConstructor[*stubKeysetDeriverKey]()
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubKeysetDeriverKey]()
 
 	if err := protoserialization.RegisterKeyParser(stubKeysetDeriverURL, &stubKeysetDeriverKeyParser{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
@@ -376,14 +376,14 @@ func TestPrimitiveFactory_UsesFullPrimitives(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
 	}
 
-	if err := registryconfig.RegisterPrimitiveConstructor[*stubKeysetDeriverKey](func(k key.Key) (any, error) {
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubKeysetDeriverKey](func(k key.Key) (any, error) {
 		that, ok := k.(*stubKeysetDeriverKey)
 		if !ok {
 			return nil, fmt.Errorf("key is not a stubKeysetDeriverKey")
 		}
 		return &fullKeyDeriver{k: that}, nil
 	}); err != nil {
-		t.Fatalf("registryconfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	for _, tc := range []struct {
@@ -484,7 +484,7 @@ func TestPrimitiveFactory_MultipleKeys_UsesFullPrimitives(t *testing.T) {
 	defer protoserialization.UnregisterKeySerializer[*stubKeysetDeriverKey]()
 	defer protoserialization.UnregisterKeyParser(derivedKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*derivedKey]()
-	defer registryconfig.UnregisterPrimitiveConstructor[*stubKeysetDeriverKey]()
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubKeysetDeriverKey]()
 
 	if err := protoserialization.RegisterKeyParser(stubKeysetDeriverURL, &stubKeysetDeriverKeyParser{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
@@ -499,14 +499,14 @@ func TestPrimitiveFactory_MultipleKeys_UsesFullPrimitives(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
 	}
 
-	if err := registryconfig.RegisterPrimitiveConstructor[*stubKeysetDeriverKey](func(k key.Key) (any, error) {
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubKeysetDeriverKey](func(k key.Key) (any, error) {
 		that, ok := k.(*stubKeysetDeriverKey)
 		if !ok {
 			return nil, fmt.Errorf("key is not a stubKeysetDeriverKey")
 		}
 		return &fullKeyDeriver{k: that}, nil
 	}); err != nil {
-		t.Fatalf("registryconfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	km := keyset.NewManager()
@@ -583,7 +583,7 @@ func TestPrimitiveFactory_KeysetDeriverFailsIfFullPrimitiveFails(t *testing.T) {
 	defer protoserialization.UnregisterKeySerializer[*stubKeysetDeriverKey]()
 	defer protoserialization.UnregisterKeyParser(derivedKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*derivedKey]()
-	defer registryconfig.UnregisterPrimitiveConstructor[*stubKeysetDeriverKey]()
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubKeysetDeriverKey]()
 
 	if err := protoserialization.RegisterKeyParser(stubKeysetDeriverURL, &stubKeysetDeriverKeyParser{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
@@ -598,10 +598,10 @@ func TestPrimitiveFactory_KeysetDeriverFailsIfFullPrimitiveFails(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
 	}
 
-	if err := registryconfig.RegisterPrimitiveConstructor[*stubKeysetDeriverKey](func(k key.Key) (any, error) {
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubKeysetDeriverKey](func(k key.Key) (any, error) {
 		return &failingKeyDeriver{}, nil
 	}); err != nil {
-		t.Fatalf("registryconfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	// Create a keyset with a single key.

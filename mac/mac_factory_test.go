@@ -28,8 +28,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -729,7 +729,7 @@ func (s *stubKeyParser) ParseKey(serialization *protoserialization.KeySerializat
 }
 
 func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
-	defer registryconfig.UnregisterPrimitiveConstructor[*stubKey]()
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubKey]()
 	defer protoserialization.UnregisterKeyParser(stubKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*stubKey]()
 
@@ -742,8 +742,8 @@ func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 	// Register a primitive constructor to make sure that the factory uses the
 	// full primitive.
 	primitiveConstructor := func(key key.Key) (any, error) { return &stubFullMAC{}, nil }
-	if err := registryconfig.RegisterPrimitiveConstructor[*stubKey](primitiveConstructor); err != nil {
-		t.Fatalf("registryconfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubKey](primitiveConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	km := keyset.NewManager()

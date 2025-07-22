@@ -29,8 +29,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/hybrid"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -815,8 +815,8 @@ func (s *stubPrivateKeyParser) ParseKey(serialization *protoserialization.KeySer
 }
 
 func TestPrimitivesFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
-	defer registryconfig.UnregisterPrimitiveConstructor[*stubPublicKey]()
-	defer registryconfig.UnregisterPrimitiveConstructor[*stubPrivateKey]()
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubPublicKey]()
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubPrivateKey]()
 	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
 	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
@@ -837,12 +837,12 @@ func TestPrimitivesFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 	// Register a primitive constructor to make sure that the factory uses the
 	// full primitive.
 	primitiveConstructor := func(key key.Key) (any, error) { return &stubFullHybridEncrypt{}, nil }
-	if err := registryconfig.RegisterPrimitiveConstructor[*stubPublicKey](primitiveConstructor); err != nil {
-		t.Fatalf("registryconfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubPublicKey](primitiveConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 	decryptPrimitiveConstructor := func(key key.Key) (any, error) { return &stubFullHybridDecrypt{}, nil }
-	if err := registryconfig.RegisterPrimitiveConstructor[*stubPrivateKey](decryptPrimitiveConstructor); err != nil {
-		t.Fatalf("registryconfig.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubPrivateKey](decryptPrimitiveConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	km := keyset.NewManager()

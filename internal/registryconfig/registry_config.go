@@ -18,22 +18,12 @@
 package registryconfig
 
 import (
-	"fmt"
-	"reflect"
-	"sync"
-
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
-
-var (
-	primitiveConstructorsMu sync.RWMutex
-	primitiveConstructors   = make(map[reflect.Type]primitiveConstructor)
-)
-
-type primitiveConstructor func(key key.Key) (any, error)
 
 // RegistryConfig is an internal way for the keyset handle to access the
 // old global Registry through the new Configuration interface.
@@ -46,41 +36,11 @@ func (c *RegistryConfig) PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ interna
 
 // PrimitiveFromKey constructs a primitive from a [key.Key] using the registry.
 func (c *RegistryConfig) PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error) {
-	if key == nil {
-		return nil, fmt.Errorf("key is nil")
-	}
-	constructor, found := primitiveConstructors[reflect.TypeOf(key)]
-	if !found {
-		return nil, fmt.Errorf("no constructor found for key %T", key)
-	}
-	return constructor(key)
+	return primitiveregistry.Primitive(key)
 }
 
 // RegisterKeyManager registers a provided [registry.KeyManager] by forwarding
 // it directly to the Registry.
 func (c *RegistryConfig) RegisterKeyManager(km registry.KeyManager, _ internalapi.Token) error {
 	return registry.RegisterKeyManager(km)
-}
-
-// RegisterPrimitiveConstructor registers a function that constructs primitives
-// from a given [key.Key] to the global registry.
-func RegisterPrimitiveConstructor[K key.Key](constructor primitiveConstructor) error {
-	keyType := reflect.TypeFor[K]()
-	primitiveConstructorsMu.Lock()
-	defer primitiveConstructorsMu.Unlock()
-	if existingCreator, found := primitiveConstructors[keyType]; found && reflect.ValueOf(existingCreator).Pointer() != reflect.ValueOf(constructor).Pointer() {
-		return fmt.Errorf("a different constructor already registered for %v", keyType)
-	}
-	primitiveConstructors[keyType] = constructor
-	return nil
-}
-
-// UnregisterPrimitiveConstructor removes the primitive constructor for the
-// given key type.
-//
-// This function is intended to be used in tests only.
-func UnregisterPrimitiveConstructor[K key.Key]() {
-	primitiveConstructorsMu.Lock()
-	defer primitiveConstructorsMu.Unlock()
-	delete(primitiveConstructors, reflect.TypeFor[K]())
 }

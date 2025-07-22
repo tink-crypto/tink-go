@@ -22,6 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	hfpb "github.com/tink-crypto/tink-go/v2/proto/hmac_prf_go_proto"
@@ -41,7 +42,7 @@ func init() {
 	if err := protoserialization.RegisterParametersParser(typeURL, new(parametersParser)); err != nil {
 		panic(fmt.Sprintf("hmacprf.init() failed: %v", err))
 	}
-	if err := registryconfig.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("hmacprf.init() failed: %v", err))
 	}
 	if err := keygenregistry.RegisterKeyCreator[*Parameters](createKey); err != nil {
