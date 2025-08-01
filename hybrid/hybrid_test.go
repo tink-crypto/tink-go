@@ -89,11 +89,12 @@ func Example() {
 
 	// Create a keyset handle from the cleartext private keyset in the previous
 	// step. The keyset handle provides abstract access to the underlying keyset to
-	// limit the access of the raw key material. WARNING: In practice,
-	// it is unlikely you will want to use a insecurecleartextkeyset, as it implies
-	// that your key material is passed in cleartext, which is a security risk.
+	// limit the access of the raw key material.
+	//
+	// WARNING: In practice, it is unlikely you will want to use a insecurecleartextkeyset,
+	// as it implies that your key material is passed in cleartext, which is a security risk.
 	// Consider encrypting it with a remote key in Cloud KMS, AWS KMS or HashiCorp Vault.
-	// See https://github.com/google/tink/blob/master/docs/GOLANG-HOWTO.md#storing-and-loading-existing-keysets.
+	// See https://developers.google.com/tink/key-management-overview.
 	privateKeysetHandle, err := insecurecleartextkeyset.Read(
 		keyset.NewJSONReader(bytes.NewBufferString(privateJSONKeyset)))
 	if err != nil {
@@ -114,4 +115,5 @@ func Example() {
 	fmt.Println(string(decrypted))
 	// Output: message
 }
+
 // [END hybrid-example]

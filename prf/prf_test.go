@@ -31,7 +31,7 @@ func Example() {
 
 	// TODO: save the keyset to a safe location. DO NOT hardcode it in source code.
 	// Consider encrypting it with a remote key in Cloud KMS, AWS KMS or HashiCorp Vault.
-	// See https://github.com/google/tink/blob/master/docs/GOLANG-HOWTO.md#storing-and-loading-existing-keysets.
+	// See https://developers.google.com/tink/key-management-overview.
 
 	ps, err := prf.NewPRFSet(kh)
 	if err != nil {

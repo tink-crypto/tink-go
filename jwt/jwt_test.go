@@ -67,11 +67,12 @@ func Example_signAndVerify() {
 
 	// Create a keyset handle from the cleartext private keyset in the previous
 	// step. The keyset handle provides abstract access to the underlying keyset to
-	// limit the access of the raw key material. WARNING: In practice,
-	// it is unlikely you will want to use a insecurecleartextkeyset, as it implies
-	// that your key material is passed in cleartext, which is a security risk.
-	// Consider encrypting it with a remote key in Cloud KMS, AWS KMS or HashiCorp Vault.
-	// See https://github.com/google/tink/blob/master/docs/GOLANG-HOWTO.md#storing-and-loading-existing-keysets.
+	// limit the access of the raw key material.
+	//
+	// WARNING: In practice, it is unlikely you will want to use a insecurecleartextkeyset,
+	// as it implies that your key material is passed in cleartext, which is a security risk.
+	// consider encrypting it with a remote key in Cloud KMS, AWS KMS or HashiCorp Vault.
+	// See https://developers.google.com/tink/key-management-overview.
 	privateKeysetHandle, err := insecurecleartextkeyset.Read(
 		keyset.NewJSONReader(bytes.NewBufferString(privateJSONKeyset)))
 	if err != nil {
@@ -258,8 +259,8 @@ func Example_computeMACAndVerify() {
 	}
 
 	// TODO: Save the keyset to a safe location. DO NOT hardcode it in source
-	// code.  Consider encrypting it with a remote key in a KMS.  See
-	// https://github.com/google/tink/blob/master/docs/GOLANG-HOWTO.md#storing-and-loading-existing-keysets
+	// code.  Consider encrypting it with a remote key in a KMS.  .See
+	// https://developers.google.com/tink/key-management-overview.
 
 	// Create a token and compute a MAC for it.
 	expiresAt := time.Now().Add(time.Hour)

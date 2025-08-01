@@ -34,6 +34,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature"
+
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -120,7 +121,7 @@ func TestDeriveKey(t *testing.T) {
 	}
 
 	// Derivation names match KEY_TEMPLATE_NAMES in
-	// https://github.com/google/tink/blob/cd96c47ced3f72199832573cdccf18719dc7c73b/testing/cross_language/util/utilities.py.
+	// https://github.com/tink-crypto/tink-cross-lang-tests/blob/main/cross_language/cross_language/util/utilities.py
 	derivations := []struct {
 		name     string
 		template *tinkpb.KeyTemplate

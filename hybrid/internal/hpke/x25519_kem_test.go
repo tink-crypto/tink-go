@@ -128,7 +128,7 @@ func TestX25519KEMDecapsulateBoringSSLVectors(t *testing.T) {
 
 // TestX25519KEMDecapsulateEncapsulatedKeyPrefixesLargerSlice checks--if the
 // encapsulated key is part of a larger slice, as in HPKE Encrypt
-// https://github.com/google/tink/blob/619b6c1bb1f8573ca56de50cfc6ba23d355670db/go/hybrid/hpke/encrypt.go#L61
+// https://github.com/tink-crypto/tink-go/blob/d25153b336507a5cc37555d3c1ed36ba41cb3f30/hybrid/internal/hpke/encrypt.go#L58
 // --that decapsulate does not modify the larger slice.
 func TestX25519KEMDecapsulateEncapsulatedKeyPrefixesLargerSlice(t *testing.T) {
 	_, v := rfcVectorA1(t)
