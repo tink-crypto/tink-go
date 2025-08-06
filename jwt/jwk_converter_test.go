@@ -492,6 +492,25 @@ func TestJWKSetToPublicKeysetHandleVerifyValidJWT(t *testing.T) {
 	}
 }
 
+func TestJWKSetEd25519KeysNotSupported(t *testing.T) {
+	jwkSet := `{
+		"keys":[
+			{
+				"kty":"OKP",
+				"crv":"Ed25519",
+				"x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPmd1Xo",
+				"use":"sig",
+				"alg":"EdDSA",
+				"key_ops":["verify"]
+			}
+		]
+	}`
+	// The Ed25519 algorithm type is not supported by this caller.
+	if _, err := jwt.JWKSetToPublicKeysetHandle([]byte(jwkSet)); err == nil {
+		t.Errorf("JWKSetToPublicKeysetHandle() err = nil, want error")
+	}
+}
+
 func TestJWKSetToPublicKeysetHandleInvalidJSONFails(t *testing.T) {
 	if _, err := jwt.JWKSetToPublicKeysetHandle([]byte(`({[}])`)); err == nil {
 		t.Errorf("jwt.JWKSetToPublicKeysetHandle() err = nil, want error")
