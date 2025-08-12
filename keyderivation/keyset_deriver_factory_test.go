@@ -234,6 +234,7 @@ func TestPrimitiveFactory_UsesRawPrimitives(t *testing.T) {
 	defer protoserialization.UnregisterKeySerializer[*stubKeysetDeriverKey]()
 	defer protoserialization.UnregisterKeyParser(derivedKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*derivedKey]()
+	defer registry.UnregisterKeyManager(stubKeysetDeriverURL, internalapi.Token{})
 
 	if err := protoserialization.RegisterKeyParser(stubKeysetDeriverURL, &stubKeysetDeriverKeyParser{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)

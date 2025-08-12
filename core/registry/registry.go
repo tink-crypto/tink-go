@@ -33,6 +33,7 @@ import (
 	"sync"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -152,4 +153,14 @@ func ClearKMSClients() {
 	kmsClientsMu.Lock()
 	defer kmsClientsMu.Unlock()
 	kmsClients = []KMSClient{}
+}
+
+// UnregisterKeyManager unregisters the key manager for the given typeURL.
+// Does nothing if the key manager is not registered.
+//
+// This function is intended to be used in tests only and is an internal API.
+func UnregisterKeyManager(typeURL string, _ internalapi.Token) {
+	keyManagersMu.Lock()
+	defer keyManagersMu.Unlock()
+	delete(keyManagers, typeURL)
 }
