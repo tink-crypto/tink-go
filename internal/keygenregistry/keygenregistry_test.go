@@ -101,6 +101,8 @@ func stubKeyCreatorFails(p key.Parameters, idRequirement uint32) (key.Key, error
 }
 
 func TestCreateKeyFailsIfKeyCreatorFails(t *testing.T) {
+	defer keygenregistry.UnregisterKeyCreator[*stubParams1]()
+
 	if err := keygenregistry.RegisterKeyCreator[*stubParams1](stubKeyCreatorFails); err != nil {
 		t.Errorf("keygenregistry.RegisterKeyCreator[*stubParams1](stubKeyCreatorFails) err = %v, want nil", err)
 	}
