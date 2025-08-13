@@ -32,4 +32,10 @@ func init() {
 	if err := protoserialization.RegisterKeyParser(publicKeyTypeURL, new(publicKeyParser)); err != nil {
 		panic(fmt.Sprintf("jwtecdsa: failed to register public key parser: %v", err))
 	}
+	if err := protoserialization.RegisterKeySerializer[*PrivateKey](new(privateKeySerializer)); err != nil {
+		panic(fmt.Sprintf("jwtecdsa: failed to register private key serializer: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(privateKeyTypeURL, new(privateKeyParser)); err != nil {
+		panic(fmt.Sprintf("jwtecdsa: failed to register private key parser: %v", err))
+	}
 }

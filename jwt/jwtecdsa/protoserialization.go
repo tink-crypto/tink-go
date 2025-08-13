@@ -17,9 +17,11 @@ import (
 	"slices"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/ec"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 
 	jwtecdsapb "github.com/tink-crypto/tink-go/v2/proto/jwt_ecdsa_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -128,6 +130,34 @@ func (s *parametersParser) Parse(kt *tinkpb.KeyTemplate) (key.Parameters, error)
 	return NewParameters(kidStrategy, algorithmFromProto(keyFormat.GetAlgorithm()))
 }
 
+func publicKeyToProto(k *PublicKey) (*jwtecdsapb.JwtEcdsaPublicKey, error) {
+	xy := k.PublicPoint()[1:]
+	coordinateSize, err := coordinateSizeFromAlgorithm(k.parameters.Algorithm())
+	if err != nil {
+		return nil, err
+	}
+	paddedX, err := ec.BigIntBytesToFixedSizeBuffer(xy[:coordinateSize], coordinateSize+1)
+	if err != nil {
+		return nil, err
+	}
+	paddedY, err := ec.BigIntBytesToFixedSizeBuffer(xy[coordinateSize:], coordinateSize+1)
+	if err != nil {
+		return nil, err
+	}
+	protoPublicKey := &jwtecdsapb.JwtEcdsaPublicKey{
+		Version:   0,
+		Algorithm: algorithmToProto(k.parameters.Algorithm()),
+		X:         paddedX,
+		Y:         paddedY,
+	}
+	if k.parameters.KIDStrategy() == CustomKID {
+		protoPublicKey.CustomKid = &jwtecdsapb.JwtEcdsaPublicKey_CustomKid{
+			Value: k.kid,
+		}
+	}
+	return protoPublicKey, nil
+}
+
 type publicKeySerializer struct{}
 
 var _ protoserialization.KeySerializer = (*publicKeySerializer)(nil)
@@ -149,30 +179,10 @@ func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.Key
 	if !ok {
 		return nil, fmt.Errorf("key is of type %T; needed *PublicKey", key)
 	}
-	xy := jwtECDSAPublicKey.PublicPoint()[1:]
-	coordinateSize, err := coordinateSizeFromAlgorithm(jwtECDSAPublicKey.parameters.Algorithm())
+	protoPublicKey, err := publicKeyToProto(jwtECDSAPublicKey)
 	if err != nil {
 		return nil, err
 	}
-	paddedX, err := ec.BigIntBytesToFixedSizeBuffer(xy[:coordinateSize], coordinateSize+1)
-	if err != nil {
-		return nil, err
-	}
-	paddedY, err := ec.BigIntBytesToFixedSizeBuffer(xy[coordinateSize:], coordinateSize+1)
-	if err != nil {
-		return nil, err
-	}
-	protoPublicKey := &jwtecdsapb.JwtEcdsaPublicKey{
-		Algorithm: algorithmToProto(jwtECDSAPublicKey.parameters.Algorithm()),
-		X:         paddedX,
-		Y:         paddedY,
-	}
-	if jwtECDSAPublicKey.parameters.KIDStrategy() == CustomKID {
-		protoPublicKey.CustomKid = &jwtecdsapb.JwtEcdsaPublicKey_CustomKid{
-			Value: jwtECDSAPublicKey.kid,
-		}
-	}
-
 	serializedPublicKey, err := proto.Marshal(protoPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal JwtEcdsaPublicKey: %v", err)
@@ -184,6 +194,45 @@ func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.Key
 		Value:           serializedPublicKey,
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 	}, outputPrefixTypeFromKIDStrategy(jwtECDSAPublicKey.parameters.KIDStrategy()), idRequirement)
+}
+
+func publicKeyFromProto(protoPublicKey *jwtecdsapb.JwtEcdsaPublicKey, keySerialization *protoserialization.KeySerialization) (*PublicKey, error) {
+	if protoPublicKey.GetVersion() != 0 {
+		return nil, fmt.Errorf("invalid public key version: got %d, want 0", protoPublicKey.GetVersion())
+	}
+	coordinateSize, err := coordinateSizeFromAlgorithm(algorithmFromProto(protoPublicKey.GetAlgorithm()))
+	if err != nil {
+		return nil, err
+	}
+	// Tolerate arbitrary leading zeros in the coordinates.
+	// This is to support the case where the curve size in bytes + 1 is the
+	// length of the coordinate. This happens when Tink adds an extra leading
+	// 0x00 byte (see b/264525021).
+	x, err := ec.BigIntBytesToFixedSizeBuffer(protoPublicKey.GetX(), coordinateSize)
+	if err != nil {
+		return nil, err
+	}
+	y, err := ec.BigIntBytesToFixedSizeBuffer(protoPublicKey.GetY(), coordinateSize)
+	if err != nil {
+		return nil, err
+	}
+	if len(x) != coordinateSize || len(y) != coordinateSize {
+		return nil, fmt.Errorf("invalid coordinate size: got (%d, %d) want (%d, %d)", len(x), len(y), coordinateSize, coordinateSize)
+	}
+	kidStrategy := kidStrategyFromOutputPrefixType(keySerialization.OutputPrefixType(), protoPublicKey.GetCustomKid() != nil)
+	params, err := NewParameters(kidStrategy, algorithmFromProto(protoPublicKey.GetAlgorithm()))
+	if err != nil {
+		return nil, err
+	}
+	uncompressedPoint := slices.Concat([]byte{0x04}, x, y)
+	keyID, _ := keySerialization.IDRequirement()
+	return NewPublicKey(PublicKeyOpts{
+		PublicPoint:   uncompressedPoint,
+		IDRequirement: keyID,
+		HasCustomKID:  protoPublicKey.GetCustomKid() != nil,
+		CustomKID:     protoPublicKey.GetCustomKid().GetValue(),
+		Parameters:    params,
+	})
 }
 
 type publicKeyParser struct{}
@@ -201,50 +250,96 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 		return nil, fmt.Errorf("invalid key material type: got %v, want %v", keySerialization.KeyData().GetKeyMaterialType(), tinkpb.KeyData_ASYMMETRIC_PUBLIC)
 	}
 
-	publicKey := &jwtecdsapb.JwtEcdsaPublicKey{}
-	if err := proto.Unmarshal(keySerialization.KeyData().GetValue(), publicKey); err != nil {
+	publicKeyProto := &jwtecdsapb.JwtEcdsaPublicKey{}
+	if err := proto.Unmarshal(keySerialization.KeyData().GetValue(), publicKeyProto); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JwtEcdsaPublicKey: %v", err)
 	}
-	if publicKey.GetVersion() != 0 {
-		return nil, fmt.Errorf("invalid version: got %d, want 0", publicKey.GetVersion())
-	}
+	return publicKeyFromProto(publicKeyProto, keySerialization)
+}
 
-	coordinateSize, err := coordinateSizeFromAlgorithm(algorithmFromProto(publicKey.GetAlgorithm()))
+type privateKeySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*privateKeySerializer)(nil)
+
+func (s *privateKeySerializer) SerializeKey(k key.Key) (*protoserialization.KeySerialization, error) {
+	jwtECDSAPrivateKey, ok := k.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T; needed *PrivateKey", k)
+	}
+	publicKey, err := jwtECDSAPrivateKey.PublicKey()
 	if err != nil {
 		return nil, err
 	}
-
-	// Tolerate arbitrary leading zeros in the coordinates.
-	// This is to support the case where the curve size in bytes + 1 is the
-	// length of the coordinate. This happens when Tink adds an extra leading
-	// 0x00 byte (see b/264525021).
-	x, err := ec.BigIntBytesToFixedSizeBuffer(publicKey.GetX(), coordinateSize)
+	jwtECDSAPublicKey, ok := publicKey.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("public key is of type %T; needed *PublicKey", publicKey)
+	}
+	protoPublicKey, err := publicKeyToProto(jwtECDSAPublicKey)
 	if err != nil {
 		return nil, err
 	}
-	y, err := ec.BigIntBytesToFixedSizeBuffer(publicKey.GetY(), coordinateSize)
+	coordinateSize, err := coordinateSizeFromAlgorithm(jwtECDSAPublicKey.parameters.Algorithm())
 	if err != nil {
 		return nil, err
 	}
-
-	if len(x) != coordinateSize || len(y) != coordinateSize {
-		return nil, fmt.Errorf("invalid coordinate size: got (%d, %d) want (%d, %d)", len(x), len(y), coordinateSize, coordinateSize)
-	}
-
-	kidStrategy := kidStrategyFromOutputPrefixType(keySerialization.OutputPrefixType(), publicKey.GetCustomKid() != nil)
-	params, err := NewParameters(kidStrategy, algorithmFromProto(publicKey.GetAlgorithm()))
+	paddedPrivateKey, err := ec.BigIntBytesToFixedSizeBuffer(jwtECDSAPrivateKey.privateKeyBytes.Data(insecuresecretdataaccess.Token{}), coordinateSize+1)
 	if err != nil {
 		return nil, err
 	}
+	protoPrivateKey := &jwtecdsapb.JwtEcdsaPrivateKey{
+		Version:   0,
+		PublicKey: protoPublicKey,
+		KeyValue:  paddedPrivateKey,
+	}
+	serializedPrivateKey, err := proto.Marshal(protoPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal JwtEcdsaPrivateKey: %v", err)
+	}
+	idRequirement, _ := jwtECDSAPrivateKey.IDRequirement()
+	return protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         privateKeyTypeURL,
+		Value:           serializedPrivateKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}, outputPrefixTypeFromKIDStrategy(jwtECDSAPublicKey.parameters.KIDStrategy()), idRequirement)
+}
 
-	uncompressedPoint := slices.Concat([]byte{0x04}, x, y)
-	// keySerialization.IDRequirement() returns zero if the key doesn't have a key requirement.
-	keyID, _ := keySerialization.IDRequirement()
-	return NewPublicKey(PublicKeyOpts{
-		PublicPoint:   uncompressedPoint,
-		IDRequirement: keyID,
-		HasCustomKID:  publicKey.GetCustomKid() != nil,
-		CustomKID:     publicKey.GetCustomKid().GetValue(),
-		Parameters:    params,
-	})
+type privateKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*privateKeyParser)(nil)
+
+func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	if keySerialization == nil {
+		return nil, fmt.Errorf("key serialization can't be nil")
+	}
+	if keySerialization.KeyData().GetTypeUrl() != privateKeyTypeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keySerialization.KeyData().GetTypeUrl(), privateKeyTypeURL)
+	}
+	if keySerialization.KeyData().GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PRIVATE {
+		return nil, fmt.Errorf("invalid key material type: got %v, want %v", keySerialization.KeyData().GetKeyMaterialType(), tinkpb.KeyData_ASYMMETRIC_PRIVATE)
+	}
+	privateKeyProto := &jwtecdsapb.JwtEcdsaPrivateKey{}
+	if err := proto.Unmarshal(keySerialization.KeyData().GetValue(), privateKeyProto); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JwtEcdsaPrivateKey: %v", err)
+	}
+	if privateKeyProto.GetVersion() != 0 {
+		return nil, fmt.Errorf("invalid version: got %d, want 0", privateKeyProto.GetVersion())
+	}
+	publicKey, err := publicKeyFromProto(privateKeyProto.GetPublicKey(), keySerialization)
+	if err != nil {
+		return nil, err
+	}
+	alg := algorithmFromProto(privateKeyProto.GetPublicKey().GetAlgorithm())
+	coordinateSize, err := coordinateSizeFromAlgorithm(alg)
+	if err != nil {
+		return nil, err
+	}
+	// Tolerate arbitrary leading zeros in the private key.
+	privateKeyBytes, err := ec.BigIntBytesToFixedSizeBuffer(privateKeyProto.GetKeyValue(), coordinateSize)
+	if err != nil {
+		return nil, err
+	}
+	return NewPrivateKeyFromPublicKey(
+		secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}),
+		publicKey,
+	)
 }
