@@ -166,21 +166,6 @@ func TestFactoryVerifyWithDifferentKeyFails(t *testing.T) {
 	}
 }
 
-func TestFactorySignWithTinkAndCustomKIDFails(t *testing.T) {
-	_, privKeyHandle, _ := createKeyAndKeyHandles(t, refString("customKID"), tinkpb.OutputPrefixType_TINK)
-	signer, err := jwt.NewSigner(privKeyHandle)
-	if err != nil {
-		t.Fatalf("jwt.NewSigner() err = %v, want nil", err)
-	}
-	rawJWT, err := jwt.NewRawJWT(&jwt.RawJWTOptions{WithoutExpiration: true})
-	if err != nil {
-		t.Fatalf("jwt.NewRawJWT() err = %v, want nil", err)
-	}
-	if _, err := signer.SignAndEncode(rawJWT); err == nil {
-		t.Errorf("signer.SignAndEncode() err = nil, want error")
-	}
-}
-
 type signerVerifierFactoryKIDTestCase struct {
 	tag                  string
 	signerOutputPrefix   tinkpb.OutputPrefixType
@@ -205,20 +190,6 @@ func TestFactorySignVerifyWithKIDFailure(t *testing.T) {
 			signerKID:            refString("customKID"),
 			verifierOutputPrefix: tinkpb.OutputPrefixType_RAW,
 			verifierKID:          refString("OtherCustomKID"),
-		},
-		{
-			tag:                  "verifier with tink output prefix and custom kid when token has no kid",
-			signerOutputPrefix:   tinkpb.OutputPrefixType_RAW,
-			signerKID:            nil,
-			verifierOutputPrefix: tinkpb.OutputPrefixType_TINK,
-			verifierKID:          refString("customKID"),
-		},
-		{
-			tag:                  "verifier with tink output prefix and custom kid when token has kid",
-			signerOutputPrefix:   tinkpb.OutputPrefixType_RAW,
-			signerKID:            refString("customKID"),
-			verifierOutputPrefix: tinkpb.OutputPrefixType_TINK,
-			verifierKID:          refString("customKid"),
 		},
 		{
 			tag:                  "token with fixed kid and verifier with tink output prefix",
@@ -592,8 +563,8 @@ func TestFactorySignAndVerifyWithAnnotationsEmitsMonitoringOnError(t *testing.T)
 	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
 		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 	}
-	kid := "intrusive_kid"
-	_, privHandle, pubHandle := createKeyAndKeyHandles(t, &kid, tinkpb.OutputPrefixType_TINK)
+	// Create valid keyset handles.
+	_, privHandle, pubHandle := createKeyAndKeyHandles(t, nil, tinkpb.OutputPrefixType_TINK)
 	buff := &bytes.Buffer{}
 	if err := insecurecleartextkeyset.Write(privHandle, keyset.NewBinaryWriter(buff)); err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
@@ -619,17 +590,15 @@ func TestFactorySignAndVerifyWithAnnotationsEmitsMonitoringOnError(t *testing.T)
 	if err != nil {
 		t.Fatalf("jwt.NewVerifier() err = %v, want nil", err)
 	}
-	rawJWT, err := jwt.NewRawJWT(&jwt.RawJWTOptions{WithoutExpiration: true})
-	if err != nil {
-		t.Fatalf("jwt.NewRawJWT() err = %v, want nil", err)
-	}
 	validator, err := jwt.NewValidator(&jwt.ValidatorOpts{AllowMissingExpiration: true})
 	if err != nil {
 		t.Fatalf("jwt.NewValidator() err = %v, want nil", err)
 	}
-	if _, err := signer.SignAndEncode(rawJWT); err == nil {
+	// Fails because of nil rawJWT.
+	if _, err := signer.SignAndEncode(nil); err == nil {
 		t.Fatalf("signer.SignAndEncode() err = nil, want error")
 	}
+	// Fails because of invalid token.
 	if _, err := verifier.VerifyAndDecode("invalid_token", validator); err == nil {
 		t.Fatalf("verifier.VerifyAndDecode() err = nil want error")
 	}

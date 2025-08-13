@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+
+	_ "github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa" // Register jwtecdsa keys and proto serialization.
 )
 
 // A generic error returned when something went wrong before validation
