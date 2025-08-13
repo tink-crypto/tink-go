@@ -19,7 +19,9 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
 // PublicKey represents a public key for JWT ECDSA signing.
@@ -145,4 +147,56 @@ func (k *PublicKey) Equal(other key.Key) bool {
 		bytes.Equal(k.publicPoint, that.publicPoint) &&
 		k.idRequirement == that.idRequirement &&
 		k.kid == that.kid && k.hasKID == that.hasKID
+}
+
+// PrivateKey represents a JWT ECDSA key.
+type PrivateKey struct {
+	publicKey       *PublicKey
+	privateKeyBytes secretdata.Bytes
+}
+
+// NewPrivateKeyFromPublicKey creates a new JWT ECDSA private key.
+//
+// The private key value must be octet encoded as per [SEC 1 v2.0, Section
+// 2.3.5].
+//
+// [SEC 1 v2.0, Section 2.3.5]: https://www.secg.org/sec1-v2.pdf#page=17.08
+func NewPrivateKeyFromPublicKey(keyBytes secretdata.Bytes, publicKey *PublicKey) (*PrivateKey, error) {
+	if publicKey == nil {
+		return nil, fmt.Errorf("jwtecdsa.NewPrivateKeyFromPublicKey: public key can't be nil")
+	}
+	curve, err := ecdhCurveFromAlgorithm(publicKey.parameters.Algorithm())
+	if err != nil {
+		return nil, fmt.Errorf("jwtecdsa.NewPrivateKeyFromPublicKey: %v", err)
+	}
+	ecdhPrivateKey, err := curve.NewPrivateKey(keyBytes.Data(insecuresecretdataaccess.Token{}))
+	if err != nil {
+		return nil, fmt.Errorf("jwtecdsa.NewPrivateKeyFromPublicKey: %v", err)
+	}
+	if !bytes.Equal(publicKey.PublicPoint(), ecdhPrivateKey.PublicKey().Bytes()) {
+		return nil, fmt.Errorf("jwtecdsa.NewPrivateKeyFromPublicKey: public key mismatch")
+	}
+	return &PrivateKey{
+		publicKey:       publicKey,
+		privateKeyBytes: keyBytes,
+	}, nil
+}
+
+// Parameters returns the parameters of the key.
+func (k *PrivateKey) Parameters() key.Parameters { return k.publicKey.Parameters() }
+
+// PrivateKeyValue returns the private key material.
+func (k *PrivateKey) PrivateKeyValue() secretdata.Bytes { return k.privateKeyBytes }
+
+// PublicKey returns the public key.
+func (k *PrivateKey) PublicKey() (key.Key, error) { return k.publicKey, nil }
+
+// IDRequirement returns the ID requirement for this key.
+func (k *PrivateKey) IDRequirement() (uint32, bool) { return k.publicKey.IDRequirement() }
+
+// Equal returns true if k and other are equal.
+func (k *PrivateKey) Equal(other key.Key) bool {
+	that, ok := other.(*PrivateKey)
+	return ok && k.publicKey.Equal(that.publicKey) &&
+		k.privateKeyBytes.Equal(that.privateKeyBytes)
 }
