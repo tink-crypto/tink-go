@@ -762,6 +762,131 @@ func TestKeysetManagerAddKeySucceeds(t *testing.T) {
 	}
 }
 
+func TestKeysetManager_AddKeyWithOptsAsPrimary_Fails(t *testing.T) {
+	defer protoserialization.UnregisterKeySerializer[*testKey]()
+	if err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %q, want nil", err)
+	}
+
+	manager := keyset.NewManager()
+	// Cannot set primary a key which is not enabled.
+	if _, err := manager.AddKeyWithOpts(&testKey{
+		params: testParameters{hasIDRequirement: true},
+		id:     1,
+	}, internalapi.Token{}, keyset.AsPrimary(), keyset.WithStatus(keyset.Disabled)); err == nil {
+		t.Errorf("manager.AddKeyWithOpts() err = nil, want error")
+	}
+	if _, err := manager.AddKeyWithOpts(&testKey{
+		params: testParameters{hasIDRequirement: true},
+		id:     1,
+	}, internalapi.Token{}, keyset.AsPrimary(), keyset.WithStatus(keyset.Destroyed)); err == nil {
+		t.Errorf("manager.AddKeyWithOpts() err = nil, want error")
+	}
+}
+
+func TestKeysetManager_AddKeyWithOptsAsPrimary_Succeeds(t *testing.T) {
+	defer protoserialization.UnregisterKeySerializer[*testKey]()
+	if err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %q, want nil", err)
+	}
+
+	manager := keyset.NewManager()
+
+	// By default, not primary.
+	keyID1, err := manager.AddKeyWithOpts(&testKey{
+		params: testParameters{hasIDRequirement: true},
+		id:     1,
+	}, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("manager.AddKeyWithOpts() err = %q, want nil", err)
+	}
+	if keyID1 != 1 {
+		t.Errorf("keyID1 = %d, want 1", keyID1)
+	}
+	// Handle should fail.
+	if _, err := manager.Handle(); err == nil {
+		t.Fatalf("manager.Handle() err = nil, want error")
+	}
+
+	// Add a new key as primary.
+	keyID2, err := manager.AddKeyWithOpts(&testKey{
+		params: testParameters{hasIDRequirement: true},
+		id:     2,
+	}, internalapi.Token{}, keyset.AsPrimary())
+	if err != nil {
+		t.Fatalf("manager.AddKeyWithOpts() err = %q, want nil", err)
+	}
+	if keyID2 != 2 {
+		t.Errorf("keyID2 = %d, want 2", keyID2)
+	}
+	{ // Handle now works, and the ID should be 2.
+		handle, err := manager.Handle()
+		if err != nil {
+			t.Fatalf("manager.Handle() err = %q, want nil", err)
+		}
+
+		if handle.Len() != 2 {
+			t.Errorf("handle.Len() = %d, want 2", handle.Len())
+		}
+
+		primaryEntry, err := handle.Primary()
+		if err != nil {
+			t.Fatalf("handle.Primary() err = %q, want nil", err)
+		}
+		if primaryEntry.KeyID() != keyID2 {
+			t.Errorf("primaryEntry.KeyID() = %d, want %d", primaryEntry.KeyID(), keyID2)
+		}
+	}
+
+	// Add another new key as primary.
+	keyID3, err := manager.AddKeyWithOpts(&testKey{
+		params: testParameters{hasIDRequirement: true},
+		id:     3,
+	}, internalapi.Token{}, keyset.AsPrimary())
+	if err != nil {
+		t.Fatalf("manager.AddKeyWithOpts() err = %q, want nil", err)
+	}
+	if keyID3 != 3 {
+		t.Errorf("keyID3 = %d, want 3", keyID3)
+	}
+	{ // Handle now works, and the ID should be 3.
+		handle, err := manager.Handle()
+		if err != nil {
+			t.Fatalf("manager.Handle() err = %q, want nil", err)
+		}
+
+		if handle.Len() != 3 {
+			t.Errorf("handle.Len() = %d, want 2", handle.Len())
+		}
+
+		primaryEntry, err := handle.Primary()
+		if err != nil {
+			t.Fatalf("handle.Primary() err = %q, want nil", err)
+		}
+		if primaryEntry.KeyID() != keyID3 {
+			t.Errorf("primaryEntry.KeyID() = %d, want %d", primaryEntry.KeyID(), keyID2)
+		}
+	}
+
+	// Overwrite the primary key with SetPrimary.
+	if err := manager.SetPrimary(keyID1); err != nil {
+		t.Fatalf("manager.SetPrimary(%v) err = %q, want nil", keyID1, err)
+	}
+	{ // Handle now works, and the ID should be 1.
+		handle, err := manager.Handle()
+		if err != nil {
+			t.Fatalf("manager.Handle() err = %q, want nil", err)
+		}
+		primaryEntry, err := handle.Primary()
+		if err != nil {
+			t.Fatalf("handle.Primary() err = %q, want nil", err)
+		}
+		if primaryEntry.KeyID() != keyID1 {
+			t.Errorf("primaryEntry.KeyID() = %d, want %d", primaryEntry.KeyID(), keyID1)
+		}
+	}
+}
+
 func TestKeysetManager_AddKeyWithOpts_Succeeds(t *testing.T) {
 	defer protoserialization.UnregisterKeySerializer[*testKey]()
 	if err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}); err != nil {

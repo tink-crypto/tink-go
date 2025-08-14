@@ -92,6 +92,7 @@ type entry struct {
 	fixedID    uint32
 	hasFixedID bool
 	status     KeyStatus
+	isPrimary  bool
 }
 
 // KeyOpts is an interface for options that can be applied to a key.
@@ -123,6 +124,14 @@ func WithFixedID(id uint32) KeyOpts {
 		}
 		e.fixedID = id
 		e.hasFixedID = true
+		return nil
+	})
+}
+
+// AsPrimary sets the key as primary.
+func AsPrimary() KeyOpts {
+	return keyOpts(func(e *entry) error {
+		e.isPrimary = true
 		return nil
 	})
 }
@@ -183,6 +192,12 @@ func (km *Manager) AddKeyWithOpts(key key.Key, _ internalapi.Token, opts ...KeyO
 		KeyData:          keySerialization.KeyData(),
 	}
 	km.ks.Key = append(km.ks.Key, newKey)
+	if e.isPrimary {
+		if e.status != Enabled {
+			return 0, fmt.Errorf("keyset.Manager: cannot set primary key with status %s", e.status)
+		}
+		km.ks.PrimaryKeyId = keyID
+	}
 	return newKey.GetKeyId(), nil
 }
 
