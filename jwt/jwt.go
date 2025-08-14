@@ -20,7 +20,9 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 
+	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"
 	_ "github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa" // Register jwtecdsa keys and proto serialization.
 )
 
@@ -59,5 +61,8 @@ func init() {
 	}
 	if err := registry.RegisterKeyManager(new(jwtPSVerifierKeyManager)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PSS verifier key manager: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtecdsa.PrivateKey](createJWTECDSASigner); err != nil {
+		panic(fmt.Sprintf("jwt.init() failed: %v", err))
 	}
 }
