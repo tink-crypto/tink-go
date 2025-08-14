@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package jwt_test
+package jwt
 
 import (
+	"encoding/hex"
 	"fmt"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
-	"github.com/tink-crypto/tink-go/v2/jwt"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -75,6 +74,15 @@ func mustCreateJWTECDSAPrivateKey(t *testing.T, keyBytes []byte, pub *jwtecdsa.P
 	return key
 }
 
+func mustHexDecode(t *testing.T, hexStr string) []byte {
+	t.Helper()
+	keyBytes, err := hex.DecodeString(hexStr)
+	if err != nil {
+		t.Fatalf("hex.DecodeString(%q) err = %v, want nil", hexStr, err)
+	}
+	return keyBytes
+}
+
 func TestJWTECDSASignerVerfierCreator(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
@@ -111,13 +119,13 @@ func TestJWTECDSASignerVerfierCreator(t *testing.T) {
 				pubKey := mustCreateJWTECDSAPublicKey(t, pubKeyOpts)
 				privKey := mustCreateJWTECDSAPrivateKey(t, mustHexDecode(t, tc.privKeyHex), pubKey)
 
-				p, err := primitiveregistry.Primitive(privKey)
+				p, err := createJWTECDSASigner(privKey)
 				if err != nil {
-					t.Fatalf("primitiveregistry.Primitive() err = %v, want nil", err)
+					t.Fatalf("createJWTECDSASigner() err = %v, want nil", err)
 				}
-				signer, ok := p.(jwt.Signer)
+				signer, ok := p.(Signer)
 				if !ok {
-					t.Fatalf("primitiveregistry.Primitive(%T) = %T, want sKID", privKey, p)
+					t.Fatalf("createJWTECDSASigner(%T) = %T, want sKID", privKey, p)
 				}
 
 				// Create a public keyset handle.
@@ -135,30 +143,30 @@ func TestJWTECDSASignerVerfierCreator(t *testing.T) {
 					t.Fatalf("km.Handle() err = %v, want nil", err)
 				}
 
-				verifier, err := jwt.NewVerifier(pubKeyHandle)
+				verifier, err := NewVerifier(pubKeyHandle)
 				if err != nil {
-					t.Fatalf("jwt.NewVerifier() err = %v, want nil", err)
+					t.Fatalf("NewVerifier() err = %v, want nil", err)
 				}
 
 				// Try to sign and verify a JWT with the issuer set.
 				issuer := "https://www.example.com"
-				rawJWT, err := jwt.NewRawJWT(&jwt.RawJWTOptions{
+				rawJWT, err := NewRawJWT(&RawJWTOptions{
 					Issuer:            &issuer,
 					WithoutExpiration: true,
 				})
 				if err != nil {
-					t.Fatalf("jwt.NewRawJWT() err = %v, want nil", err)
+					t.Fatalf("NewRawJWT() err = %v, want nil", err)
 				}
 				signedToken, err := signer.SignAndEncode(rawJWT)
 				if err != nil {
 					t.Fatalf("signer.SignAndEncode() err = %v, want nil", err)
 				}
-				validator, err := jwt.NewValidator(&jwt.ValidatorOpts{
+				validator, err := NewValidator(&ValidatorOpts{
 					ExpectedIssuer:         &issuer,
 					AllowMissingExpiration: true,
 				})
 				if err != nil {
-					t.Fatalf("jwt.NewValidator() err = %v, want nil", err)
+					t.Fatalf("NewValidator() err = %v, want nil", err)
 				}
 				verifiedJWT, err := verifier.VerifyAndDecode(signedToken, validator)
 				if err != nil {

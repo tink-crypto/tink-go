@@ -35,6 +35,9 @@ func NewSigner(handle *keyset.Handle) (Signer, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
+	// WARNING: This is an all-or-nothing operation, meaning that *all* the keys
+	// in the keyset must implement jwt.Signer. Until all JWT signature keys have
+	// a primitive constructor, this is unused.
 	ps, err := keyset.Primitives[Signer](handle, internalapi.Token{})
 	if err != nil {
 		// Try to obtain a signerWithKIDInterface primitive set.
