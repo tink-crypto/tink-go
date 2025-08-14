@@ -615,12 +615,28 @@ func TestFactorySignAndVerifyWithAnnotationsEmitsMonitoringOnError(t *testing.T)
 const stubPrivateKeyURL = "type.googleapis.com/google.crypto.tink.StubPrivateKey"
 const stubPublicKeyURL = "type.googleapis.com/google.crypto.tink.StubPublicKey"
 
-type stubFullSigner struct{}
+type stubFullSigner struct {
+	kid *string
+}
 
 var _ jwt.Signer = (*stubFullSigner)(nil)
 
 func (s *stubFullSigner) SignAndEncode(_ *jwt.RawJWT) (string, error) {
-	return "full_signer", nil
+	if s.kid == nil {
+		return "full_signer", nil
+	}
+	return *s.kid + "_full_signer", nil
+}
+
+type stubFullVerifier struct{}
+
+var _ jwt.Verifier = (*stubFullVerifier)(nil)
+
+func (s *stubFullVerifier) VerifyAndDecode(t string, _ *jwt.Validator) (*jwt.VerifiedJWT, error) {
+	if t != "AQIDBA_full_signer" {
+		return nil, fmt.Errorf("invalid token")
+	}
+	return &jwt.VerifiedJWT{}, nil
 }
 
 // Parameters and keys.
@@ -738,19 +754,28 @@ func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
 	}
-	// Register primitive constructor to make sure that the factory uses full
+
+	// Register primitive constructors to make sure that the factory uses full
 	// primitives.
 	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubPrivateKey]()
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubPublicKey]()
 
-	signerConstructor := func(key key.Key) (any, error) { return &stubFullSigner{}, nil }
+	signerConstructor := func(key key.Key) (any, error) {
+		kid := "AQIDBA" // for 0x01020304
+		return &stubFullSigner{&kid}, nil
+	}
 	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubPrivateKey](signerConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	verifierConstructor := func(key key.Key) (any, error) { return &stubFullVerifier{}, nil }
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubPublicKey](verifierConstructor); err != nil {
 		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	km := keyset.NewManager()
 	keyID, err := km.AddKey(&stubPrivateKey{
-		prefixType:    tinkpb.OutputPrefixType_RAW,
-		idRequirement: 0,
+		prefixType:    tinkpb.OutputPrefixType_TINK,
+		idRequirement: 0x01020304,
 	})
 	if err != nil {
 		t.Fatalf("km.AddKey() err = %v, want nil", err)
@@ -775,8 +800,24 @@ func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("signer.SignAndEncode(() err = %v, want nil", err)
 	}
-	if !cmp.Equal(token, "full_signer") {
-		t.Errorf("token = %q, want: %q", token, "full_signer")
+	if !cmp.Equal(token, "AQIDBA_full_signer") {
+		t.Errorf("token = %q, want: %q", token, "full_primitive")
+	}
+
+	publicHandle, err := handle.Public()
+	if err != nil {
+		t.Fatalf("handle.Public() err = %v, want nil", err)
+	}
+	verifier, err := jwt.NewVerifier(publicHandle)
+	if err != nil {
+		t.Fatalf("jwt.NewVerifier() err = %v, want nil", err)
+	}
+	validator, err := jwt.NewValidator(&jwt.ValidatorOpts{AllowMissingExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewValidator() err = %v, want nil", err)
+	}
+	if _, err := verifier.VerifyAndDecode(token, validator); err != nil {
+		t.Fatalf("verifier.VerifyAndDecode() err = %v, want nil", err)
 	}
 }
 
@@ -789,6 +830,21 @@ func (s *stubLegacySigner) SignAndEncodeWithKID(_ *jwt.RawJWT, kid *string) (str
 	return *kid + "_legacy_signer", nil
 }
 
+type stubLegacyVerifier struct{}
+
+func (s *stubLegacyVerifier) VerifyAndDecodeWithKID(compact string, _ *jwt.Validator, kid *string) (*jwt.VerifiedJWT, error) {
+	if kid == nil {
+		if compact == "legacy_signer" {
+			return &jwt.VerifiedJWT{}, nil
+		}
+	} else {
+		if compact == *kid+"_legacy_signer" {
+			return &jwt.VerifiedJWT{}, nil
+		}
+	}
+	return nil, fmt.Errorf("invalid token")
+}
+
 type stubPrivateKeyManager struct{}
 
 var _ registry.KeyManager = (*stubPrivateKeyManager)(nil)
@@ -799,9 +855,31 @@ func (km *stubPrivateKeyManager) NewKey(_ []byte) (proto.Message, error) {
 func (km *stubPrivateKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) {
 	return nil, fmt.Errorf("not implemented")
 }
-func (km *stubPrivateKeyManager) DoesSupport(keyURL string) bool  { return keyURL == stubPrivateKeyURL }
-func (km *stubPrivateKeyManager) TypeURL() string                 { return stubPrivateKeyURL }
-func (km *stubPrivateKeyManager) Primitive(_ []byte) (any, error) { return &stubLegacySigner{}, nil }
+func (km *stubPrivateKeyManager) DoesSupport(keyURL string) bool {
+	return keyURL == stubPrivateKeyURL
+}
+func (km *stubPrivateKeyManager) TypeURL() string { return stubPrivateKeyURL }
+func (km *stubPrivateKeyManager) Primitive(_ []byte) (any, error) {
+	return &stubLegacySigner{}, nil
+}
+
+type stubPublicKeyManager struct{}
+
+var _ registry.KeyManager = (*stubPublicKeyManager)(nil)
+
+func (km *stubPublicKeyManager) NewKey(_ []byte) (proto.Message, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubPublicKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubPublicKeyManager) DoesSupport(keyURL string) bool {
+	return keyURL == stubPublicKeyURL
+}
+func (km *stubPublicKeyManager) TypeURL() string { return stubPublicKeyURL }
+func (km *stubPublicKeyManager) Primitive(_ []byte) (any, error) {
+	return &stubLegacyVerifier{}, nil
+}
 
 func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
 	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
@@ -823,8 +901,12 @@ func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
 	}
 
 	defer registry.UnregisterKeyManager(stubPrivateKeyURL, internalapi.Token{})
+	defer registry.UnregisterKeyManager(stubPublicKeyURL, internalapi.Token{})
 
 	if err := registry.RegisterKeyManager(&stubPrivateKeyManager{}); err != nil {
+		t.Fatalf("registry.RegisterKeyManager() err = %v, want nil", err)
+	}
+	if err := registry.RegisterKeyManager(&stubPublicKeyManager{}); err != nil {
 		t.Fatalf("registry.RegisterKeyManager() err = %v, want nil", err)
 	}
 
@@ -875,6 +957,58 @@ func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
 			if !cmp.Equal(token, tc.wantToken) {
 				t.Errorf("token = %q, want: %q", token, tc.wantToken)
 			}
+
+			publicHandle, err := handle.Public()
+			if err != nil {
+				t.Fatalf("handle.Public() err = %v, want nil", err)
+			}
+			verifier, err := jwt.NewVerifier(publicHandle)
+			if err != nil {
+				t.Fatalf("jwt.NewVerifier() err = %v, want nil", err)
+			}
+			validator, err := jwt.NewValidator(&jwt.ValidatorOpts{AllowMissingExpiration: true})
+			if err != nil {
+				t.Fatalf("jwt.NewValidator() err = %v, want nil", err)
+			}
+			if _, err := verifier.VerifyAndDecode(token, validator); err != nil {
+				t.Fatalf("verifier.VerifyAndDecode() err = %v, want nil", err)
+			}
 		})
+	}
+}
+
+// TestPrimitiveFactoryMultipleKeys tests that the factory can create a signer
+// and a verifier from a keyset with all JWT signer keys.
+func TestPrimitiveFactoryMultipleKeys(t *testing.T) {
+	km := keyset.NewManager()
+	keyID, err := km.Add(jwt.ES256Template())
+	if err != nil {
+		t.Fatalf("km.Add() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	if _, err := km.Add(jwt.RS256_2048_F4_Key_Template()); err != nil {
+		t.Fatalf("km.Add() err = %v, want nil", err)
+	}
+	if _, err := km.Add(jwt.RS256_2048_F4_Key_Template()); err != nil {
+		t.Fatalf("km.Add() err = %v, want nil", err)
+	}
+	if _, err := km.Add(jwt.PS256_2048_F4_Key_Template()); err != nil {
+		t.Fatalf("km.Add() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	if _, err := jwt.NewSigner(handle); err != nil {
+		t.Fatalf("jwt.NewSigner() err = %v, want nil", err)
+	}
+	publicHandle, err := handle.Public()
+	if err != nil {
+		t.Fatalf("handle.Public() err = %v, want nil", err)
+	}
+	if _, err := jwt.NewVerifier(publicHandle); err != nil {
+		t.Fatalf("jwt.NewVerifier() err = %v, want nil", err)
 	}
 }
