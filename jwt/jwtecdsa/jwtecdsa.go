@@ -16,6 +16,7 @@ package jwtecdsa
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
 
@@ -37,5 +38,8 @@ func init() {
 	}
 	if err := protoserialization.RegisterKeyParser(privateKeyTypeURL, new(privateKeyParser)); err != nil {
 		panic(fmt.Sprintf("jwtecdsa: failed to register private key parser: %v", err))
+	}
+	if err := keygenregistry.RegisterKeyCreator[*Parameters](createPrivateKey); err != nil {
+		panic(fmt.Sprintf("jwtecdsa: failed to register key creator: %v", err))
 	}
 }

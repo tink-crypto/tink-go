@@ -15,6 +15,7 @@ package jwtecdsa
 import (
 	"bytes"
 	"crypto/ecdh"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
@@ -199,4 +200,33 @@ func (k *PrivateKey) Equal(other key.Key) bool {
 	that, ok := other.(*PrivateKey)
 	return ok && k.publicKey.Equal(that.publicKey) &&
 		k.privateKeyBytes.Equal(that.privateKeyBytes)
+}
+
+func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	jwtECDSAParams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("jwtecdsa.createPrivateKey: invalid parameters type: want %T, got %T", (*Parameters)(nil), p)
+	}
+	if jwtECDSAParams.KIDStrategy() == CustomKID {
+		return nil, fmt.Errorf("jwtecdsa.createPrivateKey: key generation is not supported for strategy %v", jwtECDSAParams.KIDStrategy())
+	}
+	curve, err := ecdhCurveFromAlgorithm(jwtECDSAParams.Algorithm())
+	if err != nil {
+		return nil, fmt.Errorf("jwtecdsa.createPrivateKey: %v", err)
+	}
+	privateKey, err := curve.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("jwtecdsa.createPrivateKey: %v", err)
+	}
+	privateKeyValue := secretdata.NewBytesFromData(privateKey.Bytes(), insecuresecretdataaccess.Token{})
+	publicKey, err := NewPublicKey(PublicKeyOpts{
+		PublicPoint:   privateKey.PublicKey().Bytes(),
+		IDRequirement: idRequirement,
+		HasCustomKID:  false,
+		Parameters:    jwtECDSAParams,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("jwtecdsa.createPrivateKey: %v", err)
+	}
+	return NewPrivateKeyFromPublicKey(privateKeyValue, publicKey)
 }
