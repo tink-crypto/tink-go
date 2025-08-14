@@ -26,28 +26,83 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
+type signerWithKIDInterface interface {
+	SignAndEncodeWithKID(*RawJWT, *string) (string, error)
+}
+
 // NewSigner generates a new instance of the JWT Signer primitive.
 func NewSigner(handle *keyset.Handle) (Signer, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := keyset.Primitives[*signerWithKID](handle, internalapi.Token{})
+	ps, err := keyset.Primitives[Signer](handle, internalapi.Token{})
 	if err != nil {
-		return nil, fmt.Errorf("jwt_signer_factory: cannot obtain primitive set: %v", err)
+		// Try to obtain a signerWithKIDInterface primitive set.
+		ps, err := keyset.Primitives[signerWithKIDInterface](handle, internalapi.Token{})
+		if err != nil {
+			return nil, fmt.Errorf("jwt_signer_factory: cannot obtain primitive set: %v", err)
+		}
+		logger, err := createSignerLogger(ps)
+		if err != nil {
+			return nil, err
+		}
+
+		if ps.Primary.Primitive == nil {
+			// Something is wrong, this should not happen.
+			return nil, fmt.Errorf("jwt_signer_factory: primary primitive is nil")
+		}
+		return &wrappedSigner{
+			primaryFullPrimitive: &fullPrimitiveAdapter{
+				primitive:  ps.Primary.Primitive,
+				keyID:      ps.Primary.KeyID,
+				prefixType: ps.Primary.PrefixType,
+			},
+			keyID:  ps.Primary.KeyID,
+			logger: logger,
+		}, nil
 	}
-	return newWrappedSigner(ps)
+	logger, err := createSignerLogger(ps)
+	if err != nil {
+		return nil, err
+	}
+
+	if ps.Primary.FullPrimitive == nil {
+		// Something is wrong, this should not happen.
+		return nil, fmt.Errorf("jwt_signer_factory: primary full primitive is nil")
+	}
+
+	return &wrappedSigner{
+		primaryFullPrimitive: ps.Primary.FullPrimitive,
+		keyID:                ps.Primary.KeyID,
+		logger:               logger,
+	}, nil
 }
 
-// wrappedSigner is a JWT Signer implementation that uses the underlying primitive set for JWT Sign.
+type fullPrimitiveAdapter struct {
+	primitive  signerWithKIDInterface
+	keyID      uint32
+	prefixType tinkpb.OutputPrefixType
+}
+
+var _ Signer = (*fullPrimitiveAdapter)(nil)
+
+func (a *fullPrimitiveAdapter) SignAndEncode(rawJWT *RawJWT) (string, error) {
+	return a.primitive.SignAndEncodeWithKID(rawJWT, keyID(a.keyID, a.prefixType))
+}
+
+// wrappedSigner is a JWT Signer implementation that uses the underlying
+// primary full primitive for signing. It logs success/failure of the signing
+// operation.
 type wrappedSigner struct {
-	ps     *primitiveset.PrimitiveSet[*signerWithKID]
-	logger monitoring.Logger
+	primaryFullPrimitive Signer
+	keyID                uint32
+	logger               monitoring.Logger
 }
 
 var _ Signer = (*wrappedSigner)(nil)
 
-func createSignerLogger(ps *primitiveset.PrimitiveSet[*signerWithKID]) (monitoring.Logger, error) {
-	// only keysets which contain annotations are monitored.
+func createSignerLogger[T any](ps *primitiveset.PrimitiveSet[T]) (monitoring.Logger, error) {
+	// Only keysets with annotations are monitored.
 	if len(ps.Annotations) == 0 {
 		return &monitoringutil.DoNothingLogger{}, nil
 	}
@@ -62,31 +117,12 @@ func createSignerLogger(ps *primitiveset.PrimitiveSet[*signerWithKID]) (monitori
 	})
 }
 
-func newWrappedSigner(ps *primitiveset.PrimitiveSet[*signerWithKID]) (*wrappedSigner, error) {
-	for _, primitives := range ps.Entries {
-		for _, p := range primitives {
-			if p.PrefixType != tinkpb.OutputPrefixType_RAW && p.PrefixType != tinkpb.OutputPrefixType_TINK {
-				return nil, fmt.Errorf("jwt_signer_factory: invalid OutputPrefixType: %s", p.PrefixType)
-			}
-		}
-	}
-	logger, err := createSignerLogger(ps)
-	if err != nil {
-		return nil, err
-	}
-	return &wrappedSigner{
-		ps:     ps,
-		logger: logger,
-	}, nil
-}
-
 func (w *wrappedSigner) SignAndEncode(rawJWT *RawJWT) (string, error) {
-	primary := w.ps.Primary
-	token, err := primary.Primitive.SignAndEncodeWithKID(rawJWT, keyID(primary.KeyID, primary.PrefixType))
+	token, err := w.primaryFullPrimitive.SignAndEncode(rawJWT)
 	if err != nil {
 		w.logger.LogFailure()
 		return "", err
 	}
-	w.logger.Log(primary.KeyID, 1)
+	w.logger.Log(w.keyID, 1)
 	return token, nil
 }

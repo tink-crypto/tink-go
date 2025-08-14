@@ -24,9 +24,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/jwt"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/signature"
@@ -604,5 +609,272 @@ func TestFactorySignAndVerifyWithAnnotationsEmitsMonitoringOnError(t *testing.T)
 	}
 	if len(client.Failures()) != 2 {
 		t.Errorf("len(client.Failures()) = %d, want 2", len(client.Failures()))
+	}
+}
+
+const stubPrivateKeyURL = "type.googleapis.com/google.crypto.tink.StubPrivateKey"
+const stubPublicKeyURL = "type.googleapis.com/google.crypto.tink.StubPublicKey"
+
+type stubFullSigner struct{}
+
+var _ jwt.Signer = (*stubFullSigner)(nil)
+
+func (s *stubFullSigner) SignAndEncode(_ *jwt.RawJWT) (string, error) {
+	return "full_signer", nil
+}
+
+// Parameters and keys.
+
+type stubParams struct{}
+
+var _ key.Parameters = (*stubParams)(nil)
+
+func (p *stubParams) Equal(_ key.Parameters) bool { return true }
+func (p *stubParams) HasIDRequirement() bool      { return true }
+
+type stubPublicKey struct {
+	prefixType    tinkpb.OutputPrefixType
+	idRequirement uint32
+}
+
+var _ key.Key = (*stubPublicKey)(nil)
+
+func (p *stubPublicKey) Equal(_ key.Key) bool          { return true }
+func (p *stubPublicKey) Parameters() key.Parameters    { return &stubParams{} }
+func (p *stubPublicKey) IDRequirement() (uint32, bool) { return p.idRequirement, p.HasIDRequirement() }
+func (p *stubPublicKey) HasIDRequirement() bool        { return p.prefixType == tinkpb.OutputPrefixType_RAW }
+
+type stubPrivateKey struct {
+	prefixType    tinkpb.OutputPrefixType
+	idRequirement uint32
+}
+
+var _ key.Key = (*stubPrivateKey)(nil)
+
+func (p *stubPrivateKey) Equal(_ key.Key) bool          { return true }
+func (p *stubPrivateKey) Parameters() key.Parameters    { return &stubParams{} }
+func (p *stubPrivateKey) IDRequirement() (uint32, bool) { return p.idRequirement, p.HasIDRequirement() }
+func (p *stubPrivateKey) HasIDRequirement() bool        { return p.prefixType != tinkpb.OutputPrefixType_RAW }
+func (p *stubPrivateKey) PublicKey() (key.Key, error) {
+	return &stubPublicKey{
+		prefixType:    p.prefixType,
+		idRequirement: p.idRequirement,
+	}, nil
+}
+
+// Proto serialization.
+
+type stubPublicKeySerialization struct{}
+
+var _ protoserialization.KeySerializer = (*stubPublicKeySerialization)(nil)
+
+func (s *stubPublicKeySerialization) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	return protoserialization.NewKeySerialization(
+		&tinkpb.KeyData{
+			TypeUrl:         stubPublicKeyURL,
+			Value:           []byte("serialized_public_key"),
+			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+		},
+		key.(*stubPublicKey).prefixType,
+		key.(*stubPublicKey).idRequirement,
+	)
+}
+
+type stubPublicKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*stubPublicKeyParser)(nil)
+
+func (s *stubPublicKeyParser) ParseKey(serialization *protoserialization.KeySerialization) (key.Key, error) {
+	idRequirement, _ := serialization.IDRequirement()
+	return &stubPublicKey{
+		prefixType:    serialization.OutputPrefixType(),
+		idRequirement: idRequirement,
+	}, nil
+}
+
+type stubPrivateKeySerialization struct{}
+
+var _ protoserialization.KeySerializer = (*stubPrivateKeySerialization)(nil)
+
+func (s *stubPrivateKeySerialization) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	return protoserialization.NewKeySerialization(
+		&tinkpb.KeyData{
+			TypeUrl:         stubPrivateKeyURL,
+			Value:           []byte("serialized_key"),
+			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+		},
+		key.(*stubPrivateKey).prefixType,
+		key.(*stubPrivateKey).idRequirement,
+	)
+}
+
+type stubPrivateKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*stubPrivateKeyParser)(nil)
+
+func (s *stubPrivateKeyParser) ParseKey(serialization *protoserialization.KeySerialization) (key.Key, error) {
+	idRequirement, _ := serialization.IDRequirement()
+	return &stubPrivateKey{
+		prefixType:    serialization.OutputPrefixType(),
+		idRequirement: idRequirement,
+	}, nil
+}
+
+func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
+	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubPublicKeyURL, &stubPublicKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPublicKey](&stubPublicKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(stubPrivateKeyURL, &stubPrivateKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	// Register primitive constructor to make sure that the factory uses full
+	// primitives.
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubPrivateKey]()
+
+	signerConstructor := func(key key.Key) (any, error) { return &stubFullSigner{}, nil }
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubPrivateKey](signerConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubPrivateKey{
+		prefixType:    tinkpb.OutputPrefixType_RAW,
+		idRequirement: 0,
+	})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	signer, err := jwt.NewSigner(handle)
+	if err != nil {
+		t.Fatalf("jwt.NewSigner() err = %v, want nil", err)
+	}
+	data, err := jwt.NewRawJWT(&jwt.RawJWTOptions{WithoutExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewRawJWT() err = %v, want nil", err)
+	}
+	token, err := signer.SignAndEncode(data)
+	if err != nil {
+		t.Fatalf("signer.SignAndEncode(() err = %v, want nil", err)
+	}
+	if !cmp.Equal(token, "full_signer") {
+		t.Errorf("token = %q, want: %q", token, "full_signer")
+	}
+}
+
+type stubLegacySigner struct{}
+
+func (s *stubLegacySigner) SignAndEncodeWithKID(_ *jwt.RawJWT, kid *string) (string, error) {
+	if kid == nil {
+		return "legacy_signer", nil
+	}
+	return *kid + "_legacy_signer", nil
+}
+
+type stubPrivateKeyManager struct{}
+
+var _ registry.KeyManager = (*stubPrivateKeyManager)(nil)
+
+func (km *stubPrivateKeyManager) NewKey(_ []byte) (proto.Message, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubPrivateKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubPrivateKeyManager) DoesSupport(keyURL string) bool  { return keyURL == stubPrivateKeyURL }
+func (km *stubPrivateKeyManager) TypeURL() string                 { return stubPrivateKeyURL }
+func (km *stubPrivateKeyManager) Primitive(_ []byte) (any, error) { return &stubLegacySigner{}, nil }
+
+func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
+	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubPublicKeyURL, &stubPublicKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPublicKey](&stubPublicKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(stubPrivateKeyURL, &stubPrivateKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	defer registry.UnregisterKeyManager(stubPrivateKeyURL, internalapi.Token{})
+
+	if err := registry.RegisterKeyManager(&stubPrivateKeyManager{}); err != nil {
+		t.Fatalf("registry.RegisterKeyManager() err = %v, want nil", err)
+	}
+
+	for _, tc := range []struct {
+		name      string
+		key       *stubPrivateKey
+		wantToken string
+	}{
+		{
+			name:      "TINK",
+			key:       &stubPrivateKey{tinkpb.OutputPrefixType_TINK, 0x01020304},
+			wantToken: "AQIDBA_legacy_signer",
+		},
+		{
+			name:      "RAW",
+			key:       &stubPrivateKey{tinkpb.OutputPrefixType_RAW, 0},
+			wantToken: "legacy_signer",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a keyset with a single key.
+			km := keyset.NewManager()
+			keyID, err := km.AddKey(tc.key)
+			if err != nil {
+				t.Fatalf("km.AddKey() err = %v, want nil", err)
+			}
+			if err := km.SetPrimary(keyID); err != nil {
+				t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+			}
+			handle, err := km.Handle()
+			if err != nil {
+				t.Fatalf("km.Handle() err = %v, want nil", err)
+			}
+
+			signer, err := jwt.NewSigner(handle)
+			if err != nil {
+				t.Fatalf("jwt.NewSigner() err = %v, want nil", err)
+			}
+			data, err := jwt.NewRawJWT(&jwt.RawJWTOptions{WithoutExpiration: true})
+			if err != nil {
+				t.Fatalf("jwt.NewRawJWT() err = %v, want nil", err)
+			}
+
+			token, err := signer.SignAndEncode(data)
+			if err != nil {
+				t.Fatalf("signer.SignAndEncode(() err = %v, want nil", err)
+			}
+			if !cmp.Equal(token, tc.wantToken) {
+				t.Errorf("token = %q, want: %q", token, tc.wantToken)
+			}
+		})
 	}
 }
