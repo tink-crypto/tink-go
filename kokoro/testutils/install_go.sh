@@ -59,7 +59,8 @@ install_temp_go() {
     set -x
     cd "${go_tmpdir}"
     curl -OLsS "${go_url}"
-    echo "${go_sha256} ${go_archive}" | sha256sum -c
+    # The explicit "-" to specify stdin in sha256sum is needed on MacOS sequoia
+    echo "${go_sha256} ${go_archive}" | sha256sum -c -
     tar -xzf "${go_archive}"
   )
 
