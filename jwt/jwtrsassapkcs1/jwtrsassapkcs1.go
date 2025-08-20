@@ -14,3 +14,18 @@
 
 // Package jwtrsassapkcs1 provides parameters for JWT RSA SSA PKCS1 keys.
 package jwtrsassapkcs1
+
+import (
+	"fmt"
+
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+)
+
+func init() {
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
+		panic(fmt.Sprintf("protoserialization.RegisterParametersSerializer() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(privateKeyTypeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("protoserialization.RegisterParametersParser() failed: %v", err))
+	}
+}
