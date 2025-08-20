@@ -15,6 +15,7 @@
 package jwtrsassapkcs1_test
 
 import (
+	"math/bits"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -98,7 +99,6 @@ func TestNewParameters(t *testing.T) {
 		},
 		wantErr: true,
 	}}
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := jwtrsassapkcs1.NewParameters(tc.opts)
@@ -107,6 +107,22 @@ func TestNewParameters(t *testing.T) {
 			}
 		})
 	}
+
+	// On 32 bit platforms, the public exponent cannot be larger than 1<<31.
+	if bits.UintSize == 64 {
+		expVal := 1 << (bits.UintSize/2 - 1)
+		t.Run("exponent too larrge", func(t *testing.T) {
+			if _, err := jwtrsassapkcs1.NewParameters(jwtrsassapkcs1.ParametersOpts{
+				ModulusSizeInBits: 2048,
+				PublicExponent:    expVal,
+				Algorithm:         jwtrsassapkcs1.RS256,
+				KidStrategy:       jwtrsassapkcs1.Base64EncodedKeyIDAsKID,
+			}); err == nil {
+				t.Errorf("jwtrsassapkcs1.NewParameters() error = nil, want error")
+			}
+		})
+	}
+
 }
 
 func TestParametersGetters(t *testing.T) {

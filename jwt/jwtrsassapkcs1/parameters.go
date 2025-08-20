@@ -119,6 +119,9 @@ var _ key.Parameters = (*Parameters)(nil)
 const (
 	// f4 is the public exponent 65537.
 	f4 = 65537
+	// Max exponent for RSA keys used in
+	// https://cs.opensource.google/go/go/+/master:src/crypto/internal/fips140/rsa/rsa.go;l=370;drc=a76cc5a4ecb004616404cac5bb756da293818469
+	maxExponent = 1<<31 - 1
 )
 
 // ParametersOpts represents the options for creating a [Parameters] instance.
@@ -140,10 +143,10 @@ func NewParameters(opts ParametersOpts) (*Parameters, error) {
 	if opts.KidStrategy == UnknownKIDStrategy {
 		return nil, fmt.Errorf("unsupported kid strategy: %v", opts.KidStrategy)
 	}
-	if opts.PublicExponent < f4 {
-		return nil, fmt.Errorf("invalid public exponent: %v, want >= %v", opts.PublicExponent, f4)
+	if opts.PublicExponent < f4 || opts.PublicExponent > maxExponent {
+		return nil, fmt.Errorf("invalid public exponent: %v, want >= %v and <= %v", opts.PublicExponent, f4, maxExponent)
 	}
-	// These are consistent with the checks by tink-java and tink-cc.
+	// To be consistent with tink-java and tink-cc.
 	if opts.PublicExponent%2 != 1 {
 		return nil, fmt.Errorf("invalid public exponent: %v, want odd", opts.PublicExponent)
 	}
