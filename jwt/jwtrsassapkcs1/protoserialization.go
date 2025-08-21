@@ -14,6 +14,7 @@ package jwtrsassapkcs1
 
 import (
 	"fmt"
+	"math/big"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -132,4 +133,108 @@ func (s *parametersParser) Parse(kt *tinkpb.KeyTemplate) (key.Parameters, error)
 		ModulusSizeInBits: int(keyFormat.GetModulusSizeInBits()),
 		PublicExponent:    f4,
 	})
+}
+
+// publicKeyToProto converts a [PublicKey] to a [jwtrsapb.JwtRsaSsaPkcs1PublicKey]
+// proto.
+func publicKeyToProto(k *PublicKey) (*jwtrsapb.JwtRsaSsaPkcs1PublicKey, error) {
+	if k.parameters == nil {
+		return nil, fmt.Errorf("parameters can't be nil")
+	}
+	protoPublicKey := &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+		Version:   0,
+		Algorithm: algorithmToProto(k.parameters.Algorithm()),
+		N:         k.Modulus(),
+		E:         new(big.Int).SetInt64(int64(k.parameters.PublicExponent())).Bytes(),
+	}
+	if k.parameters.KIDStrategy() == CustomKID {
+		kid, hasKID := k.KID()
+		if !hasKID {
+			return nil, fmt.Errorf("CustomKID strategy requires a KID")
+		}
+		protoPublicKey.CustomKid = &jwtrsapb.JwtRsaSsaPkcs1PublicKey_CustomKid{
+			Value: kid,
+		}
+	}
+	return protoPublicKey, nil
+}
+
+type publicKeySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*publicKeySerializer)(nil)
+
+func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	jwtRSAPublicKey, ok := key.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T; needed %T", key, (*PublicKey)(nil))
+	}
+	protoPublicKey, err := publicKeyToProto(jwtRSAPublicKey)
+	if err != nil {
+		return nil, err
+	}
+	serializedPublicKey, err := proto.Marshal(protoPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal %T: %v", protoPublicKey, err)
+	}
+
+	idRequirement, _ := jwtRSAPublicKey.IDRequirement()
+	return protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         publicKeyTypeURL,
+		Value:           serializedPublicKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+	}, outputPrefixTypeFromKIDStrategy(jwtRSAPublicKey.parameters.KIDStrategy()), idRequirement)
+}
+
+// publicKeyFromProto converts a [jwtrsapb.JwtRsaSsaPkcs1PublicKey] proto to a
+// [PublicKey].
+func publicKeyFromProto(protoPublicKey *jwtrsapb.JwtRsaSsaPkcs1PublicKey, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) (*PublicKey, error) {
+	if protoPublicKey.GetVersion() != 0 {
+		return nil, fmt.Errorf("invalid public key version: got %d, want 0", protoPublicKey.GetVersion())
+	}
+	kidStrategy := kidStrategyFromOutputPrefixType(outputPrefixType, protoPublicKey.GetCustomKid() != nil)
+
+	modulusSizeInBits := new(big.Int).SetBytes(protoPublicKey.GetN()).BitLen()
+
+	fmt.Printf("modulusSizeInBits: %v\n", modulusSizeInBits)
+
+	exponent := new(big.Int).SetBytes(protoPublicKey.GetE()).Int64()
+	params, err := NewParameters(ParametersOpts{
+		KidStrategy:       kidStrategy,
+		Algorithm:         algorithmFromProto(protoPublicKey.GetAlgorithm()),
+		ModulusSizeInBits: modulusSizeInBits,
+		PublicExponent:    int(exponent),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return NewPublicKey(PublicKeyOpts{
+		Modulus:       protoPublicKey.GetN(),
+		IDRequirement: idRequirement,
+		HasCustomKID:  protoPublicKey.GetCustomKid() != nil,
+		CustomKID:     protoPublicKey.GetCustomKid().GetValue(),
+		Parameters:    params,
+	})
+}
+
+type publicKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*publicKeyParser)(nil)
+
+func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	if keySerialization == nil {
+		return nil, fmt.Errorf("key serialization can't be nil")
+	}
+	if keySerialization.KeyData().GetTypeUrl() != publicKeyTypeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keySerialization.KeyData().GetTypeUrl(), publicKeyTypeURL)
+	}
+	if keySerialization.KeyData().GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PUBLIC {
+		return nil, fmt.Errorf("invalid key material type: got %v, want %v", keySerialization.KeyData().GetKeyMaterialType(), tinkpb.KeyData_ASYMMETRIC_PUBLIC)
+	}
+
+	publicKeyProto := &jwtrsapb.JwtRsaSsaPkcs1PublicKey{}
+	if err := proto.Unmarshal(keySerialization.KeyData().GetValue(), publicKeyProto); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal %T: %v", err, publicKeyProto)
+	}
+	idRequirement, _ := keySerialization.IDRequirement()
+	return publicKeyFromProto(publicKeyProto, keySerialization.OutputPrefixType(), idRequirement)
 }

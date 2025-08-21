@@ -14,6 +14,7 @@ package jwtrsassapkcs1_test
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -47,6 +48,24 @@ func mustCreateParameters(t *testing.T, kid jwtrsassapkcs1.KIDStrategy, alg jwtr
 		t.Fatalf("jwtrsassapkcs1.NewParameters() err = %v, want nil", err)
 	}
 	return p
+}
+
+func mustNewKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
+	t.Helper()
+	keySerialization, err := protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
+	if err != nil {
+		t.Fatalf("protoserialization.NewKeySerialization() err = %v, want nil", err)
+	}
+	return keySerialization
+}
+
+func mustCreatePublicKey(t *testing.T, opts jwtrsassapkcs1.PublicKeyOpts) *jwtrsassapkcs1.PublicKey {
+	t.Helper()
+	key, err := jwtrsassapkcs1.NewPublicKey(opts)
+	if err != nil {
+		t.Fatalf("jwtrsassapkcs1.NewPublicKey() err = %v, want nil", err)
+	}
+	return key
 }
 
 func TestParametersSerializer(t *testing.T) {
@@ -292,6 +311,283 @@ func TestParametersParser_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := protoserialization.ParseParameters(tc.kt); err == nil {
 				t.Errorf("protoserialization.ParseParameters(%v) error = nil, want error", tc.kt)
+			}
+		})
+	}
+}
+
+type protoserializationPublicKeyTestCase struct {
+	name                   string
+	publicKey              *jwtrsassapkcs1.PublicKey
+	publicKeySerialization *protoserialization.KeySerialization
+}
+
+func TestPublicKeySerializer(t *testing.T) {
+	e := []byte{0x01, 0x00, 0x01}
+	testCases := []*protoserializationPublicKeyTestCase{
+		{
+			name: fmt.Sprintf("%v_%v_TINK", jwtrsassapkcs1.Base64EncodedKeyIDAsKID, jwtrsassapkcs1.RS256),
+			publicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+				Modulus:       mustBase64Decode(t, n2048Base64),
+				IDRequirement: 54321,
+				HasCustomKID:  false,
+				Parameters:    mustCreateParameters(t, jwtrsassapkcs1.Base64EncodedKeyIDAsKID, jwtrsassapkcs1.RS256, 2048),
+			}),
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS256,
+					N:         mustBase64Decode(t, n2048Base64),
+					E:         e,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 54321),
+		},
+		{
+			name: fmt.Sprintf("%v_%v_RAW", jwtrsassapkcs1.IgnoredKID, jwtrsassapkcs1.RS384),
+			publicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+				Modulus:      mustBase64Decode(t, n3072Base64),
+				HasCustomKID: false,
+				Parameters:   mustCreateParameters(t, jwtrsassapkcs1.IgnoredKID, jwtrsassapkcs1.RS384, 3072),
+			}),
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS384,
+					N:         mustBase64Decode(t, n3072Base64),
+					E:         e,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: fmt.Sprintf("%v_%v_RAW", jwtrsassapkcs1.CustomKID, jwtrsassapkcs1.RS512),
+			publicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+				Modulus:      mustBase64Decode(t, n4096Base64),
+				HasCustomKID: true,
+				CustomKID:    "customKID123",
+				Parameters:   mustCreateParameters(t, jwtrsassapkcs1.CustomKID, jwtrsassapkcs1.RS512, 4096),
+			}),
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS512,
+					N:         mustBase64Decode(t, n4096Base64),
+					E:         e,
+					CustomKid: &jwtrsapb.JwtRsaSsaPkcs1PublicKey_CustomKid{Value: "customKID123"},
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			keySerialization, err := protoserialization.SerializeKey(tc.publicKey)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeKey() err = %v, want nil", err)
+			}
+			if diff := cmp.Diff(tc.publicKeySerialization, keySerialization, protocmp.Transform(), cmp.AllowUnexported(protoserialization.KeySerialization{})); diff != "" {
+				t.Errorf("unexpected diff (-want +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestPublicKeyParser(t *testing.T) {
+	e := []byte{0x01, 0x00, 0x01}
+	testCases := []*protoserializationPublicKeyTestCase{
+		{
+			name: fmt.Sprintf("%v_%v_TINK", jwtrsassapkcs1.Base64EncodedKeyIDAsKID, jwtrsassapkcs1.RS256),
+			publicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+				Modulus:       mustBase64Decode(t, n2048Base64),
+				IDRequirement: 54321,
+				HasCustomKID:  false,
+				Parameters:    mustCreateParameters(t, jwtrsassapkcs1.Base64EncodedKeyIDAsKID, jwtrsassapkcs1.RS256, 2048),
+			}),
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS256,
+					N:         mustBase64Decode(t, n2048Base64),
+					E:         e,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 54321),
+		},
+		{
+			name: fmt.Sprintf("%v_%v_RAW", jwtrsassapkcs1.IgnoredKID, jwtrsassapkcs1.RS384),
+			publicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+				Modulus:      mustBase64Decode(t, n3072Base64),
+				HasCustomKID: false,
+				Parameters:   mustCreateParameters(t, jwtrsassapkcs1.IgnoredKID, jwtrsassapkcs1.RS384, 3072),
+			}),
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS384,
+					N:         mustBase64Decode(t, n3072Base64),
+					E:         e,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name: fmt.Sprintf("%v_%v_RAW", jwtrsassapkcs1.CustomKID, jwtrsassapkcs1.RS512),
+			publicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+				Modulus:      mustBase64Decode(t, n4096Base64),
+				HasCustomKID: true,
+				CustomKID:    "customKID123",
+				Parameters:   mustCreateParameters(t, jwtrsassapkcs1.CustomKID, jwtrsassapkcs1.RS512, 4096),
+			}),
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS512,
+					N:         mustBase64Decode(t, n4096Base64),
+					E:         e,
+					CustomKid: &jwtrsapb.JwtRsaSsaPkcs1PublicKey_CustomKid{Value: "customKID123"},
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseKey(tc.publicKeySerialization)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseKey() err = %v, want nil", err)
+			}
+			if diff := cmp.Diff(tc.publicKey, got, protocmp.Transform(), cmp.AllowUnexported(protoserialization.KeySerialization{})); diff != "" {
+				t.Errorf("unexpected diff (-want +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestPublicKeyParser_Errors(t *testing.T) {
+	e := new(big.Int).SetInt64(f4).Bytes()
+	for _, tc := range []struct {
+		name                   string
+		publicKeySerialization *protoserialization.KeySerialization
+	}{
+		{
+			name: "invalid_key_material_type",
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS256,
+					N:         mustBase64Decode(t, n2048Base64),
+					E:         e,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "modulus_too_small",
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS256,
+					N:         mustBase64Decode(t, n2048Base64)[1:],
+					E:         e,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "invalid_exponent_even",
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS256,
+					N:         mustBase64Decode(t, n2048Base64),
+					E:         new(big.Int).SetInt64(f4 + 1).Bytes(),
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "exponent_too_small",
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS256,
+					N:         mustBase64Decode(t, n2048Base64),
+					E:         new(big.Int).SetInt64(f4 - 2).Bytes(),
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "exponent_too_large",
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS256,
+					N:         mustBase64Decode(t, n2048Base64),
+					E:         new(big.Int).Lsh(big.NewInt(1), 31).Bytes(),
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "invalid_version",
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   1,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS256,
+					N:         mustBase64Decode(t, n2048Base64),
+					E:         e,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "unknown_algorithm",
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS_UNKNOWN,
+					N:         mustBase64Decode(t, n2048Base64),
+					E:         e,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "tink_with_custom_kid",
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS256,
+					N:         mustBase64Decode(t, n2048Base64),
+					E:         e,
+					CustomKid: &jwtrsapb.JwtRsaSsaPkcs1PublicKey_CustomKid{Value: "myCustomKID"},
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseKey(tc.publicKeySerialization); err == nil {
+				t.Error("protoserialization.ParseKey() err = nil, want error")
+			} else {
+				t.Logf("protoserialization.ParseKey() err = %v", err)
 			}
 		})
 	}

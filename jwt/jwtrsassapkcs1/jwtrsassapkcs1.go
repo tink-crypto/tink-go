@@ -28,4 +28,10 @@ func init() {
 	if err := protoserialization.RegisterParametersParser(privateKeyTypeURL, &parametersParser{}); err != nil {
 		panic(fmt.Sprintf("protoserialization.RegisterParametersParser() failed: %v", err))
 	}
+	if err := protoserialization.RegisterKeySerializer[*PublicKey](&publicKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("protoserialization.RegisterKeySerializer() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(publicKeyTypeURL, &publicKeyParser{}); err != nil {
+		panic(fmt.Sprintf("protoserialization.RegisterKeyParser() failed: %v", err))
+	}
 }
