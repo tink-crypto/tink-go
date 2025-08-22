@@ -14,6 +14,11 @@
 # limitations under the License.
 ################################################################################
 
+# Generated with openssl rand -hex 10
+echo "==========================================================================="
+echo "Tink Script ID: 2e4a047132d27d9948be (to quickly find the script from logs)"
+echo "==========================================================================="
+
 set -euo pipefail
 
 TINK_GO_PROJECT_PATH="$(pwd)"

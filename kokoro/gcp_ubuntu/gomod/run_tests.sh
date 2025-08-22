@@ -20,6 +20,12 @@
 #
 # CONTAINER_IMAGE="s-docker.pkg.dev/tink-test-infrastructure/linux-tink-go-base:latest" \
 #  sh ./kokoro/gcp_ubuntu/gomod/run_tests.sh
+
+# Generated with openssl rand -hex 10
+echo "==========================================================================="
+echo "Tink Script ID: c0e803678984485c75eb (to quickly find the script from logs)"
+echo "==========================================================================="
+
 set -euo pipefail
 
 RUN_COMMAND_ARGS=()
