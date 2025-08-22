@@ -34,4 +34,10 @@ func init() {
 	if err := protoserialization.RegisterKeyParser(publicKeyTypeURL, &publicKeyParser{}); err != nil {
 		panic(fmt.Sprintf("protoserialization.RegisterKeyParser() failed: %v", err))
 	}
+	if err := protoserialization.RegisterKeySerializer[*PrivateKey](&privateKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("protoserialization.RegisterKeySerializer() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(privateKeyTypeURL, &privateKeyParser{}); err != nil {
+		panic(fmt.Sprintf("protoserialization.RegisterKeyParser() failed: %v", err))
+	}
 }

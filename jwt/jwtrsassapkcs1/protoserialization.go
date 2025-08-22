@@ -17,8 +17,10 @@ import (
 	"math/big"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 
 	jwtrsapb "github.com/tink-crypto/tink-go/v2/proto/jwt_rsa_ssa_pkcs1_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -237,4 +239,97 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	}
 	idRequirement, _ := keySerialization.IDRequirement()
 	return publicKeyFromProto(publicKeyProto, keySerialization.OutputPrefixType(), idRequirement)
+}
+
+type privateKeySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*privateKeySerializer)(nil)
+
+func (s *privateKeySerializer) SerializeKey(k key.Key) (*protoserialization.KeySerialization, error) {
+	jwtRSAPrivateKey, ok := k.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("key is of type %T; needed %T", k, (*PrivateKey)(nil))
+	}
+	if jwtRSAPrivateKey.publicKey == nil {
+		return nil, fmt.Errorf("public key can't be nil")
+	}
+	publicKeyProto, err := publicKeyToProto(jwtRSAPrivateKey.publicKey)
+	if err != nil {
+		return nil, err
+	}
+	protoPrivateKey := &jwtrsapb.JwtRsaSsaPkcs1PrivateKey{
+		Version:   0,
+		PublicKey: publicKeyProto,
+		D:         jwtRSAPrivateKey.D().Data(insecuresecretdataaccess.Token{}),
+		P:         jwtRSAPrivateKey.P().Data(insecuresecretdataaccess.Token{}),
+		Q:         jwtRSAPrivateKey.Q().Data(insecuresecretdataaccess.Token{}),
+		Dp:        jwtRSAPrivateKey.DP().Data(insecuresecretdataaccess.Token{}),
+		Dq:        jwtRSAPrivateKey.DQ().Data(insecuresecretdataaccess.Token{}),
+		Crt:       jwtRSAPrivateKey.QInv().Data(insecuresecretdataaccess.Token{}),
+	}
+	serializedPrivateKey, err := proto.Marshal(protoPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal %T: %v", protoPrivateKey, err)
+	}
+	idRequirement, _ := jwtRSAPrivateKey.IDRequirement()
+	return protoserialization.NewKeySerialization(&tinkpb.KeyData{
+		TypeUrl:         privateKeyTypeURL,
+		Value:           serializedPrivateKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}, outputPrefixTypeFromKIDStrategy(jwtRSAPrivateKey.publicKey.parameters.KIDStrategy()), idRequirement)
+}
+
+func removeLeadingZeros(keyBytes []byte) []byte {
+	return new(big.Int).SetBytes(keyBytes).Bytes()
+}
+
+type privateKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*privateKeyParser)(nil)
+
+func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	if keySerialization == nil {
+		return nil, fmt.Errorf("key serialization can't be nil")
+	}
+	if keySerialization.KeyData().GetTypeUrl() != privateKeyTypeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keySerialization.KeyData().GetTypeUrl(), privateKeyTypeURL)
+	}
+	if keySerialization.KeyData().GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PRIVATE {
+		return nil, fmt.Errorf("invalid key material type: got %v, want %v", keySerialization.KeyData().GetKeyMaterialType(), tinkpb.KeyData_ASYMMETRIC_PRIVATE)
+	}
+	privateKeyProto := &jwtrsapb.JwtRsaSsaPkcs1PrivateKey{}
+	if err := proto.Unmarshal(keySerialization.KeyData().GetValue(), privateKeyProto); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal %T: %v", privateKeyProto, err)
+	}
+	idRequirement, _ := keySerialization.IDRequirement()
+	outputPrefixType := keySerialization.OutputPrefixType()
+
+	if privateKeyProto.GetVersion() != 0 {
+		return nil, fmt.Errorf("invalid private key version: got %d, want 0", privateKeyProto.GetVersion())
+	}
+	publicKey, err := publicKeyFromProto(privateKeyProto.GetPublicKey(), outputPrefixType, idRequirement)
+	if err != nil {
+		return nil, err
+	}
+	privateKey, err := NewPrivateKey(PrivateKeyOpts{
+		PublicKey: publicKey,
+		D:         secretdata.NewBytesFromData(removeLeadingZeros(privateKeyProto.GetD()), insecuresecretdataaccess.Token{}),
+		P:         secretdata.NewBytesFromData(removeLeadingZeros(privateKeyProto.GetP()), insecuresecretdataaccess.Token{}),
+		Q:         secretdata.NewBytesFromData(removeLeadingZeros(privateKeyProto.GetQ()), insecuresecretdataaccess.Token{}),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Make sure the computed values match the ones in the proto.
+	if !privateKey.DP().Equal(secretdata.NewBytesFromData(removeLeadingZeros(privateKeyProto.GetDp()), insecuresecretdataaccess.Token{})) {
+		return nil, fmt.Errorf("private key DP doesn't match")
+	}
+	if !privateKey.DQ().Equal(secretdata.NewBytesFromData(removeLeadingZeros(privateKeyProto.GetDq()), insecuresecretdataaccess.Token{})) {
+		return nil, fmt.Errorf("private key DQ doesn't match")
+	}
+	if !privateKey.QInv().Equal(secretdata.NewBytesFromData(removeLeadingZeros(privateKeyProto.GetCrt()), insecuresecretdataaccess.Token{})) {
+		return nil, fmt.Errorf("private key QInv doesn't match")
+	}
+	return privateKey, nil
 }
