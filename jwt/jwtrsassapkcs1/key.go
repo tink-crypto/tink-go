@@ -16,12 +16,15 @@ package jwtrsassapkcs1
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"math/big"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
 // PublicKey represents a public key for JWT RSA SSA PKCS1 signing.
@@ -130,4 +133,100 @@ func (k *PublicKey) Equal(other key.Key) bool {
 		bytes.Equal(k.modulus, that.modulus) &&
 		k.idRequirement == that.idRequirement &&
 		k.kid == that.kid && k.hasKID == that.hasKID
+}
+
+// PrivateKey represents a private key for JWT RSA SSA PKCS1 signing.
+type PrivateKey struct {
+	publicKey  *PublicKey
+	privateKey *rsa.PrivateKey
+}
+
+// PrivateKeyOpts are [PrivateKey] options.
+type PrivateKeyOpts struct {
+	PublicKey *PublicKey
+	D         secretdata.Bytes
+	P         secretdata.Bytes
+	Q         secretdata.Bytes
+	// dp, dq and QInv must be computed by the Go library.
+	// See https://pkg.go.dev/crypto/rsa#PrivateKey.
+}
+
+// NewPrivateKey creates a new JWT RSA SSA PKCS1 private key.
+func NewPrivateKey(opts PrivateKeyOpts) (*PrivateKey, error) {
+	if opts.PublicKey == nil {
+		return nil, fmt.Errorf("jwtrsassapkcs1.NewPrivateKey: public key cannot be nil")
+	}
+	privateKey := rsa.PrivateKey{
+		PublicKey: rsa.PublicKey{
+			N: new(big.Int).SetBytes(opts.PublicKey.Modulus()),
+			E: opts.PublicKey.Parameters().(*Parameters).PublicExponent(),
+		},
+		D: new(big.Int).SetBytes(opts.D.Data(insecuresecretdataaccess.Token{})),
+		Primes: []*big.Int{
+			new(big.Int).SetBytes(opts.P.Data(insecuresecretdataaccess.Token{})),
+			new(big.Int).SetBytes(opts.Q.Data(insecuresecretdataaccess.Token{})),
+		},
+	}
+	if err := privateKey.Validate(); err != nil {
+		return nil, fmt.Errorf("jwtrsassapkcs1.NewPrivateKey: %v", err)
+	}
+	// We don't use opts.DP, opts.DQ, opts.QI directly, because rsa.PrivateKey.Validate()
+	// does not check if they are correct. Instead, we call Precompute() to derive
+	// them from P, Q and D, and then use the derived values. This ensures that the
+	// precomputed values are correct.
+	privateKey.Precompute()
+
+	return &PrivateKey{
+		publicKey:  opts.PublicKey,
+		privateKey: &privateKey,
+	}, nil
+}
+
+// Parameters returns the parameters of the key.
+func (k *PrivateKey) Parameters() key.Parameters { return k.publicKey.Parameters() }
+
+// PublicKey returns the public key.
+func (k *PrivateKey) PublicKey() (key.Key, error) { return k.publicKey, nil }
+
+// IDRequirement returns the ID requirement for this key.
+func (k *PrivateKey) IDRequirement() (uint32, bool) { return k.publicKey.IDRequirement() }
+
+// D returns the private exponent D.
+func (k *PrivateKey) D() secretdata.Bytes {
+	return secretdata.NewBytesFromData(k.privateKey.D.Bytes(), insecuresecretdataaccess.Token{})
+}
+
+// P returns the prime factor P.
+func (k *PrivateKey) P() secretdata.Bytes {
+	return secretdata.NewBytesFromData(k.privateKey.Primes[0].Bytes(), insecuresecretdataaccess.Token{})
+}
+
+// Q returns the prime factor Q.
+func (k *PrivateKey) Q() secretdata.Bytes {
+	return secretdata.NewBytesFromData(k.privateKey.Primes[1].Bytes(), insecuresecretdataaccess.Token{})
+}
+
+// DP returns the private prime factor P-1.
+func (k *PrivateKey) DP() secretdata.Bytes {
+	return secretdata.NewBytesFromData(k.privateKey.Precomputed.Dp.Bytes(), insecuresecretdataaccess.Token{})
+}
+
+// DQ returns the private prime factor Q-1.
+func (k *PrivateKey) DQ() secretdata.Bytes {
+	return secretdata.NewBytesFromData(k.privateKey.Precomputed.Dq.Bytes(), insecuresecretdataaccess.Token{})
+}
+
+// QInv returns the inverse of Q.
+func (k *PrivateKey) QInv() secretdata.Bytes {
+	return secretdata.NewBytesFromData(k.privateKey.Precomputed.Qinv.Bytes(), insecuresecretdataaccess.Token{})
+}
+
+// Equal returns true if k and other are equal.
+// Note that the comparison is not constant time.
+func (k *PrivateKey) Equal(other key.Key) bool {
+	that, ok := other.(*PrivateKey)
+	if !ok {
+		return false
+	}
+	return ok && k.publicKey.Equal(that.publicKey) && k.privateKey.Equal(that.privateKey)
 }

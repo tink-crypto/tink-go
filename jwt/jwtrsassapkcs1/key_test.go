@@ -22,7 +22,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
 const (
@@ -433,6 +435,409 @@ func TestNewPublicKey_Errors(t *testing.T) {
 				t.Errorf("NewPublicKey(%v) err = nil, want error", tc.opts)
 			} else {
 				t.Logf("NewPublicKey(%v) err = %v", tc.opts, err)
+			}
+		})
+	}
+}
+
+type privateKeyTestCase struct {
+	name string
+	opts jwtrsassapkcs1.PrivateKeyOpts
+	// Derived values.
+	wantDP   secretdata.Bytes
+	wantDQ   secretdata.Bytes
+	wantQInv secretdata.Bytes
+}
+
+func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
+	var tcs []privateKeyTestCase
+
+	type keyMaterial struct {
+		n, d, p, q, dp, dq, qInv string
+		size                     int
+	}
+	keyMaterials := []keyMaterial{
+		{n2048Base64, d2048Base64, p2048Base64, q2048Base64, dp2048Base64, dq2048Base64, qInv2048Base64, 2048},
+		{n3072Base64, d3072Base64, p3072Base64, q3072Base64, dp3072Base64, dq3072Base64, qInv3072Base64, 3072},
+		{n4096Base64, d4096Base64, p4096Base64, q4096Base64, dp4096Base64, dq4096Base64, qInv4096Base64, 4096},
+	}
+
+	for _, algorithm := range []jwtrsassapkcs1.Algorithm{jwtrsassapkcs1.RS256, jwtrsassapkcs1.RS384, jwtrsassapkcs1.RS512} {
+		for _, km := range keyMaterials {
+			decodedD := mustBase64Decode(t, km.d)
+			decodedP := mustBase64Decode(t, km.p)
+			decodedQ := mustBase64Decode(t, km.q)
+			decodedDP := mustBase64Decode(t, km.dp)
+			decodedDQ := mustBase64Decode(t, km.dq)
+			decodedQInv := mustBase64Decode(t, km.qInv)
+
+			for _, kidStrategyAndValues := range []struct {
+				strategy      jwtrsassapkcs1.KIDStrategy
+				idRequirement uint32
+				customKID     string
+				hasCustomKID  bool
+			}{
+				{jwtrsassapkcs1.Base64EncodedKeyIDAsKID, 0x01020304, "", false},
+				{jwtrsassapkcs1.IgnoredKID, 0, "", false},
+				{jwtrsassapkcs1.CustomKID, 0, "test-kid", true},
+			} {
+				pkOpts := jwtrsassapkcs1.PublicKeyOpts{
+					Modulus:       mustBase64Decode(t, km.n),
+					IDRequirement: kidStrategyAndValues.idRequirement,
+					CustomKID:     kidStrategyAndValues.customKID,
+					HasCustomKID:  kidStrategyAndValues.hasCustomKID,
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: km.size,
+						PublicExponent:    f4,
+						Algorithm:         algorithm,
+						KidStrategy:       kidStrategyAndValues.strategy,
+					}),
+				}
+				pk := mustCreatePublicKey(t, pkOpts)
+
+				tcs = append(tcs, privateKeyTestCase{
+					name: fmt.Sprintf("%s_%d_%s", algorithm, km.size, kidStrategyAndValues.strategy),
+					opts: jwtrsassapkcs1.PrivateKeyOpts{
+						PublicKey: pk,
+						D:         secretdata.NewBytesFromData(decodedD, insecuresecretdataaccess.Token{}),
+						P:         secretdata.NewBytesFromData(decodedP, insecuresecretdataaccess.Token{}),
+						Q:         secretdata.NewBytesFromData(decodedQ, insecuresecretdataaccess.Token{}),
+					},
+					wantDP:   secretdata.NewBytesFromData(decodedDP, insecuresecretdataaccess.Token{}),
+					wantDQ:   secretdata.NewBytesFromData(decodedDQ, insecuresecretdataaccess.Token{}),
+					wantQInv: secretdata.NewBytesFromData(decodedQInv, insecuresecretdataaccess.Token{}),
+				})
+			}
+		}
+	}
+	return tcs
+}
+
+func TestPrivateKey(t *testing.T) {
+	for _, tc := range privateKeyTestCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			privKey, err := jwtrsassapkcs1.NewPrivateKey(tc.opts)
+			if err != nil {
+				t.Fatalf("NewPrivateKey(%v) failed: %v", tc.opts, err)
+			}
+
+			// Test getters
+			if !privKey.Parameters().Equal(tc.opts.PublicKey.Parameters()) {
+				t.Errorf("privKey.Parameters() = %v, want %v", privKey.Parameters(), tc.opts.PublicKey.Parameters())
+			}
+			pubKey, err := privKey.PublicKey()
+			if err != nil {
+				t.Fatalf("privKey.PublicKey() failed: %v", err)
+			}
+			if !pubKey.Equal(tc.opts.PublicKey) {
+				t.Errorf("privKey.PublicKey() = %v, want %v", pubKey, tc.opts.PublicKey)
+			}
+			idReq, hasIDReq := privKey.IDRequirement()
+			wantIDReq, wantHasIDReq := tc.opts.PublicKey.IDRequirement()
+			if idReq != wantIDReq || hasIDReq != wantHasIDReq {
+				t.Errorf("privKey.IDRequirement() = %v, %v, want %v, %v", idReq, hasIDReq, wantIDReq, wantHasIDReq)
+			}
+
+			if diff := cmp.Diff(tc.opts.D, privKey.D()); diff != "" {
+				t.Errorf("privKey.D() mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.opts.P, privKey.P()); diff != "" {
+				t.Errorf("privKey.P() mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.opts.Q, privKey.Q()); diff != "" {
+				t.Errorf("privKey.Q() mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantDP, privKey.DP()); diff != "" {
+				t.Errorf("privKey.DP() mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantDQ, privKey.DQ()); diff != "" {
+				t.Errorf("privKey.DQ() mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantQInv, privKey.QInv()); diff != "" {
+				t.Errorf("privKey.QInv() mismatch (-want +got):\n%s", diff)
+			}
+
+			// Test equality with a newly created key from the same options
+			privKey2, err := jwtrsassapkcs1.NewPrivateKey(tc.opts)
+			if err != nil {
+				t.Fatalf("NewPrivateKey(%v) failed: %v", tc.opts, err)
+			}
+			if !privKey.Equal(privKey2) {
+				t.Errorf("privKey.Equal(privKey2) = false, want true")
+			}
+			if !privKey2.Equal(privKey) {
+				t.Errorf("privKey2.Equal(privKey) = false, want true")
+			}
+		})
+	}
+}
+
+func TestPrivateKeyEqual_Different(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		pk1  *jwtrsassapkcs1.PrivateKey
+		pk2  *jwtrsassapkcs1.PrivateKey
+	}{
+		{
+			name: "DifferentKey",
+			pk1: mustCreatePrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustBase64Decode(t, n2048Base64),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.Base64EncodedKeyIDAsKID,
+					}),
+					IDRequirement: 0x01020304,
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			}),
+			pk2: mustCreatePrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustStringToBigInt(t, n2048BigInt16, 16).Bytes(),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.Base64EncodedKeyIDAsKID,
+					}),
+					IDRequirement: 0x01020304,
+				}),
+				D: secretdata.NewBytesFromData(mustStringToBigInt(t, d2048BigInt10, 10).Bytes(), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustStringToBigInt(t, p2048BigInt10, 10).Bytes(), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustStringToBigInt(t, q2048BigInt10, 10).Bytes(), insecuresecretdataaccess.Token{}),
+			}),
+		},
+		{
+			name: "DifferentIDRequirement",
+			pk1: mustCreatePrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustBase64Decode(t, n2048Base64),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.Base64EncodedKeyIDAsKID,
+					}),
+					IDRequirement: 0x01020304,
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			}),
+			pk2: mustCreatePrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustBase64Decode(t, n2048Base64),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.Base64EncodedKeyIDAsKID,
+					}),
+					IDRequirement: 0x020304005,
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			}),
+		},
+		{
+			name: "DifferentKIDStrategy",
+			pk1: mustCreatePrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustBase64Decode(t, n2048Base64),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.CustomKID,
+					}),
+					HasCustomKID:  true,
+					IDRequirement: 0,
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			}),
+			pk2: mustCreatePrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustBase64Decode(t, n2048Base64),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+					IDRequirement: 0,
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			}),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.pk1.Equal(tc.pk2) {
+				t.Errorf("tc.pk1.Equal(tc.pk2) = true, want false")
+			}
+			if tc.pk2.Equal(tc.pk1) {
+				t.Errorf("tc.pk2.Equal(tc.pk1) = true, want false")
+			}
+		})
+	}
+}
+
+func mustCreatePrivateKey(t *testing.T, opts jwtrsassapkcs1.PrivateKeyOpts) *jwtrsassapkcs1.PrivateKey {
+	t.Helper()
+	pk, err := jwtrsassapkcs1.NewPrivateKey(opts)
+	if err != nil {
+		t.Fatalf("jwtrsassapkcs1.NewPrivateKey(%v) failed: %v", opts, err)
+	}
+	return pk
+}
+
+func TestNewPrivateKey_Errors(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts jwtrsassapkcs1.PrivateKeyOpts
+	}{
+		{
+			name: "NilPublicKey",
+			opts: jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: nil,
+				D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			},
+		},
+		{
+			name: "InvalidPrivateKey_WrongSizeD",
+			opts: jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustBase64Decode(t, n2048Base64),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), insecuresecretdataaccess.Token{}), // Wrong size D
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			},
+		},
+		{
+			name: "InvalidPrivateKey_MismatchedD",
+			opts: jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustBase64Decode(t, n2048Base64),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+				}),
+				D: secretdata.NewBytesFromData(mustStringToBigInt(t, d2048BigInt10, 10).Bytes(), insecuresecretdataaccess.Token{}), // Mismatched D
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			},
+		},
+		{
+			name: "InvalidPrivateKey_WrongSizeP",
+			opts: jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustBase64Decode(t, n2048Base64),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}), // Wrong size P
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			},
+		},
+		{
+			name: "InvalidPrivateKey_MismatchedP",
+			opts: jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustBase64Decode(t, n2048Base64),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustStringToBigInt(t, p2048BigInt10, 10).Bytes(), insecuresecretdataaccess.Token{}), // Mismatched P
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			},
+		},
+		{
+			name: "InvalidPrivateKey_WrongSizeQ",
+			opts: jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustBase64Decode(t, n2048Base64),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}), // Wrong size Q
+			},
+		},
+		{
+			name: "InvalidPrivateKey_MismatchedQ",
+			opts: jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustBase64Decode(t, n2048Base64),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustStringToBigInt(t, q2048BigInt10, 10).Bytes(), insecuresecretdataaccess.Token{}), // Mismatched Q
+			},
+		},
+		{
+			name: "IncompatiblePublicKey",
+			opts: jwtrsassapkcs1.PrivateKeyOpts{
+				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Modulus: mustStringToBigInt(t, n2048BigInt16, 16).Bytes(),
+					Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    f4,
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := jwtrsassapkcs1.NewPrivateKey(tc.opts); err == nil {
+				t.Errorf("NewPrivateKey(%v) err = nil, want error", tc.opts)
+			} else {
+				t.Logf("NewPrivateKey(%v) err = %v", tc.opts, err)
 			}
 		})
 	}
