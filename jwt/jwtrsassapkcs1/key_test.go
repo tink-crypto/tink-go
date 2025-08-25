@@ -362,6 +362,19 @@ func TestNewPublicKey_Errors(t *testing.T) {
 			},
 		},
 		{
+			name: "IDRequirementRequiredButNotSet",
+			opts: jwtrsassapkcs1.PublicKeyOpts{
+				Modulus: mustBase64Decode(t, n2048Base64),
+				Parameters: mustCreateParametersFromOpts(t, jwtrsassapkcs1.ParametersOpts{
+					ModulusSizeInBits: 2048,
+					PublicExponent:    f4,
+					Algorithm:         jwtrsassapkcs1.RS256,
+					KidStrategy:       jwtrsassapkcs1.Base64EncodedKeyIDAsKID,
+				}),
+				IDRequirement: 0,
+			},
+		},
+		{
 			name: "InvalidModulusBitLength",
 			opts: jwtrsassapkcs1.PublicKeyOpts{
 				Modulus: mustBase64Decode(t, n3072Base64),

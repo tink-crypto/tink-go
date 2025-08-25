@@ -83,6 +83,9 @@ func NewPublicKey(opts PublicKeyOpts) (*PublicKey, error) {
 	if !opts.Parameters.HasIDRequirement() && opts.IDRequirement != 0 {
 		return nil, fmt.Errorf("jwtrsassapkcs1.NewPublicKey: ID requirement must be 0 if ID is not required")
 	}
+	if opts.Parameters.HasIDRequirement() && opts.IDRequirement == 0 {
+		return nil, fmt.Errorf("jwtrsassapkcs1.NewPublicKey: ID requirement must not be 0 if ID is required")
+	}
 
 	modulusBigInt := new(big.Int).SetBytes(opts.Modulus)
 	if modulusBigInt.BitLen() != opts.Parameters.ModulusSizeInBits() {
