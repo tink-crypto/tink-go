@@ -15,3 +15,30 @@
 // Package jwtrsassapss defines parameters and keys for the JWT-RSA-SSA-PSS
 // algorithm.
 package jwtrsassapss
+
+import (
+	"fmt"
+
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+)
+
+func init() {
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
+		panic(fmt.Sprintf("protoserialization.RegisterParametersSerializer() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(privateKeyTypeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("protoserialization.RegisterParametersParser() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*PublicKey](&publicKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("protoserialization.RegisterKeySerializer() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(publicKeyTypeURL, &publicKeyParser{}); err != nil {
+		panic(fmt.Sprintf("protoserialization.RegisterKeyParser() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*PrivateKey](&privateKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("protoserialization.RegisterKeySerializer() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(privateKeyTypeURL, &privateKeyParser{}); err != nil {
+		panic(fmt.Sprintf("protoserialization.RegisterKeyParser() failed: %v", err))
+	}
+}

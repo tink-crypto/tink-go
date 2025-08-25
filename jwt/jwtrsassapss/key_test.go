@@ -427,15 +427,6 @@ func TestNewPublicKey_Errors(t *testing.T) {
 	}
 }
 
-func mustCreatePublicKey(t *testing.T, opts jwtrsassapss.PublicKeyOpts) *jwtrsassapss.PublicKey {
-	t.Helper()
-	key, err := jwtrsassapss.NewPublicKey(opts)
-	if err != nil {
-		t.Fatalf("jwtrsassapss.NewPublicKey() err = %v, want nil", err)
-	}
-	return key
-}
-
 type privateKeyTestCase struct {
 	name string
 	opts jwtrsassapss.PrivateKeyOpts
