@@ -197,8 +197,6 @@ func publicKeyFromProto(protoPublicKey *jwtrsapb.JwtRsaSsaPkcs1PublicKey, output
 
 	modulusSizeInBits := new(big.Int).SetBytes(protoPublicKey.GetN()).BitLen()
 
-	fmt.Printf("modulusSizeInBits: %v\n", modulusSizeInBits)
-
 	exponent := new(big.Int).SetBytes(protoPublicKey.GetE()).Int64()
 	params, err := NewParameters(ParametersOpts{
 		KidStrategy:       kidStrategy,
