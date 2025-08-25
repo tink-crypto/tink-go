@@ -15,7 +15,7 @@
 package jwt
 
 import (
-	"github.com/tink-crypto/tink-go/v2/jwt/internal"
+	"github.com/tink-crypto/tink-go/v2/internal/jwk"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 )
 
@@ -24,12 +24,12 @@ import (
 // public keys for algorithms ES256, ES384, ES512, RS256, RS384, and RS512 are supported.
 // JWK is defined in https://www.rfc-editor.org/rfc/rfc7517.txt.
 func JWKSetToPublicKeysetHandle(jwkSet []byte) (*keyset.Handle, error) {
-	return internal.JWKSetToPublicKeysetHandle(jwkSet, internal.Ed25519SupportNone)
+	return jwk.ToPublicKeysetHandle(jwkSet, jwk.Ed25519SupportNone)
 }
 
 // JWKSetFromPublicKeysetHandle converts a Tink KeysetHandle with JWT keys into a Json Web Key (JWK) set.
 // Currently only public keys for algorithms ES256, ES384, ES512, RS256, RS384, and RS512 are supported.
 // JWK is defined in https://www.rfc-editor.org/rfc/rfc7517.html.
 func JWKSetFromPublicKeysetHandle(kh *keyset.Handle) ([]byte, error) {
-	return internal.JWKSetFromPublicKeysetHandle(kh, internal.Ed25519SupportNone)
+	return jwk.FromPublicKeysetHandle(kh, jwk.Ed25519SupportNone)
 }

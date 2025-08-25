@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package jwk_test
 
 import (
 	"testing"
@@ -20,6 +20,7 @@ import (
 	spb "google.golang.org/protobuf/types/known/structpb"
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/testing/protocmp"
+	"github.com/tink-crypto/tink-go/v2/internal/jwk"
 )
 
 func TestEd25519KeyConversion(t *testing.T) {
@@ -37,15 +38,15 @@ func TestEd25519KeyConversion(t *testing.T) {
 	}`
 
 	// Convert JWK Set to KeysetHandle
-	handle, err := JWKSetToPublicKeysetHandle([]byte(jwkSet), Ed25519SupportTink)
+	handle, err := jwk.ToPublicKeysetHandle([]byte(jwkSet), jwk.Ed25519SupportTink)
 	if err != nil {
-		t.Fatalf("JWKSetToPublicKeysetHandle() err = %v, want nil", err)
+		t.Fatalf("ToPublicKeysetHandle() err = %v, want nil", err)
 	}
 
 	// Convert KeysetHandle back to JWK Set
-	gotJWKSet, err := JWKSetFromPublicKeysetHandle(handle, Ed25519SupportTink)
+	gotJWKSet, err := jwk.FromPublicKeysetHandle(handle, jwk.Ed25519SupportTink)
 	if err != nil {
-		t.Fatalf("JWKSetFromPublicKeysetHandle() err = %v, want nil", err)
+		t.Fatalf("FromPublicKeysetHandle() err = %v, want nil", err)
 	}
 
 	// Compare the original and converted JWK Sets
@@ -78,20 +79,20 @@ func TestEd25519KeyConversionNotSupported(t *testing.T) {
 	}`
 
 	// Attempt to convert JWK Set to KeysetHandle with Ed25519SupportNone
-	_, err := JWKSetToPublicKeysetHandle([]byte(jwkSet), Ed25519SupportNone)
+	_, err := jwk.ToPublicKeysetHandle([]byte(jwkSet), jwk.Ed25519SupportNone)
 	if err == nil {
-		t.Fatalf("JWKSetToPublicKeysetHandle() err = nil, want error")
+		t.Fatalf("ToPublicKeysetHandle() err = nil, want error")
 	}
 
 	// Convert JWK Set to KeysetHandle
-	handle, err := JWKSetToPublicKeysetHandle([]byte(jwkSet), Ed25519SupportTink)
+	handle, err := jwk.ToPublicKeysetHandle([]byte(jwkSet), jwk.Ed25519SupportTink)
 	if err != nil {
-		t.Fatalf("JWKSetToPublicKeysetHandle() err = %v, want nil", err)
+		t.Fatalf("ToPublicKeysetHandle() err = %v, want nil", err)
 	}
 
 	// Attempt to convert KeysetHandle back to JWK Set with Ed25519SupportNone
-	_, err = JWKSetFromPublicKeysetHandle(handle, Ed25519SupportNone)
+	_, err = jwk.FromPublicKeysetHandle(handle, jwk.Ed25519SupportNone)
 	if err == nil {
-		t.Fatalf("JWKSetFromPublicKeysetHandle() err = nil, want error")
+		t.Fatalf("FromPublicKeysetHandle() err = nil, want error")
 	}
 }

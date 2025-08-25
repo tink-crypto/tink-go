@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package internal provides functions to convert between JWK and Tink keysets.
-package internal
+// Package jwk provides functions to convert between JWK and Tink keysets.
+package jwk
 
 import (
 	"bytes"
@@ -37,7 +37,8 @@ const (
 	jwtECDSAPublicKeyType = "type.googleapis.com/google.crypto.tink.JwtEcdsaPublicKey"
 	jwtRSPublicKeyType    = "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey"
 	jwtPSPublicKeyType    = "type.googleapis.com/google.crypto.tink.JwtRsaSsaPssPublicKey"
-	ed25519PublicKeyType  = "type.googleapis.com/google.crypto.tink.Ed25519PublicKey"
+
+	ed25519PublicKeyType = "type.googleapis.com/google.crypto.tink.Ed25519PublicKey"
 )
 
 // Ed25519SupportType is an enum to control Ed25519 key conversion.
@@ -435,13 +436,13 @@ func keysetKeyFromStruct(val *spb.Value, keyID uint32, ed25519Support Ed25519Sup
 	}, nil
 }
 
-// JWKSetToPublicKeysetHandle converts a Json Web Key (JWK) set into a Tink KeysetHandle.
+// ToPublicKeysetHandle converts a Json Web Key (JWK) set into a Tink public KeysetHandle.
 // It requires that all keys in the set have the "alg" field set. Currently, only
 // public keys for algorithms ES256, ES384, ES512, RS256, RS384, RS512 are supported.
 // Ed25519 is supported, but it will return a Tink Verification Key instead of JWT verification.
 // TODO - b/436348879: separate JWK Signature and JWT conversions.
 // JWK is defined in https://www.rfc-editor.org/rfc/rfc7517.txt.
-func JWKSetToPublicKeysetHandle(jwkSet []byte, ed25519Support Ed25519SupportType) (*keyset.Handle, error) {
+func ToPublicKeysetHandle(jwkSet []byte, ed25519Support Ed25519SupportType) (*keyset.Handle, error) {
 	jwk := &spb.Struct{}
 	if err := jwk.UnmarshalJSON(jwkSet); err != nil {
 		return nil, err
@@ -632,12 +633,12 @@ func setKeyID(outKey *spb.Struct, key *tinkpb.Keyset_Key, customKID *string) err
 	return nil
 }
 
-// JWKSetFromPublicKeysetHandle converts a Tink KeysetHandle with JWT keys into a Json Web Key (JWK) set.
+// FromPublicKeysetHandle converts a Tink KeysetHandle into a Json Web Key (JWK) set.
 // Currently only public keys for algorithms ES256, ES384, ES512, RS256, RS384, RS512 are supported.
 // Ed25519 is supported, but it will return a Tink Verification Key instead of JWT verification.
 // TODO - b/436348879: separate JWK Signature and JWT conversions.
 // JWK is defined in https://www.rfc-editor.org/rfc/rfc7517.html.
-func JWKSetFromPublicKeysetHandle(kh *keyset.Handle, ed25519Support Ed25519SupportType) ([]byte, error) {
+func FromPublicKeysetHandle(kh *keyset.Handle, ed25519Support Ed25519SupportType) ([]byte, error) {
 	b := &bytes.Buffer{}
 	if err := kh.WriteWithNoSecrets(keyset.NewBinaryWriter(b)); err != nil {
 		return nil, err
