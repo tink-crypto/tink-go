@@ -709,6 +709,10 @@ func TestJWKSetToPublicKeysetInvalidPS256JWKSet(t *testing.T) {
 	}
 }
 
+// Taken from:
+// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/rsa_pkcs1_2048_test.json#L13
+const n2048Base64 = "s1EKK81M5kTFtZSuUFnhKy8FS2WNXaWVmi_fGHG4CLw98-Yo0nkuUarVwSS0O9pFPcpc3kvPKOe9Tv-6DLS3Qru21aATy2PRqjqJ4CYn71OYtSwM_ZfSCKvrjXybzgu-sBmobdtYm-sppbdL-GEHXGd8gdQw8DDCZSR6-dPJFAzLZTCdB-Ctwe_RXPF-ewVdfaOGjkZIzDoYDw7n-OHnsYCYozkbTOcWHpjVevipR-IBpGPi1rvKgFnlcG6d_tj0hWRl_6cS7RqhjoiNEtxqoJzpXs_Kg8xbCxXbCchkf11STA8udiCjQWuWI8rcDwl69XMmHJjIQAqhKvOOQ8rYTQ"
+
 func TestJWKSetToPublicKeysetPrimitiveRS256SmallModulusFails(t *testing.T) {
 	jwk := `{"keys":[
 		{"kty":"RSA",
@@ -722,25 +726,22 @@ func TestJWKSetToPublicKeysetPrimitiveRS256SmallModulusFails(t *testing.T) {
 	}`
 	// Keys in the keyset are validated when the primitive is generated.
 	// JWKSetToPublicKeysetHandle but NewVerifier will fail.
-	pubHandle, err := jwt.JWKSetToPublicKeysetHandle([]byte(jwk))
-	if err != nil {
-		t.Fatalf("jwt.JWKSetToPublicKeysetHandle() err = %v, want nil", err)
-	}
-	if _, err := jwt.NewVerifier(pubHandle); err == nil {
-		t.Errorf("jwt.NewVerifier() err = nil, want error")
+	if _, err := jwt.JWKSetToPublicKeysetHandle([]byte(jwk)); err == nil {
+		t.Fatalf("jwt.JWKSetToPublicKeysetHandle() err = nil, want error")
 	}
 }
 
 func TestJWKSetToPublicKeysetRS256CorrectlySetsKID(t *testing.T) {
-	jwkSet := `{"keys":[
+	jwkSet := fmt.Sprintf(`{"keys":[
       {"kty":"RSA",
-       "n":"AQAB",
+       "n":"%s",
        "e":"AQAB",
        "use":"sig",
        "alg":"RS256",
        "key_ops":["verify"],
        "kid":"DfpE4Q"
-      }]}`
+      }]
+	}`, n2048Base64)
 	kh, err := jwt.JWKSetToPublicKeysetHandle([]byte(jwkSet))
 	if err != nil {
 		t.Fatalf("JWKSetToPublicKeysetHandle() err = %v, want nil", err)
@@ -763,12 +764,12 @@ func TestJWKSetToPublicKeysetRS256CorrectlySetsKID(t *testing.T) {
 }
 
 func TestJWKSetToPublicKeysetRS256WithoutOptionalFieldsSucceeds(t *testing.T) {
-	jwkSet := `{"keys":[
+	jwkSet := fmt.Sprintf(`{"keys":[
       {"kty":"RSA",
-       "n":"AQAB",
+       "n":"%s",
        "e":"AQAB",
        "alg":"RS256"
-      }]}`
+      }]}`, n2048Base64)
 	if _, err := jwt.JWKSetToPublicKeysetHandle([]byte(jwkSet)); err != nil {
 		t.Fatalf("jwt.JWKSetToPublicKeysetHandle() err = %v, want nil", err)
 	}
@@ -1389,12 +1390,6 @@ func TestJWKSetFromPublicKeysetHandleInvalidKeysetsFails(t *testing.T) {
 		},
 		KeyValue: mustHexDecode(t, p256PrivateKeyHex),
 	})
-	jwtRssaSsaPkcs1PublicKeyWithUnknownAlgorithm := mustMarshal(t, &jrsppb.JwtRsaSsaPkcs1PublicKey{
-		Version:   0,
-		Algorithm: jrsppb.JwtRsaSsaPkcs1Algorithm_RS_UNKNOWN,
-		N:         []byte("00"), // Unsigned big integer in big-endian representation.
-		E:         []byte("01"), // Unsigned big integer in big-endian representation.
-	})
 
 	for _, tc := range []jwkSetTestCase{
 		{
@@ -1421,22 +1416,6 @@ func TestJWKSetFromPublicKeysetHandleInvalidKeysetsFails(t *testing.T) {
 						KeyData: &tinkpb.KeyData{
 							TypeUrl:         "type.googleapis.com/google.crypto.tink.UnknownKey",
 							Value:           []byte("unknown key"),
-							KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
-						},
-						Status:           tinkpb.KeyStatusType_ENABLED,
-						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-					},
-				},
-			}),
-		},
-		{
-			tag: "JwtRsaSsaPkcs1 unknown algorithm", // The algorithm is set in the base64 encoded value of the key data.
-			publicKeyset: mustJSONSerialize(t, &tinkpb.Keyset{
-				Key: []*tinkpb.Keyset_Key{
-					{
-						KeyData: &tinkpb.KeyData{
-							TypeUrl:         "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
-							Value:           jwtRssaSsaPkcs1PublicKeyWithUnknownAlgorithm,
 							KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 						},
 						Status:           tinkpb.KeyStatusType_ENABLED,
