@@ -13,13 +13,20 @@
 // limitations under the License.
 
 // Package slhdsa implements SLH-DSA as specified in NIST FIPS 205 (https://doi.org/10.6028/NIST.FIPS.205).
+// The implementation is constant time assuming that the underlying hashing primitives are constant time.
 package slhdsa
 
-import "math/bits"
+import (
+	"crypto/rand"
+	"fmt"
+	"math/bits"
+	"slices"
+)
 
 type params struct {
 	// SLH-DSA parameters (see Table 2 of the SLH-DSA specification).
-	n   uint32
+	n uint32
+	// Note that h = d * hp.
 	h   uint32
 	d   uint32
 	hp  uint32
@@ -224,3 +231,194 @@ var (
 	// SLH_DSA_SHAKE_256f defines parameters for SLH-DSA-SHAKE-256f.
 	SLH_DSA_SHAKE_256f = newParams(param256f, hashParamShake)
 )
+
+// PublicKey represents an SLH-DSA public key.
+type PublicKey struct {
+	pkSeed []byte
+	pkRoot []byte
+	// Corresponding parameters.
+	p *params
+}
+
+// SecretKey represents an SLH-DSA secret key.
+type SecretKey struct {
+	skSeed []byte
+	skPrf  []byte
+	pkSeed []byte
+	pkRoot []byte
+	// Corresponding parameters.
+	p *params
+}
+
+// Algorithm 18 (slh_keygen_internal).
+func (p *params) slhKeygenInternal(skSeed []byte, skPrf []byte, pkSeed []byte) (*SecretKey, *PublicKey) {
+	// Generate the public key from the top-level XMSS tree.
+	adrs := newAddress()
+	adrs.setLayerAddress(p.d - 1)
+	pkRoot := p.xmssNode(skSeed, 0, p.hp, pkSeed, adrs)
+	return &SecretKey{skSeed, skPrf, pkSeed, pkRoot, p}, &PublicKey{pkSeed, pkRoot, p}
+}
+
+// Algorithm 19 (slh_sign_internal).
+// This generates a signature of the form R || SIG_FORS || SIG_HT, where:
+// - R is a random n-byte string,
+// - SIG_FORS is a k * (1 + a) * n-byte FORS signature of the message digest, and
+// - SIG_HT is a (h + d * len) * n-byte Hypertree signature of the FORS signature and the message digest.
+// Here, addrnd selects between the "hedged" or the "deterministic" variant, depending on whether
+// the caller passes a truly random string or otherwise the pkSeed, respectively.
+func (sk *SecretKey) signInternal(msg []byte, addrnd []byte) []byte {
+	adrs := newAddress()
+	// Generate randomizer.
+	sig := sk.p.hPrfMsg(sk.skPrf, addrnd, msg)
+	// Compute message digest.
+	digest := sk.p.hHMsg(sig, sk.pkSeed, sk.pkRoot, msg)
+	r := (sk.p.k*sk.p.a + 7) / 8
+	s := (sk.p.h - sk.p.hp + 7) / 8
+	t := (sk.p.hp + 7) / 8
+	md := digest[0:r]
+	tmpIdxTree := digest[r : r+s]
+	tmpIdxLeaf := digest[r+s : r+s+t]
+	idxTree := toInt(tmpIdxTree, s)
+	if sk.p.h-sk.p.hp > 64 {
+		panic("unreachable")
+	}
+	// For the 256f parameter sets, h - hp = 64, so mod 2^(h - hp) is equivalent
+	// to masking uint64 idxTree with 0xFFFFFFFFFFFFFFFF, which is a no-op.
+	if sk.p.h-sk.p.hp != 64 {
+		idxTree &= (uint64(1) << (sk.p.h - sk.p.hp)) - uint64(1)
+	}
+	idxLeaf := uint32(toInt(tmpIdxLeaf, t)) & ((1 << sk.p.hp) - 1)
+	adrs.setTreeAddress(idxTree)
+	adrs.setTypeAndClear(addressFORSTree)
+	adrs.setKeyPairAddress(idxLeaf)
+	sigFors := sk.p.forsSign(md, sk.skSeed, sk.pkSeed, adrs)
+	sig = append(sig, sigFors...)
+	// Get FORS key.
+	pkFors := sk.p.forsPkFromSig(sigFors, md, sk.pkSeed, adrs)
+	return append(sig, sk.p.htSign(pkFors, sk.skSeed, sk.pkSeed, idxTree, idxLeaf)...)
+}
+
+// Algorithm 20 (slh_verify_internal).
+func (pk *PublicKey) verifyInternal(msg []byte, sig []byte) error {
+	forsIdx := 1 + pk.p.k*(1+pk.p.a)
+	if len(sig) != int((forsIdx+pk.p.h+pk.p.d*pk.p.len)*pk.p.n) {
+		return fmt.Errorf("invalid signature length")
+	}
+	adrs := newAddress()
+	R := sig[:pk.p.n]
+	sigFors := sig[pk.p.n : forsIdx*pk.p.n]
+	sigHT := sig[forsIdx*pk.p.n:]
+	// Compute message digest.
+	digest := pk.p.hHMsg(R, pk.pkSeed, pk.pkRoot, msg)
+	r := (pk.p.k*pk.p.a + 7) / 8
+	s := (pk.p.h - pk.p.hp + 7) / 8
+	t := (pk.p.hp + 7) / 8
+	md := digest[0:r]
+	tmpIdxTree := digest[r : r+s]
+	tmpIdxLeaf := digest[r+s : r+s+t]
+	idxTree := toInt(tmpIdxTree, s)
+	if pk.p.h-pk.p.hp > 64 {
+		panic("unreachable")
+	}
+	// For the 256f parameter sets, h - hp = 64, so mod 2^(h - hp) is equivalent
+	// to masking uint64 idxTree with 0xFFFFFFFFFFFFFFFF, which is a no-op.
+	if pk.p.h-pk.p.hp != 64 {
+		idxTree &= (uint64(1) << (pk.p.h - pk.p.hp)) - uint64(1)
+	}
+	idxLeaf := uint32(toInt(tmpIdxLeaf, t)) & ((1 << pk.p.hp) - 1)
+	// Compare FORS public key.
+	adrs.setTreeAddress(idxTree)
+	adrs.setTypeAndClear(addressFORSTree)
+	adrs.setKeyPairAddress(idxLeaf)
+	pkFors := pk.p.forsPkFromSig(sigFors, md, pk.pkSeed, adrs)
+	if !pk.p.htVerify(pkFors, sigHT, pk.pkSeed, idxTree, idxLeaf, pk.pkRoot) {
+		return fmt.Errorf("invalid signature")
+	}
+	return nil
+}
+
+// Algorithm 21 (slh_keygen).
+func (p *params) KeyGen() (*SecretKey, *PublicKey) {
+	// Set skSeed, skPrf, and pkSeed to random n-byte strings. Note that rand.Read never returns an error.
+	skSeed := make([]byte, p.n)
+	rand.Read(skSeed[:])
+	skPrf := make([]byte, p.n)
+	rand.Read(skPrf[:])
+	pkSeed := make([]byte, p.n)
+	rand.Read(pkSeed[:])
+	return p.slhKeygenInternal(skSeed, skPrf, pkSeed)
+}
+
+// Encode encodes a public key.
+func (pk *PublicKey) Encode() []byte {
+	return slices.Concat(pk.pkSeed, pk.pkRoot)
+}
+
+// PublicKeyLength returns the length of a public key.
+func (p *params) PublicKeyLength() int {
+	return int(2 * p.n)
+}
+
+// Decode decodes a public key.
+func (p *params) DecodePublicKey(pkEnc []byte) (*PublicKey, error) {
+	if len(pkEnc) != p.PublicKeyLength() {
+		return nil, fmt.Errorf("invalid public key length")
+	}
+	pkSeed := pkEnc[0:p.n]
+	pkRoot := pkEnc[p.n : 2*p.n]
+	return &PublicKey{pkSeed, pkRoot, p}, nil
+}
+
+// Encode encodes a secret key.
+func (sk *SecretKey) Encode() []byte {
+	return slices.Concat(sk.skSeed, sk.skPrf, sk.pkSeed, sk.pkRoot)
+}
+
+// SecretKeyLength returns the length of a secret key.
+func (p *params) SecretKeyLength() int {
+	return int(4 * p.n)
+}
+
+// Decode decodes a secret key.
+func (p *params) DecodeSecretKey(skEnc []byte) (*SecretKey, error) {
+	if len(skEnc) != p.SecretKeyLength() {
+		return nil, fmt.Errorf("invalid secret key length")
+	}
+	skSeed := skEnc[0:p.n]
+	skPrf := skEnc[p.n : 2*p.n]
+	pkSeed := skEnc[2*p.n : 3*p.n]
+	pkRoot := skEnc[3*p.n : 4*p.n]
+	return &SecretKey{skSeed, skPrf, pkSeed, pkRoot, p}, nil
+}
+
+// PublicKey returns the public key corresponding to a secret key.
+func (sk *SecretKey) PublicKey() *PublicKey {
+	return &PublicKey{sk.pkSeed, sk.pkRoot, sk.p}
+}
+
+// Sign is the standard signing function. This is Algorithm 22 (slh_sign) of the SLH-DSA specification.
+func (sk *SecretKey) Sign(msg []byte, ctx []byte) ([]byte, error) {
+	if len(ctx) > 255 {
+		return nil, fmt.Errorf("context too long")
+	}
+	// Generate additional randomness. Note that rand.Read never returns an error.
+	addrnd := make([]byte, sk.p.n)
+	rand.Read(addrnd[:])
+	return sk.signInternal(slices.Concat([]byte{0, byte(len(ctx))}, ctx, msg), addrnd), nil
+}
+
+// SignDeterministic signs deterministically. This is Algorithm 22 (slh_sign) of the SLH-DSA specification with PK.seed as randomness.
+func (sk *SecretKey) SignDeterministic(msg []byte, ctx []byte) ([]byte, error) {
+	if len(ctx) > 255 {
+		return nil, fmt.Errorf("context too long")
+	}
+	return sk.signInternal(slices.Concat([]byte{0, byte(len(ctx))}, ctx, msg), sk.pkSeed), nil
+}
+
+// Verify is the standard verification function. This is Algorithm 24 (slh_verify) of the SLH-DSA specification.
+func (pk *PublicKey) Verify(msg []byte, sig []byte, ctx []byte) error {
+	if len(ctx) > 255 {
+		return fmt.Errorf("context too long")
+	}
+	return pk.verifyInternal(slices.Concat([]byte{0, byte(len(ctx))}, ctx, msg), sig)
+}
