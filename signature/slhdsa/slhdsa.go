@@ -20,9 +20,16 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 )
 
 func init() {
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*PublicKey](verifierConstructor); err != nil {
+		panic(fmt.Sprintf("slhdsa.init() failed: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*PrivateKey](signerConstructor); err != nil {
+		panic(fmt.Sprintf("slhdsa.init() failed: %v", err))
+	}
 	if err := keygenregistry.RegisterKeyCreator[*Parameters](createPrivateKey); err != nil {
 		panic(fmt.Sprintf("slhdsa.init() failed: %v", err))
 	}
