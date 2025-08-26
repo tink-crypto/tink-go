@@ -533,25 +533,22 @@ func TestJWKSetToPublicKeysetPrimitivePS256SmallModulusFails(t *testing.T) {
 	}`
 	// Keys in the keyset are validated when the primitive is generated.
 	// JWKSetToPublicKeysetHandle doesn't fail, but NewVerifier will fail.
-	pubHandle, err := jwt.JWKSetToPublicKeysetHandle([]byte(jwk))
-	if err != nil {
-		t.Fatalf("jwt.JWKSetToPublicKeysetHandle() err = %v, want nil", err)
-	}
-	if _, err := jwt.NewVerifier(pubHandle); err == nil {
-		t.Errorf("jwt.NewVerifier() err = nil, want error")
+	if _, err := jwt.JWKSetToPublicKeysetHandle([]byte(jwk)); err == nil {
+		t.Fatalf("jwt.JWKSetToPublicKeysetHandle() err = nil, want error")
 	}
 }
 
 func TestJWKSetToPublicKeysetPS256CorrectlySetsKID(t *testing.T) {
-	jwkSet := `{"keys":[
+	jwkSet := fmt.Sprintf(`{"keys":[
       {"kty":"RSA",
-       "n":"AQAB",
+       "n":"%s",
        "e":"AQAB",
        "use":"sig",
        "alg":"PS256",
        "key_ops":["verify"],
        "kid":"DfpE4Q"
-      }]}`
+      }]}`, n2048Base64)
+
 	kh, err := jwt.JWKSetToPublicKeysetHandle([]byte(jwkSet))
 	if err != nil {
 		t.Fatalf("JWKSetToPublicKeysetHandle() err = %v, want nil", err)
@@ -574,12 +571,12 @@ func TestJWKSetToPublicKeysetPS256CorrectlySetsKID(t *testing.T) {
 }
 
 func TestJWKSetToPublicKeysetPS256WithoutOptionalFieldsSucceeds(t *testing.T) {
-	jwkSet := `{"keys":[
+	jwkSet := fmt.Sprintf(`{"keys":[
       {"kty":"RSA",
-       "n":"AQAB",
+        "n":"%s",
        "e":"AQAB",
        "alg":"PS256"
-      }]}`
+      }]}`, n2048Base64)
 	if _, err := jwt.JWKSetToPublicKeysetHandle([]byte(jwkSet)); err != nil {
 		t.Fatalf("jwt.JWKSetToPublicKeysetHandle() err = %v, want nil", err)
 	}

@@ -23,6 +23,7 @@ import (
 
 	_ "github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"             // Register jwtecdsa keys and proto serialization.
 	_ "github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1" // Register jwtrsassapkcs1 keys and proto serialization.
+	_ "github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"     // Register jwtrsassapss keys and proto serialization.
 )
 
 // A generic error returned when something went wrong before validation
