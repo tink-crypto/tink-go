@@ -25,4 +25,5 @@ import (
 	_ "github.com/tink-crypto/tink-go/v2/signature/mldsa"             // register mldsa key managers
 	_ "github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1" // register rsassapkcs1 key managers
 	_ "github.com/tink-crypto/tink-go/v2/signature/rsassapss"     // register rsassapss key managers
+	_ "github.com/tink-crypto/tink-go/v2/signature/slhdsa"           // register slhdsa key managers
 )
