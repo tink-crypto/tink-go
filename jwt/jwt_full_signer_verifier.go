@@ -20,9 +20,11 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1"
+	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
 	"github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1"
+	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -55,7 +57,7 @@ func (s *fullSigner) SignAndEncode(rawJWT *RawJWT) (string, error) {
 	return s.sKID.SignAndEncodeWithKID(rawJWT, s.keyID)
 }
 
-func createFullSigner(hasIDRequirement, isCustomKID bool, kid string, algorithm string, signer tink.Signer) (any, error) {
+func newFullSigner(hasIDRequirement, isCustomKID bool, kid string, algorithm string, signer tink.Signer) (any, error) {
 	var err error
 	var sKID *signerWithKID
 	if isCustomKID {
@@ -113,7 +115,7 @@ func createJWTECDSASigner(key key.Key) (any, error) {
 	}
 
 	kid, _ := jwtPublicKey.KID()
-	return createFullSigner(jwtParams.HasIDRequirement(), jwtParams.KIDStrategy() == jwtecdsa.CustomKID, kid, jwtParams.Algorithm().String(), ecdsaSigner)
+	return newFullSigner(jwtParams.HasIDRequirement(), jwtParams.KIDStrategy() == jwtecdsa.CustomKID, kid, jwtParams.Algorithm().String(), ecdsaSigner)
 }
 
 func createJWTRSASSAPKCS1Signer(key key.Key) (any, error) {
@@ -162,5 +164,64 @@ func createJWTRSASSAPKCS1Signer(key key.Key) (any, error) {
 	}
 
 	kid, _ := jwtPublicKey.KID()
-	return createFullSigner(jwtParams.HasIDRequirement(), jwtParams.KIDStrategy() == jwtrsassapkcs1.CustomKID, kid, jwtParams.Algorithm().String(), rsaSSAPKCS1Signer)
+	return newFullSigner(jwtParams.HasIDRequirement(), jwtParams.KIDStrategy() == jwtrsassapkcs1.CustomKID, kid, jwtParams.Algorithm().String(), rsaSSAPKCS1Signer)
+}
+
+func createJWTRSASSAPSSSigner(key key.Key) (any, error) {
+	privateKey, ok := key.(*jwtrsassapss.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("expected %T, got %T", (*jwtrsassapss.PrivateKey)(nil), key)
+	}
+	publicKey, err := privateKey.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	jwtPublicKey := publicKey.(*jwtrsassapss.PublicKey)
+	jwtParams := privateKey.Parameters().(*jwtrsassapss.Parameters)
+
+	var hashType rsassapss.HashType
+	var saltLen int
+	switch jwtParams.Algorithm() {
+	case jwtrsassapss.PS256:
+		hashType = rsassapss.SHA256
+		saltLen = 32
+	case jwtrsassapss.PS384:
+		hashType = rsassapss.SHA384
+		saltLen = 48
+	case jwtrsassapss.PS512:
+		hashType = rsassapss.SHA512
+		saltLen = 64
+	default:
+		return nil, fmt.Errorf("unsupported algorithm: %s", jwtParams.Algorithm())
+	}
+
+	rsaSSAPSSParams, err := rsassapss.NewParameters(rsassapss.ParametersValues{
+		ModulusSizeBits: jwtParams.ModulusSizeInBits(),
+		PublicExponent:  jwtParams.PublicExponent(),
+		SigHashType:     hashType,
+		MGF1HashType:    hashType,
+		SaltLengthBytes: saltLen,
+	}, rsassapss.VariantNoPrefix)
+	if err != nil {
+		return nil, err
+	}
+	rsaSSAPSSPublicKey, err := rsassapss.NewPublicKey(jwtPublicKey.Modulus(), 0, rsaSSAPSSParams)
+	if err != nil {
+		return nil, err
+	}
+	rsaSSAPSSPrivateKey, err := rsassapss.NewPrivateKey(rsaSSAPSSPublicKey, rsassapss.PrivateKeyValues{
+		P: privateKey.P(),
+		Q: privateKey.Q(),
+		D: privateKey.D(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	rsaSSAPSSSigner, err := rsassapss.NewSigner(rsaSSAPSSPrivateKey, internalapi.Token{})
+	if err != nil {
+		return nil, err
+	}
+
+	kid, _ := jwtPublicKey.KID()
+	return newFullSigner(jwtParams.HasIDRequirement(), jwtParams.KIDStrategy() == jwtrsassapss.CustomKID, kid, jwtParams.Algorithm().String(), rsaSSAPSSSigner)
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1"
+	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -145,6 +146,33 @@ func mustCreateJWTRSASSAPKCS1PrivateKey(t *testing.T, opts jwtrsassapkcs1.Privat
 	return key
 }
 
+func mustCreateJWTRSASSAPSSParameters(t *testing.T, opts jwtrsassapss.ParametersOpts) *jwtrsassapss.Parameters {
+	t.Helper()
+	params, err := jwtrsassapss.NewParameters(opts)
+	if err != nil {
+		t.Fatalf("jwtrsassapss.NewParameters() err = %v, want nil", err)
+	}
+	return params
+}
+
+func mustCreateJWTRSASSAPSSPublicKey(t *testing.T, opts jwtrsassapss.PublicKeyOpts) *jwtrsassapss.PublicKey {
+	t.Helper()
+	key, err := jwtrsassapss.NewPublicKey(opts)
+	if err != nil {
+		t.Fatalf("jwtrsassapss.NewPublicKey() err = %v, want nil", err)
+	}
+	return key
+}
+
+func mustCreateJWTRSASSAPSSPrivateKey(t *testing.T, opts jwtrsassapss.PrivateKeyOpts) *jwtrsassapss.PrivateKey {
+	t.Helper()
+	key, err := jwtrsassapss.NewPrivateKey(opts)
+	if err != nil {
+		t.Fatalf("jwtrsassapss.NewPrivateKey() err = %v, want nil", err)
+	}
+	return key
+}
+
 func mustHexDecode(t *testing.T, hexStr string) []byte {
 	t.Helper()
 	keyBytes, err := hex.DecodeString(hexStr)
@@ -170,10 +198,14 @@ type privateKey interface {
 func TestSignerVerfierCreator(t *testing.T) {
 	defer primitiveregistry.UnregisterPrimitiveConstructor[*jwtecdsa.PrivateKey]()
 	defer primitiveregistry.UnregisterPrimitiveConstructor[*jwtrsassapkcs1.PrivateKey]()
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*jwtrsassapss.PrivateKey]()
 	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtecdsa.PrivateKey](createJWTECDSASigner); err != nil {
 		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
 	}
 	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapkcs1.PrivateKey](createJWTRSASSAPKCS1Signer); err != nil {
+		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapss.PrivateKey](createJWTRSASSAPSSSigner); err != nil {
 		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
 	}
 	for _, tc := range []struct {
@@ -419,6 +451,174 @@ func TestSignerVerfierCreator(t *testing.T) {
 						PublicExponent:    65537, // f4
 						Algorithm:         jwtrsassapkcs1.RS512,
 						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n4096Base64),
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
+			}),
+		},
+		// PS256
+		{
+			name: "PS256_Base64EncodedKeyIDAsKID",
+			privateKey: mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
+				PublicKey: mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS256,
+						KidStrategy:       jwtrsassapss.Base64EncodedKeyIDAsKID,
+					}),
+					Modulus:       mustBase64Decode(t, n2048Base64),
+					IDRequirement: 0x01020304,
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			}),
+		},
+		{
+			name: "PS256_CustomKID",
+			privateKey: mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
+				PublicKey: mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS256,
+						KidStrategy:       jwtrsassapss.CustomKID,
+					}),
+					Modulus:       mustBase64Decode(t, n2048Base64),
+					IDRequirement: 0,
+					HasCustomKID:  true,
+					CustomKID:     "custom-kid",
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			}),
+		},
+		{
+			name: "PS256_IgnoredKID",
+			privateKey: mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
+				PublicKey: mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS256,
+						KidStrategy:       jwtrsassapss.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n2048Base64),
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+			}),
+		},
+		// PS384
+		{
+			name: "PS384_Base64EncodedKeyIDAsKID",
+			privateKey: mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
+				PublicKey: mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 3072,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS384,
+						KidStrategy:       jwtrsassapss.Base64EncodedKeyIDAsKID,
+					}),
+					Modulus:       mustBase64Decode(t, n3072Base64),
+					IDRequirement: 0x01020304,
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
+			}),
+		},
+		{
+			name: "PS384_CustomKID",
+			privateKey: mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
+				PublicKey: mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 3072,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS384,
+						KidStrategy:       jwtrsassapss.CustomKID,
+					}),
+					Modulus:       mustBase64Decode(t, n3072Base64),
+					IDRequirement: 0,
+					HasCustomKID:  true,
+					CustomKID:     "custom-kid",
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
+			}),
+		},
+		{
+			name: "PS384_IgnoredKID",
+			privateKey: mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
+				PublicKey: mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 3072,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS384,
+						KidStrategy:       jwtrsassapss.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n3072Base64),
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
+			}),
+		},
+		// PS512
+		{
+			name: "PS512_Base64EncodedKeyIDAsKID",
+			privateKey: mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
+				PublicKey: mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 4096,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS512,
+						KidStrategy:       jwtrsassapss.Base64EncodedKeyIDAsKID,
+					}),
+					Modulus:       mustBase64Decode(t, n4096Base64),
+					IDRequirement: 0x01020304,
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
+			}),
+		},
+		{
+			name: "PS512_CustomKID",
+			privateKey: mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
+				PublicKey: mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 4096,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS512,
+						KidStrategy:       jwtrsassapss.CustomKID,
+					}),
+					Modulus:       mustBase64Decode(t, n4096Base64),
+					IDRequirement: 0,
+					HasCustomKID:  true,
+					CustomKID:     "custom-kid",
+				}),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
+			}),
+		},
+		{
+			name: "PS512_IgnoredKID",
+			privateKey: mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
+				PublicKey: mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 4096,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS512,
+						KidStrategy:       jwtrsassapss.IgnoredKID,
 					}),
 					Modulus: mustBase64Decode(t, n4096Base64),
 				}),
