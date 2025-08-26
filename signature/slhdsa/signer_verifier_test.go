@@ -21,10 +21,110 @@ import (
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/signature/slhdsa"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/signature"
 	tinkslhdsa "github.com/tink-crypto/tink-go/v2/signature/slhdsa"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 )
+
+func TestSignVerifyManager(t *testing.T) {
+	message := random.GetRandomBytes(20)
+	for _, tc := range []struct {
+		name          string
+		hashType      tinkslhdsa.HashType
+		keySize       int
+		sigType       tinkslhdsa.SignatureType
+		variant       tinkslhdsa.Variant
+		idRequirement uint32
+	}{
+		{
+			name:          "TINK",
+			hashType:      tinkslhdsa.SHA2,
+			keySize:       64,
+			sigType:       tinkslhdsa.SmallSignature,
+			variant:       tinkslhdsa.VariantTink,
+			idRequirement: uint32(0x01020304),
+		},
+		{
+			name:          "RAW",
+			hashType:      tinkslhdsa.SHA2,
+			keySize:       64,
+			sigType:       tinkslhdsa.SmallSignature,
+			variant:       tinkslhdsa.VariantNoPrefix,
+			idRequirement: uint32(0),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			params, err := tinkslhdsa.NewParameters(tc.hashType, tc.keySize, tc.sigType, tc.variant)
+			if err != nil {
+				t.Fatalf("tinkslhdsa.NewParameters(%v) err = %v, want nil", tc.variant, err)
+			}
+			publicKeyBytes, privateKeyBytes := getTestKeyPair(t, tc.hashType, tc.keySize, tc.sigType)
+			publicKey, err := tinkslhdsa.NewPublicKey(publicKeyBytes, tc.idRequirement, params)
+			if err != nil {
+				t.Fatalf("tinkslhdsa.NewPublicKey(%v, %v, %v) err = %v, want nil", publicKeyBytes, tc.idRequirement, params, err)
+			}
+			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}), tc.idRequirement, params)
+			if err != nil {
+				t.Fatalf("tinkslhdsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", privateKeyBytes, tc.idRequirement, params, err)
+			}
+
+			// Signer verifier from keys.
+			signer, err := tinkslhdsa.NewSigner(privateKey, internalapi.Token{})
+			if err != nil {
+				t.Fatalf("tinkslhdsa.NewSigner(%v, internalapi.Token{}) err = %v, want nil", privateKey, err)
+			}
+			sigBytes, err := signer.Sign(message)
+			if err != nil {
+				t.Fatalf("signer.Sign(%x) err = %v, want nil", message, err)
+			}
+
+			verifier, err := tinkslhdsa.NewVerifier(publicKey, internalapi.Token{})
+			if err != nil {
+				t.Fatalf("tinkslhdsa.NewVerifier(%v, internalapi.Token{}) err = %v, want nil", publicKey, err)
+			}
+			if err := verifier.Verify(sigBytes, message); err != nil {
+				t.Errorf("verifier.Verify(%x, %x) err = %v, want nil", sigBytes, message, err)
+			}
+
+			// Signer verifier from keyset handle.
+			km := keyset.NewManager()
+			keyID, err := km.AddKey(privateKey)
+			if err != nil {
+				t.Fatalf("km.AddKey(%v) err = %v, want nil", privateKey, err)
+			}
+			if err := km.SetPrimary(keyID); err != nil {
+				t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID, err)
+			}
+			keysetHandle, err := km.Handle()
+			if err != nil {
+				t.Fatalf("km.Handle() err = %v, want nil", err)
+			}
+			publicKeysetHandle, err := keysetHandle.Public()
+			if err != nil {
+				t.Fatalf("keysetHandle.Public() err = %v, want nil", err)
+			}
+
+			signerFromKeyset, err := signature.NewSigner(keysetHandle)
+			if err != nil {
+				t.Fatalf("signature.NewSigner(%v) err = %v, want nil", keysetHandle, err)
+			}
+			sigBytesFromKeyset, err := signerFromKeyset.Sign(message)
+			if err != nil {
+				t.Fatalf("signerFromKeyset.Sign(%x) err = %v, want nil", message, err)
+			}
+
+			verifierFromKeyset, err := signature.NewVerifier(publicKeysetHandle)
+			if err != nil {
+				t.Fatalf("signature.NewVerifier() err = %v, want nil", err)
+			}
+			if err := verifierFromKeyset.Verify(sigBytesFromKeyset, message); err != nil {
+				t.Errorf("verifierFromKeyset.Verify(%x, %x) err = %v, want nil", sigBytesFromKeyset, message, err)
+			}
+		})
+	}
+}
 
 func TestVerifyFails(t *testing.T) {
 	for _, tc := range []struct {

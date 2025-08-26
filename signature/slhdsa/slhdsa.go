@@ -19,12 +19,36 @@ package slhdsa
 import (
 	"fmt"
 
+	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
+	slhdsapb "github.com/tink-crypto/tink-go/v2/proto/slh_dsa_go_proto"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func init() {
+	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManager(signerTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func(b []byte) (proto.Message, error) {
+		protoKey := &slhdsapb.SlhDsaPrivateKey{}
+		if err := proto.Unmarshal(b, protoKey); err != nil {
+			return nil, err
+		}
+		return protoKey, nil
+	})); err != nil {
+		panic(fmt.Sprintf("slhdsa.init() failed: %v", err))
+	}
+	if err := registry.RegisterKeyManager(legacykeymanager.New(verifierTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PUBLIC, func(b []byte) (proto.Message, error) {
+		protoKey := &slhdsapb.SlhDsaPublicKey{}
+		if err := proto.Unmarshal(b, protoKey); err != nil {
+			return nil, err
+		}
+		return protoKey, nil
+	})); err != nil {
+		panic(fmt.Sprintf("slhdsa.init() failed: %v", err))
+	}
 	if err := protoserialization.RegisterKeySerializer[*PublicKey](&publicKeySerializer{}); err != nil {
 		panic(fmt.Sprintf("slhdsa.init() failed: %v", err))
 	}
