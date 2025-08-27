@@ -20,10 +20,11 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 
-	_ "github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"             // Register jwtecdsa keys and proto serialization.
-	_ "github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1" // Register jwtrsassapkcs1 keys and proto serialization.
-	_ "github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"     // Register jwtrsassapss keys and proto serialization.
+	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"             // Also registers jwtecdsa keys and proto serialization.
+	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1" // Also registers jwtrsassapkcs1 keys and proto serialization.
+	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"     // Also registers jwtrsassapss keys and proto serialization.
 )
 
 // A generic error returned when something went wrong before validation
@@ -62,6 +63,15 @@ func init() {
 	if err := registry.RegisterKeyManager(new(jwtPSVerifierKeyManager)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PSS verifier key manager: %v", err))
 	}
-	// NOTE: We can register primitive constructors here only after all keys are
-	// defined and have a primitive constructor.
+
+	// Signer primitive constructors.
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtecdsa.PrivateKey](createJWTECDSASigner); err != nil {
+		panic(fmt.Sprintf("jwt.init() failed registering JWT ECDSA signer primitive constructor: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapkcs1.PrivateKey](createJWTRSASSAPKCS1Signer); err != nil {
+		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PKCS1 signer primitive constructor: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapss.PrivateKey](createJWTRSASSAPSSSigner); err != nil {
+		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PSS signer primitive constructor: %v", err))
+	}
 }
