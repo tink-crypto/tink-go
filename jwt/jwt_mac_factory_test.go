@@ -21,9 +21,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/jwt"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/signature"
@@ -34,6 +39,10 @@ import (
 
 	jwtmacpb "github.com/tink-crypto/tink-go/v2/proto/jwt_hmac_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+)
+
+const (
+	stubKeyTypeURL = "type.googleapis.com/google.crypto.tink.StubKey"
 )
 
 func newJWTHMACKey(algorithm jwtmacpb.JwtHmacAlgorithm, kid *jwtmacpb.JwtHmacKey_CustomKid) *jwtmacpb.JwtHmacKey {
@@ -320,6 +329,228 @@ func TestComputeAndVerifyWithoutAnnotationsEmitsNoMonitoring(t *testing.T) {
 	}
 	if len(client.Events()) != 0 {
 		t.Errorf("len(client.Events()) = %d, want = 0", len(client.Events()))
+	}
+}
+
+// Defines a stub JWT MAC full primitive to test the factory.
+type stubFullMAC struct {
+	kid *string
+}
+
+func (s *stubFullMAC) ComputeMACAndEncode(_ *jwt.RawJWT) (string, error) {
+	if s.kid == nil {
+		return "stub_full_mac", nil
+	}
+	return *s.kid + "_stub_full_mac", nil
+}
+
+func (s *stubFullMAC) VerifyMACAndDecode(compact string, _ *jwt.Validator) (*jwt.VerifiedJWT, error) {
+	if compact != "AQIDBA_stub_full_mac" {
+		return nil, fmt.Errorf("invalid token")
+	}
+	return &jwt.VerifiedJWT{}, nil
+}
+
+// Defines a stub key for the stub JWT MAC full primitive.
+type stubKey struct {
+	idRequirement uint32
+	prefixType    tinkpb.OutputPrefixType
+}
+
+func (s *stubKey) Parameters() key.Parameters { return nil }
+func (s *stubKey) Equal(_ key.Key) bool       { return false }
+func (s *stubKey) IDRequirement() (uint32, bool) {
+	return s.idRequirement, s.prefixType != tinkpb.OutputPrefixType_RAW
+}
+
+// Defines a stub key parser for the stub JWT MAC full primitive.
+type stubKeyParser struct{}
+
+func (s *stubKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	idRequirement, _ := keySerialization.IDRequirement()
+	return &stubKey{
+		idRequirement: idRequirement,
+		prefixType:    keySerialization.OutputPrefixType(),
+	}, nil
+}
+
+// Defines a stub key serializer for the stub JWT MAC full primitive.
+type stubKeySerializer struct{}
+
+func (s *stubKeySerializer) SerializeKey(k key.Key) (*protoserialization.KeySerialization, error) {
+	stubk, ok := k.(*stubKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type")
+	}
+	return protoserialization.NewKeySerialization(
+		&tinkpb.KeyData{
+			TypeUrl:         stubKeyTypeURL,
+			Value:           []byte("stub_key"),
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+		},
+		stubk.prefixType,
+		stubk.idRequirement,
+	)
+}
+
+func TestMACPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubKeyTypeURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKey]()
+	if err := protoserialization.RegisterKeyParser(stubKeyTypeURL, &stubKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKey](&stubKeySerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	// Register primitive constructor to make sure that the factory uses full primitives.
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubKey]()
+	macConstructor := func(key key.Key) (any, error) {
+		kid := "AQIDBA" // for 0x01020304
+		return &stubFullMAC{&kid}, nil
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubKey](macConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubKey{idRequirement: 0x01020304, prefixType: tinkpb.OutputPrefixType_TINK})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	mac, err := jwt.NewMAC(handle)
+	if err != nil {
+		t.Fatalf("jwt.NewMAC() err = %v, want nil", err)
+	}
+	data, err := jwt.NewRawJWT(&jwt.RawJWTOptions{WithoutExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewRawJWT() err = %v, want nil", err)
+	}
+	token, err := mac.ComputeMACAndEncode(data)
+	if err != nil {
+		t.Fatalf("mac.ComputeMACAndEncode() err = %v, want nil", err)
+	}
+	if token != "AQIDBA_stub_full_mac" {
+		t.Errorf("token = %q, want: %q", token, "AQIDBA_stub_full_mac")
+	}
+	validator, err := jwt.NewValidator(&jwt.ValidatorOpts{AllowMissingExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewValidator() err = %v, want nil", err)
+	}
+	if _, err := mac.VerifyMACAndDecode(token, validator); err != nil {
+		t.Fatalf("mac.VerifyMACAndDecode() err = %v, want nil", err)
+	}
+}
+
+type stubLegacyMAC struct{}
+
+func (s *stubLegacyMAC) ComputeMACAndEncodeWithKID(_ *jwt.RawJWT, kid *string) (string, error) {
+	if kid == nil {
+		return "legacy_mac", nil
+	}
+	return *kid + "_legacy_mac", nil
+}
+func (s *stubLegacyMAC) VerifyMACAndDecodeWithKID(compact string, _ *jwt.Validator, kid *string) (*jwt.VerifiedJWT, error) {
+	if kid == nil {
+		if compact == "legacy_mac" {
+			return &jwt.VerifiedJWT{}, nil
+		}
+	} else {
+		if compact == *kid+"_legacy_mac" {
+			return &jwt.VerifiedJWT{}, nil
+		}
+	}
+	return nil, fmt.Errorf("invalid token")
+}
+
+type stubKeyManager struct{}
+
+func (km *stubKeyManager) NewKey(_ []byte) (proto.Message, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (km *stubKeyManager) DoesSupport(keyURL string) bool  { return keyURL == stubKeyTypeURL }
+func (km *stubKeyManager) TypeURL() string                 { return stubKeyTypeURL }
+func (km *stubKeyManager) Primitive(_ []byte) (any, error) { return &stubLegacyMAC{}, nil }
+
+func TestMACPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubKeyTypeURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKey]()
+	if err := protoserialization.RegisterKeyParser(stubKeyTypeURL, &stubKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKey](&stubKeySerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	defer registry.UnregisterKeyManager(stubKeyTypeURL, internalapi.Token{})
+	if err := registry.RegisterKeyManager(&stubKeyManager{}); err != nil {
+		t.Fatalf("registry.RegisterKeyManager() err = %v, want nil", err)
+	}
+
+	for _, tc := range []struct {
+		name      string
+		key       *stubKey
+		wantToken string
+	}{
+		{
+			name:      "TINK",
+			key:       &stubKey{idRequirement: 0x01020304, prefixType: tinkpb.OutputPrefixType_TINK},
+			wantToken: "AQIDBA_legacy_mac",
+		},
+		{
+			name:      "RAW",
+			key:       &stubKey{idRequirement: 0, prefixType: tinkpb.OutputPrefixType_RAW},
+			wantToken: "legacy_mac",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			km := keyset.NewManager()
+			keyID, err := km.AddKey(tc.key)
+			if err != nil {
+				t.Fatalf("km.AddKey() err = %v, want nil", err)
+			}
+			if err := km.SetPrimary(keyID); err != nil {
+				t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+			}
+			handle, err := km.Handle()
+			if err != nil {
+				t.Fatalf("km.Handle() err = %v, want nil", err)
+			}
+
+			mac, err := jwt.NewMAC(handle)
+			if err != nil {
+				t.Fatalf("jwt.NewMAC() err = %v, want nil", err)
+			}
+			data, err := jwt.NewRawJWT(&jwt.RawJWTOptions{WithoutExpiration: true})
+			if err != nil {
+				t.Fatalf("jwt.NewRawJWT() err = %v, want nil", err)
+			}
+			token, err := mac.ComputeMACAndEncode(data)
+			if err != nil {
+				t.Fatalf("mac.ComputeMACAndEncode() err = %v, want nil", err)
+			}
+			if token != tc.wantToken {
+				t.Errorf("token = %q, want: %q", token, tc.wantToken)
+			}
+			validator, err := jwt.NewValidator(&jwt.ValidatorOpts{AllowMissingExpiration: true})
+			if err != nil {
+				t.Fatalf("jwt.NewValidator() err = %v, want nil", err)
+			}
+			if _, err := mac.VerifyMACAndDecode(token, validator); err != nil {
+				t.Fatalf("mac.VerifyMACAndDecode() err = %v, want nil", err)
+			}
+		})
 	}
 }
 

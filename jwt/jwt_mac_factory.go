@@ -26,43 +26,125 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
+type macWithKIDInterface interface {
+	ComputeMACAndEncodeWithKID(token *RawJWT, kid *string) (string, error)
+	VerifyMACAndDecodeWithKID(compact string, validator *Validator, kid *string) (*VerifiedJWT, error)
+}
+
+type macAndKeyID struct {
+	mac   MAC
+	keyID uint32
+}
+
+type macWithKIDAdapter struct {
+	macWithKID macWithKIDInterface
+	keyID      uint32
+	prefixType tinkpb.OutputPrefixType
+}
+
+var _ MAC = (*macWithKIDAdapter)(nil)
+
+func (a *macWithKIDAdapter) ComputeMACAndEncode(token *RawJWT) (string, error) {
+	return a.macWithKID.ComputeMACAndEncodeWithKID(token, keyID(a.keyID, a.prefixType))
+}
+
+func (a *macWithKIDAdapter) VerifyMACAndDecode(compact string, validator *Validator) (*VerifiedJWT, error) {
+	return a.macWithKID.VerifyMACAndDecodeWithKID(compact, validator, keyID(a.keyID, a.prefixType))
+}
+
 // NewMAC generates a new instance of the JWT MAC primitive.
 func NewMAC(handle *keyset.Handle) (MAC, error) {
 	if handle == nil {
-		return nil, fmt.Errorf("keyset handle can't be nil")
+		return nil, fmt.Errorf("jwt_mac_factory: keyset handle can't be nil")
 	}
-	ps, err := keyset.Primitives[*macWithKID](handle, internalapi.Token{})
+	var macs []macAndKeyID
+	var primary macAndKeyID
+	var computeLogger monitoring.Logger
+	var verifyLogger monitoring.Logger
+
+	// Try to obtain full primitives first. If it fails, likely because there is no
+	// full primitive constructor registered, fall back to the "raw"
+	// macWithKID primitives.
+	ps, err := keyset.Primitives[MAC](handle, internalapi.Token{})
 	if err != nil {
-		return nil, fmt.Errorf("jwt_mac_factory: cannot obtain primitive set: %v", err)
+		// Try to obtain a macWithKIDInterface primitive set.
+		ps, err := keyset.Primitives[macWithKIDInterface](handle, internalapi.Token{})
+		if err != nil {
+			return nil, fmt.Errorf("jwt_mac_factory: cannot obtain primitive set: %v", err)
+		}
+		computeLogger, verifyLogger, err = createMacLoggers(ps)
+		if err != nil {
+			return nil, err
+		}
+		for _, primitives := range ps.Entries {
+			for _, p := range primitives {
+				if p.Primitive == nil {
+					// Something is wrong, this should not happen.
+					return nil, fmt.Errorf("jwt_mac_factory: primitive is nil")
+				}
+				if p.PrefixType != tinkpb.OutputPrefixType_RAW && p.PrefixType != tinkpb.OutputPrefixType_TINK {
+					return nil, fmt.Errorf("jwt_mac_factory: invalid OutputPrefixType: %s", p.PrefixType)
+				}
+				macs = append(macs, macAndKeyID{
+					mac: &macWithKIDAdapter{
+						macWithKID: p.Primitive,
+						keyID:      p.KeyID,
+						prefixType: p.PrefixType,
+					},
+					keyID: p.KeyID,
+				})
+			}
+		}
+		primary = macAndKeyID{
+			mac: &macWithKIDAdapter{
+				macWithKID: ps.Primary.Primitive,
+				keyID:      ps.Primary.KeyID,
+				prefixType: ps.Primary.PrefixType,
+			},
+			keyID: ps.Primary.KeyID,
+		}
+	} else {
+		computeLogger, verifyLogger, err = createMacLoggers(ps)
+		if err != nil {
+			return nil, err
+		}
+		for _, primitives := range ps.Entries {
+			for _, p := range primitives {
+				if p.FullPrimitive == nil {
+					// Something is wrong, this should not happen.
+					return nil, fmt.Errorf("jwt_mac_factory: full primitive is nil")
+				}
+				macs = append(macs, macAndKeyID{
+					mac:   p.FullPrimitive,
+					keyID: p.KeyID,
+				})
+			}
+		}
+		primary = macAndKeyID{
+			mac:   ps.Primary.FullPrimitive,
+			keyID: ps.Primary.KeyID,
+		}
 	}
-	return newWrappedJWTMAC(ps)
+	return &wrappedJWTMAC{
+		macs:          macs,
+		primary:       primary,
+		computeLogger: computeLogger,
+		verifyLogger:  verifyLogger,
+	}, nil
 }
 
-// wrappedJWTMAC is a JWTMAC implementation that uses the underlying primitive set for JWT MAC.
+// wrappedJWTMAC is a JWT MAC implementation that uses the underlying primitive
+// set for JWT MAC.
 type wrappedJWTMAC struct {
-	ps            *primitiveset.PrimitiveSet[*macWithKID]
+	macs          []macAndKeyID
+	primary       macAndKeyID
 	computeLogger monitoring.Logger
 	verifyLogger  monitoring.Logger
 }
 
 var _ MAC = (*wrappedJWTMAC)(nil)
 
-func newWrappedJWTMAC(ps *primitiveset.PrimitiveSet[*macWithKID]) (*wrappedJWTMAC, error) {
-	for _, primitives := range ps.Entries {
-		for _, p := range primitives {
-			if p.PrefixType != tinkpb.OutputPrefixType_RAW && p.PrefixType != tinkpb.OutputPrefixType_TINK {
-				return nil, fmt.Errorf("jwt_mac_factory: invalid OutputPrefixType: %s", p.PrefixType)
-			}
-		}
-	}
-	computeLogger, verifyLogger, err := createLoggers(ps)
-	if err != nil {
-		return nil, err
-	}
-	return &wrappedJWTMAC{ps: ps, computeLogger: computeLogger, verifyLogger: verifyLogger}, nil
-}
-
-func createLoggers(ps *primitiveset.PrimitiveSet[*macWithKID]) (monitoring.Logger, monitoring.Logger, error) {
+func createMacLoggers[T any](ps *primitiveset.PrimitiveSet[T]) (monitoring.Logger, monitoring.Logger, error) {
 	if len(ps.Annotations) == 0 {
 		return &monitoringutil.DoNothingLogger{}, &monitoringutil.DoNothingLogger{}, nil
 	}
@@ -91,29 +173,28 @@ func createLoggers(ps *primitiveset.PrimitiveSet[*macWithKID]) (monitoring.Logge
 }
 
 func (w *wrappedJWTMAC) ComputeMACAndEncode(token *RawJWT) (string, error) {
-	primary := w.ps.Primary
-	signedToken, err := primary.Primitive.ComputeMACAndEncodeWithKID(token, keyID(primary.KeyID, primary.PrefixType))
+	signedToken, err := w.primary.mac.ComputeMACAndEncode(token)
 	if err != nil {
 		w.computeLogger.LogFailure()
 		return "", err
 	}
-	w.computeLogger.Log(primary.KeyID, 1)
+	w.computeLogger.Log(w.primary.keyID, 1)
 	return signedToken, nil
 }
 
 func (w *wrappedJWTMAC) VerifyMACAndDecode(compact string, validator *Validator) (*VerifiedJWT, error) {
 	var interestingErr error
-	for _, s := range w.ps.Entries {
-		for _, e := range s {
-			verifiedJWT, err := e.Primitive.VerifyMACAndDecodeWithKID(compact, validator, keyID(e.KeyID, e.PrefixType))
-			if err == nil {
-				w.verifyLogger.Log(e.KeyID, 1)
-				return verifiedJWT, nil
-			}
-			if err != errJwtVerification {
-				// any error that is not the generic errJwtVerification is considered interesting
-				interestingErr = err
-			}
+	for _, macWithKeyID := range w.macs {
+		mac, keyID := macWithKeyID.mac, macWithKeyID.keyID
+		verifiedJWT, err := mac.VerifyMACAndDecode(compact, validator)
+		if err == nil {
+			w.verifyLogger.Log(keyID, 1)
+			return verifiedJWT, nil
+		}
+		if err != errJwtVerification {
+			// Any error that is not the generic errJwtVerification is considered
+			// interesting.
+			interestingErr = err
 		}
 	}
 	w.verifyLogger.LogFailure()
