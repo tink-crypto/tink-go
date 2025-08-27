@@ -18,7 +18,9 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -193,6 +195,507 @@ func mustBase64Decode(t *testing.T, in string) []byte {
 
 type privateKey interface {
 	PublicKey() (key.Key, error)
+}
+
+type jwtSignatureTestVector struct {
+	name       string
+	privateKey key.Key
+	publicKey  key.Key
+	signedJwt  string
+	validator  *Validator
+}
+
+// ES256, https://datatracker.ietf.org/doc/html/rfc7515#appendix-A.3
+const (
+	es256X = "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU"
+	es256Y = "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+	es256S = "jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI"
+)
+
+func jwtSignatureTestVectors(t *testing.T) []jwtSignatureTestVector {
+	var testVectors []jwtSignatureTestVector
+
+	// ES256
+	{ // Ignored KID
+		params := mustCreateJWTECDSAParameters(t, jwtecdsa.IgnoredKID, jwtecdsa.ES256)
+		publicKey := mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
+			Parameters:    params,
+			PublicPoint:   slices.Concat([]byte{4}, mustBase64Decode(t, es256X), mustBase64Decode(t, es256Y)),
+			IDRequirement: 0,
+		})
+		privateKey := mustCreateJWTECDSAPrivateKey(t, mustBase64Decode(t, es256S), publicKey)
+
+		iss := "joe"
+		validator, err := NewValidator(&ValidatorOpts{
+			ExpectedIssuer: &iss,
+			FixedNow:       time.Unix(1300819380, 0).Add(-1 * time.Hour),
+		})
+		if err != nil {
+			t.Fatalf("NewValidator() err = %v, want nil", err)
+		}
+		testVectors = append(testVectors, jwtSignatureTestVector{
+			name:       "ES256_IgnoredKID",
+			privateKey: privateKey,
+			publicKey:  publicKey,
+			validator:  validator,
+			signedJwt:
+			// {"alg":"ES256"}
+			"eyJhbGciOiJFUzI1NiJ9" +
+				"." +
+				// {"iss":"joe",
+				//  "exp":1300819380,
+				//  "http://example.com/is_root":true}
+				"eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFt" +
+				"cGxlLmNvbS9pc19yb290Ijp0cnVlfQ" +
+				"." +
+				"DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSA" +
+				"pmWQxfKTUJqPP3-Kg6NU1Q",
+		})
+	}
+	{ // Base64EncodedKeyIDAsKID
+		params := mustCreateJWTECDSAParameters(t, jwtecdsa.Base64EncodedKeyIDAsKID, jwtecdsa.ES256)
+		publicKey := mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
+			Parameters:    params,
+			PublicPoint:   slices.Concat([]byte{4}, mustBase64Decode(t, es256X), mustBase64Decode(t, es256Y)),
+			IDRequirement: 0x01020304,
+		})
+		privateKey := mustCreateJWTECDSAPrivateKey(t, mustBase64Decode(t, es256S), publicKey)
+
+		iss := "issuer"
+		validator, err := NewValidator(&ValidatorOpts{
+			ExpectedIssuer:         &iss,
+			AllowMissingExpiration: true,
+		})
+		if err != nil {
+			t.Fatalf("NewValidator() err = %v, want nil", err)
+		}
+		testVectors = append(testVectors, jwtSignatureTestVector{
+			name:       "ES256_Base64EncodedKeyIDAsKID",
+			privateKey: privateKey,
+			publicKey:  publicKey,
+			validator:  validator,
+			signedJwt:
+			// {"kid":"AQIDBA","alg":"ES256"}
+			"eyJraWQiOiJBUUlEQkEiLCJhbGciOiJFUzI1NiJ9" +
+				"." +
+				// {"iss":"issuer"}
+				"eyJpc3MiOiJpc3N1ZXIifQ" +
+				"." +
+				"Mgzp130-bvzWJAQlkrQRt45EeKQ6ymZX1ABQoautz1fMW2sVLONkoPl_g6UYxecYz-" +
+				"2ApvT292dR_3jHd0S3QA",
+		})
+	}
+	{ // CustomKID
+		params := mustCreateJWTECDSAParameters(t, jwtecdsa.CustomKID, jwtecdsa.ES256)
+		publicKey := mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
+			Parameters:   params,
+			PublicPoint:  slices.Concat([]byte{4}, mustBase64Decode(t, es256X), mustBase64Decode(t, es256Y)),
+			CustomKID:    "custom-kid",
+			HasCustomKID: true,
+		})
+		privateKey := mustCreateJWTECDSAPrivateKey(t, mustBase64Decode(t, es256S), publicKey)
+
+		iss := "issuer"
+		validator, err := NewValidator(&ValidatorOpts{
+			ExpectedIssuer:         &iss,
+			AllowMissingExpiration: true,
+		})
+		if err != nil {
+			t.Fatalf("NewValidator() err = %v, want nil", err)
+		}
+		testVectors = append(testVectors, jwtSignatureTestVector{
+			name:       "ES256_CustomKID",
+			privateKey: privateKey,
+			publicKey:  publicKey,
+			validator:  validator,
+			signedJwt:
+			// {"kid":"custom-kid","alg":"ES256"}
+			"eyJraWQiOiJjdXN0b20ta2lkIiwiYWxnIjoiRVMyNTYifQ" +
+				"." +
+				// {"iss":"issuer"}
+				"eyJpc3MiOiJpc3N1ZXIifQ" +
+				"." +
+				"A51jqxnj-pddSJUm7dxe4bcmac3xOVg85xhIQ8Fsohv4_" +
+				"LNMJnmx6Pw9xXGeUHDtW4Y59CxATAmXDqnqvB-kiA",
+		})
+	}
+	// RS256
+	{ // Ignored KID
+		params := mustCreateJWTRSASSAPKCS1Parameters(t, jwtrsassapkcs1.ParametersOpts{
+			ModulusSizeInBits: 2048,
+			PublicExponent:    0x10001,
+			Algorithm:         jwtrsassapkcs1.RS256,
+			KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+		})
+		publicKey := mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+			Parameters:    params,
+			IDRequirement: 0,
+			Modulus:       mustBase64Decode(t, n2048Base64),
+		})
+		privateKey := mustCreateJWTRSASSAPKCS1PrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
+			PublicKey: publicKey,
+			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+		})
+
+		iss := "joe"
+		validator, err := NewValidator(&ValidatorOpts{
+			ExpectedIssuer: &iss,
+			FixedNow:       time.Unix(1300819380, 0).Add(-1 * time.Hour),
+		})
+		if err != nil {
+			t.Fatalf("NewValidator() err = %v, want nil", err)
+		}
+		testVectors = append(testVectors, jwtSignatureTestVector{
+			name:       "RS256_IgnoredKID",
+			privateKey: privateKey,
+			publicKey:  publicKey,
+			validator:  validator,
+			signedJwt:
+			// {"alg":"RS256"}
+			"eyJhbGciOiJSUzI1NiJ9" +
+				"." +
+				// {"iss":"joe",
+				//  "exp":1300819380,
+				//  "http://example.com/is_root":true}
+				"eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFt" +
+				"cGxlLmNvbS9pc19yb290Ijp0cnVlfQ" +
+				"." +
+				"F_h14Jj1TXhtO6DzWk5Ecei4h7I-" +
+				"y9aCLUn8wMzFaIQ76MbE5qjkvLGyVpf5zwhrEx8WGmQTjufQ1kIFiu45O9qg0ZnDvRunMi" +
+				"73F80PxXOdbWIUfY1QF1JCO-TqFHfymG8xShpQEm6R-WeF-" +
+				"LeWxa6GWaNrJcvM4aggotdGKhgHC7SwYXVYjPhmH4r8jaUuGzCIO_iQb31n-" +
+				"aR05XR16xti54pIgWlxXNgLhZ13umDeohZ6xkSny4HFvsJ2j08zo1CXtGOPdd34IKv4Y5S" +
+				"xKJ5YwXVLukyGqvPLy8PNCkQlh32N5kjh9IGdg25OgR08ADQjRKinVjO_UxROv0bj4Q",
+		})
+	}
+	{ // Base64EncodedKeyIDAsKID
+		params := mustCreateJWTRSASSAPKCS1Parameters(t, jwtrsassapkcs1.ParametersOpts{
+			ModulusSizeInBits: 2048,
+			PublicExponent:    0x10001,
+			Algorithm:         jwtrsassapkcs1.RS256,
+			KidStrategy:       jwtrsassapkcs1.Base64EncodedKeyIDAsKID,
+		})
+		publicKey := mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+			Parameters:    params,
+			IDRequirement: 0x01020304,
+			Modulus:       mustBase64Decode(t, n2048Base64),
+		})
+		privateKey := mustCreateJWTRSASSAPKCS1PrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
+			PublicKey: publicKey,
+			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+		})
+
+		iss := "issuer"
+		validator, err := NewValidator(&ValidatorOpts{
+			ExpectedIssuer:         &iss,
+			AllowMissingExpiration: true,
+		})
+		if err != nil {
+			t.Fatalf("NewValidator() err = %v, want nil", err)
+		}
+		testVectors = append(testVectors, jwtSignatureTestVector{
+			name:       "RS256_Base64EncodedKeyIDAsKID",
+			privateKey: privateKey,
+			publicKey:  publicKey,
+			validator:  validator,
+			signedJwt:
+			// {"kid":"AQIDBA","alg":"RS256"}
+			"eyJraWQiOiJBUUlEQkEiLCJhbGciOiJSUzI1NiJ9" +
+				"." +
+				// {"iss":"issuer"}
+				"eyJpc3MiOiJpc3N1ZXIifQ" +
+				"." +
+				"SPjCMSIBpUwJZXV-wxs_2IT6Vh6znxtAasbK9eONeljAqPcBDm3dpjC25rtoeWEN5fL1_" +
+				"P4EG6C87jLQyFgaFt1ghvJIN3_mlcykVKKj1P_wrxIyjg7itRujKw_" +
+				"GIYj6eT3CV0Ei6xx6UHTkyIGZwQnGO2I6Q9mFyS-1OGBUmK-4xXK_" +
+				"CCk9Bop5gjNcPkbrnFql15-KygppSbYp8s4ob59K_g6G-b7JN32WAqjoRzaAOJ9GhItg_" +
+				"2BTow4Z1-4w6wH94X1WRnZbjFXJ6JcBr0noNy1k1PnavsHiQTm_" +
+				"FRqsR6JbqkVDGLueWHlCBuBFr2SKqvIYDY8DOCP3Qi3nGA",
+		})
+	}
+	{ // CustomKID
+		params := mustCreateJWTRSASSAPKCS1Parameters(t, jwtrsassapkcs1.ParametersOpts{
+			ModulusSizeInBits: 2048,
+			PublicExponent:    0x10001,
+			Algorithm:         jwtrsassapkcs1.RS256,
+			KidStrategy:       jwtrsassapkcs1.CustomKID,
+		})
+		publicKey := mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+			Parameters:   params,
+			CustomKID:    "custom-kid",
+			HasCustomKID: true,
+			Modulus:      mustBase64Decode(t, n2048Base64),
+		})
+		privateKey := mustCreateJWTRSASSAPKCS1PrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
+			PublicKey: publicKey,
+			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+		})
+
+		iss := "issuer"
+		validator, err := NewValidator(&ValidatorOpts{
+			ExpectedIssuer:         &iss,
+			AllowMissingExpiration: true,
+		})
+		if err != nil {
+			t.Fatalf("NewValidator() err = %v, want nil", err)
+		}
+		testVectors = append(testVectors, jwtSignatureTestVector{
+			name:       "RS256_CustomKID",
+			privateKey: privateKey,
+			publicKey:  publicKey,
+			validator:  validator,
+			signedJwt:
+			// {"kid":"custom-kid","alg":"RS256"}
+			"eyJraWQiOiJjdXN0b20ta2lkIiwiYWxnIjoiUlMyNTYifQ" +
+				"." +
+				// {"iss":"issuer"}
+				"eyJpc3MiOiJpc3N1ZXIifQ" +
+				"." +
+				"jHc-0csHrSxYdJ6fhfiS88Evy4q1FZ3igL-" +
+				"f8vP0RBdl5gYy1Lx8qJQJkybZ04BzwyockPz3rs5UGj7a0w5S0jVnPC9Ktg1O5V5vY28ua" +
+				"EQHXrskuBRPiynNOS_" +
+				"MCJtc1CJlmzVD99UHJGcKsTfzN30u6wZALnlLqrMEJ6ZluQ4T1UJUJjlFjlrf9qWeHhFu8" +
+				"xEEovnbwlX54UgGuaYiuqlS1ZV8_c9kG9oXU-8IriuqUctss3VtN4_" +
+				"1XgEvFreOypKnCn29TAIaB8Frhq5CBsF2O30cTFFa0WtZox2lZsFU9RobrIOELC-" +
+				"9kpIkE6iS03H-G0fi228XNRNCB0XhzA",
+		})
+	}
+	// PS256
+	{ // Ignored KID
+		params := mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+			ModulusSizeInBits: 2048,
+			PublicExponent:    0x10001,
+			Algorithm:         jwtrsassapss.PS256,
+			KidStrategy:       jwtrsassapss.IgnoredKID,
+		})
+		publicKey := mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+			Parameters:    params,
+			IDRequirement: 0,
+			Modulus:       mustBase64Decode(t, n2048Base64),
+		})
+		privateKey := mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
+			PublicKey: publicKey,
+			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+		})
+
+		iss := "joe"
+		validator, err := NewValidator(&ValidatorOpts{
+			ExpectedIssuer: &iss,
+			FixedNow:       time.Unix(1300819380, 0).Add(-1 * time.Hour),
+		})
+		if err != nil {
+			t.Fatalf("NewValidator() err = %v, want nil", err)
+		}
+		testVectors = append(testVectors, jwtSignatureTestVector{
+			name:       "PS256_IgnoredKID",
+			privateKey: privateKey,
+			publicKey:  publicKey,
+			validator:  validator,
+			signedJwt:
+			// {"alg":"PS256"}
+			"eyJhbGciOiJQUzI1NiJ9" +
+				"." +
+				// {"iss":"joe",
+				//  "exp":1300819380,
+				//  "http://example.com/is_root":true}
+				"eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFt" +
+				"cGxlLmNvbS9pc19yb290Ijp0cnVlfQ" +
+				"." +
+				"WeMZxYgxDNYFbVm2-pt3uxlj1fIS540KIz1mUMwBfcWunpduvtzj_fWPJv_" +
+				"bqRC78GdqUaOju01Sega8ECcVsg_8guRyJOl_" +
+				"BmE9c6kxzSiPyZJ9f1xUjx9WfQ5kcoYMNMVJ_" +
+				"gUO9QbWin23UiHBBs61rolzn0M6xfNS6MkaYXfsa8aYOWAmsLU_" +
+				"6WOQtN645bSyoyHDIah2dHXZXQBc6SkqLP8fW1oiTLU4PcVr6SzQIHfK0kS674lqqmdFVK" +
+				"QfyIakLEhGsQuZ0XzKRE-RbUrQGelKiC1q5Jz3Gq0nAGqOSPkFMA_" +
+				"5TK1TQhykfbIuXYAClbt1tM74ee27sb2uuQ",
+		})
+	}
+	{ // Base64EncodedKeyIDAsKID
+		params := mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+			ModulusSizeInBits: 2048,
+			PublicExponent:    0x10001,
+			Algorithm:         jwtrsassapss.PS256,
+			KidStrategy:       jwtrsassapss.Base64EncodedKeyIDAsKID,
+		})
+		publicKey := mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+			Parameters:    params,
+			IDRequirement: 0x01020304,
+			Modulus:       mustBase64Decode(t, n2048Base64),
+		})
+		privateKey := mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
+			PublicKey: publicKey,
+			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+		})
+
+		iss := "issuer"
+		validator, err := NewValidator(&ValidatorOpts{
+			ExpectedIssuer:         &iss,
+			AllowMissingExpiration: true,
+		})
+		if err != nil {
+			t.Fatalf("NewValidator() err = %v, want nil", err)
+		}
+		testVectors = append(testVectors, jwtSignatureTestVector{
+			name:       "PS256_Base64EncodedKeyIDAsKID",
+			privateKey: privateKey,
+			publicKey:  publicKey,
+			validator:  validator,
+			signedJwt:
+			// {"kid":"AQIDBA","alg":"PS256"}
+			"eyJraWQiOiJBUUlEQkEiLCJhbGciOiJQUzI1NiJ9" +
+				"." +
+				// {"iss":"issuer"}
+				"eyJpc3MiOiJpc3N1ZXIifQ" +
+				"." +
+				"g3PZHFG5ZTEhq_" +
+				"73HvCOy5DMsEIYOvuhDVzx839d8KhepjQ50QukGG5xIndgNkwJ6lHNGoDxXuAWu8ckSkt7" +
+				"y4RVYc9Qef7cViiHFlJSSFhGocZZuoNFa4uVyQFRe84Zn70kTt2CZ22bhFAJ9rGdTF-" +
+				"Vw5BgiHquHiivFzHyo6Q4hOL901Sm1hIW3wHJ6wneW_at6iVLv80l3jRxh19y7JfQJ-" +
+				"hCE3yv5UKDYJMlNwwY1jzVD1GdFwpNnjTtgtSH9rFMY8t7D9iXfQjo4iNpZFxeho2igyuV" +
+				"dUj8BhfzFO6aSk6NxWdY--ALTJ06YfqMhqNzt_cDrtMksR8vJMcjEQ",
+		})
+	}
+	{ // CustomKID
+		params := mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+			ModulusSizeInBits: 2048,
+			PublicExponent:    0x10001,
+			Algorithm:         jwtrsassapss.PS256,
+			KidStrategy:       jwtrsassapss.CustomKID,
+		})
+		publicKey := mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+			Parameters:   params,
+			CustomKID:    "custom-kid",
+			HasCustomKID: true,
+			Modulus:      mustBase64Decode(t, n2048Base64),
+		})
+		privateKey := mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
+			PublicKey: publicKey,
+			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
+		})
+
+		iss := "issuer"
+		validator, err := NewValidator(&ValidatorOpts{
+			ExpectedIssuer:         &iss,
+			AllowMissingExpiration: true,
+		})
+		if err != nil {
+			t.Fatalf("NewValidator() err = %v, want nil", err)
+		}
+		testVectors = append(testVectors, jwtSignatureTestVector{
+			name:       "PS256_CustomKID",
+			privateKey: privateKey,
+			publicKey:  publicKey,
+			validator:  validator,
+			signedJwt:
+			// {"kid":"custom-kid","alg":"PS256"}
+			"eyJraWQiOiJjdXN0b20ta2lkIiwiYWxnIjoiUFMyNTYifQ" +
+				"." +
+				// {"iss":"issuer"}
+				"eyJpc3MiOiJpc3N1ZXIifQ" +
+				"." +
+				"jrJpl_N-" +
+				"uwEDnFrUoqjvJb0Hc9RCyXl9C8heT9Z7ITKOHn4B8laq3Otz20TLeJ9eHNESHZh7mq5R1o" +
+				"1vgdkGmxvtmQ8OXC9sr1paFFWREH7FD9ofHSpru7WqkDLH4K9iiQnr6s_" +
+				"Idy56f9xbELgBkwipSQVeEiLbWXvMasU2YyyOMfEFF40Y-" +
+				"dzxFVHPUWKV7GdrrT7TdiA9Z9pSl4JNQau3_" +
+				"sEXOnBZQ3GxJ63vsDQgAzTuz6Ggr8DuuiLHkOZyqAF6qckQ7IzGEYw7jDbHEBR3VbUU8xZ" +
+				"e-X1uZS-ZbijC452qDAT8qCp0z9zKT-zOOa1W0hdxDOnG2pPWqNzy7g",
+		})
+	}
+
+	return testVectors
+}
+
+func mustCreateKeysetHandles(t *testing.T, secretKey key.Key, publicKey key.Key) (*keyset.Handle, *keyset.Handle) {
+	privateKeysetManager := keyset.NewManager()
+	if _, err := privateKeysetManager.AddKeyWithOpts(secretKey, internalapi.Token{}, keyset.AsPrimary()); err != nil {
+		t.Fatalf("privateKeysetManager.AddKey() err = %v, want nil", err)
+	}
+	privateKeyset, err := privateKeysetManager.Handle()
+	if err != nil {
+		t.Fatalf("privateKeysetManager.Handle() err = %v, want nil", err)
+	}
+
+	publickKeysetManager := keyset.NewManager()
+	if _, err := publickKeysetManager.AddKeyWithOpts(publicKey, internalapi.Token{}, keyset.AsPrimary()); err != nil {
+		t.Fatalf("publickKeysetManager.AddKey() err = %v, want nil", err)
+	}
+	publicKeyset, err := publickKeysetManager.Handle()
+	if err != nil {
+		t.Fatalf("publickKeysetManager.Handle() err = %v, want nil", err)
+	}
+
+	return privateKeyset, publicKeyset
+}
+
+func TestSignerVerfierTestVectors(t *testing.T) {
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*jwtecdsa.PrivateKey]()
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*jwtrsassapkcs1.PrivateKey]()
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*jwtrsassapss.PrivateKey]()
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtecdsa.PrivateKey](createJWTECDSASigner); err != nil {
+		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapkcs1.PrivateKey](createJWTRSASSAPKCS1Signer); err != nil {
+		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapss.PrivateKey](createJWTRSASSAPSSSigner); err != nil {
+		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
+	}
+
+	for _, tc := range jwtSignatureTestVectors(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			privateKeyset, publicKeyset := mustCreateKeysetHandles(t, tc.privateKey, tc.publicKey)
+			signer, err := NewSigner(privateKeyset)
+			if err != nil {
+				t.Fatalf("NewSigner(privateKeyset) = %v, want nil", err)
+			}
+			verifier, err := NewVerifier(publicKeyset)
+			if err != nil {
+				t.Fatalf("NewVerifier(publicKeyset) = %v, want nil", err)
+			}
+
+			// Verify the test vector
+			if _, err := verifier.VerifyAndDecode(tc.signedJwt, tc.validator); err != nil {
+				t.Errorf("verifier.VerifyAndDecode() = %v, want nil", err)
+			}
+
+			// Sign and verify
+			iss := "issuer"
+			rawJWT, err := NewRawJWT(&RawJWTOptions{
+				Issuer:            &iss,
+				WithoutExpiration: true,
+			})
+			if err != nil {
+				t.Fatalf("NewRawJWT() = %v, want nil", err)
+			}
+			signedJWT, err := signer.SignAndEncode(rawJWT)
+			if err != nil {
+				t.Fatalf("signer.SignAndEncode() = %v, want nil", err)
+			}
+			validator, err := NewValidator(&ValidatorOpts{
+				ExpectedIssuer:         &iss,
+				AllowMissingExpiration: true,
+			})
+			if err != nil {
+				t.Fatalf("NewValidator() = %v, want nil", err)
+			}
+			if _, err := verifier.VerifyAndDecode(signedJWT, validator); err != nil {
+				t.Errorf("verifier.VerifyAndDecode() = %v, want nil", err)
+			}
+		})
+	}
 }
 
 func TestSignerVerfierCreator(t *testing.T) {
@@ -629,36 +1132,18 @@ func TestSignerVerfierCreator(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			p, err := primitiveregistry.Primitive(tc.privateKey)
-			if err != nil {
-				t.Fatalf("primitiveregistry.Primitive() err = %v, want nil", err)
-			}
-			signer, ok := p.(Signer)
-			if !ok {
-				t.Fatalf("primitiveregistry.Primitive(%T) = %T, want sKID", tc.privateKey, p)
-			}
-
-			// Create a public keyset handle.
-			km := keyset.NewManager()
 			publicKey, err := tc.privateKey.(privateKey).PublicKey()
 			if err != nil {
 				t.Fatalf("tc.privateKey.(privateKey).PublicKey() err = %v, want nil", err)
 			}
-			keyID, err := km.AddKeyWithOpts(publicKey, internalapi.Token{})
+			privateKeyset, publicKeyset := mustCreateKeysetHandles(t, tc.privateKey, publicKey)
+			signer, err := NewSigner(privateKeyset)
 			if err != nil {
-				t.Fatalf("km.AddKey() err = %v, want nil", err)
+				t.Fatalf("NewSigner(privateKeyset) = %v, want nil", err)
 			}
-			if err := km.SetPrimary(keyID); err != nil {
-				t.Fatalf("km.SetPrimary() err = %v, want nil", err)
-			}
-			pubKeyHandle, err := km.Handle()
+			verifier, err := NewVerifier(publicKeyset)
 			if err != nil {
-				t.Fatalf("km.Handle() err = %v, want nil", err)
-			}
-
-			verifier, err := NewVerifier(pubKeyHandle)
-			if err != nil {
-				t.Fatalf("NewVerifier() err = %v, want nil", err)
+				t.Fatalf("NewVerifier(publicKeyset) = %v, want nil", err)
 			}
 
 			// Try to sign and verify a JWT with the issuer set.
