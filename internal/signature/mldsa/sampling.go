@@ -49,13 +49,18 @@ func rejectNTTPoly(rho [32 + 2]byte) *polyNTT {
 	G.Write(rho[:])
 	i := 0
 	for i < degree {
-		var s [3]byte
+		// For SHAKE128, the rate (i.e. blocksize) is 168 bytes.
+		var s [168]byte
 		G.Read(s[:])
-		// Inlined Algorithm 14 (CoeffFromThreeBytes)
-		c := uint32(s[0]) | uint32(s[1])<<8 | uint32(s[2]&0x7F)<<16
-		if c < q {
-			res[i] = rZq(c)
-			i++
+		// We have that 168 mod 3 = 0. Then 168/3 = 56 (exact), so we may read 3-blocks
+		// from 3-index 0,...,55. Then on 3-index 56 we have j = 168 and the loop exits.
+		for j := 0; j < 168 && i < degree; j += 3 {
+			// Inlined Algorithm 14 (CoeffFromThreeBytes)
+			c := uint32(s[j]) | uint32(s[j+1])<<8 | uint32(s[j+2]&0x7F)<<16
+			if c < q {
+				res[i] = rZq(c)
+				i++
+			}
 		}
 	}
 	return res
@@ -67,7 +72,8 @@ func (par *params) coeffFromHalfByte(b byte) (rZq, bool) {
 		// Constant time "b mod 5".
 		bMod5 := byte(uint16(b) - 5*((uint16(b)*205)>>10))
 		return rZq(2).sub(rZq(bMod5)), true
-	} else if par.eta == 4 && b < 9 {
+	}
+	if par.eta == 4 && b < 9 {
 		return rZq(4).sub(rZq(b)), true
 	}
 	return rZq(0), false
