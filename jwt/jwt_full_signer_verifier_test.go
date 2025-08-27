@@ -712,8 +712,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
 	}
 	for _, tc := range []struct {
-		name       string
-		privateKey key.Key
+		name               string
+		privateKey         key.Key
+		otherVerifyingKeys []key.Key
 	}{
 		// ES256
 		{
@@ -723,6 +724,12 @@ func TestSignerVerfierCreator(t *testing.T) {
 				PublicPoint:   mustHexDecode(t, p256PublicKeyPointHex),
 				IDRequirement: 0x01020304,
 			})),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
+					Parameters:  mustCreateJWTECDSAParameters(t, jwtecdsa.IgnoredKID, jwtecdsa.ES256),
+					PublicPoint: mustHexDecode(t, p256PublicKeyPointHex),
+				}),
+			},
 		},
 		{
 			name: "ES256_CustomKID",
@@ -733,14 +740,28 @@ func TestSignerVerfierCreator(t *testing.T) {
 				HasCustomKID:  true,
 				CustomKID:     "custom-kid",
 			})),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
+					Parameters:  mustCreateJWTECDSAParameters(t, jwtecdsa.IgnoredKID, jwtecdsa.ES256),
+					PublicPoint: mustHexDecode(t, p256PublicKeyPointHex),
+				}),
+			},
 		},
 		{
 			name: "ES256_IgnoredKID",
 			privateKey: mustCreateJWTECDSAPrivateKey(t, mustHexDecode(t, p256PrivateKeyHex), mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
-				Parameters:    mustCreateJWTECDSAParameters(t, jwtecdsa.Base64EncodedKeyIDAsKID, jwtecdsa.ES256),
+				Parameters:    mustCreateJWTECDSAParameters(t, jwtecdsa.IgnoredKID, jwtecdsa.ES256),
 				PublicPoint:   mustHexDecode(t, p256PublicKeyPointHex),
 				IDRequirement: 0,
 			})),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
+					Parameters:   mustCreateJWTECDSAParameters(t, jwtecdsa.CustomKID, jwtecdsa.ES256),
+					HasCustomKID: true,
+					CustomKID:    "custom-kid",
+					PublicPoint:  mustHexDecode(t, p256PublicKeyPointHex),
+				}),
+			},
 		},
 		// ES384
 		{
@@ -750,6 +771,12 @@ func TestSignerVerfierCreator(t *testing.T) {
 				PublicPoint:   mustHexDecode(t, p384PublicKeyPointHex),
 				IDRequirement: 0x01020304,
 			})),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
+					Parameters:  mustCreateJWTECDSAParameters(t, jwtecdsa.IgnoredKID, jwtecdsa.ES384),
+					PublicPoint: mustHexDecode(t, p384PublicKeyPointHex),
+				}),
+			},
 		},
 		{
 			name: "ES384_CustomKID",
@@ -760,13 +787,27 @@ func TestSignerVerfierCreator(t *testing.T) {
 				HasCustomKID:  true,
 				CustomKID:     "custom-kid",
 			})),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
+					Parameters:  mustCreateJWTECDSAParameters(t, jwtecdsa.IgnoredKID, jwtecdsa.ES384),
+					PublicPoint: mustHexDecode(t, p384PublicKeyPointHex),
+				}),
+			},
 		},
 		{
 			name: "ES384_IgnoredKID",
 			privateKey: mustCreateJWTECDSAPrivateKey(t, mustHexDecode(t, p384PrivateKeyHex), mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
-				Parameters:  mustCreateJWTECDSAParameters(t, jwtecdsa.Base64EncodedKeyIDAsKID, jwtecdsa.ES384),
+				Parameters:  mustCreateJWTECDSAParameters(t, jwtecdsa.IgnoredKID, jwtecdsa.ES384),
 				PublicPoint: mustHexDecode(t, p384PublicKeyPointHex),
 			})),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
+					Parameters:   mustCreateJWTECDSAParameters(t, jwtecdsa.CustomKID, jwtecdsa.ES384),
+					HasCustomKID: true,
+					CustomKID:    "custom-kid",
+					PublicPoint:  mustHexDecode(t, p384PublicKeyPointHex),
+				}),
+			},
 		},
 		// ES512
 		{
@@ -776,6 +817,12 @@ func TestSignerVerfierCreator(t *testing.T) {
 				PublicPoint:   mustHexDecode(t, p521PublicKeyPointHex),
 				IDRequirement: 0x01020304,
 			})),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
+					Parameters:  mustCreateJWTECDSAParameters(t, jwtecdsa.IgnoredKID, jwtecdsa.ES512),
+					PublicPoint: mustHexDecode(t, p521PublicKeyPointHex),
+				}),
+			},
 		},
 		{
 			name: "ES512_CustomKID",
@@ -786,13 +833,27 @@ func TestSignerVerfierCreator(t *testing.T) {
 				HasCustomKID:  true,
 				CustomKID:     "custom-kid",
 			})),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
+					Parameters:  mustCreateJWTECDSAParameters(t, jwtecdsa.IgnoredKID, jwtecdsa.ES512),
+					PublicPoint: mustHexDecode(t, p521PublicKeyPointHex),
+				}),
+			},
 		},
 		{
 			name: "ES512_IgnoredKID",
 			privateKey: mustCreateJWTECDSAPrivateKey(t, mustHexDecode(t, p521PrivateKeyHex), mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
-				Parameters:  mustCreateJWTECDSAParameters(t, jwtecdsa.Base64EncodedKeyIDAsKID, jwtecdsa.ES512),
+				Parameters:  mustCreateJWTECDSAParameters(t, jwtecdsa.IgnoredKID, jwtecdsa.ES512),
 				PublicPoint: mustHexDecode(t, p521PublicKeyPointHex),
 			})),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTECDSAPublicKey(t, jwtecdsa.PublicKeyOpts{
+					Parameters:   mustCreateJWTECDSAParameters(t, jwtecdsa.CustomKID, jwtecdsa.ES512),
+					HasCustomKID: true,
+					CustomKID:    "custom-kid",
+					PublicPoint:  mustHexDecode(t, p521PublicKeyPointHex),
+				}),
+			},
 		},
 		// RS256
 		{
@@ -812,6 +873,17 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPKCS1Parameters(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n2048Base64),
+				}),
+			},
 		},
 		{
 			name: "RS256_CustomKID",
@@ -832,6 +904,17 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPKCS1Parameters(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n2048Base64),
+				}),
+			},
 		},
 		{
 			name: "RS256_IgnoredKID",
@@ -849,6 +932,19 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPKCS1Parameters(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapkcs1.RS256,
+						KidStrategy:       jwtrsassapkcs1.CustomKID,
+					}),
+					Modulus:      mustBase64Decode(t, n2048Base64),
+					HasCustomKID: true,
+					CustomKID:    "custom-kid",
+				}),
+			},
 		},
 		// RS384
 		{
@@ -868,6 +964,17 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPKCS1Parameters(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 3072,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapkcs1.RS384,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n3072Base64),
+				}),
+			},
 		},
 		{
 			name: "RS384_CustomKID",
@@ -888,6 +995,17 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPKCS1Parameters(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 3072,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapkcs1.RS384,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n3072Base64),
+				}),
+			},
 		},
 		{
 			name: "RS384_IgnoredKID",
@@ -905,6 +1023,19 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPKCS1Parameters(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 3072,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapkcs1.RS384,
+						KidStrategy:       jwtrsassapkcs1.CustomKID,
+					}),
+					Modulus:      mustBase64Decode(t, n3072Base64),
+					HasCustomKID: true,
+					CustomKID:    "custom-kid",
+				}),
+			},
 		},
 		// RS512
 		{
@@ -924,6 +1055,17 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPKCS1Parameters(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 4096,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapkcs1.RS512,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n4096Base64),
+				}),
+			},
 		},
 		{
 			name: "RS512_CustomKID",
@@ -944,6 +1086,17 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPKCS1Parameters(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 4096,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapkcs1.RS512,
+						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n4096Base64),
+				}),
+			},
 		},
 		{
 			name: "RS512_IgnoredKID",
@@ -961,6 +1114,19 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPKCS1Parameters(t, jwtrsassapkcs1.ParametersOpts{
+						ModulusSizeInBits: 4096,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapkcs1.RS512,
+						KidStrategy:       jwtrsassapkcs1.CustomKID,
+					}),
+					Modulus:      mustBase64Decode(t, n4096Base64),
+					HasCustomKID: true,
+					CustomKID:    "custom-kid",
+				}),
+			},
 		},
 		// PS256
 		{
@@ -980,6 +1146,17 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS256,
+						KidStrategy:       jwtrsassapss.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n2048Base64),
+				}),
+			},
 		},
 		{
 			name: "PS256_CustomKID",
@@ -1000,6 +1177,17 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS256,
+						KidStrategy:       jwtrsassapss.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n2048Base64),
+				}),
+			},
 		},
 		{
 			name: "PS256_IgnoredKID",
@@ -1017,6 +1205,19 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 2048,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS256,
+						KidStrategy:       jwtrsassapss.CustomKID,
+					}),
+					Modulus:      mustBase64Decode(t, n2048Base64),
+					HasCustomKID: true,
+					CustomKID:    "custom-kid",
+				}),
+			},
 		},
 		// PS384
 		{
@@ -1036,6 +1237,17 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 3072,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS384,
+						KidStrategy:       jwtrsassapss.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n3072Base64),
+				}),
+			},
 		},
 		{
 			name: "PS384_CustomKID",
@@ -1056,6 +1268,17 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 3072,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS384,
+						KidStrategy:       jwtrsassapss.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n3072Base64),
+				}),
+			},
 		},
 		{
 			name: "PS384_IgnoredKID",
@@ -1073,6 +1296,19 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 3072,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS384,
+						KidStrategy:       jwtrsassapss.CustomKID,
+					}),
+					Modulus:      mustBase64Decode(t, n3072Base64),
+					HasCustomKID: true,
+					CustomKID:    "custom-kid",
+				}),
+			},
 		},
 		// PS512
 		{
@@ -1092,6 +1328,17 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 4096,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS512,
+						KidStrategy:       jwtrsassapss.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n4096Base64),
+				}),
+			},
 		},
 		{
 			name: "PS512_CustomKID",
@@ -1112,6 +1359,17 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 4096,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS512,
+						KidStrategy:       jwtrsassapss.IgnoredKID,
+					}),
+					Modulus: mustBase64Decode(t, n4096Base64),
+				}),
+			},
 		},
 		{
 			name: "PS512_IgnoredKID",
@@ -1129,6 +1387,19 @@ func TestSignerVerfierCreator(t *testing.T) {
 				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
 				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
+			otherVerifyingKeys: []key.Key{
+				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
+					Parameters: mustCreateJWTRSASSAPSSParameters(t, jwtrsassapss.ParametersOpts{
+						ModulusSizeInBits: 4096,
+						PublicExponent:    65537, // f4
+						Algorithm:         jwtrsassapss.PS512,
+						KidStrategy:       jwtrsassapss.CustomKID,
+					}),
+					Modulus:      mustBase64Decode(t, n4096Base64),
+					HasCustomKID: true,
+					CustomKID:    "custom-kid",
+				}),
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1176,6 +1447,18 @@ func TestSignerVerfierCreator(t *testing.T) {
 			}
 			if gotIssuer != issuer {
 				t.Errorf("verifiedJWT.Issuer() = %q, want %q", gotIssuer, issuer)
+			}
+
+			// Check other verifying keys.
+			for _, publicKey := range tc.otherVerifyingKeys {
+				_, publicKeyset := mustCreateKeysetHandles(t, tc.privateKey, publicKey)
+				verifier, err := NewVerifier(publicKeyset)
+				if err != nil {
+					t.Fatalf("NewVerifier(publicKeyset) = %v, want nil", err)
+				}
+				if _, err := verifier.VerifyAndDecode(signedToken, validator); err != nil {
+					t.Errorf("verifier.VerifyAndDecode() err = %v, want nil", err)
+				}
 			}
 		})
 	}
