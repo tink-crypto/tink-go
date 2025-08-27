@@ -205,6 +205,66 @@ func (p *fakeParametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Param
 	return p.params, nil
 }
 
+func TestPrimitive_WithCustomPrimitiveFunc(t *testing.T) {
+	customPrimitive := "custom primitive"
+	customErr := errors.New("custom error")
+
+	tests := []struct {
+		name          string
+		km            registry.KeyManager
+		pFunc         primitiveFunc
+		wantPrimitive any
+		wantErr       error
+	}{
+		{
+			name: "KeyManager_CustomFuncReturnsPrimitive",
+			km: NewWithCustomPrimitive(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil, func(serializedKey []byte) (any, error) {
+				return customPrimitive, nil
+			}),
+			wantPrimitive: customPrimitive,
+			wantErr:       nil,
+		},
+		{
+			name: "KeyManager_CustomFuncReturnsError",
+			km: NewWithCustomPrimitive(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil, func(serializedKey []byte) (any, error) {
+				return nil, customErr
+			}),
+			wantPrimitive: nil,
+			wantErr:       customErr,
+		},
+		{
+			name: "PrivateKeyManager_CustomFuncReturnsPrimitive",
+			km: NewPrivateKeyManagerWithCustomPrimitive(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil, func(serializedKey []byte) (any, error) {
+				return customPrimitive, nil
+			}),
+			wantPrimitive: customPrimitive,
+			wantErr:       nil,
+		},
+		{
+			name: "PrivateKeyManager_CustomFuncReturnsError",
+			km: NewPrivateKeyManagerWithCustomPrimitive(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil, func(serializedKey []byte) (any, error) {
+				return nil, customErr
+			}),
+			wantPrimitive: nil,
+			wantErr:       customErr,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			serializedKey := random.GetRandomBytes(16)
+			gotPrimitive, err := tc.km.Primitive(serializedKey)
+
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("Primitive() error = %v, want %v", err, tc.wantErr)
+			}
+			if gotPrimitive != tc.wantPrimitive {
+				t.Errorf("Primitive() = %v, want %v", gotPrimitive, tc.wantPrimitive)
+			}
+		})
+	}
+}
+
 func TestPrimitive_FailsIfConfigFails(t *testing.T) {
 	defer protoserialization.UnregisterKeyParser(fakeKeyTypeURL)
 	defer protoserialization.UnregisterKeySerializer[*fakeKey]()
