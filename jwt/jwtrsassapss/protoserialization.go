@@ -127,13 +127,19 @@ func (s *parametersParser) Parse(kt *tinkpb.KeyTemplate) (key.Parameters, error)
 	if keyFormat.GetVersion() != 0 {
 		return nil, fmt.Errorf("invalid version: got %d, want 0", keyFormat.GetVersion())
 	}
+
+	publicExponent := new(big.Int).SetBytes(keyFormat.GetPublicExponent())
+	if !publicExponent.IsInt64() {
+		return nil, fmt.Errorf("public exponent cannot be represented as int64")
+	}
+
 	// Key format cannot specify a CustomKID.
 	kidStrategy := kidStrategyFromOutputPrefixType(kt.GetOutputPrefixType(), false)
 	return NewParameters(ParametersOpts{
 		KidStrategy:       kidStrategy,
 		Algorithm:         algorithmFromProto(keyFormat.GetAlgorithm()),
 		ModulusSizeInBits: int(keyFormat.GetModulusSizeInBits()),
-		PublicExponent:    f4,
+		PublicExponent:    int(publicExponent.Int64()),
 	})
 }
 

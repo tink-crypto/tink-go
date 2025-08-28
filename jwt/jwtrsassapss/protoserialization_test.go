@@ -310,10 +310,38 @@ func TestParametersParser_Errors(t *testing.T) {
 				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
 		},
+		{
+			name: "invalid public exponent",
+			kt: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPssPrivateKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPssKeyFormat{
+					Algorithm:         jwtrsapb.JwtRsaSsaPssAlgorithm_PS256,
+					ModulusSizeInBits: 2048,
+					PublicExponent:    []byte{0x01, 0x00},
+					Version:           0,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
+		{
+			name: "invalid public exponent too large to fit in int64",
+			kt: &tinkpb.KeyTemplate{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPssPrivateKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPssKeyFormat{
+					Algorithm:         jwtrsapb.JwtRsaSsaPssAlgorithm_PS256,
+					ModulusSizeInBits: 2048,
+					PublicExponent:    new(big.Int).Add(new(big.Int).Lsh(big.NewInt(1), 64), big.NewInt(1)).Bytes(), // 2^64 + 1
+					Version:           0,
+				}),
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := protoserialization.ParseParameters(tc.kt); err == nil {
 				t.Errorf("protoserialization.ParseParameters(%v) error = nil, want error", tc.kt)
+			} else {
+				t.Logf("protoserialization.ParseParameters(%v) error = %v", tc.kt, err)
 			}
 		})
 	}
