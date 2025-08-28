@@ -45,7 +45,7 @@ func createJWTHMACKeyTemplate(keySize uint32, algorithm jwtmacpb.JwtHmacAlgorith
 
 func createJWTECDSAKeyTemplate(algorithm jepb.JwtEcdsaAlgorithm, outputPrefixType tinkpb.OutputPrefixType) *tinkpb.KeyTemplate {
 	format := &jepb.JwtEcdsaKeyFormat{
-		Version:   jwtECDSASignerKeyVersion,
+		Version:   0,
 		Algorithm: algorithm,
 	}
 	serializedFormat, err := proto.Marshal(format)
@@ -61,7 +61,7 @@ func createJWTECDSAKeyTemplate(algorithm jepb.JwtEcdsaAlgorithm, outputPrefixTyp
 
 func createJWTRSKeyTemplate(algorithm jrsppb.JwtRsaSsaPkcs1Algorithm, modulusSizeInBits uint32, outputPrefixType tinkpb.OutputPrefixType) *tinkpb.KeyTemplate {
 	format := &jrsppb.JwtRsaSsaPkcs1KeyFormat{
-		Version:           jwtRSSignerKeyVersion,
+		Version:           0,
 		Algorithm:         algorithm,
 		ModulusSizeInBits: modulusSizeInBits,
 		PublicExponent:    []byte{0x01, 0x00, 0x01},
@@ -71,7 +71,7 @@ func createJWTRSKeyTemplate(algorithm jrsppb.JwtRsaSsaPkcs1Algorithm, modulusSiz
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key format: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          jwtRSSignerTypeURL,
+		TypeUrl:          jwtJWTRSASSAPKCS1SignerTypeURL,
 		Value:            serializedFormat,
 		OutputPrefixType: outputPrefixType,
 	}
@@ -79,7 +79,7 @@ func createJWTRSKeyTemplate(algorithm jrsppb.JwtRsaSsaPkcs1Algorithm, modulusSiz
 
 func createJWTPSKeyTemplate(algorithm jrpsspb.JwtRsaSsaPssAlgorithm, modulusSizeInBits uint32, outputPrefixType tinkpb.OutputPrefixType) *tinkpb.KeyTemplate {
 	format := &jrpsspb.JwtRsaSsaPssKeyFormat{
-		Version:           jwtPSSignerKeyVersion,
+		Version:           0,
 		Algorithm:         algorithm,
 		PublicExponent:    []byte{0x01, 0x00, 0x01},
 		ModulusSizeInBits: modulusSizeInBits,
@@ -89,7 +89,7 @@ func createJWTPSKeyTemplate(algorithm jrpsspb.JwtRsaSsaPssAlgorithm, modulusSize
 		tinkerror.Fail(fmt.Sprintf("failed to marshal key format: %s", err))
 	}
 	return &tinkpb.KeyTemplate{
-		TypeUrl:          jwtPSSignerTypeURL,
+		TypeUrl:          jwtJWTRSASSAPSSSignerTypeURL,
 		Value:            serializedFormat,
 		OutputPrefixType: outputPrefixType,
 	}

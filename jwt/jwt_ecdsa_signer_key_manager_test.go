@@ -183,8 +183,8 @@ func TestECDSASignerNewKeyDataWithInvalidAlgorithmFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createECDSASerializedKeyFormat() err = %v, want nil", err)
 	}
-	if _, err := km.NewKeyData(keyFormat); err != errECDSAInvalidAlgorithm {
-		t.Errorf("km.NewKeyData() err = %v, want %v", err, errECDSAInvalidAlgorithm)
+	if _, err := km.NewKeyData(keyFormat); err == nil {
+		t.Errorf("km.NewKeyData(keyFormat) err = %v, want %v", err, errECDSAInvalidAlgorithm)
 	}
 }
 
@@ -273,86 +273,10 @@ func TestECDSASignerPublicKeyDataGeneratesValidKeyData(t *testing.T) {
 	}
 }
 
-func TestECDSASignerPrimitiveWithEmptyKeyFails(t *testing.T) {
+func TestECDSASignerPrimitiveAlwaysFails(t *testing.T) {
 	km, err := registry.GetKeyManager(testECDSASignerKeyType)
 	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testECDSASignerKeyType, err)
-	}
-	if _, err := km.Primitive(nil); err == nil {
-		t.Errorf("km.Primitive(nil) err = nil, want error")
-	}
-}
-
-func TestECDSASignerPrimitiveWithInvalidKeyVersionFails(t *testing.T) {
-	km, err := registry.GetKeyManager(testECDSASignerKeyType)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testECDSASignerKeyType, err)
-	}
-	k, err := createECDSAKey()
-	if err != nil {
-		t.Fatalf("createECDSAKey() err = %v, want nil", err)
-	}
-	k.Version = testECDSASignerVersion + 1
-	serializedKey, err := proto.Marshal(k)
-	if err != nil {
-		t.Fatalf("proto.Marshal(k) err = %v, want nil", err)
-	}
-	if _, err := km.Primitive(serializedKey); err == nil {
-		t.Errorf("km.Primitive() err = nil, want error")
-	}
-}
-
-func TestECDSASignerPrimitiveWithoutPublicKeyFails(t *testing.T) {
-	km, err := registry.GetKeyManager(testECDSASignerKeyType)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testECDSASignerKeyType, err)
-	}
-	k, err := createECDSAKey()
-	if err != nil {
-		t.Fatalf("createECDSAKey() err = %v, want nil", err)
-	}
-	k.PublicKey = nil
-	serializedKey, err := proto.Marshal(k)
-	if err != nil {
-		t.Fatalf("proto.Marshal(k) err = %v, want nil", err)
-	}
-	if _, err := km.Primitive(serializedKey); err == nil {
-		t.Errorf("km.Primitive() err = nil, want error")
-	}
-}
-
-func TestECDSASignerPrimitiveWithInvalidAlgorithmFails(t *testing.T) {
-	km, err := registry.GetKeyManager(testECDSASignerKeyType)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testECDSASignerKeyType, err)
-	}
-	k, err := createECDSAKey()
-	if err != nil {
-		t.Fatalf("createECDSAKey() err = %v, want nil", err)
-	}
-	k.GetPublicKey().Algorithm = jepb.JwtEcdsaAlgorithm_ES_UNKNOWN
-	serializedKey, err := proto.Marshal(k)
-	if err != nil {
-		t.Fatalf("proto.Marshal(k) err = %v, want nil", err)
-	}
-	if _, err := km.Primitive(serializedKey); err == nil {
-		t.Errorf("km.Primitive(nil) err = nil, want error")
-	}
-}
-
-func TestECDSASignerPrimitiveSignAndVerifyToken(t *testing.T) {
-	rawJWT, err := NewRawJWT(&RawJWTOptions{WithoutExpiration: true})
-	if err != nil {
-		t.Fatalf("NewRawJWT() err = %v, want nil", err)
-	}
-	validator, err := NewValidator(&ValidatorOpts{AllowMissingExpiration: true})
-	if err != nil {
-		t.Fatalf("NewValidator() err = %v, want nil", err)
-	}
-
-	km, err := registry.GetKeyManager(testECDSASignerKeyType)
-	if err != nil {
-		t.Errorf("registry.GetKeyManager(%q): %v", jwtECDSASignerTypeURL, err)
+		t.Fatalf("registry.GetKeyManager(%q): %v", testECDSASignerKeyType, err)
 	}
 	k, err := createECDSAKey()
 	if err != nil {
@@ -362,107 +286,7 @@ func TestECDSASignerPrimitiveSignAndVerifyToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proto.Marshal(k) err = %v, want nil", err)
 	}
-	s, err := km.Primitive(serializedKey)
-	if err != nil {
-		t.Fatalf("km.Primitive() err = %v, want error", err)
-	}
-	signer, ok := s.(*signerWithKID)
-	if !ok {
-		t.Fatalf("s.(*signerWithKID) = %T, want *signerWithKID", s)
-	}
-	compact, err := signer.SignAndEncodeWithKID(rawJWT, nil)
-	if err != nil {
-		t.Errorf("signer.SignAndEncodeWithKID() err = %v, want nil", err)
-	}
-
-	vkm, err := registry.GetKeyManager(testECDSAVerifierKeyType)
-	if err != nil {
-		t.Errorf("registry.GetKeyManager(%q): %v", jwtECDSAVerifierTypeURL, err)
-	}
-	serializedPubKey, err := proto.Marshal(k.GetPublicKey())
-	if err != nil {
-		t.Fatalf("proto.Marshal(k.GetPublicKey()) err = %v, want nil", err)
-	}
-	v, err := vkm.Primitive(serializedPubKey)
-	if err != nil {
-		t.Fatalf("vkm.Primitive() err = %v, want error", err)
-	}
-	verifier, ok := v.(*verifierWithKID)
-	if !ok {
-		t.Fatalf("v.(*verifierWithKID) = %T, want *verifierWithKID", v)
-	}
-	if _, err := verifier.VerifyAndDecodeWithKID(compact, validator, nil); err != nil {
-		t.Errorf("verifier.VerifyAndDecodeWithKID() err = %v, want nil", err)
-	}
-	// Shouldn't contain KID header at all
-	if _, err := verifier.VerifyAndDecodeWithKID(compact, validator, refString("")); err == nil {
-		t.Errorf("verifier.VerifyAndDecodeWithKID() err = nil, want error")
-	}
-}
-
-func TestECDSASignerPrimitiveSignAndVerifyTokenWithCustomKID(t *testing.T) {
-	rawJWT, err := NewRawJWT(&RawJWTOptions{WithoutExpiration: true})
-	if err != nil {
-		t.Fatalf("NewRawJWT() err = %v, want nil", err)
-	}
-	validator, err := NewValidator(&ValidatorOpts{AllowMissingExpiration: true})
-	if err != nil {
-		t.Fatalf("NewValidator() err = %v, want nil", err)
-	}
-
-	km, err := registry.GetKeyManager(testECDSASignerKeyType)
-	if err != nil {
-		t.Errorf("registry.GetKeyManager(%q): %v", jwtECDSASignerTypeURL, err)
-	}
-	k, err := createECDSAKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	k.GetPublicKey().CustomKid = &jepb.JwtEcdsaPublicKey_CustomKid{
-		Value: "1234",
-	}
-	serializedKey, err := proto.Marshal(k)
-	if err != nil {
-		t.Fatalf("proto.Marshal(k) err = %v, want nil", err)
-	}
-	s, err := km.Primitive(serializedKey)
-	if err != nil {
-		t.Fatalf("km.Primitive() err = %v, want error", err)
-	}
-	signer, ok := s.(*signerWithKID)
-	if !ok {
-		t.Fatalf("s.(*signerWithKID) = %T, want *signerWithKID", s)
-	}
-	compact, err := signer.SignAndEncodeWithKID(rawJWT, nil)
-	if err != nil {
-		t.Errorf("signer.SignAndEncodeWithKID(kid = nil) err = %v, want nil", err)
-	}
-	if _, err := signer.SignAndEncodeWithKID(rawJWT, refString("1234")); err == nil {
-		t.Errorf("signer.SignAndEncodeWithKID(kid = 1234) err = nil, want error")
-	}
-
-	vkm, err := registry.GetKeyManager(testECDSAVerifierKeyType)
-	if err != nil {
-		t.Errorf("registry.GetKeyManager(%q): %v", jwtECDSAVerifierTypeURL, err)
-	}
-	k.GetPublicKey().CustomKid = nil
-	serializedPubKey, err := proto.Marshal(k.GetPublicKey())
-	if err != nil {
-		t.Fatalf("proto.Marshal(k.GetPublicKey()) err = %v, want nil", err)
-	}
-	v, err := vkm.Primitive(serializedPubKey)
-	if err != nil {
-		t.Fatalf("vkm.Primitive() err = %v, want error", err)
-	}
-	verifier, ok := v.(*verifierWithKID)
-	if !ok {
-		t.Fatalf("v.(*verifierWithKID) = %T, want *verifierWithKID", v)
-	}
-	if _, err := verifier.VerifyAndDecodeWithKID(compact, validator, refString("1234")); err != nil {
-		t.Errorf("verifier.VerifyAndDecodeWithKID(kid = '1234') err = %v, want nil", err)
-	}
-	// wrong KID verification fail
-	if _, err := verifier.VerifyAndDecodeWithKID(compact, validator, refString("1235")); err == nil {
-		t.Errorf("verifier.VerifyAndDecodeWithKID(kid = '1235') err = nil, want error")
+	if _, err := km.Primitive(serializedKey); err == nil {
+		t.Errorf("km.Primitive() err = nil, want error")
 	}
 }
