@@ -184,7 +184,7 @@ func TestECDSASignerNewKeyDataWithInvalidAlgorithmFails(t *testing.T) {
 		t.Fatalf("createECDSASerializedKeyFormat() err = %v, want nil", err)
 	}
 	if _, err := km.NewKeyData(keyFormat); err == nil {
-		t.Errorf("km.NewKeyData(keyFormat) err = %v, want %v", err, errECDSAInvalidAlgorithm)
+		t.Errorf("km.NewKeyData(keyFormat) err = %v, want error", err)
 	}
 }
 

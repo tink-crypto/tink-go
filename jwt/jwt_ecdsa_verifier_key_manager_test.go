@@ -17,7 +17,6 @@ package jwt
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
@@ -31,11 +30,8 @@ func TestECDSAVerifierNotImplemented(t *testing.T) {
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testECDSAVerifierKeyType, err)
 	}
-	if _, err := km.NewKey(nil); err != errECDSAVerifierNotImplemented {
-		t.Fatalf("km.NewKey() err = %v, want %v", err, errECDSAVerifierNotImplemented)
-	}
-	if _, err := km.NewKeyData(nil); err != errECDSAVerifierNotImplemented {
-		t.Fatalf("km.NewKeyData() err = %v, want %v", err, errECDSAVerifierNotImplemented)
+	if _, err := km.NewKey(nil); err == nil {
+		t.Errorf("km.NewKey() err = nil, want error")
 	}
 }
 
@@ -59,16 +55,6 @@ func TestECDSAVerifierTypeURL(t *testing.T) {
 	}
 	if km.TypeURL() != testECDSAVerifierKeyType {
 		t.Errorf("km.TypeURL() = %q, want %q", km.TypeURL(), testECDSAVerifierKeyType)
-	}
-}
-
-func TestECDSAVerifierPrimitiveWithNilKey(t *testing.T) {
-	km, err := registry.GetKeyManager(testECDSAVerifierKeyType)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testECDSAVerifierKeyType, err)
-	}
-	if _, err := km.Primitive(nil); err == nil {
-		t.Errorf("km.Primitive(nil) err = nil, want error")
 	}
 }
 
@@ -103,73 +89,7 @@ func createECDSASerializedPublicKey(algorithm jepb.JwtEcdsaAlgorithm, kid *strin
 	return proto.Marshal(pubKey)
 }
 
-func TestECDSAVerifierPrimitiveInvalidKeyVersion(t *testing.T) {
-	km, err := registry.GetKeyManager(testECDSAVerifierKeyType)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testECDSAVerifierKeyType, err)
-	}
-	var invalidKeyVersion uint32 = 1
-	serializedPubKey, err := createECDSASerializedPublicKey(jepb.JwtEcdsaAlgorithm_ES384, nil, invalidKeyVersion)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := km.Primitive(serializedPubKey); err == nil {
-		t.Errorf("km.Primitive() err = nil, want error")
-	}
-}
-
-func TestECDSAVerifierPrimitiveWithInvalidAlgorithm(t *testing.T) {
-	km, err := registry.GetKeyManager(testECDSAVerifierKeyType)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testECDSAVerifierKeyType, err)
-	}
-	serializedPubKey, err := createECDSASerializedPublicKey(jepb.JwtEcdsaAlgorithm_ES_UNKNOWN, nil /*=kid*/, 0 /*=version*/)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := km.Primitive(serializedPubKey); err == nil {
-		t.Errorf("km.Primitive() err = nil, want error")
-	}
-}
-
-func TestECDSAVerifierPrimitiveVerifyFixedToken(t *testing.T) {
-	km, err := registry.GetKeyManager(testECDSAVerifierKeyType)
-	if err != nil {
-		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testECDSAVerifierKeyType, err)
-	}
-	serializedPubKey, err := createECDSASerializedPublicKey(jepb.JwtEcdsaAlgorithm_ES256, nil /*=kid*/, 0 /*=version*/)
-	if err != nil {
-		t.Fatal(err)
-	}
-	v, err := km.Primitive(serializedPubKey)
-	if err != nil {
-		t.Fatalf("km.Primitive() err = %v, want nil", err)
-	}
-	verifier, ok := v.(*verifierWithKID)
-	if !ok {
-		t.Fatalf("primitive is not a JWT Verifier")
-	}
-	// compact from https://datatracker.ietf.org/doc/html/rfc7515#appendix-A.3
-	compact := "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSApmWQxfKTUJqPP3-Kg6NU1Q"
-	opts := &ValidatorOpts{
-		ExpectedIssuer: refString("joe"),
-		FixedNow:       time.Unix(12345, 0),
-	}
-	validator, err := NewValidator(opts)
-	if err != nil {
-		t.Fatalf("creating JWTValidator: %v", err)
-	}
-	// verification succeeds because token was valid valid on January 1, 1970 UTC.
-	if _, err := verifier.VerifyAndDecodeWithKID(compact, validator, nil); err != nil {
-		t.Errorf("verifier.VerifyAndDecodeWithKID(kid = nil) err = %v, want nil", err)
-	}
-	// verification with KID fails because token contains no KID.
-	if _, err := verifier.VerifyAndDecodeWithKID(compact, validator, refString("1234")); err == nil {
-		t.Errorf("verifier.VerifyAndDecodeWithKID(kid = '1234') err = nil, want error")
-	}
-}
-
-func TestECDSAVerifierPrimitiveFixedTokenWithKID(t *testing.T) {
+func TestECDSAVerifierPrimitiveAlwaysFails(t *testing.T) {
 	km, err := registry.GetKeyManager(testECDSAVerifierKeyType)
 	if err != nil {
 		t.Fatalf("registry.GetKeyManager(%q) err = %v, want nil", testECDSAVerifierKeyType, err)
@@ -178,25 +98,7 @@ func TestECDSAVerifierPrimitiveFixedTokenWithKID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, err := km.Primitive(serializedPubKey)
-	if err != nil {
-		t.Fatalf("km.Primitive() err = %v, want nil", err)
-	}
-	verifier, ok := v.(*verifierWithKID)
-	if !ok {
-		t.Fatalf("primitive is not a JWT Verifier")
-	}
-	// compact is the claim set '{}' with header '{"alg":"ES256", "kid":"1234"}'
-	// signed with private key as specified in https://datatracker.ietf.org/doc/html/rfc7515#appendix-A.3
-	compact := "eyJhbGciOiJFUzI1NiIsImtpZCI6IjEyMzQifQ.e30.3jdIhPC4qfXrzE8ds6tyrLoqqmwfXX-CyfP9YG0k_LFeuF5wYPsmgPeUthMFfvPIN63zQ9i-I5BQLJVwaRTTdw"
-	validator, err := NewValidator(&ValidatorOpts{AllowMissingExpiration: true})
-	if err != nil {
-		t.Fatalf("creating JWTValidator: %v", err)
-	}
-	if _, err := verifier.VerifyAndDecodeWithKID(compact, validator, nil); err != nil {
-		t.Errorf("verifier.VerifyAndDecodeWithKID(kid = nil) err = %v, want nil ", err)
-	}
-	if _, err := verifier.VerifyAndDecodeWithKID(compact, validator, refString("1234")); err == nil {
-		t.Errorf("verifier.VerifyAndDecodeWithKID(kid = 1234) err = nil, want error ")
+	if _, err := km.Primitive(serializedPubKey); err == nil {
+		t.Errorf("km.Primitive() err = %v, want nil", err)
 	}
 }

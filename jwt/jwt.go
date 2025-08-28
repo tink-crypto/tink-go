@@ -48,20 +48,23 @@ func IsExpirationErr(err error) bool {
 }
 
 const (
-	jwtECDSASignerTypeURL          = "type.googleapis.com/google.crypto.tink.JwtEcdsaPrivateKey"
-	jwtJWTRSASSAPKCS1SignerTypeURL = "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PrivateKey"
-	jwtJWTRSASSAPSSSignerTypeURL   = "type.googleapis.com/google.crypto.tink.JwtRsaSsaPssPrivateKey"
+	jwtECDSASignerTypeURL            = "type.googleapis.com/google.crypto.tink.JwtEcdsaPrivateKey"
+	jwtJWTRSASSAPKCS1SignerTypeURL   = "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PrivateKey"
+	jwtJWTRSASSAPSSSignerTypeURL     = "type.googleapis.com/google.crypto.tink.JwtRsaSsaPssPrivateKey"
+	jwtECDSAVerifierTypeURL          = "type.googleapis.com/google.crypto.tink.JwtEcdsaPublicKey"
+	jwtJWTRSASSAPKCS1VerifierTypeURL = "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey"
+	jwtJWTRSASSAPSSVerifierTypeURL   = "type.googleapis.com/google.crypto.tink.JwtRsaSsaPssPublicKey"
 )
 
-func jwtECDSASignerPrimitive(_ []byte) (any, error) {
+func jwtECDSAPrimitive(_ []byte) (any, error) {
 	return nil, fmt.Errorf("the key manager should not be used to obtain a new primitive from a JWT ECDSA key")
 }
 
-func jwtRSASSAPKCS1SignerPrimitive(_ []byte) (any, error) {
+func jwtRSASSAPKCS1Primitive(_ []byte) (any, error) {
 	return nil, fmt.Errorf("the key manager should not be used to obtain a new primitive from a JWT RSA SSA PKCS1 key")
 }
 
-func jwtRSASSAPSSSignerPrimitive(_ []byte) (any, error) {
+func jwtRSASSAPSSPrimitive(_ []byte) (any, error) {
 	return nil, fmt.Errorf("the key manager should not be used to obtain a new primitive from a JWT RSA SSA PSS key")
 }
 
@@ -89,26 +92,54 @@ func unmarshalJWTRSASSAPSSPrivateKey(serializedKey []byte) (proto.Message, error
 	return privKey, nil
 }
 
+func unmarshalJWTECDSAPublicKey(serializedKey []byte) (proto.Message, error) {
+	privKey := &jepb.JwtEcdsaPublicKey{}
+	if err := proto.Unmarshal(serializedKey, privKey); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JwtEcdsaPublicKey: %v", err)
+	}
+	return privKey, nil
+}
+
+func unmarshalJWTRSASSAPKCS1PublicKey(serializedKey []byte) (proto.Message, error) {
+	privKey := &jrsppb.JwtRsaSsaPkcs1PublicKey{}
+	if err := proto.Unmarshal(serializedKey, privKey); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JwtRsaSsaPkcs1PublicKey: %v", err)
+	}
+	return privKey, nil
+}
+
+func unmarshalJWTRSASSAPSSPublicKey(serializedKey []byte) (proto.Message, error) {
+	privKey := &jpsppb.JwtRsaSsaPssPublicKey{}
+	if err := proto.Unmarshal(serializedKey, privKey); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JwtRsaSsaPssPublicKey: %v", err)
+	}
+	return privKey, nil
+}
+
 func init() {
 	if err := registry.RegisterKeyManager(new(jwtHMACKeyManager)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT HMAC key manager: %v", err))
 	}
-	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManagerWithCustomPrimitive(jwtECDSASignerTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, unmarshalJWTECDSAPrivateKey, jwtECDSASignerPrimitive)); err != nil {
+
+	// Signer key managers.
+	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManagerWithCustomPrimitive(jwtECDSASignerTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, unmarshalJWTECDSAPrivateKey, jwtECDSAPrimitive)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT ECDSA signer key manager: %v", err))
 	}
-	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManagerWithCustomPrimitive(jwtJWTRSASSAPKCS1SignerTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, unmarshalJWTRSASSAPKCS1PrivateKey, jwtRSASSAPKCS1SignerPrimitive)); err != nil {
+	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManagerWithCustomPrimitive(jwtJWTRSASSAPKCS1SignerTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, unmarshalJWTRSASSAPKCS1PrivateKey, jwtRSASSAPKCS1Primitive)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PKCS1 signer key manager: %v", err))
 	}
-	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManagerWithCustomPrimitive(jwtJWTRSASSAPSSSignerTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, unmarshalJWTRSASSAPSSPrivateKey, jwtRSASSAPSSSignerPrimitive)); err != nil {
+	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManagerWithCustomPrimitive(jwtJWTRSASSAPSSSignerTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, unmarshalJWTRSASSAPSSPrivateKey, jwtRSASSAPSSPrimitive)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PSS signer key manager: %v", err))
 	}
-	if err := registry.RegisterKeyManager(new(jwtECDSAVerifierKeyManager)); err != nil {
+
+	// Verifier key managers.
+	if err := registry.RegisterKeyManager(legacykeymanager.NewWithCustomPrimitive(jwtECDSAVerifierTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PUBLIC, unmarshalJWTECDSAPublicKey, jwtECDSAPrimitive)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT ECDSA verifier key manager: %v", err))
 	}
-	if err := registry.RegisterKeyManager(new(jwtRSVerifierKeyManager)); err != nil {
+	if err := registry.RegisterKeyManager(legacykeymanager.NewWithCustomPrimitive(jwtJWTRSASSAPKCS1VerifierTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PUBLIC, unmarshalJWTRSASSAPKCS1PublicKey, jwtRSASSAPKCS1Primitive)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PKCS1 verifier key manager: %v", err))
 	}
-	if err := registry.RegisterKeyManager(new(jwtPSVerifierKeyManager)); err != nil {
+	if err := registry.RegisterKeyManager(legacykeymanager.NewWithCustomPrimitive(jwtJWTRSASSAPSSVerifierTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PUBLIC, unmarshalJWTRSASSAPSSPublicKey, jwtRSASSAPSSPrimitive)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PSS verifier key manager: %v", err))
 	}
 
