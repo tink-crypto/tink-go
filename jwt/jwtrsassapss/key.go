@@ -16,6 +16,7 @@ package jwtrsassapss
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/binary"
@@ -226,4 +227,37 @@ func (k *PrivateKey) Equal(other key.Key) bool {
 		return false
 	}
 	return ok && k.publicKey.Equal(that.publicKey) && k.privateKey.Equal(that.privateKey)
+}
+
+func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	jwtRSASSAPKCS1Params, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("jwtrsassapss.createPrivateKey: invalid parameters type: want %T, got %T", (*Parameters)(nil), p)
+	}
+	if jwtRSASSAPKCS1Params.KIDStrategy() == CustomKID {
+		return nil, fmt.Errorf("jwtrsassapss.createPrivateKey: key generation is not supported for strategy %v", jwtRSASSAPKCS1Params.KIDStrategy())
+	}
+	rsaKey, err := rsa.GenerateKey(rand.Reader, int(jwtRSASSAPKCS1Params.ModulusSizeInBits()))
+	if err != nil {
+		return nil, err
+	}
+	publicKey, err := NewPublicKey(PublicKeyOpts{
+		Modulus:       rsaKey.PublicKey.N.Bytes(),
+		IDRequirement: idRequirement,
+		HasCustomKID:  false,
+		Parameters:    jwtRSASSAPKCS1Params,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("jwtrsassapss.createPrivateKey: %v", err)
+	}
+	privateKey, err := NewPrivateKey(PrivateKeyOpts{
+		PublicKey: publicKey,
+		D:         secretdata.NewBytesFromData(rsaKey.D.Bytes(), insecuresecretdataaccess.Token{}),
+		P:         secretdata.NewBytesFromData(rsaKey.Primes[0].Bytes(), insecuresecretdataaccess.Token{}),
+		Q:         secretdata.NewBytesFromData(rsaKey.Primes[1].Bytes(), insecuresecretdataaccess.Token{}),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("jwtrsassapss.createPrivateKey: %v", err)
+	}
+	return privateKey, nil
 }

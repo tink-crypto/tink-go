@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
@@ -825,6 +826,70 @@ func TestNewPrivateKey_Errors(t *testing.T) {
 				t.Errorf("NewPrivateKey(%v) err = nil, want error", tc.opts)
 			} else {
 				t.Logf("NewPrivateKey(%v) err = %v", tc.opts, err)
+			}
+		})
+	}
+}
+
+func TestPrivateKeyCreator(t *testing.T) {
+	for _, tc := range []struct {
+		kidStrategy   jwtrsassapss.KIDStrategy
+		algorithm     jwtrsassapss.Algorithm
+		idRequirement uint32
+	}{
+		{jwtrsassapss.Base64EncodedKeyIDAsKID, jwtrsassapss.PS256, 0x01020304},
+		{jwtrsassapss.Base64EncodedKeyIDAsKID, jwtrsassapss.PS384, 0x01020304},
+		{jwtrsassapss.Base64EncodedKeyIDAsKID, jwtrsassapss.PS512, 0x01020304},
+		{jwtrsassapss.IgnoredKID, jwtrsassapss.PS256, 0},
+		{jwtrsassapss.IgnoredKID, jwtrsassapss.PS384, 0},
+		{jwtrsassapss.IgnoredKID, jwtrsassapss.PS512, 0},
+	} {
+		for _, modulusSizeInBits := range []int{2048, 3072, 4096} {
+			t.Run(fmt.Sprintf("%v_%v", tc.kidStrategy, tc.algorithm), func(t *testing.T) {
+				params := mustCreateParameters(t, tc.kidStrategy, tc.algorithm, modulusSizeInBits)
+				key, err := keygenregistry.CreateKey(params, tc.idRequirement)
+				if err != nil {
+					t.Fatalf("keygenregistry.CreateKey() err = %v, want nil", err)
+				}
+				jwtrsassapssPrivateKey, ok := key.(*jwtrsassapss.PrivateKey)
+				if !ok {
+					t.Fatalf("keygenregistry.CreateKey() returned key of type %T, want %T", key, (*jwtrsassapss.PrivateKey)(nil))
+				}
+
+				idRequirement, hasIDRequirement := jwtrsassapssPrivateKey.IDRequirement()
+				if tc.kidStrategy == jwtrsassapss.Base64EncodedKeyIDAsKID {
+					if !hasIDRequirement || idRequirement != tc.idRequirement {
+						t.Errorf("jwtrsassapssPrivateKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 0x01020304, true)
+					}
+				} else {
+					if hasIDRequirement {
+						t.Errorf("jwtrsassapssPrivateKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 0, false)
+					}
+				}
+				if diff := cmp.Diff(jwtrsassapssPrivateKey.Parameters(), params); diff != "" {
+					t.Errorf("jwtrsassapssPrivateKey.Parameters() diff (-want +got): \n%s", diff)
+				}
+			})
+		}
+	}
+}
+
+// Key creation fails only for CustomKID.
+func TestPrivateKeyCreator_Errors(t *testing.T) {
+	for _, tc := range []struct {
+		kidStrategy jwtrsassapss.KIDStrategy
+		algorithm   jwtrsassapss.Algorithm
+	}{
+		{jwtrsassapss.CustomKID, jwtrsassapss.PS256},
+		{jwtrsassapss.CustomKID, jwtrsassapss.PS384},
+		{jwtrsassapss.CustomKID, jwtrsassapss.PS512},
+	} {
+		t.Run(fmt.Sprintf("%v_%v", tc.kidStrategy, tc.algorithm), func(t *testing.T) {
+			params := mustCreateParameters(t, tc.kidStrategy, tc.algorithm, 2048)
+			if _, err := keygenregistry.CreateKey(params, 0); err == nil {
+				t.Errorf("keygenregistry.CreateKey() err = nil, want error")
+			} else {
+				t.Logf("keygenregistry.CreateKey() err = %v", err)
 			}
 		})
 	}

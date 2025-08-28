@@ -19,6 +19,7 @@ package jwtrsassapss
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
 
@@ -40,5 +41,8 @@ func init() {
 	}
 	if err := protoserialization.RegisterKeyParser(privateKeyTypeURL, &privateKeyParser{}); err != nil {
 		panic(fmt.Sprintf("protoserialization.RegisterKeyParser() failed: %v", err))
+	}
+	if err := keygenregistry.RegisterKeyCreator[*Parameters](createPrivateKey); err != nil {
+		panic(fmt.Sprintf("jwtrsassapss: failed to register key creator: %v", err))
 	}
 }
