@@ -17,14 +17,12 @@ package jwt
 import (
 	"encoding/base64"
 	"encoding/hex"
-	"fmt"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"
@@ -641,19 +639,6 @@ func mustCreateKeysetHandles(t *testing.T, secretKey key.Key, publicKey key.Key)
 }
 
 func TestSignerVerfierTestVectors(t *testing.T) {
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*jwtecdsa.PrivateKey]()
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*jwtrsassapkcs1.PrivateKey]()
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*jwtrsassapss.PrivateKey]()
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtecdsa.PrivateKey](createJWTECDSASigner); err != nil {
-		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
-	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapkcs1.PrivateKey](createJWTRSASSAPKCS1Signer); err != nil {
-		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
-	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapss.PrivateKey](createJWTRSASSAPSSSigner); err != nil {
-		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
-	}
-
 	for _, tc := range jwtSignatureTestVectors(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			privateKeyset, publicKeyset := mustCreateKeysetHandles(t, tc.privateKey, tc.publicKey)
@@ -699,18 +684,6 @@ func TestSignerVerfierTestVectors(t *testing.T) {
 }
 
 func TestSignerVerfierCreator(t *testing.T) {
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*jwtecdsa.PrivateKey]()
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*jwtrsassapkcs1.PrivateKey]()
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*jwtrsassapss.PrivateKey]()
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtecdsa.PrivateKey](createJWTECDSASigner); err != nil {
-		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
-	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapkcs1.PrivateKey](createJWTRSASSAPKCS1Signer); err != nil {
-		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
-	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapss.PrivateKey](createJWTRSASSAPSSSigner); err != nil {
-		panic(fmt.Sprintf("primitiveregistry.RegisterPrimitiveConstructor() failed: %v", err))
-	}
 	for _, tc := range []struct {
 		name               string
 		privateKey         key.Key
