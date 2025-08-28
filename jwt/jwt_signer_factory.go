@@ -23,74 +23,30 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
-
-type signerWithKIDInterface interface {
-	SignAndEncodeWithKID(*RawJWT, *string) (string, error)
-}
 
 // NewSigner generates a new instance of the JWT Signer primitive.
 func NewSigner(handle *keyset.Handle) (Signer, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	// WARNING: This is an all-or-nothing operation, meaning that *all* the keys
-	// in the keyset must implement jwt.Signer. Until all JWT signature keys have
-	// a primitive constructor, this is unused.
 	ps, err := keyset.Primitives[Signer](handle, internalapi.Token{})
 	if err != nil {
-		// Try to obtain a signerWithKIDInterface primitive set.
-		ps, err := keyset.Primitives[signerWithKIDInterface](handle, internalapi.Token{})
-		if err != nil {
-			return nil, fmt.Errorf("jwt_signer_factory: cannot obtain primitive set: %v", err)
-		}
-		logger, err := createSignerLogger(ps)
-		if err != nil {
-			return nil, err
-		}
-
-		if ps.Primary.Primitive == nil {
-			// Something is wrong, this should not happen.
-			return nil, fmt.Errorf("jwt_signer_factory: primary primitive is nil")
-		}
-		return &wrappedSigner{
-			primaryFullPrimitive: &fullPrimitiveAdapter{
-				primitive:  ps.Primary.Primitive,
-				keyID:      ps.Primary.KeyID,
-				prefixType: ps.Primary.PrefixType,
-			},
-			keyID:  ps.Primary.KeyID,
-			logger: logger,
-		}, nil
+		return nil, fmt.Errorf("jwt_signer_factory: cannot obtain primitive set: %v", err)
 	}
 	logger, err := createSignerLogger(ps)
 	if err != nil {
 		return nil, err
 	}
-
 	if ps.Primary.FullPrimitive == nil {
 		// Something is wrong, this should not happen.
 		return nil, fmt.Errorf("jwt_signer_factory: primary full primitive is nil")
 	}
-
 	return &wrappedSigner{
 		primaryFullPrimitive: ps.Primary.FullPrimitive,
 		keyID:                ps.Primary.KeyID,
 		logger:               logger,
 	}, nil
-}
-
-type fullPrimitiveAdapter struct {
-	primitive  signerWithKIDInterface
-	keyID      uint32
-	prefixType tinkpb.OutputPrefixType
-}
-
-var _ Signer = (*fullPrimitiveAdapter)(nil)
-
-func (a *fullPrimitiveAdapter) SignAndEncode(rawJWT *RawJWT) (string, error) {
-	return a.primitive.SignAndEncodeWithKID(rawJWT, keyID(a.keyID, a.prefixType))
 }
 
 // wrappedSigner is a JWT Signer implementation that uses the underlying

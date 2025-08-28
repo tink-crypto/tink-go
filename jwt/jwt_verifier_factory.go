@@ -23,7 +23,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 type verifierAndKeyID struct {
@@ -31,75 +30,30 @@ type verifierAndKeyID struct {
 	keyID    uint32
 }
 
-type verifierWithKIDInterface interface {
-	VerifyAndDecodeWithKID(compact string, validator *Validator, kid *string) (*VerifiedJWT, error)
-}
-
-type fullVerifierAdapter struct {
-	verifierWithKID verifierWithKIDInterface
-	keyID           uint32
-	prefixType      tinkpb.OutputPrefixType
-}
-
-var _ Verifier = (*fullVerifierAdapter)(nil)
-
-func (a *fullVerifierAdapter) VerifyAndDecode(compact string, validator *Validator) (*VerifiedJWT, error) {
-	return a.verifierWithKID.VerifyAndDecodeWithKID(compact, validator, keyID(a.keyID, a.prefixType))
-}
-
 // NewVerifier generates a new instance of the JWT Verifier primitive.
 func NewVerifier(handle *keyset.Handle) (Verifier, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	var verifiers []verifierAndKeyID
-	var logger monitoring.Logger
-	// Try to obtain full primitives first. If it fails, likely because there is no
-	// full primitive constructor registered, fall back to the "raw"
-	// verifierWithKIDInterface primitives.
 	ps, err := keyset.Primitives[Verifier](handle, internalapi.Token{})
 	if err != nil {
-		// Try to obtain a verifierWithKIDInterface primitive set.
-		ps, err := keyset.Primitives[verifierWithKIDInterface](handle, internalapi.Token{})
-		if err != nil {
-			return nil, fmt.Errorf("jwt_verifier_factory: cannot obtain primitive set: %v", err)
-		}
-		logger, err = createVerifierLogger(ps)
-		if err != nil {
-			return nil, err
-		}
-		for _, primitives := range ps.Entries {
-			for _, p := range primitives {
-				if p.Primitive == nil {
-					// Something is wrong, this should not happen.
-					return nil, fmt.Errorf("jwt_verifier_factory: primary primitive is nil")
-				}
-				verifiers = append(verifiers, verifierAndKeyID{
-					verifier: &fullVerifierAdapter{
-						verifierWithKID: p.Primitive,
-						keyID:           p.KeyID,
-						prefixType:      p.PrefixType,
-					},
-					keyID: p.KeyID,
-				})
+		return nil, fmt.Errorf("jwt_verifier_factory: cannot obtain primitive set: %v", err)
+	}
+	logger, err := createVerifierLogger(ps)
+	if err != nil {
+		return nil, err
+	}
+	var verifiers []verifierAndKeyID
+	for _, primitives := range ps.Entries {
+		for _, p := range primitives {
+			if p.FullPrimitive == nil {
+				// Something is wrong, this should not happen.
+				return nil, fmt.Errorf("jwt_verifier_factory: primary full primitive is nil")
 			}
-		}
-	} else {
-		logger, err = createVerifierLogger(ps)
-		if err != nil {
-			return nil, err
-		}
-		for _, primitives := range ps.Entries {
-			for _, p := range primitives {
-				if p.FullPrimitive == nil {
-					// Something is wrong, this should not happen.
-					return nil, fmt.Errorf("jwt_verifier_factory: primary full primitive is nil")
-				}
-				verifiers = append(verifiers, verifierAndKeyID{
-					verifier: p.FullPrimitive,
-					keyID:    p.KeyID,
-				})
-			}
+			verifiers = append(verifiers, verifierAndKeyID{
+				verifier: p.FullPrimitive,
+				keyID:    p.KeyID,
+			})
 		}
 	}
 	return &wrappedVerifier{
