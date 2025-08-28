@@ -122,4 +122,15 @@ func init() {
 	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapss.PrivateKey](createJWTRSASSAPSSSigner); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PSS signer primitive constructor: %v", err))
 	}
+
+	// Verifier primitive constructors.
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtecdsa.PublicKey](createJWTECDSAVerifier); err != nil {
+		panic(fmt.Sprintf("jwt.init() failed registering JWT ECDSA verifier primitive constructor: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapkcs1.PublicKey](createJWTRSASSAPKCS1Verifier); err != nil {
+		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PKCS1 verifier primitive constructor: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapss.PublicKey](createJWTRSASSAPSSVerifier); err != nil {
+		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PSS verifier primitive constructor: %v", err))
+	}
 }
