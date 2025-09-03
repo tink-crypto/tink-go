@@ -726,12 +726,12 @@ func TestKeysetManagerAddKeySucceeds(t *testing.T) {
 	if keyID1 != 1 {
 		t.Errorf("keyID1 = %d, want 1", keyID1)
 	}
-	keyID2, err := manager.AddKey(
+
+	if _, err := manager.AddKey(
 		&testKey{
 			params: testParameters{hasIDRequirement: false},
-			id:     2,
-		})
-	if err != nil {
+			id:     0,
+		}); err != nil {
 		t.Fatalf("manager.AddKey() err = %q, want nil", err)
 	}
 
@@ -753,9 +753,6 @@ func TestKeysetManagerAddKeySucceeds(t *testing.T) {
 	}
 	if keysetProto.Key[0].GetStatus() != tinkpb.KeyStatusType_ENABLED {
 		t.Errorf("keysetProto.Key[0].GetStatus() = %v, want %v", keysetProto.Key[0].GetStatus(), tinkpb.KeyStatusType_ENABLED)
-	}
-	if keysetProto.Key[1].KeyId != keyID2 {
-		t.Errorf("keysetProto.Key[0].KeyId = %d, want %v", keysetProto.Key[1].KeyId, keyID2)
 	}
 	if keysetProto.Key[1].GetStatus() != tinkpb.KeyStatusType_ENABLED {
 		t.Errorf("keysetProto.Key[1].GetStatus() = %v, want %v", keysetProto.Key[1].GetStatus(), tinkpb.KeyStatusType_DISABLED)
@@ -1097,28 +1094,6 @@ func TestKeysetManagerAddKeyFailsIfKeyIsNull(t *testing.T) {
 func TestKeysetManager_AddKeyWithOpts_FailsIfKeyIsNull(t *testing.T) {
 	manager := keyset.NewManager()
 	_, err := manager.AddKeyWithOpts(nil, internalapi.Token{})
-	if err == nil {
-		t.Errorf("manager.AddKeyWithOpts() err = nil, want err")
-	}
-}
-
-func TestKeysetManagerAddKeyFailsIfNoSerializerIsAvailable(t *testing.T) {
-	manager := keyset.NewManager()
-	_, err := manager.AddKey(&testKey{
-		params: testParameters{hasIDRequirement: true},
-		id:     1,
-	})
-	if err == nil {
-		t.Errorf("manager.AddKey() err = nil, want err")
-	}
-}
-
-func TestKeysetManager_AddKeyWithOpts_FailsIfNoSerializerIsAvailable(t *testing.T) {
-	manager := keyset.NewManager()
-	_, err := manager.AddKeyWithOpts(&testKey{
-		params: testParameters{hasIDRequirement: true},
-		id:     1,
-	}, internalapi.Token{})
 	if err == nil {
 		t.Errorf("manager.AddKeyWithOpts() err = nil, want err")
 	}

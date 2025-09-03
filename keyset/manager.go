@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"slices"
 
-	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -29,17 +28,43 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
+// entry is an internal representation of an [Entry].
+type entry struct {
+	key key.Key
+	// A key ID is the ID requirement of the [key.Key] object, if set, otherwise a
+	// random ID.
+	fixedID    uint32
+	hasFixedID bool
+	status     KeyStatus
+	isPrimary  bool
+}
+
+func fromKeysetEntries(entries []*Entry) []*entry {
+	ret := make([]*entry, len(entries))
+	for i, e := range entries {
+		_, isRequired := e.key.IDRequirement()
+		ret[i] = &entry{
+			key:        e.key,
+			fixedID:    e.keyID,
+			hasFixedID: isRequired,
+			status:     e.status,
+			isPrimary:  e.isPrimary,
+		}
+	}
+	return ret
+}
+
 // Manager manages a Keyset-proto, with convenience methods that rotate, disable, enable or destroy keys.
 // Note: It is not thread-safe.
 type Manager struct {
-	ks                *tinkpb.Keyset
+	entries           []*entry
 	unavailableKeyIDs map[uint32]bool // set of key IDs that are not available for new keys
 }
 
 // NewManager creates a new instance with an empty Keyset.
 func NewManager() *Manager {
 	ret := new(Manager)
-	ret.ks = new(tinkpb.Keyset)
+	ret.entries = make([]*entry, 0)
 	ret.unavailableKeyIDs = make(map[uint32]bool)
 	return ret
 }
@@ -47,10 +72,10 @@ func NewManager() *Manager {
 // NewManagerFromHandle creates a new instance from the given Handle.
 func NewManagerFromHandle(kh *Handle) *Manager {
 	ret := new(Manager)
-	ret.ks = keysetMaterial(kh)
+	ret.entries = fromKeysetEntries(kh.entries)
 	ret.unavailableKeyIDs = make(map[uint32]bool)
-	for _, key := range ret.ks.Key {
-		ret.unavailableKeyIDs[key.KeyId] = true
+	for _, e := range ret.entries {
+		ret.unavailableKeyIDs[e.fixedID] = true
 	}
 	return ret
 }
@@ -65,7 +90,7 @@ func (km *Manager) Add(kt *tinkpb.KeyTemplate) (uint32, error) {
 	if kt.OutputPrefixType == tinkpb.OutputPrefixType_UNKNOWN_PREFIX {
 		return 0, errors.New("keyset.Manager: unknown output prefix type")
 	}
-	if km.ks == nil {
+	if km.entries == nil {
 		return 0, errors.New("keyset.Manager: cannot add key to nil keyset")
 	}
 	keyData, err := registry.NewKeyData(kt)
@@ -73,26 +98,25 @@ func (km *Manager) Add(kt *tinkpb.KeyTemplate) (uint32, error) {
 		return 0, fmt.Errorf("keyset.Manager: cannot create KeyData: %s", err)
 	}
 	keyID := km.newRandomKeyID()
-	key := &tinkpb.Keyset_Key{
-		KeyData:          keyData,
-		Status:           tinkpb.KeyStatusType_ENABLED,
-		KeyId:            keyID,
-		OutputPrefixType: kt.OutputPrefixType,
+	idRequirement := uint32(0)
+	if kt.GetOutputPrefixType() != tinkpb.OutputPrefixType_RAW {
+		idRequirement = keyID
 	}
-	km.ks.Key = append(km.ks.Key, key)
+	keySerialization, err := protoserialization.NewKeySerialization(keyData, kt.OutputPrefixType, idRequirement)
+	if err != nil {
+		return 0, fmt.Errorf("keyset.Manager: cannot create KeySerialization: %s", err)
+	}
+	key, err := protoserialization.ParseKey(keySerialization)
+	if err != nil {
+		return 0, fmt.Errorf("keyset.Manager: cannot parse key: %s", err)
+	}
+	km.entries = append(km.entries, &entry{
+		key:       key,
+		isPrimary: false,
+		fixedID:   keyID,
+		status:    Enabled,
+	})
 	return keyID, nil
-}
-
-// entry is a wrapper struct that holds a key, its status and the key ID
-// strategy.
-type entry struct {
-	key key.Key
-	// A key ID is the ID requirement of the [key.Key] object, if set, otherwise a
-	// random ID.
-	fixedID    uint32
-	hasFixedID bool
-	status     KeyStatus
-	isPrimary  bool
 }
 
 // KeyOpts is an interface for options that can be applied to a key.
@@ -164,6 +188,19 @@ func (km *Manager) AddKeyWithOpts(key key.Key, _ internalapi.Token, opts ...KeyO
 		}
 	}
 
+	if e.status == Unknown {
+		return 0, fmt.Errorf("keyset.Manager: unknown key status")
+	}
+	if e.isPrimary {
+		if e.status != Enabled {
+			return 0, fmt.Errorf("keyset.Manager: primary key must be enabled")
+		}
+		// Make all others not primary.
+		for _, otherEntry := range km.entries {
+			otherEntry.isPrimary = false
+		}
+	}
+
 	var keyID uint32
 	if e.hasFixedID {
 		// Use the fixed ID if not already in use.
@@ -176,29 +213,9 @@ func (km *Manager) AddKeyWithOpts(key key.Key, _ internalapi.Token, opts ...KeyO
 		// Use a random ID.
 		keyID = km.newRandomKeyID()
 	}
-
-	protoStatus, err := keyStatusToProto(e.status)
-	if err != nil {
-		return 0, fmt.Errorf("keyset.Manager: %v", err)
-	}
-	keySerialization, err := protoserialization.SerializeKey(key)
-	if err != nil {
-		return 0, fmt.Errorf("keyset.Manager: %v", err)
-	}
-	newKey := &tinkpb.Keyset_Key{
-		KeyId:            keyID,
-		Status:           protoStatus,
-		OutputPrefixType: keySerialization.OutputPrefixType(),
-		KeyData:          keySerialization.KeyData(),
-	}
-	km.ks.Key = append(km.ks.Key, newKey)
-	if e.isPrimary {
-		if e.status != Enabled {
-			return 0, fmt.Errorf("keyset.Manager: cannot set primary key with status %s", e.status)
-		}
-		km.ks.PrimaryKeyId = keyID
-	}
-	return newKey.GetKeyId(), nil
+	e.fixedID = keyID
+	km.entries = append(km.entries, e)
+	return keyID, nil
 }
 
 // AddKey adds key to the keyset and returns the key ID. The added key is
@@ -217,97 +234,98 @@ func (km *Manager) AddNewKeyFromParameters(parameters key.Parameters) (uint32, e
 	return km.Add(keyTemplate)
 }
 
+func findEntry(entries []*entry, keyID uint32) (*entry, int, error) {
+	i := slices.IndexFunc(entries, func(e *entry) bool {
+		return e.fixedID == keyID
+	})
+	if i == -1 {
+		return nil, i, fmt.Errorf("keyset.Manager: key with id %d not found", keyID)
+	}
+	return entries[i], i, nil
+}
+
 // SetPrimary sets the key with given keyID as primary.
 // Returns an error if the key is not found or not enabled.
 func (km *Manager) SetPrimary(keyID uint32) error {
-	if km.ks == nil {
-		return errors.New("keyset.Manager: cannot set primary key to nil keyset")
+	entry, _, err := findEntry(km.entries, keyID)
+	if err != nil {
+		return err
 	}
-	for _, key := range km.ks.Key {
-		if key.KeyId != keyID {
+	if entry.status != Enabled {
+		return errors.New("keyset.Manager: cannot set key as primary because it's not enabled")
+	}
+	entry.isPrimary = true
+	// Make all others not primary.
+	for _, otherEntry := range km.entries {
+		if otherEntry.fixedID == entry.fixedID {
 			continue
 		}
-		if key.Status == tinkpb.KeyStatusType_ENABLED {
-			km.ks.PrimaryKeyId = keyID
-			return nil
-		}
-		return errors.New("keyset.Manager: cannot set key as primary because it's not enabled")
-
+		otherEntry.isPrimary = false
 	}
-	return fmt.Errorf("keyset.Manager: key with id %d not found", keyID)
+	return nil
 }
 
 // Enable will enable the key with given keyID.
 // Returns an error if the key is not found or is not enabled or disabled already.
 func (km *Manager) Enable(keyID uint32) error {
-	if km.ks == nil {
-		return errors.New("keyset.Manager: cannot enable key; nil keyset")
+	entry, _, err := findEntry(km.entries, keyID)
+	if err != nil {
+		return err
 	}
-	for i, key := range km.ks.Key {
-		if key.KeyId != keyID {
-			continue
-		}
-		if key.Status == tinkpb.KeyStatusType_ENABLED || key.Status == tinkpb.KeyStatusType_DISABLED {
-			km.ks.Key[i].Status = tinkpb.KeyStatusType_ENABLED
-			return nil
-		}
-		return fmt.Errorf("keyset.Manager: cannot enable key with id %d with status %s", keyID, key.Status.String())
+	if entry.status != Disabled && entry.status != Enabled {
+		return fmt.Errorf("keyset.Manager: cannot enable key with id %d with status %s", keyID, entry.status)
 	}
-	return fmt.Errorf("keyset.Manager: key with id %d not found", keyID)
+	entry.status = Enabled
+	return nil
 }
 
 // Disable will disable the key with given keyID.
 // Returns an error if the key is not found or it is the primary key.
 func (km *Manager) Disable(keyID uint32) error {
-	if km.ks == nil {
-		return errors.New("keyset.Manager: cannot disable key; nil keyset")
+	entry, _, err := findEntry(km.entries, keyID)
+	if err != nil {
+		return err
 	}
-	if km.ks.PrimaryKeyId == keyID {
+	if entry.isPrimary {
 		return errors.New("keyset.Manager: cannot disable the primary key")
 	}
-	for i, key := range km.ks.Key {
-		if key.KeyId != keyID {
-			continue
-		}
-		if key.Status == tinkpb.KeyStatusType_ENABLED || key.Status == tinkpb.KeyStatusType_DISABLED {
-			km.ks.Key[i].Status = tinkpb.KeyStatusType_DISABLED
-			return nil
-		}
-		return fmt.Errorf("keyset.Manager: cannot disable key with id %d with status %s", keyID, key.Status.String())
+	if entry.status != Enabled && entry.status != Disabled {
+		return fmt.Errorf("keyset.Manager: cannot disable key with id %d with status %s", keyID, entry.status)
 	}
-	return fmt.Errorf("keyset.Manager: key with id %d not found", keyID)
+	entry.status = Disabled
+	return nil
 }
 
 // Delete will delete the key with given keyID, removing the key from the keyset entirely.
 // Returns an error if the key is not found or it is the primary key.
 func (km *Manager) Delete(keyID uint32) error {
-	if km.ks == nil {
-		return errors.New("keyset.Manager: cannot delete key, no keyset")
+	entry, i, err := findEntry(km.entries, keyID)
+	if err != nil {
+		return err
 	}
-	if km.ks.PrimaryKeyId == keyID {
+	if entry.isPrimary {
 		return errors.New("keyset.Manager: cannot delete the primary key")
 	}
-	deleteIdx, found := 0, false
-	for i, key := range km.ks.Key {
-		if key.KeyId == keyID {
-			deleteIdx = i
-			found = true
-			break
-		}
-	}
-	if !found {
-		return fmt.Errorf("keyset.Manager: key with id %d not found", keyID)
-	}
-	km.ks.Key = slices.Delete(km.ks.Key, deleteIdx, deleteIdx+1)
-	// NOTE: not removing the ID from unavailableKeyIDs on purpose to avoid reusing the keyID right
-	// away.
+	km.entries = slices.Delete(km.entries, i, i+1)
 	return nil
 }
 
 // Handle creates a new Handle for the managed keyset.
 func (km *Manager) Handle() (*Handle, error) {
-	// Make a copy of the keyset to keep it
-	ks := proto.Clone(km.ks).(*tinkpb.Keyset)
+	// TODO: ambrosin - Allow creating a Handle from entries.
+	var entries []*Entry
+	for _, e := range km.entries {
+		entries = append(entries, &Entry{
+			key:       e.key,
+			keyID:     e.fixedID,
+			status:    e.status,
+			isPrimary: e.isPrimary,
+		})
+	}
+	ks, err := entriesToProtoKeyset(entries)
+	if err != nil {
+		return nil, err
+	}
 	return newWithOptions(ks)
 }
 
