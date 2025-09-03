@@ -12,3 +12,22 @@
 
 // Package jwthmac provides a JWT HMAC signer and verifier.
 package jwthmac
+
+import (
+	"fmt"
+
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+)
+
+const (
+	keyTypeURL = "type.googleapis.com/google.crypto.tink.JwtHmacKey"
+)
+
+func init() {
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](new(parametersSerializer)); err != nil {
+		panic(fmt.Sprintf("jwthmac: failed to register parameters serializer: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(keyTypeURL, new(parametersParser)); err != nil {
+		panic(fmt.Sprintf("jwthmac: failed to register parameters parser: %v", err))
+	}
+}
