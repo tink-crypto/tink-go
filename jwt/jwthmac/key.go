@@ -84,7 +84,7 @@ func NewKey(opts KeyOpts) (*Key, error) {
 	}
 	kid, hasKID, err := computeKID(customKID, opts.IDRequirement, opts.Parameters)
 	if err != nil {
-		return nil, fmt.Errorf("jwtrsassapkcs1.NewPublicKey: %v", err)
+		return nil, fmt.Errorf("jwthmac.NewKey: %v", err)
 	}
 	return &Key{
 		parameters:    opts.Parameters,
