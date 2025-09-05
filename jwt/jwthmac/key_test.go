@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwthmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
@@ -280,6 +281,69 @@ func TestNewKey_Errors(t *testing.T) {
 				t.Errorf("NewKey(%v) err = nil, want error", tc.opts)
 			} else {
 				t.Logf("NewKey(%v) err = %v", tc.opts, err)
+			}
+		})
+	}
+}
+
+func TestKeyCreator(t *testing.T) {
+	for _, tc := range []struct {
+		kidStrategy    jwthmac.KIDStrategy
+		algorithm      jwthmac.Algorithm
+		idRequirement  uint32
+		keySizeInBytes int
+	}{
+		{jwthmac.Base64EncodedKeyIDAsKID, jwthmac.HS256, 0x01020304, 32},
+		{jwthmac.Base64EncodedKeyIDAsKID, jwthmac.HS384, 0x01020304, 48},
+		{jwthmac.Base64EncodedKeyIDAsKID, jwthmac.HS512, 0x01020304, 64},
+		{jwthmac.IgnoredKID, jwthmac.HS256, 0, 32},
+		{jwthmac.IgnoredKID, jwthmac.HS384, 0, 48},
+		{jwthmac.IgnoredKID, jwthmac.HS512, 0, 64},
+	} {
+		t.Run(fmt.Sprintf("%v_%v_%d", tc.kidStrategy, tc.algorithm, tc.keySizeInBytes), func(t *testing.T) {
+			params := mustCreateParameters(t, tc.keySizeInBytes, tc.kidStrategy, tc.algorithm)
+			key, err := keygenregistry.CreateKey(params, tc.idRequirement)
+			if err != nil {
+				t.Fatalf("keygenregistry.CreateKey() err = %v, want nil", err)
+			}
+			jwthmacKey, ok := key.(*jwthmac.Key)
+			if !ok {
+				t.Fatalf("keygenregistry.CreateKey() returned key of type %T, want %T", key, (*jwthmac.Key)(nil))
+			}
+
+			idRequirement, hasIDRequirement := jwthmacKey.IDRequirement()
+			if tc.kidStrategy == jwthmac.Base64EncodedKeyIDAsKID {
+				if !hasIDRequirement || idRequirement != tc.idRequirement {
+					t.Errorf("jwthmacKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 0x01020304, true)
+				}
+			} else {
+				if hasIDRequirement {
+					t.Errorf("jwthmacKey.IDRequirement() (%v, %v), want (%v, %v)", idRequirement, hasIDRequirement, 0, false)
+				}
+			}
+			if diff := cmp.Diff(jwthmacKey.Parameters(), params); diff != "" {
+				t.Errorf("jwthmacKey.Parameters() diff (-want +got): \n%s", diff)
+			}
+		})
+	}
+}
+
+func TestKeyCreator_Errors(t *testing.T) {
+	for _, tc := range []struct {
+		kidStrategy    jwthmac.KIDStrategy
+		algorithm      jwthmac.Algorithm
+		keySizeInBytes int
+	}{
+		{jwthmac.CustomKID, jwthmac.HS256, 32},
+		{jwthmac.CustomKID, jwthmac.HS384, 48},
+		{jwthmac.CustomKID, jwthmac.HS512, 64},
+	} {
+		t.Run(fmt.Sprintf("%v_%v", tc.kidStrategy, tc.algorithm), func(t *testing.T) {
+			params := mustCreateParameters(t, tc.keySizeInBytes, tc.kidStrategy, tc.algorithm)
+			if _, err := keygenregistry.CreateKey(params, 0); err == nil {
+				t.Errorf("keygenregistry.CreateKey() err = nil, want error")
+			} else {
+				t.Logf("keygenregistry.CreateKey() err = %v", err)
 			}
 		})
 	}

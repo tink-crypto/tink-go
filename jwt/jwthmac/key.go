@@ -117,3 +117,24 @@ func (k *Key) Equal(other key.Key) bool {
 		k.idRequirement == that.idRequirement &&
 		k.kid == that.kid && k.hasKID == that.hasKID
 }
+
+func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	jwtHMACParams, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("jwthmac.createKey: invalid parameters type: want %T, got %T", (*Parameters)(nil), p)
+	}
+	if jwtHMACParams.KIDStrategy() == CustomKID {
+		return nil, fmt.Errorf("jwthmac.createKey: key generation is not supported for strategy %v", jwtHMACParams.KIDStrategy())
+	}
+
+	secretKeyBytes, err := secretdata.NewBytesFromRand(uint32(jwtHMACParams.KeySizeInBytes()))
+	if err != nil {
+		return nil, fmt.Errorf("jwthmac.createKey: failed to generate secret key bytes: %v", err)
+	}
+
+	return NewKey(KeyOpts{
+		KeyBytes:      secretKeyBytes,
+		IDRequirement: idRequirement,
+		Parameters:    jwtHMACParams,
+	})
+}

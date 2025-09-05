@@ -16,6 +16,7 @@ package jwthmac
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
 
@@ -35,5 +36,8 @@ func init() {
 	}
 	if err := protoserialization.RegisterKeyParser(keyTypeURL, new(keyParser)); err != nil {
 		panic(fmt.Sprintf("jwthmac: failed to register key parser: %v", err))
+	}
+	if err := keygenregistry.RegisterKeyCreator[*Parameters](createKey); err != nil {
+		panic(fmt.Sprintf("jwthmac: failed to register key creator: %v", err))
 	}
 }
