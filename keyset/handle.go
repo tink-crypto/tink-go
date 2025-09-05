@@ -16,8 +16,8 @@ package keyset
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"slices"
 
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
@@ -37,10 +37,9 @@ var errInvalidKeyset = fmt.Errorf("keyset.Handle: invalid keyset")
 // Handle provides access to a keyset to limit the exposure of the internal
 // keyset representation, which may hold sensitive key material.
 type Handle struct {
-	entries          []*Entry
-	annotations      map[string]string
-	keysetHasSecrets bool // Whether the keyset contains secret key material.
-	primaryKeyEntry  *Entry
+	entries         []*Entry
+	annotations     map[string]string
+	primaryKeyEntry *Entry
 }
 
 // KeyStatus is the key status.
@@ -165,24 +164,50 @@ func entriesToProtoKeyset(entries []*Entry) (*tinkpb.Keyset, error) {
 	return protoKeyset, nil
 }
 
+func newFromEntries(entries []*Entry, opts ...Option) (*Handle, error) {
+	var primaryKeyEntry *Entry = nil
+	for _, entry := range entries {
+		if entry.IsPrimary() {
+			primaryKeyEntry = entry
+		}
+		if entry.KeyStatus() == Unknown {
+			return nil, fmt.Errorf("keyset.Handle: unknown key status for key with id %d", entry.KeyID())
+		}
+	}
+	if primaryKeyEntry == nil {
+		return nil, fmt.Errorf("keyset.Handle: no primary key")
+	}
+	h := &Handle{
+		entries:         entries,
+		primaryKeyEntry: primaryKeyEntry,
+	}
+	if err := applyOptions(h, opts...); err != nil {
+		return nil, err
+	}
+	return h, nil
+}
+
+func hasSecrets(ks *tinkpb.Keyset) bool {
+	return slices.ContainsFunc(ks.GetKey(), func(protoKey *tinkpb.Keyset_Key) bool {
+		switch protoKey.GetKeyData().GetKeyMaterialType() {
+		case tinkpb.KeyData_UNKNOWN_KEYMATERIAL, tinkpb.KeyData_ASYMMETRIC_PRIVATE, tinkpb.KeyData_SYMMETRIC:
+			return true
+		}
+		return false
+	})
+}
+
 func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
 	if err := Validate(ks); err != nil {
 		return nil, fmt.Errorf("invalid keyset: %v", err)
 	}
 	entries := make([]*Entry, len(ks.GetKey()))
 	var primaryKeyEntry *Entry = nil
-	hasSecrets := false
 	for i, protoKey := range ks.GetKey() {
 		protoKeyData := protoKey.GetKeyData()
 		keyID := protoKey.GetKeyId()
 		if protoKey.GetOutputPrefixType() == tinkpb.OutputPrefixType_RAW {
 			keyID = 0
-		}
-		if !hasSecrets {
-			switch protoKey.GetKeyData().GetKeyMaterialType() {
-			case tinkpb.KeyData_UNKNOWN_KEYMATERIAL, tinkpb.KeyData_ASYMMETRIC_PRIVATE, tinkpb.KeyData_SYMMETRIC:
-				hasSecrets = true
-			}
 		}
 		protoKeySerialization, err := protoserialization.NewKeySerialization(protoKeyData, protoKey.GetOutputPrefixType(), keyID)
 		if err != nil {
@@ -207,9 +232,8 @@ func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
 		}
 	}
 	h := &Handle{
-		entries:          entries,
-		keysetHasSecrets: hasSecrets,
-		primaryKeyEntry:  primaryKeyEntry,
+		entries:         entries,
+		primaryKeyEntry: primaryKeyEntry,
 	}
 	if err := applyOptions(h, opts...); err != nil {
 		return nil, err
@@ -239,13 +263,12 @@ func NewHandle(kt *tinkpb.KeyTemplate) (*Handle, error) {
 // NewHandleWithNoSecrets creates a new instance of KeysetHandle from the
 // the given keyset which does not contain any secret key material.
 func NewHandleWithNoSecrets(ks *tinkpb.Keyset) (*Handle, error) {
+	if hasSecrets(ks) {
+		return nil, fmt.Errorf("keyset.Handle: importing unencrypted secret key material is forbidden")
+	}
 	handle, err := newWithOptions(ks)
 	if err != nil {
 		return nil, fmt.Errorf("keyset.Handle: cannot generate new keyset: %s", err)
-	}
-	if handle.keysetHasSecrets {
-		// If you need to do this, you have to use func insecurecleartextkeyset.Read() instead.
-		return nil, errors.New("keyset.Handle: importing unencrypted secret key material is forbidden")
 	}
 	return handle, nil
 }
@@ -349,9 +372,8 @@ func (h *Handle) Public() (*Handle, error) {
 		}
 	}
 	return &Handle{
-		entries:          entries,
-		keysetHasSecrets: false,
-		primaryKeyEntry:  primaryKeyEntry,
+		entries:         entries,
+		primaryKeyEntry: primaryKeyEntry,
 	}, nil
 }
 
@@ -425,12 +447,12 @@ func (h *Handle) WriteWithNoSecrets(w Writer) error {
 	if h == nil {
 		return fmt.Errorf("keyset.Handle: nil handle")
 	}
-	if h.keysetHasSecrets {
-		return errors.New("keyset.Handle: exporting unencrypted secret key material is forbidden")
-	}
 	protoKeyset, err := entriesToProtoKeyset(h.entries)
 	if err != nil {
 		return err
+	}
+	if hasSecrets(protoKeyset) {
+		return fmt.Errorf("eyset.Handle: exporting unencrypted secret key material is forbidden")
 	}
 	return w.Write(protoKeyset)
 }

@@ -326,7 +326,6 @@ func (km *Manager) SetAnnotations(annotations map[string]string) error {
 
 // Handle creates a new Handle for the managed keyset.
 func (km *Manager) Handle() (*Handle, error) {
-	// TODO: ambrosin - Allow creating a Handle from entries.
 	var entries []*Entry
 	for _, e := range km.entries {
 		entries = append(entries, &Entry{
@@ -336,14 +335,7 @@ func (km *Manager) Handle() (*Handle, error) {
 			isPrimary: e.isPrimary,
 		})
 	}
-	ks, err := entriesToProtoKeyset(entries)
-	if err != nil {
-		return nil, err
-	}
-	// No need to copy annotations here: these can be obtained only through
-	// `keyset.Primitives` in a `PrimitiveSet` and only read from it by
-	// monitoring clients.
-	return newWithOptions(ks, WithAnnotations(km.annotations))
+	return newFromEntries(entries, WithAnnotations(km.annotations))
 }
 
 // newRandomKeyID generates a key id that has not been used by any key in the keyset.
