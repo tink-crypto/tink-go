@@ -16,6 +16,7 @@ package hybrid_test
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"testing"
@@ -24,80 +25,103 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
-	"github.com/tink-crypto/tink-go/v2/testkeyset"
-	"github.com/tink-crypto/tink-go/v2/testutil"
 
-	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func TestHybridFactoryTest(t *testing.T) {
-	c := commonpb.EllipticCurveType_NIST_P256
-	ht := commonpb.HashType_SHA256
-	primaryPtFmt := commonpb.EcPointFormat_UNCOMPRESSED
-	rawPtFmt := commonpb.EcPointFormat_COMPRESSED
-	primaryDek := aead.AES128CTRHMACSHA256KeyTemplate()
-	rawDek := aead.AES128CTRHMACSHA256KeyTemplate()
-	primarySalt := []byte("some salt")
-	rawSalt := []byte("other salt")
 
-	primaryPrivProto, err := testutil.GenerateECIESAEADHKDFPrivateKey(c, ht, primaryPtFmt, primaryDek, primarySalt)
+	demParams, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
+		HashType:           aesctrhmac.SHA256,
+		AESKeySizeInBytes:  16,
+		IVSizeInBytes:      16,
+		HMACKeySizeInBytes: 32,
+		TagSizeInBytes:     16,
+		Variant:            aesctrhmac.VariantNoPrefix,
+	})
 	if err != nil {
-		t.Fatalf("testutil.GenerateECIESAEADHKDFPrivateKey(c, ht, primaryPtFmt, primaryDek, primarySalt) err = %v, want nil", err)
-	}
-	sPrimaryPriv, err := proto.Marshal(primaryPrivProto)
-	if err != nil {
-		t.Fatalf("proto.Marshal(primaryPrivProto) err = %v, want nil", err)
+		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
 	}
 
-	primaryPrivKey := testutil.NewKey(
-		testutil.NewKeyData(testutil.EciesAeadHkdfPrivateKeyTypeURL, sPrimaryPriv, tinkpb.KeyData_ASYMMETRIC_PRIVATE),
-		tinkpb.KeyStatusType_ENABLED, 8, tinkpb.OutputPrefixType_RAW)
-
-	rawPrivProto, err := testutil.GenerateECIESAEADHKDFPrivateKey(c, ht, rawPtFmt, rawDek, rawSalt)
+	primaryKeyParams, err := ecies.NewParameters(ecies.ParametersOpts{
+		CurveType:            ecies.NISTP256,
+		HashType:             ecies.SHA256,
+		NISTCurvePointFormat: ecies.UncompressedPointFormat,
+		DEMParameters:        demParams,
+		Salt:                 []byte("some salt"),
+		Variant:              ecies.VariantNoPrefix,
+	})
 	if err != nil {
-		t.Fatalf("testutil.GenerateECIESAEADHKDFPrivateKey(c, ht, rawPtFmt, rawDek, rawSalt) err = %v, want nil", err)
+		t.Fatalf("ecies.NewParameters() err = %v, want nil", err)
 	}
-	sRawPriv, err := proto.Marshal(rawPrivProto)
+	otherKeyParams, err := ecies.NewParameters(ecies.ParametersOpts{
+		CurveType:            ecies.NISTP256,
+		HashType:             ecies.SHA256,
+		NISTCurvePointFormat: ecies.CompressedPointFormat,
+		DEMParameters:        demParams,
+		Salt:                 []byte("other salt"),
+		Variant:              ecies.VariantNoPrefix,
+	})
 	if err != nil {
-		t.Fatalf("proto.Marshal(rawPrivProto) err = %v, want nil", err)
-	}
-	rawPrivKey := testutil.NewKey(
-		testutil.NewKeyData(testutil.EciesAeadHkdfPrivateKeyTypeURL, sRawPriv, tinkpb.KeyData_ASYMMETRIC_PRIVATE),
-		tinkpb.KeyStatusType_ENABLED, 11, tinkpb.OutputPrefixType_RAW)
-
-	privKeys := []*tinkpb.Keyset_Key{primaryPrivKey, rawPrivKey}
-	privKeyset := testutil.NewKeyset(privKeys[0].KeyId, privKeys)
-	khPriv, err := testkeyset.NewHandle(privKeyset)
-	if err != nil {
-		t.Fatalf("testkeyset.NewHandle(privKeyset) err = %v, want nil", err)
-	}
-
-	khPub, err := khPriv.Public()
-	if err != nil {
-		t.Fatalf("khPriv.Public() err = %v, want nil", err)
+		t.Fatalf("ecies.NewParameters() err = %v, want nil", err)
 	}
 
-	e, err := hybrid.NewHybridEncrypt(khPub)
+	keyBytes, err := hex.DecodeString("C9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721")
 	if err != nil {
-		t.Fatalf("hybrid.NewHybridEncrypt(khPub) err = %v, want nil", err)
+		t.Fatalf("hex.DecodeString() err = %v, want nil", err)
 	}
-	d, err := hybrid.NewHybridDecrypt(khPriv)
+	primaryPrivateKey, err := ecies.NewPrivateKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), 0, primaryKeyParams)
 	if err != nil {
-		t.Fatalf("hybrid.NewHybridDecrypt(khPriv) err = %v, want nil", err)
+		t.Fatalf("ecies.NewPrivateKey() err = %v, want nil", err)
+	}
+	otherPrivateKey, err := ecies.NewPrivateKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), 0, otherKeyParams)
+	if err != nil {
+		t.Fatalf("ecies.NewPrivateKey() err = %v, want nil", err)
+	}
+	km := keyset.NewManager()
+	_, err = km.AddKeyWithOpts(primaryPrivateKey, internalapi.Token{}, keyset.WithFixedID(8), keyset.AsPrimary())
+	if err != nil {
+		t.Fatalf("km.AddKeyWithOpts() err = %v, want nil", err)
+	}
+	_, err = km.AddKeyWithOpts(otherPrivateKey, internalapi.Token{}, keyset.WithFixedID(11))
+	if err != nil {
+		t.Fatalf("km.AddKeyWithOpts() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	publicHandle, err := handle.Public()
+	if err != nil {
+		t.Fatalf("handle.Public() err = %v, want nil", err)
+	}
+
+	e, err := hybrid.NewHybridEncrypt(publicHandle)
+	if err != nil {
+		t.Fatalf("hybrid.NewHybridEncrypt(publicHandle) err = %v, want nil", err)
+	}
+	d, err := hybrid.NewHybridDecrypt(handle)
+	if err != nil {
+		t.Fatalf("hybrid.NewHybridDecrypt(handle) err = %v, want nil", err)
 	}
 
 	for i := 0; i < 1000; i++ {
