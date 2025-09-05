@@ -939,18 +939,6 @@ func TestPrimitivesWithMultipleConfigs(t *testing.T) {
 	}
 }
 
-type testKeyManager struct{}
-
-type testPrimitive struct{}
-
-func (km *testKeyManager) Primitive(_ []byte) (any, error)              { return testPrimitive{}, nil }
-func (km *testKeyManager) NewKey(_ []byte) (proto.Message, error)       { return nil, nil }
-func (km *testKeyManager) TypeURL() string                              { return mac.HMACSHA256Tag128KeyTemplate().TypeUrl }
-func (km *testKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) { return nil, nil }
-func (km *testKeyManager) DoesSupport(typeURL string) bool {
-	return typeURL == mac.HMACSHA256Tag128KeyTemplate().TypeUrl
-}
-
 func TestLenWithOneKey(t *testing.T) {
 	template := mac.HMACSHA256Tag128KeyTemplate()
 	handle, err := keyset.NewHandle(template)

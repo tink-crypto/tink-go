@@ -20,6 +20,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -27,6 +30,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
 	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/tink"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -781,11 +785,23 @@ func TestKeysetManager_AddKeyWithOptsAsPrimary_Fails(t *testing.T) {
 	}
 }
 
+type testKeyManger struct{}
+
+func (km *testKeyManger) Primitive(_ []byte) (any, error)              { return "", nil }
+func (km *testKeyManger) NewKey(_ []byte) (proto.Message, error)       { return nil, nil }
+func (km *testKeyManger) TypeURL() string                              { return "test_type_url" }
+func (km *testKeyManger) NewKeyData(_ []byte) (*tinkpb.KeyData, error) { return nil, nil }
+func (km *testKeyManger) DoesSupport(typeURL string) bool {
+	return typeURL == "test_type_url"
+}
+
 func TestKeysetManager_AddKeyWithOptsAsPrimary_Succeeds(t *testing.T) {
 	defer protoserialization.UnregisterKeySerializer[*testKey]()
 	if err := protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}); err != nil {
 		t.Fatalf("protoserialization.RegisterKeySerializer[*testKey](&testKeySerializer{}) err = %q, want nil", err)
 	}
+	defer registry.UnregisterKeyManager("test_type_url", internalapi.Token{})
+	registry.RegisterKeyManager(&testKeyManger{})
 
 	manager := keyset.NewManager()
 
@@ -824,6 +840,15 @@ func TestKeysetManager_AddKeyWithOptsAsPrimary_Succeeds(t *testing.T) {
 
 		if handle.Len() != 2 {
 			t.Errorf("handle.Len() = %d, want 2", handle.Len())
+		}
+
+		// Make sure annotations are nil.
+		ps, err := keyset.Primitives[string](handle, internalapi.Token{})
+		if err != nil {
+			t.Fatalf("keyset.Primitives[string](handle, internalapi.Token{}) err = %q, want nil", err)
+		}
+		if ps.Annotations != nil {
+			t.Errorf("ps.Annotations = %v, want nil", ps.Annotations)
 		}
 
 		primaryEntry, err := handle.Primary()
@@ -1265,4 +1290,118 @@ func TestKeysetManagerAddNewKeyFromParametersWorks(t *testing.T) {
 	if err := primitive.VerifyMAC(tag, message); err != nil {
 		t.Errorf("primitive.VerifyMAC(message, mac) err = %q, want nil", err)
 	}
+}
+
+func TestKeysetManagerSetAnnotations_FailsIfManagerIsNull(t *testing.T) {
+	km := (*keyset.Manager)(nil)
+	if err := km.SetAnnotations(nil); err == nil {
+		t.Errorf("km.SetAnnotations(nil) err = nil, want error")
+	}
+}
+
+func TestKeysetManagerSetAnnotations_ReadOnly(t *testing.T) {
+	manager := keyset.NewManager()
+	annotations := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	}
+	if err := manager.SetAnnotations(annotations); err != nil {
+		t.Fatalf("manager.SetAnnotations() err = %q, want nil", err)
+	}
+	// Add a new value, overwrite an existing one and delete a key.
+	annotations["key3"] = "value3"
+	annotations["key2"] = "value2-new"
+	delete(annotations, "key1")
+
+	// Add a key and set it as primary.
+	keyID, err := manager.Add(mac.HMACSHA256Tag128KeyTemplate())
+	if err != nil {
+		t.Fatalf("manager.Add() err = %q, want nil", err)
+	}
+	if err := manager.SetPrimary(keyID); err != nil {
+		t.Fatalf("manager.SetPrimary() err = %q, want nil", err)
+	}
+
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %q, want nil", err)
+	}
+	ps, err := keyset.Primitives[tink.MAC](handle, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("keyset.Primitives[tink.MAC](handle, internalapi.Token{}) err = %q, want nil", err)
+	}
+	// We expect them to be no longer equal.
+	if cmp.Equal(ps.Annotations, annotations) {
+		t.Errorf("ps.Annotations == annotations, want different")
+	}
+}
+
+func TestKeysetManagerSetAnnotations(t *testing.T) {
+	manager := keyset.NewManager()
+	annotations := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	}
+	if err := manager.SetAnnotations(annotations); err != nil {
+		t.Fatalf("manager.SetAnnotations() err = %q, want nil", err)
+	}
+
+	// Add a key and set it as primary.
+	keyID, err := manager.Add(mac.HMACSHA256Tag128KeyTemplate())
+	if err != nil {
+		t.Fatalf("manager.Add() err = %q, want nil", err)
+	}
+	if err := manager.SetPrimary(keyID); err != nil {
+		t.Fatalf("manager.SetPrimary() err = %q, want nil", err)
+	}
+
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %q, want nil", err)
+	}
+	ps, err := keyset.Primitives[tink.MAC](handle, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("keyset.Primitives[tink.MAC](handle, internalapi.Token{}) err = %q, want nil", err)
+	}
+	if !cmp.Equal(ps.Annotations, annotations) {
+		t.Errorf("ps.Annotations = %v, want %v", ps.Annotations, annotations)
+	}
+
+	t.Run("set different annotations", func(t *testing.T) {
+		annotations2 := map[string]string{
+			"key3": "value3",
+			"key4": "value4",
+		}
+		if err := manager.SetAnnotations(annotations2); err != nil {
+			t.Fatalf("manager.SetAnnotations() err = %q, want nil", err)
+		}
+		handle, err := manager.Handle()
+		if err != nil {
+			t.Fatalf("manager.Handle() err = %q, want nil", err)
+		}
+		ps, err := keyset.Primitives[tink.MAC](handle, internalapi.Token{})
+		if err != nil {
+			t.Fatalf("keyset.Primitives[tink.MAC](handle, internalapi.Token{}) err = %q, want nil", err)
+		}
+		if !cmp.Equal(ps.Annotations, annotations2) {
+			t.Errorf("ps.Annotations = %v, want %v", ps.Annotations, annotations2)
+		}
+	})
+
+	t.Run("set nil annotations", func(t *testing.T) {
+		if err := manager.SetAnnotations(nil); err != nil {
+			t.Fatalf("manager.SetAnnotations() err = %q, want nil", err)
+		}
+		handle, err := manager.Handle()
+		if err != nil {
+			t.Fatalf("manager.Handle() err = %q, want nil", err)
+		}
+		ps, err := keyset.Primitives[tink.MAC](handle, internalapi.Token{})
+		if err != nil {
+			t.Fatalf("keyset.Primitives[tink.MAC](handle, internalapi.Token{}) err = %q, want nil", err)
+		}
+		if ps.Annotations != nil {
+			t.Errorf("ps.Annotations = %v, want nil", ps.Annotations)
+		}
+	})
 }

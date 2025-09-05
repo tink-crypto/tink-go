@@ -17,6 +17,7 @@ package keyset
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
@@ -59,6 +60,7 @@ func fromKeysetEntries(entries []*Entry) []*entry {
 type Manager struct {
 	entries           []*entry
 	unavailableKeyIDs map[uint32]bool // set of key IDs that are not available for new keys
+	annotations       map[string]string
 }
 
 // NewManager creates a new instance with an empty Keyset.
@@ -310,6 +312,18 @@ func (km *Manager) Delete(keyID uint32) error {
 	return nil
 }
 
+// SetAnnotations sets the annotations for the keyset.
+//
+// This method makes a copy of the annotations map to prevent the caller from
+// modifying the annotations.
+func (km *Manager) SetAnnotations(annotations map[string]string) error {
+	if km == nil {
+		return errors.New("keyset.Manager: key manager is nil")
+	}
+	km.annotations = maps.Clone(annotations)
+	return nil
+}
+
 // Handle creates a new Handle for the managed keyset.
 func (km *Manager) Handle() (*Handle, error) {
 	// TODO: ambrosin - Allow creating a Handle from entries.
@@ -326,7 +340,10 @@ func (km *Manager) Handle() (*Handle, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newWithOptions(ks)
+	// No need to copy annotations here: these can be obtained only through
+	// `keyset.Primitives` in a `PrimitiveSet` and only read from it by
+	// monitoring clients.
+	return newWithOptions(ks, WithAnnotations(km.annotations))
 }
 
 // newRandomKeyID generates a key id that has not been used by any key in the keyset.
