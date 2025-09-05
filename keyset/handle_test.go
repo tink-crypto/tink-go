@@ -508,30 +508,6 @@ func TestPrimitivesReturnsError(t *testing.T) {
 	}
 }
 
-func TestPrimitivesWithKeyManagerReturnsError(t *testing.T) {
-	testCases := []struct {
-		name   string
-		handle *keyset.Handle
-	}{
-		{
-			name:   "zero value handle",
-			handle: &keyset.Handle{},
-		},
-		{
-			name:   "nil handle",
-			handle: nil,
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := keyset.PrimitivesWithKeyManager[any](tc.handle, &testKeyManager{}, internalapi.Token{})
-			if err == nil {
-				t.Errorf("handle.PrimitivesWithKeyManager() err = nil, want err")
-			}
-		})
-	}
-}
-
 func TestKeysetInfoPanics(t *testing.T) {
 	testCases := []struct {
 		name   string
@@ -975,28 +951,6 @@ func (km *testKeyManager) DoesSupport(typeURL string) bool {
 	return typeURL == mac.HMACSHA256Tag128KeyTemplate().TypeUrl
 }
 
-func TestPrimitivesWithKeyManager(t *testing.T) {
-	template := mac.HMACSHA256Tag128KeyTemplate()
-	handle, err := keyset.NewHandle(template)
-	if err != nil {
-		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", template, err)
-	}
-
-	// Verify that without providing a custom key manager we get a usual MAC.
-	if _, err = mac.New(handle); err != nil {
-		t.Fatalf("mac.New(%v) err = %v, want nil", handle, err)
-	}
-
-	// Verify that with the custom key manager provided we get the custom primitive.
-	primitives, err := keyset.PrimitivesWithKeyManager[testPrimitive](handle, &testKeyManager{}, internalapi.Token{})
-	if err != nil {
-		t.Fatalf("keyset.PrimitivesWithKeyManager[testPrimitive](handle, ) err = %v, want nil", err)
-	}
-	if len(primitives.EntriesInKeysetOrder) != 1 {
-		t.Errorf("len(keyset.PrimitivesWithKeyManager[testPrimitive](handle, )) = %d, want 1", len(primitives.EntriesInKeysetOrder))
-	}
-}
-
 func TestLenWithOneKey(t *testing.T) {
 	template := mac.HMACSHA256Tag128KeyTemplate()
 	handle, err := keyset.NewHandle(template)
@@ -1242,35 +1196,6 @@ func TestPrimitivesIsThreadSafe(t *testing.T) {
 			_, err := keyset.Primitives[tink.Signer](handle, internalapi.Token{})
 			if err != nil {
 				t.Fatalf("keyset.Primitives[tink.Signer](handle, internalapi.Token{}) err = %v, want nil", err)
-			}
-		})
-	}
-}
-
-func TestPrimitivesWithKeyManagerIsThreadSafe(t *testing.T) {
-	template := mac.HMACSHA256Tag128KeyTemplate()
-	manager := keyset.NewManager()
-	// Add 10 keys. Last one is the primary.
-	for i := 0; i < 10; i++ {
-		keyID, err := manager.Add(template)
-		if err != nil {
-			t.Fatalf("manager.Add(template) err = %v, want nil", err)
-		}
-		if err = manager.SetPrimary(keyID); err != nil {
-			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
-		}
-	}
-	handle, err := manager.Handle()
-	if err != nil {
-		t.Fatalf("manager.Handle() err = %v, want nil", err)
-	}
-	keysetManager := &testKeyManager{}
-	for i := 0; i < 50; i++ {
-		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
-			t.Parallel()
-			_, err := keyset.PrimitivesWithKeyManager[testPrimitive](handle, keysetManager, internalapi.Token{})
-			if err != nil {
-				t.Fatalf("keyset.PrimitivesWithKeyManager[testPrimitive](handle, ...) err = %v, want nil", err)
 			}
 		})
 	}

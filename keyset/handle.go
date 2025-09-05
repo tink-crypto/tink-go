@@ -484,28 +484,6 @@ func Primitives[T any](h *Handle, _ internalapi.Token, opts ...PrimitivesOption)
 	return p, nil
 }
 
-// PrimitivesWithKeyManager creates a set of primitives corresponding to
-// the keys with status=ENABLED in the keyset of the given keysetHandle, using
-// the given key manager (instead of registered key managers) for keys supported
-// by it.  Keys not supported by the key manager are handled by matching registered
-// key managers (if present), and keys with status!=ENABLED are skipped.
-//
-// This enables custom treatment of keys, for example providing extra context
-// (e.g. credentials for accessing keys managed by a KMS), or gathering custom
-// monitoring/profiling information.
-//
-// The returned set is usually later "wrapped" into a class that implements
-// the corresponding Primitive-interface.
-//
-// NOTE: This is an internal API.
-func PrimitivesWithKeyManager[T any](h *Handle, km registry.KeyManager, _ internalapi.Token) (*primitiveset.PrimitiveSet[T], error) {
-	p, err := primitives[T](h, km)
-	if err != nil {
-		return nil, fmt.Errorf("keyset.Handle: %v", err)
-	}
-	return p, nil
-}
-
 func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry *Entry, km registry.KeyManager, config Config) (*primitiveset.Entry[T], error) {
 	protoKey, err := entryToProtoKey(entry)
 	if err != nil {
