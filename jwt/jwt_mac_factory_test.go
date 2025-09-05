@@ -629,24 +629,54 @@ func TestComputeAndVerifyWithAnnotationsEmitsMonitoring(t *testing.T) {
 	}
 }
 
+type alwaysFailingStubMAC struct{}
+
+func (s *alwaysFailingStubMAC) ComputeMACAndEncode(_ *jwt.RawJWT) (string, error) {
+	return "", fmt.Errorf("always failing")
+}
+
+func (s *alwaysFailingStubMAC) VerifyMACAndDecode(compact string, _ *jwt.Validator) (*jwt.VerifiedJWT, error) {
+	return nil, fmt.Errorf("always failing")
+}
+
 func TestComputeFailureEmitsMonitoring(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubKeyTypeURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKey]()
+	if err := protoserialization.RegisterKeyParser(stubKeyTypeURL, &stubKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKey](&stubKeySerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	// Register primitive constructor to make sure that the factory uses full primitives.
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubKey]()
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubKey](func(key key.Key) (any, error) {
+		return &alwaysFailingStubMAC{}, nil
+	}); err != nil {
+		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
 	defer internalregistry.ClearMonitoringClient()
 	client := &fakemonitoring.Client{Name: ""}
 	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
 		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 	}
-	keyData, err := newKeyData(newJWTHMACKey(jwtmacpb.JwtHmacAlgorithm_HS256, &jwtmacpb.JwtHmacKey_CustomKid{Value: "custom-kid"}))
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubKey{idRequirement: 0x01020304, prefixType: tinkpb.OutputPrefixType_TINK})
 	if err != nil {
-		t.Fatalf("creating NewKeyData: %v", err)
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
 	}
-	primaryKey := testutil.NewKey(keyData, tinkpb.KeyStatusType_ENABLED, 42, tinkpb.OutputPrefixType_TINK)
-	kh, err := testkeyset.NewHandle(testutil.NewKeyset(primaryKey.KeyId, []*tinkpb.Keyset_Key{primaryKey}))
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
 	if err != nil {
-		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
+		t.Fatalf("km.Handle() err = %v, want nil", err)
 	}
 	// Annotations are only supported through the `insecurecleartextkeyset` API.
 	buff := &bytes.Buffer{}
-	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
+	if err := insecurecleartextkeyset.Write(handle, keyset.NewBinaryWriter(buff)); err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
 	}
 	annotations := map[string]string{"foo": "bar"}

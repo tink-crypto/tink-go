@@ -25,6 +25,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"             // Also registers jwtecdsa keys and proto serialization.
+	_ "github.com/tink-crypto/tink-go/v2/jwt/jwthmac"             // Registers jwthmac keys and proto serialization.
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1" // Also registers jwtrsassapkcs1 keys and proto serialization.
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"     // Also registers jwtrsassapss keys and proto serialization.
 	jepb "github.com/tink-crypto/tink-go/v2/proto/jwt_ecdsa_go_proto"
