@@ -30,4 +30,10 @@ func init() {
 	if err := protoserialization.RegisterParametersParser(keyTypeURL, new(parametersParser)); err != nil {
 		panic(fmt.Sprintf("jwthmac: failed to register parameters parser: %v", err))
 	}
+	if err := protoserialization.RegisterKeySerializer[*Key](new(keySerializer)); err != nil {
+		panic(fmt.Sprintf("jwthmac: failed to register key serializer: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(keyTypeURL, new(keyParser)); err != nil {
+		panic(fmt.Sprintf("jwthmac: failed to register key parser: %v", err))
+	}
 }
