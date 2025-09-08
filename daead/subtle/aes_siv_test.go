@@ -25,10 +25,9 @@ import (
 )
 
 type AESSIVSuite struct {
-	Algorithm        string
-	GeneratorVersion string
-	NumberOfTests    uint32
-	TestGroups       []*testGroup
+	Algorithm     string
+	NumberOfTests uint32
+	TestGroups    []*testGroup
 }
 
 type testGroup struct {

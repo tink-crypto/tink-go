@@ -270,10 +270,9 @@ func TestDecryptFailsWithInvalidInputs(t *testing.T) {
 }
 
 type AESCMACSuite struct {
-	Algorithm        string
-	GeneratorVersion string
-	NumberOfTests    uint32
-	TestGroups       []*testgroup
+	Algorithm     string
+	NumberOfTests uint32
+	TestGroups    []*testgroup
 }
 
 type testgroup struct {

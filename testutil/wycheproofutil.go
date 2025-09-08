@@ -28,10 +28,9 @@ import (
 // WycheproofSuite in a struct that strongly types the testGroups
 // field. See wycheproofutil_test.go for an example.
 type WycheproofSuite struct {
-	Algorithm        string            `json:"algorithm"`
-	GeneratorVersion string            `json:"generatorVersion"`
-	NumberOfTests    int               `json:"numberOfTests"`
-	Notes            map[string]string `json:"notes"`
+	Algorithm     string            `json:"algorithm"`
+	NumberOfTests int               `json:"numberOfTests"`
+	Notes         map[string]string `json:"notes"`
 }
 
 // WycheproofGroup represents the common elements of a testGroups
