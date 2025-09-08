@@ -29,7 +29,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager"
@@ -145,59 +144,11 @@ func (sc *stubConfig) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, err
 	return &stubAEAD{prefix: aesGCMKey.OutputPrefix()}, nil
 }
 
-func annotateKeyset(t *testing.T, kh *keyset.Handle, annotations map[string]string) *keyset.Handle {
-	// Annotations are only supported through the `insecurecleartextkeyset` API.
-	buff := &bytes.Buffer{}
-	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
-		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
-	}
-	mh, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
-	if err != nil {
-		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
-	}
-	return mh
-}
-
 func TestNewWithConfig(t *testing.T) {
 	annotations := map[string]string{"foo": "bar"}
-	keysetHandleWithPrimaryWithPrefix := func() *keyset.Handle {
-		km := keyset.NewManager()
-		_, err := km.Add(aead.AES256GCMNoPrefixKeyTemplate())
-		if err != nil {
-			t.Fatalf("km.Add() err = %v, want nil", err)
-		}
-		keyID, err := km.Add(aead.AES256GCMKeyTemplate())
-		if err != nil {
-			t.Fatalf("km.Add() err = %v, want nil", err)
-		}
-		if err := km.SetPrimary(keyID); err != nil {
-			t.Fatalf("km.SetPrimary() err = %v, want nil", err)
-		}
-		kh, err := km.Handle()
-		if err != nil {
-			t.Fatalf("km.Handle() err = %v, want nil", err)
-		}
-		return annotateKeyset(t, kh, annotations)
-	}()
-	keysetHandleWithPrimaryWithoutPrefix := func() *keyset.Handle {
-		km := keyset.NewManager()
-		keyID, err := km.Add(aead.AES256GCMNoPrefixKeyTemplate())
-		if err != nil {
-			t.Fatalf("km.Add() err = %v, want nil", err)
-		}
-		if err := km.SetPrimary(keyID); err != nil {
-			t.Fatalf("km.SetPrimary() err = %v, want nil", err)
-		}
-		_, err = km.Add(aead.AES256GCMKeyTemplate())
-		if err != nil {
-			t.Fatalf("km.Add() err = %v, want nil", err)
-		}
-		kh, err := km.Handle()
-		if err != nil {
-			t.Fatalf("km.Handle() err = %v, want nil", err)
-		}
-		return annotateKeyset(t, kh, annotations)
-	}()
+	// Last key is primary.
+	keysetHandleWithPrimaryWithPrefix := mustCreateHandle(t, annotations, aead.AES256GCMNoPrefixKeyTemplate(), aead.AES256GCMKeyTemplate())
+	keysetHandleWithPrimaryWithoutPrefix := mustCreateHandle(t, annotations, aead.AES256GCMKeyTemplate(), aead.AES256GCMNoPrefixKeyTemplate())
 	for _, tc := range []struct {
 		name       string
 		config     *stubConfig
@@ -378,21 +329,9 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsEncryptionDecryptionWithPr
 	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
 		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 	}
-	kh, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
-	if err != nil {
-		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
-	}
-	// Annotations are only supported through the `insecurecleartextkeyset` API.
-	buff := &bytes.Buffer{}
-	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
-		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
-	}
 	annotations := map[string]string{"foo": "bar"}
-	mh, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
-	if err != nil {
-		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
-	}
-	p, err := aead.New(mh)
+	kh := mustCreateHandle(t, annotations, aead.AES128GCMKeyTemplate())
+	p, err := aead.New(kh)
 	if err != nil {
 		t.Fatalf("aead.New() err = %v, want nil", err)
 	}
@@ -424,12 +363,12 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsEncryptionDecryptionWithPr
 	)
 	want := []*fakemonitoring.LogEvent{
 		{
-			KeyID:    mh.KeysetInfo().GetPrimaryKeyId(),
+			KeyID:    kh.KeysetInfo().GetPrimaryKeyId(),
 			NumBytes: len(data),
 			Context:  monitoring.NewContext("aead", "encrypt", wantKeysetInfo),
 		},
 		{
-			KeyID:    mh.KeysetInfo().GetPrimaryKeyId(),
+			KeyID:    kh.KeysetInfo().GetPrimaryKeyId(),
 			NumBytes: len(ct),
 			Context:  monitoring.NewContext("aead", "decrypt", wantKeysetInfo),
 		},
@@ -445,21 +384,9 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsEncryptionDecryptionWithou
 	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
 		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 	}
-	kh, err := keyset.NewHandle(aead.AES256GCMNoPrefixKeyTemplate())
-	if err != nil {
-		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
-	}
-	// Annotations are only supported through the `insecurecleartextkeyset` API.
-	buff := &bytes.Buffer{}
-	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
-		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
-	}
 	annotations := map[string]string{"foo": "bar"}
-	mh, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
-	if err != nil {
-		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
-	}
-	p, err := aead.New(mh)
+	kh := mustCreateHandle(t, annotations, aead.AES256GCMNoPrefixKeyTemplate())
+	p, err := aead.New(kh)
 	if err != nil {
 		t.Fatalf("aead.New() err = %v, want nil", err)
 	}
@@ -490,12 +417,12 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsEncryptionDecryptionWithou
 	)
 	want := []*fakemonitoring.LogEvent{
 		{
-			KeyID:    mh.KeysetInfo().GetPrimaryKeyId(),
+			KeyID:    kh.KeysetInfo().GetPrimaryKeyId(),
 			NumBytes: len(data),
 			Context:  monitoring.NewContext("aead", "encrypt", wantKeysetInfo),
 		},
 		{
-			KeyID:    mh.KeysetInfo().GetPrimaryKeyId(),
+			KeyID:    kh.KeysetInfo().GetPrimaryKeyId(),
 			NumBytes: len(ct),
 			Context:  monitoring.NewContext("aead", "decrypt", wantKeysetInfo),
 		},
@@ -532,21 +459,15 @@ func TestPrimitiveFactoryMonitoringWithAnnotatiosMultipleKeysLogsEncryptionDecry
 	if err := manager.Disable(keyIDs[0]); err != nil {
 		t.Fatalf("manager.Disable(%d) err = %v, want nil", keyIDs[0], err)
 	}
+	annotations := map[string]string{"foo": "bar"}
+	if err := manager.SetAnnotations(annotations); err != nil {
+		t.Fatalf("manager.SetAnnotations(%v) err = %v, want nil", annotations, err)
+	}
 	kh, err := manager.Handle()
 	if err != nil {
 		t.Fatalf("manager.Handle() err = %v, want nil", err)
 	}
-	// Annotations are only supported through the `insecurecleartextkeyset` API.
-	buff := &bytes.Buffer{}
-	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
-		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
-	}
-	annotations := map[string]string{"foo": "bar"}
-	mh, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
-	if err != nil {
-		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
-	}
-	p, err := aead.New(mh)
+	p, err := aead.New(kh)
 	if err != nil {
 		t.Fatalf("aead.New() err = %v, want nil", err)
 	}
@@ -636,21 +557,9 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsEncryptionFailureIsLogged(t *t
 	if err := registry.RegisterKeyManager(km); err != nil {
 		t.Fatalf("registry.RegisterKeyManager() err = %v, want nil", err)
 	}
-	kh, err := keyset.NewHandle(template)
-	if err != nil {
-		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
-	}
-	// Annotations are only supported through the `insecurecleartextkeyset` API.
-	buff := &bytes.Buffer{}
-	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
-		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
-	}
 	annotations := map[string]string{"foo": "bar"}
-	mh, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
-	if err != nil {
-		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
-	}
-	p, err := aead.New(mh)
+	kh := mustCreateHandle(t, annotations, template)
+	p, err := aead.New(kh)
 	if err != nil {
 		t.Fatalf("aead.New() err = %v, want nil", err)
 	}
@@ -689,21 +598,9 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsDecryptionFailureIsLogged(t *t
 	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
 		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 	}
-	kh, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
-	if err != nil {
-		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
-	}
-	// Annotations are only supported through the `insecurecleartextkeyset` API.
-	buff := &bytes.Buffer{}
-	if err := insecurecleartextkeyset.Write(kh, keyset.NewBinaryWriter(buff)); err != nil {
-		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
-	}
 	annotations := map[string]string{"foo": "bar"}
-	mh, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
-	if err != nil {
-		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
-	}
-	p, err := aead.New(mh)
+	kh := mustCreateHandle(t, annotations, aead.AES128GCMKeyTemplate())
+	p, err := aead.New(kh)
 	if err != nil {
 		t.Fatalf("aead.New() err = %v, want nil", err)
 	}
@@ -736,43 +633,46 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsDecryptionFailureIsLogged(t *t
 	}
 }
 
+func mustCreateHandle(t *testing.T, annotations map[string]string, templates ...*tinkpb.KeyTemplate) *keyset.Handle {
+	t.Helper()
+	km := keyset.NewManager()
+	for _, template := range templates {
+		keyID, err := km.Add(template)
+		if err != nil {
+			t.Fatalf("km.Add(%v) err = %v, want nil", template, err)
+		}
+		if err := km.SetPrimary(keyID); err != nil {
+			t.Fatalf("km.SetPrimary(%d) err = %v, want nil", keyID, err)
+		}
+	}
+	if err := km.SetAnnotations(annotations); err != nil {
+		t.Fatalf("km.SetAnnotations(%v) err = %v, want nil", annotations, err)
+	}
+	kh, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	return kh
+}
+
 func TestFactoryWithMonitoringMultiplePrimitivesLogOperations(t *testing.T) {
 	defer internalregistry.ClearMonitoringClient()
 	client := &fakemonitoring.Client{Name: ""}
 	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
 		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 	}
-	kh1, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
-	if err != nil {
-		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
-	}
-	// Annotations are only supported through the `insecurecleartextkeyset` API.
-	buff := &bytes.Buffer{}
-	if err := insecurecleartextkeyset.Write(kh1, keyset.NewBinaryWriter(buff)); err != nil {
-		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
-	}
+
 	annotations := map[string]string{"foo": "bar"}
-	mh1, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
-	if err != nil {
-		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
-	}
-	p1, err := aead.New(mh1)
+	kh1 := mustCreateHandle(t, annotations, aead.AES128GCMKeyTemplate())
+	p1, err := aead.New(kh1)
 	if err != nil {
 		t.Fatalf("aead.New() err = %v, want nil", err)
 	}
-	kh2, err := keyset.NewHandle(aead.AES128CTRHMACSHA256KeyTemplate())
+	kh2 := mustCreateHandle(t, annotations, aead.AES128CTRHMACSHA256KeyTemplate())
 	if err != nil {
 		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
 	}
-	buff.Reset()
-	if err := insecurecleartextkeyset.Write(kh2, keyset.NewBinaryWriter(buff)); err != nil {
-		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
-	}
-	mh2, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
-	if err != nil {
-		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
-	}
-	p2, err := aead.New(mh2)
+	p2, err := aead.New(kh2)
 	if err != nil {
 		t.Fatalf("aead.New() err = %v, want nil", err)
 	}
