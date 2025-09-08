@@ -18,13 +18,11 @@ import (
 	"bytes"
 	"testing"
 
-	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/hybrid/hpke"
 	"github.com/tink-crypto/tink-go/v2/hybrid"
 	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
-	"github.com/tink-crypto/tink-go/v2/testutil"
-	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -114,64 +112,124 @@ func TestSerializePrimaryPublicKeyInvalidTemplateFails(t *testing.T) {
 	}
 }
 
+func mustCreatePublicKeysetHandle(t *testing.T, opts hpke.ParametersOpts) *keyset.Handle {
+	t.Helper()
+	params, err := hpke.NewParameters(opts)
+	if err != nil {
+		t.Fatalf("hpke.NewParameters(%v) err = %v, want nil", opts, err)
+	}
+
+	km := keyset.NewManager()
+	keyID, err := km.AddNewKeyFromParameters(params)
+	if err != nil {
+		t.Fatalf("km.AddNewKeyFromParameters(%v) err = %v, want nil", params, err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID, err)
+	}
+	kh, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	publicHandle, err := kh.Public()
+	if err != nil {
+		t.Fatalf("kh.Public() err = %v, want nil", err)
+	}
+	return publicHandle
+}
+
 func TestSerializePrimaryPublicKeyInvalidKeyFails(t *testing.T) {
 	// Build valid key data.
 	keyTemplate := hybrid.DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_CHACHA20_POLY1305_Raw_Key_Template()
-	privHandle, err := keyset.NewHandle(keyTemplate)
-	if err != nil {
-		t.Fatalf("NewHandle(%v) err = %v, want nil", keyTemplate, err)
-	}
-	pubHandle, err := privHandle.Public()
-	if err != nil {
-		t.Fatalf("Public() err = %v, want nil", err)
-	}
-	pubKeyBytes, err := subtle.SerializePrimaryPublicKey(pubHandle, keyTemplate)
-	if err != nil {
-		t.Fatalf("SerializePrimaryPublicKey(%v, %v) err = %v, want nil", pubHandle, keyTemplate, err)
-	}
-	typeURL := "type.googleapis.com/google.crypto.tink.HpkePublicKey"
-	validKD := mustCreateKeyDataFromBytes(t, pubKeyBytes, hpkepb.HpkeAead_CHACHA20_POLY1305, typeURL)
-
-	// Build key data with invalid type URL.
-	invalidTypeURL := "type.googleapis.com/google.crypto.tink.InvalidTypeURL"
-	invalidTypeURLKD := mustCreateKeyDataFromBytes(t, pubKeyBytes, hpkepb.HpkeAead_CHACHA20_POLY1305, invalidTypeURL)
-
-	// Build key data with invalid HPKE params.
-	randomPubKeyBytes := random.GetRandomBytes(32)
-	invalidAEAD := hpkepb.HpkeAead_AES_128_GCM
-	invalidParamsKD := mustCreateKeyDataFromBytes(t, randomPubKeyBytes, invalidAEAD, typeURL)
-
 	tests := []struct {
-		name         string
-		primaryKeyID uint32
-		key          *tinkpb.Keyset_Key
+		name        string
+		keyTemplate *tinkpb.KeyTemplate
+		kh          *keyset.Handle
 	}{
 		{
-			"invalid prefix type",
-			123,
-			testutil.NewKey(validKD, tinkpb.KeyStatusType_ENABLED, 123, tinkpb.OutputPrefixType_TINK),
+			name:        "invalid variant",
+			keyTemplate: keyTemplate,
+			kh: mustCreatePublicKeysetHandle(t, hpke.ParametersOpts{
+				KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+				KDFID:   hpke.HKDFSHA256,
+				AEADID:  hpke.ChaCha20Poly1305,
+				Variant: hpke.VariantTink, // Want no prefix.
+			}),
 		},
 		{
-			"invalid type URL",
-			123,
-			testutil.NewKey(invalidTypeURLKD, tinkpb.KeyStatusType_ENABLED, 123, tinkpb.OutputPrefixType_RAW),
+			name:        "invalid KEMID",
+			keyTemplate: keyTemplate,
+			kh: mustCreatePublicKeysetHandle(t, hpke.ParametersOpts{
+				KEMID:   hpke.DHKEM_P384_HKDF_SHA384, // P384 is not supported.
+				KDFID:   hpke.HKDFSHA256,
+				AEADID:  hpke.ChaCha20Poly1305,
+				Variant: hpke.VariantNoPrefix,
+			}),
 		},
 		{
-			"invalid HPKE params",
-			123,
-			testutil.NewKey(invalidParamsKD, tinkpb.KeyStatusType_ENABLED, 123, tinkpb.OutputPrefixType_RAW),
+			name:        "invalid KDFID",
+			keyTemplate: keyTemplate,
+			kh: mustCreatePublicKeysetHandle(t, hpke.ParametersOpts{
+				KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+				KDFID:   hpke.HKDFSHA384, // SHA384 is not supported.
+				AEADID:  hpke.ChaCha20Poly1305,
+				Variant: hpke.VariantNoPrefix,
+			}),
+		},
+		{
+			name:        "invalid AEADID",
+			keyTemplate: keyTemplate,
+			kh: mustCreatePublicKeysetHandle(t, hpke.ParametersOpts{
+				KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+				KDFID:   hpke.HKDFSHA256,
+				AEADID:  hpke.AES256GCM, // AES256GCM is not supported.
+				Variant: hpke.VariantNoPrefix,
+			}),
+		},
+		{
+			name:        "invalid key template",
+			keyTemplate: hybrid.DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_CHACHA20_POLY1305_Key_Template(), // Want Raw key.
+			kh: mustCreatePublicKeysetHandle(t, hpke.ParametersOpts{
+				KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+				KDFID:   hpke.HKDFSHA256,
+				AEADID:  hpke.ChaCha20Poly1305,
+				Variant: hpke.VariantNoPrefix,
+			}),
+		},
+		{
+			name:        "invalid keyset handle",
+			keyTemplate: keyTemplate,
+			// Private keyset handle.
+			kh: func() *keyset.Handle {
+				kh, err := keyset.NewHandle(keyTemplate)
+				if err != nil {
+					t.Fatalf("NewHandle(%v) err = %v, want nil", keyTemplate, err)
+				}
+				return kh
+			}(),
+		},
+		{
+			name:        "nil keyset handle",
+			keyTemplate: keyTemplate,
+			kh:          nil,
+		},
+		{
+			name:        "nil template",
+			keyTemplate: nil,
+			kh: mustCreatePublicKeysetHandle(t, hpke.ParametersOpts{
+				KEMID:   hpke.DHKEM_X25519_HKDF_SHA256,
+				KDFID:   hpke.HKDFSHA256,
+				AEADID:  hpke.ChaCha20Poly1305,
+				Variant: hpke.VariantNoPrefix,
+			}),
 		},
 	}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ks := testutil.NewKeyset(test.primaryKeyID, []*tinkpb.Keyset_Key{test.key})
-			handle, err := keyset.NewHandleWithNoSecrets(ks)
-			if err != nil {
-				t.Fatalf("NewHandleWithNoSecrets(%v) err = %v, want nil", ks, err)
-			}
-			if _, err := subtle.SerializePrimaryPublicKey(handle, keyTemplate); err == nil {
-				t.Errorf("SerializePrimaryPublicKey(%v, %v) err = nil, want error", handle, keyTemplate)
+			if _, err := subtle.SerializePrimaryPublicKey(test.kh, test.keyTemplate); err == nil {
+				t.Errorf("SerializePrimaryPublicKey() err = nil, want error")
+			} else {
+				t.Logf("SerializePrimaryPublicKey() err = %v", err)
 			}
 		})
 	}
@@ -222,24 +280,4 @@ func TestKeysetHandleFromSerializedPublicKeyInvalidTemplateFails(t *testing.T) {
 			}
 		})
 	}
-}
-
-func mustCreateKeyDataFromBytes(t *testing.T, pubKeyBytes []byte, aeadID hpkepb.HpkeAead, typeURL string) *tinkpb.KeyData {
-	t.Helper()
-
-	pubKey := &hpkepb.HpkePublicKey{
-		Version: 0,
-		Params: &hpkepb.HpkeParams{
-			Kem:  hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
-			Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
-			Aead: aeadID,
-		},
-		PublicKey: pubKeyBytes,
-	}
-
-	serializedPubKey, err := proto.Marshal(pubKey)
-	if err != nil {
-		t.Fatalf("proto.Marshal(%v) err = %v, want nil", pubKey, err)
-	}
-	return testutil.NewKeyData(typeURL, serializedPubKey, tinkpb.KeyData_ASYMMETRIC_PUBLIC)
 }
