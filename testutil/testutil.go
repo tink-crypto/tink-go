@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/gob"
 	"errors"
@@ -31,7 +32,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	subtledaead "github.com/tink-crypto/tink-go/v2/daead/subtle"
-	subtlehybrid "github.com/tink-crypto/tink-go/v2/hybrid/subtle"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
@@ -896,16 +896,31 @@ func eciesAEADHKDFPrivateKey(p *eciespb.EciesAeadHkdfPublicKey, d []byte) *ecies
 	}
 }
 
+// curveFromProtoEnum returns the [elliptic.Curve] for a given
+// [commonpb.EllipticCurveType].
+func curveFromProtoEnum(c commonpb.EllipticCurveType) (elliptic.Curve, error) {
+	switch c {
+	case commonpb.EllipticCurveType_NIST_P256:
+		return elliptic.P256(), nil
+	case commonpb.EllipticCurveType_NIST_P384:
+		return elliptic.P384(), nil
+	case commonpb.EllipticCurveType_NIST_P521:
+		return elliptic.P521(), nil
+	default:
+		return nil, errors.New("unsupported curve")
+	}
+}
+
 // GenerateECIESAEADHKDFPrivateKey generates a new EC key pair and returns the private key proto.
 func GenerateECIESAEADHKDFPrivateKey(c commonpb.EllipticCurveType, ht commonpb.HashType, ptfmt commonpb.EcPointFormat, dekT *tinkpb.KeyTemplate, salt []byte) (*eciespb.EciesAeadHkdfPrivateKey, error) {
-	curve, err := subtlehybrid.GetCurve(c.String())
+	curve, err := curveFromProtoEnum(c)
 	if err != nil {
 		return nil, err
 	}
-	pvt, err := subtlehybrid.GenerateECDHKeyPair(curve)
+	d, x, y, err := elliptic.GenerateKey(curve, rand.Reader)
 	if err != nil {
 		return nil, err
 	}
-	pubKey := eciesAEADHKDFPublicKey(c, ht, ptfmt, dekT, pvt.PublicKey.Point.X.Bytes(), pvt.PublicKey.Point.Y.Bytes(), salt)
-	return eciesAEADHKDFPrivateKey(pubKey, pvt.D.Bytes()), nil
+	pubKey := eciesAEADHKDFPublicKey(c, ht, ptfmt, dekT, x.Bytes(), y.Bytes(), salt)
+	return eciesAEADHKDFPrivateKey(pubKey, d), nil
 }
