@@ -25,7 +25,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"             // Also registers jwtecdsa keys and proto serialization.
-	_ "github.com/tink-crypto/tink-go/v2/jwt/jwthmac"             // Registers jwthmac keys and proto serialization.
+	"github.com/tink-crypto/tink-go/v2/jwt/jwthmac"               // Also registers jwthmac keys and proto serialization.
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1" // Also registers jwtrsassapkcs1 keys and proto serialization.
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"     // Also registers jwtrsassapss keys and proto serialization.
 	jepb "github.com/tink-crypto/tink-go/v2/proto/jwt_ecdsa_go_proto"
@@ -142,6 +142,11 @@ func init() {
 	}
 	if err := registry.RegisterKeyManager(legacykeymanager.NewWithCustomPrimitive(jwtJWTRSASSAPSSVerifierTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PUBLIC, unmarshalJWTRSASSAPSSPublicKey, jwtRSASSAPSSPrimitive)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PSS verifier key manager: %v", err))
+	}
+
+	// MAC primitive constructors.
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwthmac.Key](createJWTHMAC); err != nil {
+		panic(fmt.Sprintf("jwt.init() failed registering JWT HMAC primitive constructor: %v", err))
 	}
 
 	// Signer primitive constructors.
