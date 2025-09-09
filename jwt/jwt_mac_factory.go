@@ -23,33 +23,11 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
-
-type macWithKIDInterface interface {
-	ComputeMACAndEncodeWithKID(token *RawJWT, kid *string) (string, error)
-	VerifyMACAndDecodeWithKID(compact string, validator *Validator, kid *string) (*VerifiedJWT, error)
-}
 
 type macAndKeyID struct {
 	mac   MAC
 	keyID uint32
-}
-
-type macWithKIDAdapter struct {
-	macWithKID macWithKIDInterface
-	keyID      uint32
-	prefixType tinkpb.OutputPrefixType
-}
-
-var _ MAC = (*macWithKIDAdapter)(nil)
-
-func (a *macWithKIDAdapter) ComputeMACAndEncode(token *RawJWT) (string, error) {
-	return a.macWithKID.ComputeMACAndEncodeWithKID(token, keyID(a.keyID, a.prefixType))
-}
-
-func (a *macWithKIDAdapter) VerifyMACAndDecode(compact string, validator *Validator) (*VerifiedJWT, error) {
-	return a.macWithKID.VerifyMACAndDecodeWithKID(compact, validator, keyID(a.keyID, a.prefixType))
 }
 
 // NewMAC generates a new instance of the JWT MAC primitive.
@@ -67,63 +45,27 @@ func NewMAC(handle *keyset.Handle) (MAC, error) {
 	// macWithKID primitives.
 	ps, err := keyset.Primitives[MAC](handle, internalapi.Token{})
 	if err != nil {
-		// Try to obtain a macWithKIDInterface primitive set.
-		ps, err := keyset.Primitives[macWithKIDInterface](handle, internalapi.Token{})
-		if err != nil {
-			return nil, fmt.Errorf("jwt_mac_factory: cannot obtain primitive set: %v", err)
-		}
-		computeLogger, verifyLogger, err = createMacLoggers(ps)
-		if err != nil {
-			return nil, err
-		}
-		for _, primitives := range ps.Entries {
-			for _, p := range primitives {
-				if p.Primitive == nil {
-					// Something is wrong, this should not happen.
-					return nil, fmt.Errorf("jwt_mac_factory: primitive is nil")
-				}
-				if p.PrefixType != tinkpb.OutputPrefixType_RAW && p.PrefixType != tinkpb.OutputPrefixType_TINK {
-					return nil, fmt.Errorf("jwt_mac_factory: invalid OutputPrefixType: %s", p.PrefixType)
-				}
-				macs = append(macs, macAndKeyID{
-					mac: &macWithKIDAdapter{
-						macWithKID: p.Primitive,
-						keyID:      p.KeyID,
-						prefixType: p.PrefixType,
-					},
-					keyID: p.KeyID,
-				})
+		return nil, fmt.Errorf("jwt_mac_factory: cannot obtain primitive set: %v", err)
+	}
+	computeLogger, verifyLogger, err = createMacLoggers(ps)
+	if err != nil {
+		return nil, err
+	}
+	for _, primitives := range ps.Entries {
+		for _, p := range primitives {
+			if p.FullPrimitive == nil {
+				// Something is wrong, this should not happen.
+				return nil, fmt.Errorf("jwt_mac_factory: full primitive is nil")
 			}
+			macs = append(macs, macAndKeyID{
+				mac:   p.FullPrimitive,
+				keyID: p.KeyID,
+			})
 		}
-		primary = macAndKeyID{
-			mac: &macWithKIDAdapter{
-				macWithKID: ps.Primary.Primitive,
-				keyID:      ps.Primary.KeyID,
-				prefixType: ps.Primary.PrefixType,
-			},
-			keyID: ps.Primary.KeyID,
-		}
-	} else {
-		computeLogger, verifyLogger, err = createMacLoggers(ps)
-		if err != nil {
-			return nil, err
-		}
-		for _, primitives := range ps.Entries {
-			for _, p := range primitives {
-				if p.FullPrimitive == nil {
-					// Something is wrong, this should not happen.
-					return nil, fmt.Errorf("jwt_mac_factory: full primitive is nil")
-				}
-				macs = append(macs, macAndKeyID{
-					mac:   p.FullPrimitive,
-					keyID: p.KeyID,
-				})
-			}
-		}
-		primary = macAndKeyID{
-			mac:   ps.Primary.FullPrimitive,
-			keyID: ps.Primary.KeyID,
-		}
+	}
+	primary = macAndKeyID{
+		mac:   ps.Primary.FullPrimitive,
+		keyID: ps.Primary.KeyID,
 	}
 	return &wrappedJWTMAC{
 		macs:          macs,
