@@ -15,9 +15,7 @@
 package jwt
 
 import (
-	"encoding/base64"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
@@ -205,193 +203,17 @@ func generateKey(keySize, version uint32, algorithm jwtmacpb.JwtHmacAlgorithm, k
 	}
 }
 
-func TestGetPrimitiveWithValidKeys(t *testing.T) {
-	rawJWT, err := NewRawJWT(&RawJWTOptions{WithoutExpiration: true, Audiences: []string{"tink-aud"}})
-	if err != nil {
-		t.Fatalf("NewRawJWT() err = %v, want nil", err)
-	}
-	validator, err := NewValidator(&ValidatorOpts{AllowMissingExpiration: true, ExpectedAudience: refString("tink-aud")})
-	if err != nil {
-		t.Fatalf("NewValidator() err = %v, want nil", err)
-	}
-	for _, tc := range []jwtKeyManagerTestCase{
-		{
-			tag: "SHA256 hash algorithm",
-			key: generateKey(32, 0, jwtmacpb.JwtHmacAlgorithm_HS256, nil),
-		},
-		{
-			tag: "SHA384 hash algorithm",
-			key: generateKey(48, 0, jwtmacpb.JwtHmacAlgorithm_HS384, nil),
-		},
-		{
-			tag: "SHA512 hash algorithm",
-			key: generateKey(64, 0, jwtmacpb.JwtHmacAlgorithm_HS512, nil),
-		},
-		{
-			tag: "with custom kid",
-			key: generateKey(64, 0, jwtmacpb.JwtHmacAlgorithm_HS512, &jwtmacpb.JwtHmacKey_CustomKid{Value: "1235"}),
-		},
-	} {
-		t.Run(tc.tag, func(t *testing.T) {
-			km, err := registry.GetKeyManager(typeURL)
-			if err != nil {
-				t.Errorf("registry.GetKeyManager(%q): %v", typeURL, err)
-			}
-			serializedKey, err := proto.Marshal(tc.key)
-			if err != nil {
-				t.Errorf("serializing key format: %v", err)
-			}
-			p, err := km.Primitive(serializedKey)
-			if err != nil {
-				t.Errorf("km.Primitive() err = %v, want nil", err)
-			}
-			primitive, ok := p.(*macWithKID)
-			if !ok {
-				t.Errorf("primitive isn't of type: macWithKID")
-			}
-			compact, err := primitive.ComputeMACAndEncodeWithKID(rawJWT, nil)
-			if err != nil {
-				t.Errorf("ComputeMACAndEncodeWithKID() err = %v, want nil", err)
-			}
-			verifiedJWT, err := primitive.VerifyMACAndDecodeWithKID(compact, validator, nil)
-			if err != nil {
-				t.Errorf("VerifyMACAndDecodeWithKID() err = %v, want nil", err)
-			}
-			audiences, err := verifiedJWT.Audiences()
-			if err != nil {
-				t.Errorf("verifiedJWT.Audiences() err = %v, want nil", err)
-			}
-			if !cmp.Equal(audiences, []string{"tink-aud"}) {
-				t.Errorf("verifiedJWT.Audiences() = %q, want ['tink-aud']", audiences)
-			}
-
-		})
-	}
-}
-
-func TestGetPrimitiveWithInvalidKeys(t *testing.T) {
-	for _, tc := range []jwtKeyManagerTestCase{
-		{
-			tag: "HS256",
-			key: generateKey(31, 0, jwtmacpb.JwtHmacAlgorithm_HS256, nil),
-		},
-		{
-			tag: "HS384",
-			key: generateKey(47, 0, jwtmacpb.JwtHmacAlgorithm_HS384, nil),
-		},
-		{
-			tag: "HS512",
-			key: generateKey(63, 0, jwtmacpb.JwtHmacAlgorithm_HS512, nil),
-		},
-	} {
-		t.Run(tc.tag, func(t *testing.T) {
-			km, err := registry.GetKeyManager(typeURL)
-			if err != nil {
-				t.Fatalf("registry.GetKeyManager(%q) err=%q, want nil", typeURL, err)
-			}
-			serializedKey, err := proto.Marshal(tc.key)
-			if err != nil {
-				t.Fatalf("proto.Marshal(tc.key) err =%q, want nil", err)
-			}
-			_, err = km.Primitive(serializedKey)
-			if err == nil {
-				t.Error("km.Primitive(serializedKey) err = nil, want error")
-			}
-		})
-	}
-}
-
-func TestSpecyfingCustomKIDAndTINKKIDFails(t *testing.T) {
-	// key and compact are examples from: https://datatracker.ietf.org/doc/html/rfc7515#appendix-A.1.1
-	compact := "eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
-	rawKey, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString("AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow")
-	if err != nil {
-		t.Fatalf("failed decoding test key: %v", err)
-	}
-	key := &jwtmacpb.JwtHmacKey{
-		KeyValue:  rawKey,
-		Algorithm: jwtmacpb.JwtHmacAlgorithm_HS256,
-		CustomKid: &jwtmacpb.JwtHmacKey_CustomKid{Value: "1235"},
-		Version:   0,
-	}
+func TestKeyManagerPrimitiveAlwaysFails(t *testing.T) {
 	km, err := registry.GetKeyManager(typeURL)
 	if err != nil {
-		t.Errorf("registry.GetKeyManager(%q): %v", typeURL, err)
+		t.Fatalf("registry.GetKeyManager(%q): %v", typeURL, err)
 	}
-	serializedKey, err := proto.Marshal(key)
+	serializedKey, err := proto.Marshal(generateKey(32, 0, jwtmacpb.JwtHmacAlgorithm_HS256, nil))
 	if err != nil {
-		t.Errorf("serializing key format: %v", err)
+		t.Fatalf("serializing key format: %v", err)
 	}
-	p, err := km.Primitive(serializedKey)
-	if err != nil {
-		t.Errorf("km.Primitive() err = %v, want nil", err)
-	}
-	primitive, ok := p.(*macWithKID)
-	if !ok {
-		t.Errorf("primitive isn't of type: macWithKID")
-	}
-
-	rawJWT, err := NewRawJWT(&RawJWTOptions{WithoutExpiration: true})
-	if err != nil {
-		t.Errorf("creating new RawJWT: %v", err)
-	}
-	opts := &ValidatorOpts{
-		ExpectedTypeHeader: refString("JWT"),
-		ExpectedIssuer:     refString("joe"),
-		FixedNow:           time.Unix(12345, 0),
-	}
-	validator, err := NewValidator(opts)
-	if err != nil {
-		t.Errorf("creating new JWTValidator: %v", err)
-	}
-	if _, err := primitive.ComputeMACAndEncodeWithKID(rawJWT, refString("4566")); err == nil {
-		t.Errorf("primitive.ComputeMACAndEncodeWithKID() err = nil, want error")
-	}
-	if _, err := primitive.VerifyMACAndDecodeWithKID(compact, validator, refString("4566")); err == nil {
-		t.Errorf("primitive.VerifyMACAndDecodeWithKID(kid = 4566) err = nil, want error")
-	}
-	// Verify success without KID
-	if _, err := primitive.VerifyMACAndDecodeWithKID(compact, validator, nil); err != nil {
-		t.Errorf("primitive.VerifyMACAndDecodeWithKID(kid = nil) err = %v, want nil", err)
-	}
-}
-
-func TestGetPrimitiveWithInvalidKeyFails(t *testing.T) {
-	for _, tc := range []jwtKeyManagerTestCase{
-		{
-			tag: "empty key",
-			key: &jwtmacpb.JwtHmacKey{},
-		},
-		{
-			tag: "nil key",
-			key: nil,
-		},
-		{
-			tag: "unsupported hash algorithm",
-			key: generateKey(32, 0, jwtmacpb.JwtHmacAlgorithm_HS_UNKNOWN, nil),
-		},
-		{
-			tag: "short key length",
-			key: generateKey(20, 0, jwtmacpb.JwtHmacAlgorithm_HS384, nil),
-		},
-		{
-			tag: "unsupported version",
-			key: generateKey(48, 1, jwtmacpb.JwtHmacAlgorithm_HS384, nil),
-		},
-	} {
-		t.Run(tc.tag, func(t *testing.T) {
-			km, err := registry.GetKeyManager(typeURL)
-			if err != nil {
-				t.Errorf("registry.GetKeyManager(%q): %v", typeURL, err)
-			}
-			serializedKey, err := proto.Marshal(tc.key)
-			if err != nil {
-				t.Errorf("serializing key format: %v", err)
-			}
-			if _, err := km.Primitive(serializedKey); err == nil {
-				t.Errorf("km.Primitive() err = nil, want error")
-			}
-		})
+	if _, err := km.Primitive(serializedKey); err == nil {
+		t.Errorf("km.Primitive() err = nil, want error")
 	}
 }
 

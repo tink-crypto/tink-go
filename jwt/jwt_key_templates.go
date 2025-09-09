@@ -29,7 +29,7 @@ import (
 func createJWTHMACKeyTemplate(keySize uint32, algorithm jwtmacpb.JwtHmacAlgorithm, outputPrefixType tinkpb.OutputPrefixType) *tinkpb.KeyTemplate {
 	format := &jwtmacpb.JwtHmacKeyFormat{
 		KeySize:   keySize,
-		Version:   jwtHMACKeyVersion,
+		Version:   0,
 		Algorithm: algorithm,
 	}
 	serializedFormat, err := proto.Marshal(format)
