@@ -21,11 +21,15 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-// keysetHandle is used by package insecurecleartextkeyset and package
+// newKeysetHandleFromProto is used by package insecurecleartextkeyset and package
 // testkeyset (via package internal) to create a keyset.Handle from cleartext
 // key material.
-func keysetHandle(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
-	return newWithOptions(ks, opts...)
+func newKeysetHandleFromProto(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
+	entries, err := keysetToEntries(ks)
+	if err != nil {
+		return nil, err
+	}
+	return newFromEntries(entries, opts...)
 }
 
 // keysetMaterial is used by package insecurecleartextkeyset and package
@@ -40,6 +44,6 @@ func keysetMaterial(h *Handle) *tinkpb.Keyset {
 }
 
 func init() {
-	internal.KeysetHandle = keysetHandle
+	internal.KeysetHandle = newKeysetHandleFromProto
 	internal.KeysetMaterial = keysetMaterial
 }

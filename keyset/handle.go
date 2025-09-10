@@ -197,12 +197,11 @@ func hasSecrets(ks *tinkpb.Keyset) bool {
 	})
 }
 
-func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
+func keysetToEntries(ks *tinkpb.Keyset) ([]*Entry, error) {
 	if err := Validate(ks); err != nil {
 		return nil, fmt.Errorf("invalid keyset: %v", err)
 	}
 	entries := make([]*Entry, len(ks.GetKey()))
-	var primaryKeyEntry *Entry = nil
 	for i, protoKey := range ks.GetKey() {
 		protoKeyData := protoKey.GetKeyData()
 		keyID := protoKey.GetKeyId()
@@ -227,18 +226,8 @@ func newWithOptions(ks *tinkpb.Keyset, opts ...Option) (*Handle, error) {
 			keyID:     protoKey.GetKeyId(),
 			status:    keyStatus,
 		}
-		if protoKey.GetKeyId() == ks.GetPrimaryKeyId() {
-			primaryKeyEntry = entries[i]
-		}
 	}
-	h := &Handle{
-		entries:         entries,
-		primaryKeyEntry: primaryKeyEntry,
-	}
-	if err := applyOptions(h, opts...); err != nil {
-		return nil, err
-	}
-	return h, nil
+	return entries, nil
 }
 
 // NewHandle creates a keyset handle that contains a single fresh key generated according
@@ -266,11 +255,7 @@ func NewHandleWithNoSecrets(ks *tinkpb.Keyset) (*Handle, error) {
 	if hasSecrets(ks) {
 		return nil, fmt.Errorf("keyset.Handle: importing unencrypted secret key material is forbidden")
 	}
-	handle, err := newWithOptions(ks)
-	if err != nil {
-		return nil, fmt.Errorf("keyset.Handle: cannot generate new keyset: %s", err)
-	}
-	return handle, nil
+	return newKeysetHandleFromProto(ks)
 }
 
 // Read tries to create a Handle from an encrypted keyset obtained via reader.
@@ -288,7 +273,7 @@ func ReadWithAssociatedData(reader Reader, masterKey tink.AEAD, associatedData [
 	if err != nil {
 		return nil, err
 	}
-	return newWithOptions(protoKeyset)
+	return newKeysetHandleFromProto(protoKeyset)
 }
 
 // ReadWithContext creates a keyset.Handle from an encrypted keyset obtained via
@@ -302,7 +287,7 @@ func ReadWithContext(ctx context.Context, reader Reader, keyEncryptionAEAD tink.
 	if err != nil {
 		return nil, err
 	}
-	return newWithOptions(protoKeyset)
+	return newKeysetHandleFromProto(protoKeyset)
 }
 
 // ReadWithNoSecrets tries to create a keyset.Handle from a keyset obtained via reader.
@@ -351,7 +336,6 @@ func (h *Handle) Public() (*Handle, error) {
 		return nil, fmt.Errorf("keyset.Handle: entries list is empty or nil")
 	}
 	entries := make([]*Entry, h.Len())
-	var primaryKeyEntry *Entry = nil
 	for i, entry := range h.entries {
 		privateKey, ok := entry.Key().(privateKey)
 		if !ok {
@@ -367,14 +351,8 @@ func (h *Handle) Public() (*Handle, error) {
 			keyID:     entry.keyID,
 			status:    entry.status,
 		}
-		if entry.isPrimary {
-			primaryKeyEntry = entries[i]
-		}
 	}
-	return &Handle{
-		entries:         entries,
-		primaryKeyEntry: primaryKeyEntry,
-	}, nil
+	return newFromEntries(entries)
 }
 
 // String returns a string representation of the managed keyset.
