@@ -57,6 +57,29 @@ func parseKeyTypeURL(ktu string) string {
 	return strings.TrimPrefix(ktu, keytypeURLPrefix)
 }
 
+// MonitoringKeysetInfoFromKeysetInfo creates a [monitoring.KeysetInfo] from a
+// [tpb.KeysetInfo] with annotations.
+func MonitoringKeysetInfoFromKeysetInfo(keysetInfo *tpb.KeysetInfo, annotations map[string]string) (*monitoring.KeysetInfo, error) {
+	keysetInfoEntries := make([]*monitoring.Entry, len(keysetInfo.GetKeyInfo()))
+	for i, keyInfo := range keysetInfo.GetKeyInfo() {
+		status, err := keyStatusFromProto(keyInfo.GetStatus())
+		if err != nil {
+			return nil, err
+		}
+		keysetInfoEntries[i] = &monitoring.Entry{
+			KeyID:     keyInfo.GetKeyId(),
+			Status:    status,
+			KeyType:   parseKeyTypeURL(keyInfo.GetTypeUrl()),
+			KeyPrefix: keyInfo.GetOutputPrefixType().String(),
+		}
+	}
+	return &monitoring.KeysetInfo{
+		Annotations:  annotations,
+		PrimaryKeyID: keysetInfo.GetPrimaryKeyId(),
+		Entries:      keysetInfoEntries,
+	}, nil
+}
+
 // KeysetInfoFromPrimitiveSet creates a `KeysetInfo` from a `PrimitiveSet`.
 // This function doesn't guarantee to preserve the ordering of the keys in the keyset.
 func KeysetInfoFromPrimitiveSet[T any](ps *primitiveset.PrimitiveSet[T]) (*monitoring.KeysetInfo, error) {
