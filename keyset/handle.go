@@ -21,7 +21,6 @@ import (
 
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -462,49 +461,41 @@ func WithConfig(c Config) PrimitivesOption {
 	}
 }
 
-// Primitives creates a set of primitives corresponding to the keys with
-// status=ENABLED in the keyset of the given keyset handle. It uses the
-// key managers that are present in the global Registry or in the Config,
-// should it be provided. It assumes that all the needed key managers are
-// present. Keys with status!=ENABLED are skipped.
+// Primitives creates a [primitiveset.PrimitiveSet] with primitives of type T
+// from keys in h.
 //
-// An example usage where a custom config is provided:
+// Only ENABLED keys are considered. This function uses either the given
+// [Config] or a global registry to create the primitives.
 //
-//	ps, err := h.Primitives(WithConfig(config.V0()))
+// Example usage:
 //
-// The returned set is usually later "wrapped" into a class that implements
-// the corresponding Primitive-interface.
+//	ps, err := keyset.Primitives[tink.AEAD](h, internalapi.Token{}, keyset.WithConfig(config.V0()))
+//
+// The returned [primitiveset.PrimitiveSet] is intended to be used by primitive
+// factories.
 //
 // NOTE: This is an internal API.
 func Primitives[T any](h *Handle, _ internalapi.Token, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet[T], error) {
-	p, err := primitives[T](h, nil, opts...)
+	p, err := primitives[T](h, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("keyset.Handle: %v", err)
 	}
 	return p, nil
 }
 
-func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry *Entry, km registry.KeyManager, config Config) (*primitiveset.Entry[T], error) {
+func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry *Entry, config Config) (*primitiveset.Entry[T], error) {
 	protoKey, err := entryToProtoKey(entry)
 	if err != nil {
 		return nil, err
 	}
 	var primitive any
-	isFullPrimitive := false
-	if km != nil && km.DoesSupport(protoKey.GetKeyData().GetTypeUrl()) {
-		primitive, err = km.Primitive(protoKey.GetKeyData().GetValue())
+	isFullPrimitive := true
+	primitive, err = config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
+	if err != nil {
+		isFullPrimitive = false
+		primitive, err = config.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})
 		if err != nil {
-			return nil, fmt.Errorf("cannot get primitive from key: %v", err)
-		}
-	} else {
-		primitive, err = config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
-		if err == nil {
-			isFullPrimitive = true
-		} else {
-			primitive, err = config.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})
-			if err != nil {
-				return nil, fmt.Errorf("cannot get primitive from key data: %v", err)
-			}
+			return nil, fmt.Errorf("cannot get primitive from key data: %v", err)
 		}
 	}
 	actualPrimitive, ok := primitive.(T)
@@ -517,7 +508,7 @@ func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry 
 	return primitiveSet.Add(actualPrimitive, protoKey)
 }
 
-func primitives[T any](h *Handle, km registry.KeyManager, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet[T], error) {
+func primitives[T any](h *Handle, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet[T], error) {
 	if h == nil {
 		return nil, fmt.Errorf("nil handle")
 	}
@@ -540,7 +531,7 @@ func primitives[T any](h *Handle, km registry.KeyManager, opts ...PrimitivesOpti
 		if entry.KeyStatus() != Enabled {
 			continue
 		}
-		primitiveSetEntry, err := addToPrimitiveSet(primitiveSet, entry, km, config)
+		primitiveSetEntry, err := addToPrimitiveSet(primitiveSet, entry, config)
 		if err != nil {
 			return nil, fmt.Errorf("cannot add primitive: %v", err)
 		}
