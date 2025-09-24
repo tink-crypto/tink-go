@@ -396,7 +396,7 @@ func keysetKeyFromStruct(val *spb.Value, ed25519Support Ed25519SupportType) (key
 	case "PS":
 		key, err = psPublicKeyDataFromStruct(keyStruct)
 	case "Ed":
-		if keyStruct.GetFields()["crv"].GetStringValue() == "Ed25519" && ed25519Support == Ed25519SupportTink {
+		if keyStruct.GetFields()["crv"].GetStringValue() == "Ed25519" && ed25519Support != Ed25519SupportNone {
 			key, err = ed25519PublicKeyDataFromStruct(keyStruct)
 		} else {
 			return nil, fmt.Errorf("Ed25519 is not supported")
@@ -551,7 +551,7 @@ func esPublicKeyToStruct(key *jwtecdsa.PublicKey) (*spb.Struct, error) {
 	return outKey, nil
 }
 
-func ed25519PublicKeyToStruct(key *ed25519.PublicKey) (*spb.Struct, error) {
+func ed25519PublicKeyToStruct(key *ed25519.PublicKey, encodedKID *string) (*spb.Struct, error) {
 	outKey := &spb.Struct{
 		Fields: map[string]*spb.Value{},
 	}
@@ -562,8 +562,8 @@ func ed25519PublicKeyToStruct(key *ed25519.PublicKey) (*spb.Struct, error) {
 	addStringEntry(outKey, "use", "sig")
 	addKeyOPSVerify(outKey)
 
-	idRequirement, hasIDRequirement := key.IDRequirement()
-	if err := setKeyID(outKey, idRequirement, hasIDRequirement, nil); err != nil {
+	// Signature keys only use the provided key ID, not the idRequirement.
+	if err := setKeyID(outKey, 0, false, encodedKID); err != nil {
 		return nil, err
 	}
 	return outKey, nil
@@ -606,10 +606,13 @@ func FromPublicKeysetHandle(kh *keyset.Handle, ed25519Support Ed25519SupportType
 		case *jwtrsassapss.PublicKey:
 			keyStruct, err = psPublicKeyToStruct(k)
 		case *ed25519.PublicKey:
-			if ed25519Support == Ed25519SupportNone {
+			switch ed25519Support {
+			case Ed25519SupportNone:
 				return nil, fmt.Errorf("Ed25519 keys are not supported")
+			case Ed25519SupportTink:
+				// ed25519PublicKeyToStruct will always encode the provided key ID instead of idRequirement.
+				keyStruct, err = ed25519PublicKeyToStruct(k, keyIDToKID(e.KeyID()))
 			}
-			keyStruct, err = ed25519PublicKeyToStruct(k)
 		default:
 			return nil, fmt.Errorf("unsupported key type %T", k)
 		}

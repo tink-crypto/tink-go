@@ -37,19 +37,19 @@ func TestEd25519KeyConversion(t *testing.T) {
 		]
 	}`
 
-	// Convert JWK Set to KeysetHandle
+	// Convert JWK Set to KeysetHandle.
 	handle, err := jwk.ToPublicKeysetHandle([]byte(jwkSet), jwk.Ed25519SupportTink)
 	if err != nil {
 		t.Fatalf("ToPublicKeysetHandle() err = %v, want nil", err)
 	}
 
-	// Convert KeysetHandle back to JWK Set
+	// Convert KeysetHandle back to JWK Set.
 	gotJWKSet, err := jwk.FromPublicKeysetHandle(handle, jwk.Ed25519SupportTink)
 	if err != nil {
 		t.Fatalf("FromPublicKeysetHandle() err = %v, want nil", err)
 	}
 
-	// Compare the original and converted JWK Sets
+	// Compare the original and converted JWK Sets.
 	want := &spb.Struct{}
 	if err := want.UnmarshalJSON([]byte(jwkSet)); err != nil {
 		t.Fatalf("want.UnmarshalJSON() err = %v, want nil", err)
@@ -58,6 +58,13 @@ func TestEd25519KeyConversion(t *testing.T) {
 	if err := got.UnmarshalJSON(gotJWKSet); err != nil {
 		t.Fatalf("got.UnmarshalJSON() err = %v, want nil", err)
 	}
+
+	if got.GetFields()["keys"].GetListValue().GetValues()[0].GetStructValue().GetFields()["kid"].GetStringValue() == "" {
+		t.Errorf("kid is empty, expected a randomly generated value")
+	}
+
+	// Remove the random generated kid from the got JWK Set to compare with the original JWK Set.
+	delete(got.GetFields()["keys"].GetListValue().GetValues()[0].GetStructValue().GetFields(), "kid")
 
 	if diff := cmp.Diff(want, got, protocmp.Transform()); diff != "" {
 		t.Errorf("mismatch in jwk sets: diff (-want +got):\n%s", diff)
@@ -78,19 +85,19 @@ func TestEd25519KeyConversionNotSupported(t *testing.T) {
 		]
 	}`
 
-	// Attempt to convert JWK Set to KeysetHandle with Ed25519SupportNone
+	// Attempt to convert JWK Set to KeysetHandle with Ed25519SupportNone.
 	_, err := jwk.ToPublicKeysetHandle([]byte(jwkSet), jwk.Ed25519SupportNone)
 	if err == nil {
 		t.Fatalf("ToPublicKeysetHandle() err = nil, want error")
 	}
 
-	// Convert JWK Set to KeysetHandle
+	// Convert JWK Set to KeysetHandle.
 	handle, err := jwk.ToPublicKeysetHandle([]byte(jwkSet), jwk.Ed25519SupportTink)
 	if err != nil {
 		t.Fatalf("ToPublicKeysetHandle() err = %v, want nil", err)
 	}
 
-	// Attempt to convert KeysetHandle back to JWK Set with Ed25519SupportNone
+	// Attempt to convert KeysetHandle back to JWK Set with Ed25519SupportNone.
 	_, err = jwk.FromPublicKeysetHandle(handle, jwk.Ed25519SupportNone)
 	if err == nil {
 		t.Fatalf("FromPublicKeysetHandle() err = nil, want error")
