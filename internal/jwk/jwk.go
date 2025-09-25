@@ -651,8 +651,7 @@ func isValidURLsafeBase64Char(c rune) bool {
 		((c >= '0') && (c <= '9')) || ((c == '-') || (c == '_')))
 }
 
-// keyIDToKID returns the keyID in big endian format base64 encoded if the key
-// output prefix is of type Tink or nil otherwise.
+// keyIDToKID returns the keyID in big endian format base64 encoded.
 func keyIDToKID(keyID uint32) *string {
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, keyID)
