@@ -17,13 +17,5 @@
 package keyderivation
 
 import (
-	"github.com/tink-crypto/tink-go/v2/internal"
-	"github.com/tink-crypto/tink-go/v2/keyset"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
-
 	_ "github.com/tink-crypto/tink-go/v2/keyderivation/prfbasedkeyderivation" // Register proto serialization, primitive constructor, and key manager.
-)
-
-var (
-	keysetHandle = internal.KeysetHandle.(func(*tinkpb.Keyset, ...keyset.Option) (*keyset.Handle, error))
 )
