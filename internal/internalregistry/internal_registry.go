@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 )
 
@@ -28,15 +29,7 @@ var (
 	monitoringClient   monitoring.Client = defaultClient
 )
 
-type doNothingLogger struct{}
-
-var _ monitoring.Logger = (*doNothingLogger)(nil)
-
-func (l *doNothingLogger) Log(uint32, int) {}
-
-func (l *doNothingLogger) LogFailure() {}
-
-var defaultLogger = &doNothingLogger{}
+var defaultLogger = &monitoringutil.DoNothingLogger{}
 
 type doNothingClient struct{}
 

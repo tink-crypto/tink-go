@@ -21,17 +21,23 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/testing/fakekms"
+	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -1347,5 +1353,178 @@ func TestWriteWithNoSecretsIsThreadSafe(t *testing.T) {
 				t.Fatalf("publicHandle.WriteWithNoSecrets(keyset.NewBinaryWriter(buff)) err = %v, want nil", err)
 			}
 		})
+	}
+}
+
+func TestKeyExportMonitoring(t *testing.T) {
+	defer internalregistry.ClearMonitoringClient()
+	fakeClient := fakemonitoring.NewClient("fake_client")
+	if err := internalregistry.RegisterMonitoringClient(fakeClient); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+
+	km := keyset.NewManager()
+	keyID1, err := km.Add(signature.ECDSAP256KeyTemplate())
+	if err != nil {
+		t.Fatalf("km.Add(template) err = %v, want nil", err)
+	}
+	keyID2, err := km.Add(signature.ECDSAP256KeyTemplate())
+	if err != nil {
+		t.Fatalf("km.Add(template) err = %v, want nil", err)
+	}
+	if err = km.SetPrimary(keyID1); err != nil {
+		t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID1, err)
+	}
+	if err := km.SetAnnotations(map[string]string{"foo": "bar"}); err != nil {
+		t.Fatalf("km.SetAnnotations() err = %v, want nil", err)
+	}
+
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	// Export all keys.
+	if got, want := len(fakeClient.Events()), 0; got != want {
+		t.Errorf("len(fakeClient.Events()) = %d, want %d", got, want)
+	}
+	if got, want := len(fakeClient.Failures()), 0; got != want {
+		t.Errorf("len(fakeClient.Failures()) = %d, want %d", got, want)
+	}
+	if got, want := len(fakeClient.KeyExportsLogs()), 0; got != want {
+		t.Errorf("len(fakeClient.KeyExportsLogs()) = %d, want %d", got, want)
+	}
+	for i := 0; i < handle.Len(); i++ {
+		entry, err := handle.Entry(i)
+		if err != nil {
+			t.Fatalf("handle.Entry(%d) err = %v, want nil", i, err)
+		}
+		_ = entry.Key()
+		if got, want := len(fakeClient.KeyExportsLogs()), i+1; got != want {
+			t.Errorf("len(fakeClient.KeyExportsLogs()) = %d, want %d", got, want)
+		}
+	}
+
+	info, err := monitoringutil.MonitoringKeysetInfoFromKeysetInfo(handle.KeysetInfo(), map[string]string{"foo": "bar"})
+	if err != nil {
+		t.Fatalf("monitoringutil.MonitoringKeysetInfoFromKeysetInfo() err = %v, want nil", err)
+	}
+
+	want := []*fakemonitoring.LogKeyExport{
+		&fakemonitoring.LogKeyExport{
+			KeyID: keyID1,
+			Context: &monitoring.Context{
+				Primitive:   "keyset",
+				APIFunction: "get_key",
+				KeysetInfo:  info,
+			},
+		},
+		&fakemonitoring.LogKeyExport{
+			KeyID: keyID2,
+			Context: &monitoring.Context{
+				Primitive:   "keyset",
+				APIFunction: "get_key",
+				KeysetInfo:  info,
+			},
+		},
+	}
+	if diff := cmp.Diff(want, fakeClient.KeyExportsLogs(), protocmp.Transform()); diff != "" {
+		t.Errorf("fakeClient.KeyExportsLogs() returned unexpected diff (-want +got):\n%s", diff)
+	}
+}
+
+// Not monitored if no annotations are set.
+func TestKeyExportNotMonitored(t *testing.T) {
+	defer internalregistry.ClearMonitoringClient()
+	fakeClient := fakemonitoring.NewClient("fake_client")
+	if err := internalregistry.RegisterMonitoringClient(fakeClient); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+
+	km := keyset.NewManager()
+	keyID1, err := km.Add(signature.ECDSAP256KeyTemplate())
+	if err != nil {
+		t.Fatalf("km.Add(template) err = %v, want nil", err)
+	}
+	if _, err = km.Add(signature.ECDSAP256KeyTemplate()); err != nil {
+		t.Fatalf("km.Add(template) err = %v, want nil", err)
+	}
+	if err = km.SetPrimary(keyID1); err != nil {
+		t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID1, err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	// Export all keys.
+	if got, want := len(fakeClient.KeyExportsLogs()), 0; got != want {
+		t.Errorf("len(fakeClient.KeyExportsLogs()) = %d, want %d", got, want)
+	}
+	for i := 0; i < handle.Len(); i++ {
+		entry, err := handle.Entry(i)
+		if err != nil {
+			t.Fatalf("handle.Entry(%d) err = %v, want nil", i, err)
+		}
+		_ = entry.Key()
+		if got, want := len(fakeClient.KeyExportsLogs()), 0; got != want {
+			t.Errorf("len(fakeClient.KeyExportsLogs()) = %d, want %d", got, want)
+		}
+	}
+
+	if fakeClient.KeyExportsLogs() != nil {
+		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
+	}
+}
+
+func TestPublicAndPrimitivesGenerateNoKeyExport(t *testing.T) {
+	defer internalregistry.ClearMonitoringClient()
+	fakeClient := fakemonitoring.NewClient("fake_client")
+	if err := internalregistry.RegisterMonitoringClient(fakeClient); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+
+	km := keyset.NewManager()
+	keyID1, err := km.Add(signature.ECDSAP256KeyTemplate())
+	if err != nil {
+		t.Fatalf("km.Add(template) err = %v, want nil", err)
+	}
+	_, err = km.Add(signature.ECDSAP256KeyTemplate())
+	if err != nil {
+		t.Fatalf("km.Add(template) err = %v, want nil", err)
+	}
+	if err = km.SetPrimary(keyID1); err != nil {
+		t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID1, err)
+	}
+	if err := km.SetAnnotations(map[string]string{"foo": "bar"}); err != nil {
+		t.Fatalf("km.SetAnnotations() err = %v, want nil", err)
+	}
+
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	publicHandle, err := handle.Public()
+	if err != nil {
+		t.Fatalf("handle.Public() err = %v, want nil", err)
+	}
+	if fakeClient.KeyExportsLogs() != nil {
+		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
+	}
+
+	// Getting primitives should not trigger key export monitoring.
+	if _, err = keyset.Primitives[tink.Signer](handle, internalapi.Token{}); err != nil {
+		t.Fatalf("keyset.Primitives[tink.Signer](handle, internalapi.Token{}) err = %v, want nil", err)
+	}
+	if fakeClient.KeyExportsLogs() != nil {
+		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
+	}
+
+	if _, err = keyset.Primitives[tink.Verifier](publicHandle, internalapi.Token{}); err != nil {
+		t.Fatalf("keyset.Primitives[tink.Verifier](publicHandle, internalapi.Token{}) err = %v, want nil", err)
+	}
+	if fakeClient.KeyExportsLogs() != nil {
+		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
 	}
 }

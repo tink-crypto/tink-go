@@ -37,6 +37,9 @@ func (l *DoNothingLogger) Log(uint32, int) {}
 // LogFailure drops a failure call.
 func (l *DoNothingLogger) LogFailure() {}
 
+// LogKeyExport drops a key export call.
+func (l *DoNothingLogger) LogKeyExport(keyID uint32) {}
+
 func keyStatusFromProto(status tpb.KeyStatusType) (monitoring.KeyStatus, error) {
 	var keyStatus monitoring.KeyStatus = 55
 	switch status {

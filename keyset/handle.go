@@ -22,10 +22,13 @@ import (
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -36,9 +39,10 @@ var errInvalidKeyset = fmt.Errorf("keyset.Handle: invalid keyset")
 // Handle provides access to a keyset to limit the exposure of the internal
 // keyset representation, which may hold sensitive key material.
 type Handle struct {
-	entries         []*Entry
-	annotations     map[string]string
-	primaryKeyEntry *Entry
+	entries          []*Entry
+	annotations      map[string]string
+	primaryKeyEntry  *Entry
+	monitoringClient monitoring.Client
 }
 
 // KeyStatus is the key status.
@@ -69,6 +73,10 @@ func (ks KeyStatus) String() string {
 	}
 }
 
+type keyExportLogger interface {
+	LogKeyExport(keyID uint32)
+}
+
 // Entry represents an entry in a keyset.
 type Entry struct {
 	// Object that represents a full Tink key, i.e., key material, parameters and algorithm.
@@ -76,10 +84,14 @@ type Entry struct {
 	isPrimary bool
 	keyID     uint32
 	status    KeyStatus
+	logger    keyExportLogger
 }
 
 // Key returns the key.
 func (e *Entry) Key() key.Key {
+	if e.logger != nil {
+		e.logger.LogKeyExport(e.keyID)
+	}
 	return e.key
 }
 
@@ -130,7 +142,8 @@ func entryToProtoKey(entry *Entry) (*tinkpb.Keyset_Key, error) {
 	if err != nil {
 		return nil, err
 	}
-	protoKeySerialization, err := protoserialization.SerializeKey(entry.Key())
+	// NOTE: Purposely not using entry.Key() here to avoid logging the key export.
+	protoKeySerialization, err := protoserialization.SerializeKey(entry.key)
 	if err != nil {
 		return nil, err
 	}
@@ -163,6 +176,28 @@ func entriesToProtoKeyset(entries []*Entry) (*tinkpb.Keyset, error) {
 	return protoKeyset, nil
 }
 
+func setEntryMonitoringIfNeeded(h *Handle) error {
+	if len(h.annotations) == 0 {
+		return nil
+	}
+	monitorinKeysetInfo, err := monitoringutil.MonitoringKeysetInfoFromKeysetInfo(h.KeysetInfo(), h.annotations)
+	if err != nil {
+		return err
+	}
+	for _, entry := range h.entries {
+		l, err := h.monitoringClient.NewLogger(&monitoring.Context{
+			Primitive:   "keyset",
+			APIFunction: "get_key",
+			KeysetInfo:  monitorinKeysetInfo,
+		})
+		if err != nil {
+			return err
+		}
+		entry.logger = l
+	}
+	return nil
+}
+
 func newFromEntries(entries []*Entry, opts ...Option) (*Handle, error) {
 	var primaryKeyEntry *Entry = nil
 	for _, entry := range entries {
@@ -177,11 +212,16 @@ func newFromEntries(entries []*Entry, opts ...Option) (*Handle, error) {
 		return nil, fmt.Errorf("keyset.Handle: no primary key")
 	}
 	h := &Handle{
-		entries:         entries,
-		primaryKeyEntry: primaryKeyEntry,
+		entries:          entries,
+		primaryKeyEntry:  primaryKeyEntry,
+		monitoringClient: internalregistry.GetMonitoringClient(),
 	}
+
 	if err := applyOptions(h, opts...); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("keyset.Handle: %v", err)
+	}
+	if err := setEntryMonitoringIfNeeded(h); err != nil {
+		return nil, fmt.Errorf("keyset.Handle: %v", err)
 	}
 	return h, nil
 }
@@ -336,7 +376,8 @@ func (h *Handle) Public() (*Handle, error) {
 	}
 	entries := make([]*Entry, h.Len())
 	for i, entry := range h.entries {
-		privateKey, ok := entry.Key().(privateKey)
+		// NOTE: Purposely not using entry.Key() here to avoid logging the key export.
+		privateKey, ok := entry.key.(privateKey)
 		if !ok {
 			return nil, fmt.Errorf("keyset.Handle: keyset contains a non-private key")
 		}
@@ -490,7 +531,8 @@ func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry 
 	}
 	var primitive any
 	isFullPrimitive := true
-	primitive, err = config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
+	// NOTE: Purposely not using entry.Key() here to avoid logging the key export.
+	primitive, err = config.PrimitiveFromKey(entry.key, internalapi.Token{})
 	if err != nil {
 		isFullPrimitive = false
 		primitive, err = config.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})

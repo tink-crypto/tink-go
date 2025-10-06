@@ -104,6 +104,9 @@ type Logger interface {
 	// method has no arguments. The MonitoringClient implementation is responsible
 	// to add context to identify where the failure comes from.
 	LogFailure()
+
+	// Logs a successful export of `keyID`.
+	LogKeyExport(keyID uint32)
 }
 
 // Client represents an interface to hold monitoring client context to create a `Logger`.

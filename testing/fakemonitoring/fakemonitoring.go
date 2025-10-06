@@ -43,6 +43,11 @@ func (l *Logger) LogFailure() {
 	l.client.addFailure(&LogFailure{Context: l.Context})
 }
 
+// LogKeyExport captures a successful key export.
+func (l *Logger) LogKeyExport(keyID uint32) {
+	l.client.addKeyExport(&LogKeyExport{Context: l.Context, KeyID: keyID})
+}
+
 // LogEvent stored on each 'Log' operation.
 type LogEvent struct {
 	Context  *monitoring.Context
@@ -55,14 +60,22 @@ type LogFailure struct {
 	Context *monitoring.Context
 }
 
+// LogKeyExport stored on each 'LogKeyExport' operation.
+type LogKeyExport struct {
+	Context *monitoring.Context
+	KeyID   uint32
+}
+
 // Client implements a fake monitoring.Client
 type Client struct {
 	Name string
 
-	eventsMu   sync.Mutex
-	events     []*LogEvent
-	failuresMu sync.Mutex
-	failures   []*LogFailure
+	eventsMu     sync.Mutex
+	events       []*LogEvent
+	failuresMu   sync.Mutex
+	failures     []*LogFailure
+	keyExportsMu sync.Mutex
+	keyExports   []*LogKeyExport
 }
 
 var _ monitoring.Client = (*Client)(nil)
@@ -92,6 +105,11 @@ func (c *Client) Failures() []*LogFailure {
 	return c.failures
 }
 
+// KeyExportsLogs returns key exports.
+func (c *Client) KeyExportsLogs() []*LogKeyExport {
+	return c.keyExports
+}
+
 func (c *Client) addEvent(event *LogEvent) {
 	c.eventsMu.Lock()
 	defer c.eventsMu.Unlock()
@@ -102,5 +120,10 @@ func (c *Client) addFailure(failure *LogFailure) {
 	defer c.failuresMu.Unlock()
 	c.failuresMu.Lock()
 	c.failures = append(c.failures, failure)
+}
 
+func (c *Client) addKeyExport(keyExport *LogKeyExport) {
+	defer c.keyExportsMu.Unlock()
+	c.keyExportsMu.Lock()
+	c.keyExports = append(c.keyExports, keyExport)
 }
