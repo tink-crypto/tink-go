@@ -326,14 +326,9 @@ func (km *Manager) SetAnnotations(annotations map[string]string) error {
 
 // Handle creates a new Handle for the managed keyset.
 func (km *Manager) Handle() (*Handle, error) {
-	var entries []*Entry
-	for _, e := range km.entries {
-		entries = append(entries, &Entry{
-			key:       e.key,
-			keyID:     e.fixedID,
-			status:    e.status,
-			isPrimary: e.isPrimary,
-		})
+	entries := make([]*Entry, len(km.entries))
+	for i, e := range km.entries {
+		entries[i] = newUnmonitoredEntry(e.key, e.isPrimary, e.fixedID, e.status)
 	}
 	return newFromEntries(entries, WithAnnotations(km.annotations))
 }

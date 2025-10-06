@@ -87,11 +87,19 @@ type Entry struct {
 	logger    keyExportLogger
 }
 
+func newUnmonitoredEntry(key key.Key, isPrimary bool, keyID uint32, status KeyStatus) *Entry {
+	return &Entry{
+		key:       key,
+		isPrimary: isPrimary,
+		keyID:     keyID,
+		status:    status,
+		logger:    &monitoringutil.DoNothingLogger{},
+	}
+}
+
 // Key returns the key.
 func (e *Entry) Key() key.Key {
-	if e.logger != nil {
-		e.logger.LogKeyExport(e.keyID)
-	}
+	e.logger.LogKeyExport(e.keyID)
 	return e.key
 }
 
@@ -108,6 +116,10 @@ func (e *Entry) KeyID() uint32 {
 // KeyStatus returns the key status.
 func (e *Entry) KeyStatus() KeyStatus {
 	return e.status
+}
+
+func (e *Entry) toUnmonitored() *Entry {
+	return newUnmonitoredEntry(e.key, e.isPrimary, e.keyID, e.status)
 }
 
 func keyStatusFromProto(status tinkpb.KeyStatusType) (KeyStatus, error) {
@@ -142,8 +154,7 @@ func entryToProtoKey(entry *Entry) (*tinkpb.Keyset_Key, error) {
 	if err != nil {
 		return nil, err
 	}
-	// NOTE: Purposely not using entry.Key() here to avoid logging the key export.
-	protoKeySerialization, err := protoserialization.SerializeKey(entry.key)
+	protoKeySerialization, err := protoserialization.SerializeKey(entry.Key())
 	if err != nil {
 		return nil, err
 	}
@@ -155,20 +166,23 @@ func entryToProtoKey(entry *Entry) (*tinkpb.Keyset_Key, error) {
 	}, nil
 }
 
-func entriesToProtoKeyset(entries []*Entry) (*tinkpb.Keyset, error) {
-	if entries == nil {
-		return nil, fmt.Errorf("entriesToProtoKeyset called with nil")
-	}
+func entriesToProtoKeyset(entries []*Entry, shouldLogKeyExport bool) (*tinkpb.Keyset, error) {
 	if len(entries) == 0 {
 		return nil, fmt.Errorf("entries is empty")
 	}
-	protoKeyset := &tinkpb.Keyset{}
-	for _, entry := range entries {
+	protoKeyset := &tinkpb.Keyset{
+		Key: make([]*tinkpb.Keyset_Key, len(entries)),
+	}
+
+	for i, entry := range entries {
+		if !shouldLogKeyExport {
+			entry = entry.toUnmonitored()
+		}
 		protoKey, err := entryToProtoKey(entry)
 		if err != nil {
 			return nil, err
 		}
-		protoKeyset.Key = append(protoKeyset.Key, protoKey)
+		protoKeyset.Key[i] = protoKey
 		if entry.IsPrimary() {
 			protoKeyset.PrimaryKeyId = entry.KeyID()
 		}
@@ -259,12 +273,7 @@ func keysetToEntries(ks *tinkpb.Keyset) ([]*Entry, error) {
 		if err != nil {
 			return nil, err
 		}
-		entries[i] = &Entry{
-			key:       key,
-			isPrimary: protoKey.GetKeyId() == ks.GetPrimaryKeyId(),
-			keyID:     protoKey.GetKeyId(),
-			status:    keyStatus,
-		}
+		entries[i] = newUnmonitoredEntry(key, protoKey.GetKeyId() == ks.GetPrimaryKeyId(), protoKey.GetKeyId(), keyStatus)
 	}
 	return entries, nil
 }
@@ -385,12 +394,7 @@ func (h *Handle) Public() (*Handle, error) {
 		if err != nil {
 			return nil, fmt.Errorf("keyset.Handle: %v", err)
 		}
-		entries[i] = &Entry{
-			key:       publicKey,
-			isPrimary: entry.isPrimary,
-			keyID:     entry.keyID,
-			status:    entry.status,
-		}
+		entries[i] = newUnmonitoredEntry(publicKey, entry.isPrimary, entry.keyID, entry.status)
 	}
 	return newFromEntries(entries)
 }
@@ -413,10 +417,17 @@ func (h *Handle) Len() int {
 	return len(h.entries)
 }
 
-// KeysetInfo returns KeysetInfo representation of the managed keyset.
+// KeysetInfo returns [*tinkpb.KeysetInfo] representation of the managed
+// keyset.
+//
 // The result does not contain any sensitive key material.
 func (h *Handle) KeysetInfo() *tinkpb.KeysetInfo {
-	return getKeysetInfo(keysetMaterial(h))
+	protoKeyset, err := entriesToProtoKeyset(h.entries, false)
+	if err != nil {
+		// This should never happen.
+		panic(err)
+	}
+	return getKeysetInfo(protoKeyset)
 }
 
 // Write encrypts and writes the enclosing keyset.
@@ -432,7 +443,7 @@ func (h *Handle) WriteWithAssociatedData(writer Writer, masterKey tink.AEAD, ass
 	if h == nil {
 		return fmt.Errorf("keyset.Handle: nil handle")
 	}
-	protoKeyset, err := entriesToProtoKeyset(h.entries)
+	protoKeyset, err := entriesToProtoKeyset(h.entries, false)
 	if err != nil {
 		return err
 	}
@@ -448,7 +459,7 @@ func (h *Handle) WriteWithContext(ctx context.Context, writer Writer, keyEncrypt
 	if h == nil {
 		return fmt.Errorf("keyset.Handle: nil handle")
 	}
-	protoKeyset, err := entriesToProtoKeyset(h.entries)
+	protoKeyset, err := entriesToProtoKeyset(h.entries, false)
 	if err != nil {
 		return fmt.Errorf("keyset.Handle: %v", err)
 	}
@@ -465,7 +476,7 @@ func (h *Handle) WriteWithNoSecrets(w Writer) error {
 	if h == nil {
 		return fmt.Errorf("keyset.Handle: nil handle")
 	}
-	protoKeyset, err := entriesToProtoKeyset(h.entries)
+	protoKeyset, err := entriesToProtoKeyset(h.entries, false)
 	if err != nil {
 		return err
 	}
@@ -525,14 +536,15 @@ func Primitives[T any](h *Handle, _ internalapi.Token, opts ...PrimitivesOption)
 }
 
 func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry *Entry, config Config) (*primitiveset.Entry[T], error) {
+	// Don't monitor this as key export.
+	entry = entry.toUnmonitored()
 	protoKey, err := entryToProtoKey(entry)
 	if err != nil {
 		return nil, err
 	}
 	var primitive any
 	isFullPrimitive := true
-	// NOTE: Purposely not using entry.Key() here to avoid logging the key export.
-	primitive, err = config.PrimitiveFromKey(entry.key, internalapi.Token{})
+	primitive, err = config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
 	if err != nil {
 		isFullPrimitive = false
 		primitive, err = config.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})

@@ -32,11 +32,12 @@ func newKeysetHandleFromProto(ks *tinkpb.Keyset, opts ...Option) (*Handle, error
 	return newFromEntries(entries, opts...)
 }
 
-// keysetMaterial is used by package insecurecleartextkeyset and package
-// testkeyset (via package internal) to read the key material in a
-// keyset.Handle. Returns a clone of the keyset.
+// keysetMaterial is used by internal packages to obtain the key material
+// contained in a [keyset.Handle] as a [tinkpb.Keyset].
+//
+// This is used through [internal.KeysetMaterial]
 func keysetMaterial(h *Handle) *tinkpb.Keyset {
-	ks, err := entriesToProtoKeyset(h.entries)
+	ks, err := entriesToProtoKeyset(h.entries, true)
 	if err != nil {
 		return nil
 	}
