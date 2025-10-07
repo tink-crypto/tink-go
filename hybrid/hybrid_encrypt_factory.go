@@ -101,7 +101,7 @@ func newWrappedHybridEncrypt(ps *primitiveset.PrimitiveSet[tink.HybridEncrypt]) 
 	if primitive == nil {
 		primitive = &fullHybridEncryptAdapter{
 			rawHybridEncrypt: ps.Primary.Primitive,
-			prefix:           []byte(ps.Primary.Prefix),
+			prefix:           ps.Primary.OutputPrefix(),
 		}
 	}
 

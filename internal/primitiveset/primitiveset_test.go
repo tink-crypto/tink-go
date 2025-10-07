@@ -19,17 +19,15 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
-
-func makeTestKey(keyID int, status tinkpb.KeyStatusType, outputPrefixType tinkpb.OutputPrefixType, typeURL string) *tinkpb.Keyset_Key {
-	k := testutil.NewDummyKey(keyID, status, outputPrefixType)
-	k.GetKeyData().TypeUrl = typeURL
-	return k
-}
 
 func TestPrimitvesetNew(t *testing.T) {
 	ps := primitiveset.New[any]()
@@ -38,68 +36,109 @@ func TestPrimitvesetNew(t *testing.T) {
 	}
 }
 
+type testKey struct {
+	keyID     uint32
+	key       key.Key
+	primitive tink.AEAD
+	isFull    bool
+}
+
+var (
+	keyBytes = []byte("01234567890123456789012345678901")
+)
+
+func mustCreateAESGCMKey(t *testing.T, variant aesgcm.Variant, keyID uint32) *aesgcm.Key {
+	params, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		Variant:        variant,
+		KeySizeInBytes: 32,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	sd := secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{})
+	key, err := aesgcm.NewKey(sd, keyID, params)
+	if err != nil {
+		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
+	}
+	return key
+}
+
+func mustCreateChaCha20Poly1305Key(t *testing.T, variant chacha20poly1305.Variant, keyID uint32) *chacha20poly1305.Key {
+	params, err := chacha20poly1305.NewParameters(variant)
+	if err != nil {
+		t.Fatalf("chacha20poly1305.NewParameters() err = %v, want nil", err)
+	}
+	sd := secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{})
+	key, err := chacha20poly1305.NewKey(sd, keyID, params)
+	if err != nil {
+		t.Fatalf("chacha20poly1305.NewKey() err = %v, want nil", err)
+	}
+	return key
+}
+
 func TestPrimitivesetAddAndEntriesInKeysetOrder(t *testing.T) {
-	keys := []*tinkpb.Keyset_Key{
-		makeTestKey(1234543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.1"),
-		makeTestKey(7213743, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_LEGACY, "type.url.2"),
-		makeTestKey(5294722, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_RAW, "type.url.3"),
-		makeTestKey(9876543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.3"),
+	keys := []testKey{
+		testKey{
+			keyID:     0x1234543,
+			key:       mustCreateAESGCMKey(t, aesgcm.VariantTink, 0x1234543),
+			primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x1234543)},
+		},
+		testKey{
+			keyID:     0x7213743,
+			key:       mustCreateAESGCMKey(t, aesgcm.VariantCrunchy, 0x7213743),
+			primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x7213743)},
+		},
+		testKey{
+			keyID:     0,
+			key:       mustCreateAESGCMKey(t, aesgcm.VariantNoPrefix, 0),
+			primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x1111111)},
+		},
+		testKey{
+			keyID:     0x9876543,
+			key:       mustCreateChaCha20Poly1305Key(t, chacha20poly1305.VariantTink, 0x9876543),
+			primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x9876543)},
+			isFull:    true,
+		},
 	}
-	full := []bool{false, false, false, true}
-	macs := make([]testutil.DummyMAC, len(keys))
-	for i := 0; i < len(macs); i++ {
-		macs[i] = testutil.DummyMAC{Name: fmt.Sprintf("%d", i)}
-	}
-	ps := primitiveset.New[tink.MAC]()
-	got := []*primitiveset.Entry[tink.MAC]{}
-	for i := 0; i < len(macs); i++ {
-		var err error
-		var e *primitiveset.Entry[tink.MAC]
-		if full[i] {
-			e, err = ps.AddFullPrimitive(&macs[i], keys[i])
-			if err != nil {
-				t.Fatalf("ps.AddFullPrimitive(%q) err = %v, want nil", macs[i].Name, err)
-			}
+	ps := primitiveset.New[tink.AEAD]()
+	var got []*primitiveset.Entry[tink.AEAD]
+	for _, k := range keys {
+		e := &primitiveset.Entry[tink.AEAD]{
+			KeyID: k.keyID,
+			Key:   k.key,
+		}
+		if k.isFull {
+			e.FullPrimitive = k.primitive
 		} else {
-			e, err = ps.Add(&macs[i], keys[i])
-			if err != nil {
-				t.Fatalf("ps.Add(%q) err = %v, want nil", macs[i].Name, err)
-			}
+			e.Primitive = k.primitive
 		}
 		got = append(got, e)
+		if err := ps.Add(e); err != nil {
+			t.Fatalf("ps.Add() err = %v, want nil", err)
+		}
 	}
-	want := []*primitiveset.Entry[tink.MAC]{
+	want := []*primitiveset.Entry[tink.AEAD]{
 		{
-			KeyID:      1234543,
-			Status:     tinkpb.KeyStatusType_ENABLED,
-			Primitive:  &testutil.DummyMAC{Name: "0"},
-			PrefixType: tinkpb.OutputPrefixType_TINK,
-			TypeURL:    "type.url.1",
-			Prefix:     string([]byte{1, 0, 18, 214, 111}),
+			KeyID:     0x1234543,
+			Primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x1234543)},
+			Key:       keys[0].key,
 		},
 		{
-			KeyID:      7213743,
-			Status:     tinkpb.KeyStatusType_ENABLED,
-			Primitive:  &testutil.DummyMAC{Name: "1"},
-			PrefixType: tinkpb.OutputPrefixType_LEGACY,
-			TypeURL:    "type.url.2",
-			Prefix:     string([]byte{0, 0, 110, 18, 175}),
+			KeyID:     0x7213743,
+			Primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x7213743)},
+			Key:       keys[1].key,
 		},
 		{
-			KeyID:      5294722,
-			Status:     tinkpb.KeyStatusType_ENABLED,
-			Primitive:  &testutil.DummyMAC{Name: "2"},
-			PrefixType: tinkpb.OutputPrefixType_RAW,
-			TypeURL:    "type.url.3",
-			Prefix:     "",
+			KeyID:     0,
+			Primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x1111111)},
+			Key:       keys[2].key,
 		},
 		{
-			KeyID:         9876543,
-			Status:        tinkpb.KeyStatusType_ENABLED,
-			FullPrimitive: &testutil.DummyMAC{Name: "3"},
-			PrefixType:    tinkpb.OutputPrefixType_TINK,
-			TypeURL:       "type.url.3",
-			Prefix:        string([]byte{1, 0, 0x96, 0xb4, 0x3f}),
+			KeyID:         0x9876543,
+			FullPrimitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x9876543)},
+			Key:           keys[3].key,
 		},
 	}
 	if diff := cmp.Diff(got, want); diff != "" {
@@ -111,50 +150,58 @@ func TestPrimitivesetAddAndEntriesInKeysetOrder(t *testing.T) {
 }
 
 func TestPrimitivesetRawEntries(t *testing.T) {
-	keys := []*tinkpb.Keyset_Key{
-		makeTestKey(1234543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.1"),
-		makeTestKey(7213743, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_LEGACY, "type.url.2"),
-		makeTestKey(9473277, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_RAW, "type.url.3"),
-		makeTestKey(5294722, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_RAW, "type.url.4"),
+	keys := []testKey{
+		testKey{
+			keyID:     0x1234543,
+			key:       mustCreateAESGCMKey(t, aesgcm.VariantTink, 0x1234543),
+			primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x1234543)},
+		},
+		testKey{
+			keyID:     0x7213743,
+			key:       mustCreateAESGCMKey(t, aesgcm.VariantCrunchy, 0x7213743),
+			primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x7213743)},
+		},
+		testKey{
+			keyID:     0,
+			key:       mustCreateAESGCMKey(t, aesgcm.VariantNoPrefix, 0),
+			primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x1111111)},
+		},
+		testKey{
+			keyID:     0x9876543,
+			key:       mustCreateChaCha20Poly1305Key(t, chacha20poly1305.VariantNoPrefix, 0),
+			primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x9876543)},
+			isFull:    true,
+		},
 	}
-	full := []bool{false, false, true, false}
-	macs := make([]testutil.DummyMAC, len(keys))
-	for i := 0; i < len(macs); i++ {
-		macs[i] = testutil.DummyMAC{Name: fmt.Sprintf("Mac#%d", i)}
-	}
-	ps := primitiveset.New[tink.MAC]()
-	for i := 0; i < len(macs); i++ {
-		var err error
-		if full[i] {
-			_, err = ps.AddFullPrimitive(&macs[i], keys[i])
-			if err != nil {
-				t.Fatalf("ps.AddFullPrimitive(%q) err = %v, want nil", macs[i].Name, err)
-			}
+	ps := primitiveset.New[tink.AEAD]()
+	for _, k := range keys {
+		e := &primitiveset.Entry[tink.AEAD]{
+			KeyID: k.keyID,
+			Key:   k.key,
+		}
+		if k.isFull {
+			e.FullPrimitive = k.primitive
 		} else {
-			_, err = ps.Add(&macs[i], keys[i])
-			if err != nil {
-				t.Fatalf("ps.Add(%q) err = %v, want nil", macs[i].Name, err)
-			}
+			e.Primitive = k.primitive
+		}
+		if err := ps.Add(e); err != nil {
+			t.Fatalf("ps.Add() err = %v, want nil", err)
 		}
 	}
 	got, err := ps.RawEntries()
 	if err != nil {
 		t.Errorf("RawEntries() err = %v, want nil", err)
 	}
-	want := []*primitiveset.Entry[tink.MAC]{
+	want := []*primitiveset.Entry[tink.AEAD]{
 		{
-			KeyID:         keys[2].GetKeyId(),
-			Status:        keys[2].GetStatus(),
-			PrefixType:    keys[2].GetOutputPrefixType(),
-			TypeURL:       keys[2].GetKeyData().GetTypeUrl(),
-			FullPrimitive: &macs[2],
+			KeyID:     0,
+			Primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x1111111)},
+			Key:       keys[2].key,
 		},
 		{
-			KeyID:      keys[3].GetKeyId(),
-			Status:     keys[3].GetStatus(),
-			PrefixType: keys[3].GetOutputPrefixType(),
-			TypeURL:    keys[3].GetKeyData().GetTypeUrl(),
-			Primitive:  &macs[3],
+			KeyID:         0x9876543,
+			FullPrimitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x9876543)},
+			Key:           keys[3].key,
 		},
 	}
 	if diff := cmp.Diff(got, want); diff != "" {
@@ -163,128 +210,126 @@ func TestPrimitivesetRawEntries(t *testing.T) {
 }
 
 type primitive struct {
-	primitive tink.MAC
+	primitive tink.AEAD
 	isFull    bool
 }
 
 func TestPrimitivesetPrefixedEntries(t *testing.T) {
 	type testCase struct {
-		tag        string
-		prefix     string
-		keys       []*tinkpb.Keyset_Key
-		primitives []primitive
-		want       []*primitiveset.Entry[tink.MAC]
+		tag           string
+		prefix        string
+		entries       []*primitiveset.Entry[tink.AEAD]
+		wantForPrefix []*primitiveset.Entry[tink.AEAD]
 	}
 	for _, tc := range []testCase{
 		{
 			tag:    "legacy Prefix",
 			prefix: string([]byte{0, 0, 18, 214, 111}), // LEGACY_PREFIX + 1234543,
-			keys: []*tinkpb.Keyset_Key{
-				makeTestKey(1234543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_LEGACY, "type.url.1"),
-				makeTestKey(7213743, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.2"),
-			},
-			primitives: []primitive{
-				{&testutil.DummyMAC{Name: "1"}, false},
-				{&testutil.DummyMAC{Name: "2"}, false},
-			},
-			want: []*primitiveset.Entry[tink.MAC]{
+			entries: []*primitiveset.Entry[tink.AEAD]{
 				{
-					KeyID:      1234543,
-					Status:     tinkpb.KeyStatusType_ENABLED,
-					Primitive:  &testutil.DummyMAC{Name: "1"},
-					PrefixType: tinkpb.OutputPrefixType_LEGACY,
-					TypeURL:    "type.url.1",
-					Prefix:     string([]byte{0, 0, 18, 214, 111}),
+					KeyID:     1234543,
+					Primitive: &testutil.DummyAEAD{Name: "1"},
+					Key:       mustCreateAESGCMKey(t, aesgcm.VariantCrunchy, 1234543),
+				},
+				{
+					KeyID:         7213743,
+					FullPrimitive: &testutil.DummyAEAD{Name: "2"},
+					Key:           mustCreateAESGCMKey(t, aesgcm.VariantCrunchy, 7213743),
+				},
+			},
+			wantForPrefix: []*primitiveset.Entry[tink.AEAD]{
+				{
+					KeyID:     1234543,
+					Primitive: &testutil.DummyAEAD{Name: "1"},
+					Key:       mustCreateAESGCMKey(t, aesgcm.VariantCrunchy, 1234543),
 				},
 			},
 		},
 		{
 			tag:    "raw prefix",
 			prefix: "",
-			keys: []*tinkpb.Keyset_Key{
-				makeTestKey(1234543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_RAW, "type.url.1"),
-				makeTestKey(7213743, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.2"),
-				makeTestKey(9876543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_RAW, "type.url.2"),
-			},
-			primitives: []primitive{
-				{&testutil.DummyMAC{Name: "1"}, false},
-				{&testutil.DummyMAC{Name: "2"}, false},
-				{&testutil.DummyMAC{Name: "3"}, true},
-			},
-			want: []*primitiveset.Entry[tink.MAC]{
+			entries: []*primitiveset.Entry[tink.AEAD]{
 				{
-					KeyID:      1234543,
-					Status:     tinkpb.KeyStatusType_ENABLED,
-					Primitive:  &testutil.DummyMAC{Name: "1"},
-					PrefixType: tinkpb.OutputPrefixType_RAW,
-					TypeURL:    "type.url.1",
-					Prefix:     "",
+					KeyID:     1234543,
+					Primitive: &testutil.DummyAEAD{Name: "1"},
+					Key:       mustCreateAESGCMKey(t, aesgcm.VariantNoPrefix, 0),
+				},
+				{
+					KeyID:         7213743,
+					FullPrimitive: &testutil.DummyAEAD{Name: "2"},
+					Key:           mustCreateAESGCMKey(t, aesgcm.VariantCrunchy, 7213743),
 				},
 				{
 					KeyID:         9876543,
-					Status:        tinkpb.KeyStatusType_ENABLED,
-					FullPrimitive: &testutil.DummyMAC{Name: "3"},
-					PrefixType:    tinkpb.OutputPrefixType_RAW,
-					TypeURL:       "type.url.2",
-					Prefix:        "",
+					FullPrimitive: &testutil.DummyAEAD{Name: "3"},
+					Key:           mustCreateAESGCMKey(t, aesgcm.VariantNoPrefix, 0),
+				},
+			},
+			wantForPrefix: []*primitiveset.Entry[tink.AEAD]{
+				{
+					KeyID:     1234543,
+					Primitive: &testutil.DummyAEAD{Name: "1"},
+					Key:       mustCreateAESGCMKey(t, aesgcm.VariantNoPrefix, 0),
+				},
+				{
+					KeyID:         9876543,
+					FullPrimitive: &testutil.DummyAEAD{Name: "3"},
+					Key:           mustCreateAESGCMKey(t, aesgcm.VariantNoPrefix, 0),
 				},
 			},
 		},
 		{
 			tag:    "tink prefix multiple entries",
 			prefix: string([]byte{1, 0, 18, 214, 111}), // TINK_PREFIX + 1234543
-			keys: []*tinkpb.Keyset_Key{
-				makeTestKey(1234543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.1"),
-				makeTestKey(1234543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.2"),
-				makeTestKey(1234543, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_RAW, "type.url.3"),
-				makeTestKey(7213743, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK, "type.url.4"),
-			},
-			primitives: []primitive{
-				{&testutil.DummyMAC{Name: "1"}, false},
-				{&testutil.DummyMAC{Name: "2"}, true},
-				{&testutil.DummyMAC{Name: "3"}, false},
-				{&testutil.DummyMAC{Name: "4"}, false},
-			},
-			want: []*primitiveset.Entry[tink.MAC]{
+			entries: []*primitiveset.Entry[tink.AEAD]{
 				{
-					KeyID:      1234543,
-					Status:     tinkpb.KeyStatusType_ENABLED,
-					Primitive:  &testutil.DummyMAC{Name: "1"},
-					PrefixType: tinkpb.OutputPrefixType_TINK,
-					TypeURL:    "type.url.1",
-					Prefix:     string([]byte{1, 0, 18, 214, 111}),
+					KeyID:     1234543,
+					Primitive: &testutil.DummyAEAD{Name: "1"},
+					Key:       mustCreateAESGCMKey(t, aesgcm.VariantTink, 1234543),
 				},
 				{
 					KeyID:         1234543,
-					Status:        tinkpb.KeyStatusType_ENABLED,
-					FullPrimitive: &testutil.DummyMAC{Name: "2"},
-					PrefixType:    tinkpb.OutputPrefixType_TINK,
-					TypeURL:       "type.url.2",
-					Prefix:        string([]byte{1, 0, 18, 214, 111}),
+					FullPrimitive: &testutil.DummyAEAD{Name: "2"},
+					Key:           mustCreateAESGCMKey(t, aesgcm.VariantTink, 1234543),
+				},
+				{
+					KeyID:         9876543,
+					FullPrimitive: &testutil.DummyAEAD{Name: "3"},
+					Key:           mustCreateAESGCMKey(t, aesgcm.VariantNoPrefix, 0),
+				},
+				{
+					KeyID:     7213743,
+					Primitive: &testutil.DummyAEAD{Name: "2"},
+					Key:       mustCreateAESGCMKey(t, aesgcm.VariantTink, 7213743),
+				},
+			},
+			wantForPrefix: []*primitiveset.Entry[tink.AEAD]{
+				{
+					KeyID:     1234543,
+					Primitive: &testutil.DummyAEAD{Name: "1"},
+					Key:       mustCreateAESGCMKey(t, aesgcm.VariantTink, 1234543),
+				},
+				{
+					KeyID:         1234543,
+					FullPrimitive: &testutil.DummyAEAD{Name: "2"},
+					Key:           mustCreateAESGCMKey(t, aesgcm.VariantTink, 1234543),
 				},
 			},
 		},
 	} {
 		t.Run(tc.tag, func(t *testing.T) {
-			ps := primitiveset.New[tink.MAC]()
-			for i := 0; i < len(tc.keys); i++ {
-				if tc.primitives[i].isFull {
-					_, err := ps.AddFullPrimitive(tc.primitives[i].primitive, tc.keys[i])
-					if err != nil {
-						t.Fatalf("ps.AddFullPrimitive(%q) err = %v, want nil", tc.primitives[i].primitive, err)
-					}
-				} else {
-					_, err := ps.Add(tc.primitives[i].primitive, tc.keys[i])
-					if err != nil {
-						t.Fatalf("ps.Add(%q) err = %v, want nil", tc.primitives[i].primitive, err)
-					}
+			ps := primitiveset.New[tink.AEAD]()
+			for i := 0; i < len(tc.entries); i++ {
+				err := ps.Add(tc.entries[i])
+				if err != nil {
+					t.Fatalf("ps.Add() err = %v, want nil", err)
 				}
 			}
 			got, err := ps.EntriesForPrefix(tc.prefix)
 			if err != nil {
 				t.Errorf("EntriesForPrefix() err =  %v, want nil", err)
 			}
-			if diff := cmp.Diff(got, tc.want); diff != "" {
+			if diff := cmp.Diff(got, tc.wantForPrefix); diff != "" {
 				t.Errorf("EntriesForPrefix() diff (-want +got):\n%s", diff)
 			}
 		})
@@ -292,42 +337,23 @@ func TestPrimitivesetPrefixedEntries(t *testing.T) {
 }
 
 func TestAddWithInvalidInput(t *testing.T) {
-	ps := primitiveset.New[tink.MAC]()
+	ps := primitiveset.New[tink.AEAD]()
 	type testCase struct {
-		tag       string
-		primitive tink.MAC
-		key       *tinkpb.Keyset_Key
+		name  string
+		entry *primitiveset.Entry[tink.AEAD]
 	}
 	for _, tc := range []testCase{
 		{
-			tag:       "nil key",
-			primitive: &testutil.DummyMAC{},
-			key:       nil,
-		},
-		{
-			tag:       "unknown prefix type",
-			primitive: &testutil.DummyMAC{},
-			key:       makeTestKey(0, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_UNKNOWN_PREFIX, "type.url.1"),
-		},
-		{
-			tag:       "disabled key",
-			primitive: &testutil.DummyMAC{},
-			key:       makeTestKey(0, tinkpb.KeyStatusType_DISABLED, tinkpb.OutputPrefixType_TINK, "type.url.1"),
-		},
-		{
-			tag:       "nil keyData",
-			primitive: &testutil.DummyMAC{},
-			key: &tinkpb.Keyset_Key{
-				KeyData:          nil,
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				KeyId:            0,
+			name: "nil key",
+			entry: &primitiveset.Entry[tink.AEAD]{
+				KeyID:     0,
+				Primitive: &testutil.DummyAEAD{Name: fmt.Sprintf("AESGCM_%d", 0x1111111)},
 			},
 		},
 	} {
-		t.Run(tc.tag, func(t *testing.T) {
-			if _, err := ps.Add(tc.primitive, tc.key); err == nil {
-				t.Errorf("ps.Add(%q, %q) err = nil, want non-nil", tc.primitive, tc.key)
+		t.Run(tc.name, func(t *testing.T) {
+			if err := ps.Add(tc.entry); err == nil {
+				t.Errorf("ps.Add() err = nil, want non-nil")
 			}
 		})
 	}

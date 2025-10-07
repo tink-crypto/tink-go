@@ -535,12 +535,12 @@ func Primitives[T any](h *Handle, _ internalapi.Token, opts ...PrimitivesOption)
 	return p, nil
 }
 
-func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry *Entry, config Config) (*primitiveset.Entry[T], error) {
+func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry *Entry, config Config) error {
 	// Don't monitor this as key export.
 	entry = entry.toUnmonitored()
 	protoKey, err := entryToProtoKey(entry)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	var primitive any
 	isFullPrimitive := true
@@ -549,17 +549,24 @@ func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry 
 		isFullPrimitive = false
 		primitive, err = config.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})
 		if err != nil {
-			return nil, fmt.Errorf("cannot get primitive from key data: %v", err)
+			return fmt.Errorf("cannot get primitive from key data: %v", err)
 		}
 	}
 	actualPrimitive, ok := primitive.(T)
 	if !ok {
-		return nil, fmt.Errorf("primitive is of type %T, want %T", primitive, (*T)(nil))
+		return fmt.Errorf("primitive is of type %T, want %T", primitive, (*T)(nil))
+	}
+	psEntry := &primitiveset.Entry[T]{
+		KeyID:     protoKey.GetKeyId(),
+		Key:       entry.Key(),
+		IsPrimary: entry.isPrimary,
 	}
 	if isFullPrimitive {
-		return primitiveSet.AddFullPrimitive(actualPrimitive, protoKey)
+		psEntry.FullPrimitive = actualPrimitive
+	} else {
+		psEntry.Primitive = actualPrimitive
 	}
-	return primitiveSet.Add(actualPrimitive, protoKey)
+	return primitiveSet.Add(psEntry)
 }
 
 func primitives[T any](h *Handle, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet[T], error) {
@@ -582,15 +589,12 @@ func primitives[T any](h *Handle, opts ...PrimitivesOption) (*primitiveset.Primi
 	primitiveSet := primitiveset.New[T]()
 	primitiveSet.Annotations = h.annotations
 	for _, entry := range h.entries {
+		// Don't add disabled keys to the primitive set.
 		if entry.KeyStatus() != Enabled {
 			continue
 		}
-		primitiveSetEntry, err := addToPrimitiveSet(primitiveSet, entry, config)
-		if err != nil {
+		if err := addToPrimitiveSet(primitiveSet, entry, config); err != nil {
 			return nil, fmt.Errorf("cannot add primitive: %v", err)
-		}
-		if entry.IsPrimary() {
-			primitiveSet.Primary = primitiveSetEntry
 		}
 	}
 	return primitiveSet, nil

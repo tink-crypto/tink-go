@@ -94,10 +94,10 @@ func newWrappedHybridDecrypt(ps *primitiveset.PrimitiveSet[tink.HybridDecrypt]) 
 			if fullPrimitive == nil {
 				fullPrimitive = &fullHybridDecryptAdapter{
 					rawHybridDecrypt: p.Primitive,
-					prefix:           []byte(p.Prefix),
+					prefix:           p.OutputPrefix(),
 				}
 			}
-			decrypters.Insert(p.Prefix, decrypterAndID{
+			decrypters.Insert(string(p.OutputPrefix()), decrypterAndID{
 				decrypter: fullPrimitive,
 				keyID:     p.KeyID,
 			})

@@ -22,6 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -71,19 +72,26 @@ func (a *fullSignerAdapter) Sign(data []byte) ([]byte, error) {
 // primitive.
 //
 // It wraps legacy primitives in a full primitive adapter.
-func extractFullSigner(entry *primitiveset.Entry[tink.Signer]) tink.Signer {
-	if entry.FullPrimitive != nil {
-		return entry.FullPrimitive
+func extractFullSigner(e *primitiveset.Entry[tink.Signer]) (tink.Signer, error) {
+	if e.FullPrimitive != nil {
+		return e.FullPrimitive, nil
+	}
+	protoKey, err := protoserialization.SerializeKey(e.Key)
+	if err != nil {
+		return nil, err
 	}
 	return &fullSignerAdapter{
-		primitive:  entry.Primitive,
-		prefix:     []byte(entry.Prefix),
-		prefixType: entry.PrefixType,
-	}
+		primitive:  e.Primitive,
+		prefix:     e.OutputPrefix(),
+		prefixType: protoKey.OutputPrefixType(),
+	}, nil
 }
 
 func newWrappedSigner(ps *primitiveset.PrimitiveSet[tink.Signer]) (*wrappedSigner, error) {
-	signer := extractFullSigner(ps.Primary)
+	signer, err := extractFullSigner(ps.Primary)
+	if err != nil {
+		return nil, err
+	}
 	logger, err := createSignerLogger(ps)
 	if err != nil {
 		return nil, err

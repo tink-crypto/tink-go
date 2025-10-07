@@ -24,6 +24,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -130,11 +131,16 @@ func toFullPrimitive(entry *primitiveset.Entry[tink.MAC]) (macAndKeyID, error) {
 			keyID:     entry.KeyID,
 		}, nil
 	}
+	protoKey, err := protoserialization.SerializeKey(entry.Key)
+	if err != nil {
+		return macAndKeyID{}, err
+	}
+	isLegacy := protoKey.OutputPrefixType() == tinkpb.OutputPrefixType_LEGACY
 	return macAndKeyID{
 		primitive: &fullMACAdapter{
 			rawPrimitive: entry.Primitive,
-			prefix:       []byte(entry.Prefix),
-			isLegacy:     entry.PrefixType == tinkpb.OutputPrefixType_LEGACY,
+			prefix:       entry.OutputPrefix(),
+			isLegacy:     isLegacy,
 		},
 		keyID: entry.KeyID,
 	}, nil
@@ -152,7 +158,8 @@ func newWrappedMAC(ps *primitiveset.PrimitiveSet[tink.MAC]) (*wrappedMAC, error)
 			if err != nil {
 				return nil, err
 			}
-			primitives[entry.Prefix] = append(primitives[entry.Prefix], primitive)
+			prefix := string(entry.OutputPrefix())
+			primitives[prefix] = append(primitives[prefix], primitive)
 		}
 	}
 

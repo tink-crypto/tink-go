@@ -66,14 +66,18 @@ func New(handle *keyset.Handle) (KeysetDeriver, error) {
 			})
 		} else {
 			idRequirement := e.KeyID
-			if e.PrefixType == tinkpb.OutputPrefixType_RAW {
+			protoKey, err := protoserialization.SerializeKey(e.Key)
+			if err != nil {
+				return nil, fmt.Errorf("keyset_deriver_factory: cannot get proto key from entry: %v", err)
+			}
+			if protoKey.OutputPrefixType() == tinkpb.OutputPrefixType_RAW {
 				idRequirement = 0
 			}
 			fullKeyDerivers = append(fullKeyDerivers, fullKeyDeriverWithKeyID{
 				fullKeyDeriver: &fullPrimitiveWrapper{
 					rawPrimitive:  e.Primitive,
 					idRequirement: idRequirement,
-					prefixType:    e.PrefixType,
+					prefixType:    protoKey.OutputPrefixType(),
 				},
 				keyID: e.KeyID,
 			})

@@ -787,7 +787,7 @@ func TestKeysetManager_AddKeyWithOptsAsPrimary_Fails(t *testing.T) {
 
 type testKeyManger struct{}
 
-func (km *testKeyManger) Primitive(_ []byte) (any, error)              { return "", nil }
+func (km *testKeyManger) Primitive(_ []byte) (any, error)              { return "primitive", nil }
 func (km *testKeyManger) NewKey(_ []byte) (proto.Message, error)       { return nil, nil }
 func (km *testKeyManger) TypeURL() string                              { return "test_type_url" }
 func (km *testKeyManger) NewKeyData(_ []byte) (*tinkpb.KeyData, error) { return nil, nil }

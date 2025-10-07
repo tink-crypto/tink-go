@@ -96,7 +96,7 @@ func extractFullAEAD(entry *primitiveset.Entry[tink.AEAD]) (*aeadAndKeyID, error
 		return &aeadAndKeyID{primitive: entry.FullPrimitive, keyID: entry.KeyID}, nil
 	}
 	return &aeadAndKeyID{
-		primitive: &fullAEADPrimitiveAdapter{primitive: entry.Primitive, prefix: []byte(entry.Prefix)},
+		primitive: &fullAEADPrimitiveAdapter{primitive: entry.Primitive, prefix: entry.OutputPrefix()},
 		keyID:     entry.KeyID,
 	}, nil
 }
@@ -108,12 +108,12 @@ func newWrappedAead(ps *primitiveset.PrimitiveSet[tink.AEAD]) (*wrappedAead, err
 	}
 	primitives := prefixmap.New[aeadAndKeyID]()
 	for _, entries := range ps.Entries {
-		for _, entry := range entries {
-			p, err := extractFullAEAD(entry)
+		for _, e := range entries {
+			p, err := extractFullAEAD(e)
 			if err != nil {
 				return nil, err
 			}
-			primitives.Insert(entry.Prefix, *p)
+			primitives.Insert(string(e.OutputPrefix()), *p)
 		}
 	}
 	encLogger, decLogger, err := createLoggers(ps)

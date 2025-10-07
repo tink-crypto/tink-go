@@ -24,6 +24,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -82,25 +83,33 @@ func (a *fullVerifierAdapter) Verify(signatureBytes, data []byte) error {
 // "full" primitive.
 //
 // It wraps legacy primitives in a full primitive adapter.
-func extractFullVerifier(entry *primitiveset.Entry[tink.Verifier]) tink.Verifier {
-	if entry.FullPrimitive != nil {
-		return entry.FullPrimitive
+func extractFullVerifier(e *primitiveset.Entry[tink.Verifier]) (tink.Verifier, error) {
+	if e.FullPrimitive != nil {
+		return e.FullPrimitive, nil
 	}
+	protoKey, err := protoserialization.SerializeKey(e.Key)
+	if err != nil {
+		return nil, err
+	}
+	prefixType := protoKey.OutputPrefixType()
 	return &fullVerifierAdapter{
-		primitive:        entry.Primitive,
-		prefix:           []byte(entry.Prefix),
-		outputPrefixType: entry.PrefixType,
-	}
+		primitive:        e.Primitive,
+		prefix:           e.OutputPrefix(),
+		outputPrefixType: prefixType,
+	}, nil
 }
 
 func newWrappedVerifier(ps *primitiveset.PrimitiveSet[tink.Verifier]) (*wrappedVerifier, error) {
 	verifiers := prefixmap.New[verifierAndID]()
 	for _, entries := range ps.Entries {
-		for _, entry := range entries {
-			verifier := extractFullVerifier(entry)
-			verifiers.Insert(entry.Prefix, verifierAndID{
+		for _, e := range entries {
+			verifier, err := extractFullVerifier(e)
+			if err != nil {
+				return nil, err
+			}
+			verifiers.Insert(string(e.OutputPrefix()), verifierAndID{
 				verifier: verifier,
-				keyID:    entry.KeyID,
+				keyID:    e.KeyID,
 			})
 		}
 	}

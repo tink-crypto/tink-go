@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -95,18 +96,19 @@ func KeysetInfoFromPrimitiveSet[T any](ps *primitiveset.PrimitiveSet[T]) (*monit
 	if ps.Primary == nil {
 		return nil, fmt.Errorf("primary key must not be nil")
 	}
+
 	entries := []*monitoring.Entry{}
 	for _, pse := range ps.Entries {
 		for _, pe := range pse {
-			keyStatus, err := keyStatusFromProto(pe.Status)
+			protoKey, err := protoserialization.SerializeKey(pe.Key)
 			if err != nil {
 				return nil, err
 			}
 			e := &monitoring.Entry{
 				KeyID:     pe.KeyID,
-				Status:    keyStatus,
-				KeyType:   parseKeyTypeURL(pe.TypeURL),
-				KeyPrefix: pe.PrefixType.String(),
+				Status:    monitoring.Enabled, // Primitiveset only contains enabled keys.
+				KeyType:   parseKeyTypeURL(protoKey.KeyData().GetTypeUrl()),
+				KeyPrefix: protoKey.OutputPrefixType().String(),
 			}
 			entries = append(entries, e)
 		}

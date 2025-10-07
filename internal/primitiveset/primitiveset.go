@@ -24,7 +24,7 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/key"
 )
 
 // Entry represents a single entry in the keyset. In addition to the actual
@@ -33,10 +33,13 @@ type Entry[T any] struct {
 	KeyID         uint32
 	Primitive     T
 	FullPrimitive T
-	Prefix        string
-	PrefixType    tinkpb.OutputPrefixType
-	Status        tinkpb.KeyStatusType
-	TypeURL       string
+	Key           key.Key
+	IsPrimary     bool
+}
+
+// OutputPrefix returns the output prefix of the key.
+func (e *Entry[T]) OutputPrefix() []byte {
+	return outputPrefix(e.Key)
 }
 
 // PrimitiveSet is used for supporting key rotation: primitives in a set
@@ -85,43 +88,29 @@ func (ps *PrimitiveSet[T]) EntriesForPrefix(prefix string) ([]*Entry[T], error) 
 	return result, nil
 }
 
-func (ps *PrimitiveSet[T]) add(primitive T, key *tinkpb.Keyset_Key, isFullPrimitive bool) (*Entry[T], error) {
-	if key == nil {
-		return nil, fmt.Errorf("primitive_set: key must not be nil")
+type withOutputPrefix interface {
+	OutputPrefix() []byte
+}
+
+func outputPrefix(key key.Key) []byte {
+	if withOutputPrefix, ok := key.(withOutputPrefix); ok {
+		return withOutputPrefix.OutputPrefix()
 	}
-	if key.GetKeyData() == nil {
-		return nil, fmt.Errorf("primitive_set: keyData must not be nil")
-	}
-	if key.GetStatus() != tinkpb.KeyStatusType_ENABLED {
-		return nil, fmt.Errorf("primitive_set: The key must be ENABLED")
-	}
-	prefix, err := cryptofmt.OutputPrefix(key)
-	if err != nil {
-		return nil, fmt.Errorf("primitive_set: %s", err)
-	}
-	e := &Entry[T]{
-		KeyID:      key.GetKeyId(),
-		Prefix:     prefix,
-		Status:     key.GetStatus(),
-		PrefixType: key.GetOutputPrefixType(),
-		TypeURL:    key.GetKeyData().GetTypeUrl(),
-	}
-	if isFullPrimitive {
-		e.FullPrimitive = primitive
-	} else {
-		e.Primitive = primitive
-	}
-	ps.Entries[prefix] = append(ps.Entries[prefix], e)
-	ps.EntriesInKeysetOrder = append(ps.EntriesInKeysetOrder, e)
-	return e, nil
+	return nil
 }
 
 // Add creates a new entry in the primitive set and returns the added entry.
-func (ps *PrimitiveSet[T]) Add(primitive T, key *tinkpb.Keyset_Key) (*Entry[T], error) {
-	return ps.add(primitive, key, false)
-}
-
-// AddFullPrimitive adds a full primitive to the primitive set.
-func (ps *PrimitiveSet[T]) AddFullPrimitive(primitive T, key *tinkpb.Keyset_Key) (*Entry[T], error) {
-	return ps.add(primitive, key, true)
+func (ps *PrimitiveSet[T]) Add(e *Entry[T]) error {
+	// TODO: b/442750026 - Consider forcing T to be a pointer type and check for
+	// nil primitives.
+	if e.Key == nil {
+		return fmt.Errorf("key must be set")
+	}
+	prefix := string(e.OutputPrefix())
+	ps.Entries[prefix] = append(ps.Entries[prefix], e)
+	ps.EntriesInKeysetOrder = append(ps.EntriesInKeysetOrder, e)
+	if e.IsPrimary {
+		ps.Primary = e
+	}
+	return nil
 }

@@ -694,16 +694,23 @@ func (p *stubParams) Equal(_ key.Parameters) bool { return true }
 func (p *stubParams) HasIDRequirement() bool      { return true }
 
 type stubKey struct {
-	prefixType   tinkpb.OutputPrefixType
-	idRequrement uint32
+	prefixType    tinkpb.OutputPrefixType
+	idRequirement uint32
 }
 
 var _ key.Key = (*stubKey)(nil)
 
 func (p *stubKey) Equal(_ key.Key) bool          { return true }
 func (p *stubKey) Parameters() key.Parameters    { return &stubParams{} }
-func (p *stubKey) IDRequirement() (uint32, bool) { return p.idRequrement, p.HasIDRequirement() }
+func (p *stubKey) IDRequirement() (uint32, bool) { return p.idRequirement, p.HasIDRequirement() }
 func (p *stubKey) HasIDRequirement() bool        { return p.prefixType != tinkpb.OutputPrefixType_RAW }
+func (p *stubKey) OutputPrefix() []byte {
+	prefix, err := cryptofmt.OutputPrefix(&tinkpb.Keyset_Key{OutputPrefixType: p.prefixType, KeyId: p.idRequirement})
+	if err != nil {
+		panic(err)
+	}
+	return []byte(prefix)
+}
 
 type stubKeySerialization struct{}
 
@@ -717,7 +724,7 @@ func (s *stubKeySerialization) SerializeKey(key key.Key) (*protoserialization.Ke
 			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 		},
 		key.(*stubKey).prefixType,
-		key.(*stubKey).idRequrement,
+		key.(*stubKey).idRequirement,
 	)
 }
 

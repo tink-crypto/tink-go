@@ -702,6 +702,13 @@ func (p *stubKey) Equal(_ key.Key) bool          { return true }
 func (p *stubKey) Parameters() key.Parameters    { return &stubParams{} }
 func (p *stubKey) IDRequirement() (uint32, bool) { return p.idRequirement, p.HasIDRequirement() }
 func (p *stubKey) HasIDRequirement() bool        { return p.prefixType != tinkpb.OutputPrefixType_RAW }
+func (p *stubKey) OutputPrefix() []byte {
+	prefix, err := cryptofmt.OutputPrefix(&tinkpb.Keyset_Key{OutputPrefixType: p.prefixType, KeyId: p.idRequirement})
+	if err != nil {
+		panic(err)
+	}
+	return []byte(prefix)
+}
 
 type stubKeySerialization struct{}
 

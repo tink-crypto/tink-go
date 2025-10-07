@@ -81,7 +81,7 @@ func extractFullDAEAD(entry *primitiveset.Entry[tink.DeterministicAEAD]) (*daead
 	return &daeadAndKeyID{
 		primitive: &fullDAEADPrimitiveAdapter{
 			primitive: entry.Primitive,
-			prefix:    []byte(entry.Prefix),
+			prefix:    entry.OutputPrefix(),
 		},
 		keyID: entry.KeyID,
 	}, nil
@@ -111,7 +111,7 @@ func newWrappedDeterministicAEAD(ps *primitiveset.PrimitiveSet[tink.Deterministi
 			if err != nil {
 				return nil, err
 			}
-			primitives.Insert(entry.Prefix, *p)
+			primitives.Insert(string(entry.OutputPrefix()), *p)
 		}
 	}
 

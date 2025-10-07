@@ -761,6 +761,13 @@ func (p *stubPublicKey) Equal(_ key.Key) bool          { return true }
 func (p *stubPublicKey) Parameters() key.Parameters    { return &stubParams{} }
 func (p *stubPublicKey) IDRequirement() (uint32, bool) { return p.idRequirement, p.HasIDRequirement() }
 func (p *stubPublicKey) HasIDRequirement() bool        { return p.prefixType != tinkpb.OutputPrefixType_RAW }
+func (p *stubPublicKey) OutputPrefix() []byte {
+	prefix, err := cryptofmt.OutputPrefix(&tinkpb.Keyset_Key{OutputPrefixType: p.prefixType, KeyId: p.idRequirement})
+	if err != nil {
+		panic(err)
+	}
+	return []byte(prefix)
+}
 
 type stubPublicKeySerialization struct{}
 
@@ -810,6 +817,7 @@ func (p *stubPrivateKey) Parameters() key.Parameters    { return &stubParams{} }
 func (p *stubPrivateKey) IDRequirement() (uint32, bool) { return p.publicKey.IDRequirement() }
 func (p *stubPrivateKey) HasIDRequirement() bool        { return p.publicKey.HasIDRequirement() }
 func (p *stubPrivateKey) PublicKey() (key.Key, error)   { return p.publicKey, nil }
+func (p *stubPrivateKey) OutputPrefix() []byte          { return p.publicKey.OutputPrefix() }
 
 type stubPrivateKeySerialization struct{}
 
