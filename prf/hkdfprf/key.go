@@ -52,11 +52,6 @@ func (k *Key) Parameters() key.Parameters { return k.parameters }
 // PRFs have no ID requirement, so this is always 0, false.
 func (k *Key) IDRequirement() (uint32, bool) { return 0, false }
 
-// OutputPrefix returns the output prefix of this key.
-//
-// PRFs have no output prefix, so this is always nil.
-func (k *Key) OutputPrefix() []byte { return nil }
-
 // Equal returns true if this key is equal to other.
 func (k *Key) Equal(other key.Key) bool {
 	that, ok := other.(*Key)

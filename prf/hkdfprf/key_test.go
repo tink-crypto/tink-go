@@ -61,9 +61,6 @@ func TestNewKey(t *testing.T) {
 					if required {
 						t.Errorf("IDRequirement() = %v, want false", required)
 					}
-					if key.OutputPrefix() != nil {
-						t.Errorf("OutputPrefix() = %v, want nil", key.OutputPrefix())
-					}
 
 					key2, err := hkdfprf.NewKey(keyBytes, params)
 					if err != nil {
