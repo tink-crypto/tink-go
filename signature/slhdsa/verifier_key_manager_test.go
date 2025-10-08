@@ -45,6 +45,15 @@ func TestVerifierKeyManagerGetPrimitiveBasic(t *testing.T) {
 			sig:      mustDecodeString(t, sigSHA2128sHex),
 			msg:      mustDecodeString(t, msgSHA2128sHex),
 		},
+		{
+			name:     "SLH-DSA-SHAKE-256f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  128,
+			sigType:  tinkslhdsa.FastSigning,
+			pub:      mustDecodeString(t, pubKeySHAKE256fHex),
+			sig:      mustDecodeString(t, sigSHAKE256fHex),
+			msg:      mustDecodeString(t, msgSHAKE256fHex),
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			km, err := registry.GetKeyManager("type.googleapis.com/google.crypto.tink.SlhDsaPublicKey")
@@ -96,6 +105,12 @@ func TestVerifierKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {
 			hashType: tinkslhdsa.SHA2,
 			keySize:  64,
 			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-256f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  128,
+			sigType:  tinkslhdsa.FastSigning,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

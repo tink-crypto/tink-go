@@ -33,9 +33,13 @@ type verifier struct {
 
 var _ tink.Verifier = (*verifier)(nil)
 
+// These checks are gated by NewParameters filtering out invalid parameters.
 func slhdsaPublicKeyFromPublicKey(publicKey *PublicKey) (*slhdsa.PublicKey, error) {
-	if publicKey.params.hashType == SHA2 && publicKey.params.keySize == 64 && publicKey.params.sigType == SmallSignature {
+	if publicKey.params.paramSet == slhDSASHA2128s() {
 		return slhdsa.SLH_DSA_SHA2_128s.DecodePublicKey(publicKey.KeyBytes())
+	}
+	if publicKey.params.paramSet == slhDSASHAKE256f() {
+		return slhdsa.SLH_DSA_SHAKE_256f.DecodePublicKey(publicKey.KeyBytes())
 	}
 	return nil, fmt.Errorf("invalid parameters: %v", publicKey.params)
 }

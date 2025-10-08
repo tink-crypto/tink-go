@@ -34,9 +34,13 @@ type signer struct {
 
 var _ tink.Signer = (*signer)(nil)
 
+// These checks are gated by NewParameters filtering out invalid parameters.
 func slhdsaSecretKeyFromPrivateKey(privateKey *PrivateKey) (*slhdsa.SecretKey, error) {
-	if privateKey.publicKey.params.hashType == SHA2 && privateKey.publicKey.params.keySize == 64 && privateKey.publicKey.params.sigType == SmallSignature {
+	if privateKey.publicKey.params.paramSet == slhDSASHA2128s() {
 		return slhdsa.SLH_DSA_SHA2_128s.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
+	}
+	if privateKey.publicKey.params.paramSet == slhDSASHAKE256f() {
+		return slhdsa.SLH_DSA_SHAKE_256f.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
 	}
 	return nil, fmt.Errorf("invalid parameters: %v", privateKey.publicKey.params)
 }

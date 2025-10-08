@@ -34,6 +34,12 @@ func TestCreateKeysetHandleFromParameters(t *testing.T) {
 			keySize:  64,
 			sigType:  slhdsa.SmallSignature,
 		},
+		{
+			name:     "SLH-DSA-SHAKE-256f",
+			hashType: slhdsa.SHAKE,
+			keySize:  128,
+			sigType:  slhdsa.FastSigning,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			params, err := slhdsa.NewParameters(tc.hashType, tc.keySize, tc.sigType, slhdsa.VariantNoPrefix)

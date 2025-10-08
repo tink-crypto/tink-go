@@ -680,10 +680,12 @@ func TestSerializeParameters(t *testing.T) {
 		{
 			name: "parameters with TINK variant",
 			parameters: &Parameters{
-				hashType: SHA2,
-				keySize:  64,
-				sigType:  SmallSignature,
-				variant:  VariantTink,
+				paramSet: parameterSet{
+					hashType: SHA2,
+					keySize:  64,
+					sigType:  SmallSignature,
+				},
+				variant: VariantTink,
 			},
 			want: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.SlhDsaPrivateKey",
@@ -694,10 +696,12 @@ func TestSerializeParameters(t *testing.T) {
 		{
 			name: "parameters with NO_PREFIX variant",
 			parameters: &Parameters{
-				hashType: SHA2,
-				keySize:  64,
-				sigType:  SmallSignature,
-				variant:  VariantNoPrefix,
+				paramSet: parameterSet{
+					hashType: SHA2,
+					keySize:  64,
+					sigType:  SmallSignature,
+				},
+				variant: VariantNoPrefix,
 			},
 			want: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.SlhDsaPrivateKey",
@@ -739,10 +743,12 @@ func TestParseParameters(t *testing.T) {
 		{
 			name: "parameters with TINK variant",
 			want: &Parameters{
-				hashType: SHA2,
-				keySize:  64,
-				sigType:  SmallSignature,
-				variant:  VariantTink,
+				paramSet: parameterSet{
+					hashType: SHA2,
+					keySize:  64,
+					sigType:  SmallSignature,
+				},
+				variant: VariantTink,
 			},
 			template: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.SlhDsaPrivateKey",
@@ -753,10 +759,12 @@ func TestParseParameters(t *testing.T) {
 		{
 			name: "parameters with NO_PREFIX variant",
 			want: &Parameters{
-				hashType: SHA2,
-				keySize:  64,
-				sigType:  SmallSignature,
-				variant:  VariantNoPrefix,
+				paramSet: parameterSet{
+					hashType: SHA2,
+					keySize:  64,
+					sigType:  SmallSignature,
+				},
+				variant: VariantNoPrefix,
 			},
 			template: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.SlhDsaPrivateKey",

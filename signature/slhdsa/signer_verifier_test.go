@@ -39,7 +39,7 @@ func TestSignVerifyManager(t *testing.T) {
 		idRequirement uint32
 	}{
 		{
-			name:          "TINK",
+			name:          "TINK SHA2-128s",
 			hashType:      tinkslhdsa.SHA2,
 			keySize:       64,
 			sigType:       tinkslhdsa.SmallSignature,
@@ -47,10 +47,26 @@ func TestSignVerifyManager(t *testing.T) {
 			idRequirement: uint32(0x01020304),
 		},
 		{
-			name:          "RAW",
+			name:          "RAW SHA2-128s",
 			hashType:      tinkslhdsa.SHA2,
 			keySize:       64,
 			sigType:       tinkslhdsa.SmallSignature,
+			variant:       tinkslhdsa.VariantNoPrefix,
+			idRequirement: uint32(0),
+		},
+		{
+			name:          "TINK SHAKE-256f",
+			hashType:      tinkslhdsa.SHAKE,
+			keySize:       128,
+			sigType:       tinkslhdsa.FastSigning,
+			variant:       tinkslhdsa.VariantTink,
+			idRequirement: uint32(0x01020304),
+		},
+		{
+			name:          "RAW SHAKE-256f",
+			hashType:      tinkslhdsa.SHAKE,
+			keySize:       128,
+			sigType:       tinkslhdsa.FastSigning,
 			variant:       tinkslhdsa.VariantNoPrefix,
 			idRequirement: uint32(0),
 		},
@@ -60,14 +76,14 @@ func TestSignVerifyManager(t *testing.T) {
 			if err != nil {
 				t.Fatalf("tinkslhdsa.NewParameters(%v) err = %v, want nil", tc.variant, err)
 			}
-			publicKeyBytes, privateKeyBytes := getTestKeyPair(t, tc.hashType, tc.keySize, tc.sigType)
-			publicKey, err := tinkslhdsa.NewPublicKey(publicKeyBytes, tc.idRequirement, params)
+			keyPair := generateTestKeyPair(t, tc.hashType, tc.keySize, tc.sigType)
+			publicKey, err := tinkslhdsa.NewPublicKey(keyPair.pubKey, tc.idRequirement, params)
 			if err != nil {
-				t.Fatalf("tinkslhdsa.NewPublicKey(%v, %v, %v) err = %v, want nil", publicKeyBytes, tc.idRequirement, params, err)
+				t.Fatalf("tinkslhdsa.NewPublicKey(%v, %v, %v) err = %v, want nil", keyPair.pubKey, tc.idRequirement, params, err)
 			}
-			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}), tc.idRequirement, params)
+			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(keyPair.privKey, insecuresecretdataaccess.Token{}), tc.idRequirement, params)
 			if err != nil {
-				t.Fatalf("tinkslhdsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", privateKeyBytes, tc.idRequirement, params, err)
+				t.Fatalf("tinkslhdsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", keyPair.privKey, tc.idRequirement, params, err)
 			}
 
 			// Signer verifier from keys.
@@ -126,6 +142,9 @@ func TestSignVerifyManager(t *testing.T) {
 	}
 }
 
+// This test is extremely slow and times out for the large SLH-DSA parameter sets,
+// so we only test the fast enough configurations. The verification correctness is
+// already tested in the internal implementation for all SLH-DSA configurations.
 func TestVerifyFails(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -135,14 +154,14 @@ func TestVerifyFails(t *testing.T) {
 		variant  tinkslhdsa.Variant
 	}{
 		{
-			name:     "TINK",
+			name:     "TINK SHA2-128s",
 			hashType: tinkslhdsa.SHA2,
 			keySize:  64,
 			sigType:  tinkslhdsa.SmallSignature,
 			variant:  tinkslhdsa.VariantTink,
 		},
 		{
-			name:     "RAW",
+			name:     "RAW SHA2-128s",
 			hashType: tinkslhdsa.SHA2,
 			keySize:  64,
 			sigType:  tinkslhdsa.SmallSignature,
@@ -226,17 +245,31 @@ func TestSignVerifyCorrectness(t *testing.T) {
 		variant  tinkslhdsa.Variant
 	}{
 		{
-			name:     "TINK",
+			name:     "TINK SHA2-128s",
 			hashType: tinkslhdsa.SHA2,
 			keySize:  64,
 			sigType:  tinkslhdsa.SmallSignature,
 			variant:  tinkslhdsa.VariantTink,
 		},
 		{
-			name:     "RAW",
+			name:     "RAW SHA2-128s",
 			hashType: tinkslhdsa.SHA2,
 			keySize:  64,
 			sigType:  tinkslhdsa.SmallSignature,
+			variant:  tinkslhdsa.VariantNoPrefix,
+		},
+		{
+			name:     "TINK SHAKE-256f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  128,
+			sigType:  tinkslhdsa.FastSigning,
+			variant:  tinkslhdsa.VariantTink,
+		},
+		{
+			name:     "RAW SHAKE-256f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  128,
+			sigType:  tinkslhdsa.FastSigning,
 			variant:  tinkslhdsa.VariantNoPrefix,
 		},
 	} {
@@ -281,6 +314,9 @@ func TestSignVerifyCorrectness(t *testing.T) {
 func keyGen(t *testing.T, hashType tinkslhdsa.HashType, keySize int, sigType tinkslhdsa.SignatureType) (*slhdsa.SecretKey, *slhdsa.PublicKey) {
 	if hashType == tinkslhdsa.SHA2 && keySize == 64 && sigType == tinkslhdsa.SmallSignature {
 		return slhdsa.SLH_DSA_SHA2_128s.KeyGen()
+	}
+	if hashType == tinkslhdsa.SHAKE && keySize == 128 && sigType == tinkslhdsa.FastSigning {
+		return slhdsa.SLH_DSA_SHAKE_256f.KeyGen()
 	}
 	t.Fatalf("unsupported parameters: %v, %v, %v", hashType, keySize, sigType)
 	return nil, nil

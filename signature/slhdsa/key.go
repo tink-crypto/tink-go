@@ -77,54 +77,73 @@ const (
 	SmallSignature
 )
 
+type parameterSet struct {
+	hashType HashType
+	keySize  int
+	sigType  SignatureType
+}
+
 // Parameters represents the parameters of a SLH-DSA key.
 //
 // Currently, only the following parameters are supported:
 //
-//	hashType: SHA2,
-//	keySize: 64,
-//	sigType: SmallSignature,
-//
-// which corresponds to the SLH-DSA-SHA2-128s parameter set.
+//	SLH-DSA-SHA2-128s: {hashType: SHA2, keySize: 64, sigType: SmallSignature},
+//	SLH-DSA-SHAKE-256f: {hashType: SHAKE, keySize: 128, sigType: FastSigning}.
 type Parameters struct {
-	hashType HashType
-	keySize  int
-	sigType  SignatureType
+	paramSet parameterSet
 	variant  Variant
+}
+
+func slhDSASHA2128s() parameterSet {
+	return parameterSet{
+		hashType: SHA2,
+		keySize:  64,
+		sigType:  SmallSignature,
+	}
+}
+
+func slhDSASHAKE256f() parameterSet {
+	return parameterSet{
+		hashType: SHAKE,
+		keySize:  128,
+		sigType:  FastSigning,
+	}
+}
+
+func checkSupportedParameters(paramSet parameterSet) error {
+	switch paramSet {
+	case slhDSASHA2128s(), slhDSASHAKE256f():
+		return nil
+	default:
+		return fmt.Errorf("unsupported parameters: %v", paramSet)
+	}
 }
 
 var _ key.Parameters = (*Parameters)(nil)
 
 // NewParameters creates a new Parameters.
 func NewParameters(hashType HashType, keySize int, sigType SignatureType, variant Variant) (*Parameters, error) {
-	if hashType != SHA2 {
-		return nil, fmt.Errorf("slhdsa.NewParameters: hashType must be SHA2")
-	}
-	if keySize != 64 {
-		return nil, fmt.Errorf("slhdsa.NewParameters: keySize must be 64")
-	}
-	if sigType != SmallSignature {
-		return nil, fmt.Errorf("slhdsa.NewParameters: sigType must be SmallSignature")
+	paramSet := parameterSet{hashType: hashType, keySize: keySize, sigType: sigType}
+	if err := checkSupportedParameters(paramSet); err != nil {
+		return nil, fmt.Errorf("slhdsa.NewParameters: %w", err)
 	}
 	if variant == VariantUnknown {
 		return nil, fmt.Errorf("slhdsa.NewParameters: variant must not be %v", VariantUnknown)
 	}
 	return &Parameters{
-		hashType: hashType,
-		keySize:  keySize,
-		sigType:  sigType,
+		paramSet: paramSet,
 		variant:  variant,
 	}, nil
 }
 
 // HashType returns the hash type.
-func (p *Parameters) HashType() HashType { return p.hashType }
+func (p *Parameters) HashType() HashType { return p.paramSet.hashType }
 
 // KeySize returns the key size in bytes.
-func (p *Parameters) KeySize() int { return p.keySize }
+func (p *Parameters) KeySize() int { return p.paramSet.keySize }
 
 // SignatureType returns the signature type.
-func (p *Parameters) SignatureType() SignatureType { return p.sigType }
+func (p *Parameters) SignatureType() SignatureType { return p.paramSet.sigType }
 
 // Variant returns the prefix variant of the parameters.
 func (p *Parameters) Variant() Variant { return p.variant }
@@ -135,10 +154,7 @@ func (p *Parameters) HasIDRequirement() bool { return p.variant != VariantNoPref
 // Equal returns true if this parameters object is equal to other.
 func (p *Parameters) Equal(other key.Parameters) bool {
 	then, ok := other.(*Parameters)
-	return ok && p.hashType == then.hashType &&
-		p.keySize == then.keySize &&
-		p.sigType == then.sigType &&
-		p.variant == then.variant
+	return ok && p.paramSet == then.paramSet && p.variant == then.variant
 }
 
 // PublicKey represents a SLH-DSA public key.
@@ -162,26 +178,50 @@ func calculateOutputPrefix(variant Variant, keyID uint32) ([]byte, error) {
 	}
 }
 
+func publicKeyLengthForParams(paramSet parameterSet) (int, error) {
+	switch paramSet {
+	case slhDSASHA2128s():
+		return slhdsa.SLH_DSA_SHA2_128s.PublicKeyLength(), nil
+	case slhDSASHAKE256f():
+		return slhdsa.SLH_DSA_SHAKE_256f.PublicKeyLength(), nil
+	default:
+		return 0, fmt.Errorf("invalid parameters: %v", paramSet)
+	}
+}
+
+func privateKeyLengthForParams(paramSet parameterSet) (int, error) {
+	switch paramSet {
+	case slhDSASHA2128s():
+		return slhdsa.SLH_DSA_SHA2_128s.SecretKeyLength(), nil
+	case slhDSASHAKE256f():
+		return slhdsa.SLH_DSA_SHAKE_256f.SecretKeyLength(), nil
+	default:
+		return 0, fmt.Errorf("invalid parameters: %v", paramSet)
+	}
+}
+
 // checkPublicKeyLengthForParameters assumes that params are not nil.
 func checkPublicKeyLengthForParameters(length int, params *Parameters) error {
-	if params.hashType == SHA2 && params.keySize == 64 && params.sigType == SmallSignature {
-		if length != slhdsa.SLH_DSA_SHA2_128s.PublicKeyLength() {
-			return fmt.Errorf("invalid public key length: %v", length)
-		}
-		return nil
+	expLength, err := publicKeyLengthForParams(params.paramSet)
+	if err != nil {
+		return err
 	}
-	return fmt.Errorf("invalid parameters: %v", params)
+	if length != expLength {
+		return fmt.Errorf("invalid public key length: %v", length)
+	}
+	return nil
 }
 
 // checkPrivateKeyLengthForParameters assumes that params are not nil.
 func checkPrivateKeyLengthForParameters(length int, params *Parameters) error {
-	if params.hashType == SHA2 && params.keySize == 64 && params.sigType == SmallSignature {
-		if length != slhdsa.SLH_DSA_SHA2_128s.SecretKeyLength() {
-			return fmt.Errorf("invalid private key length: %v", length)
-		}
-		return nil
+	expLength, err := privateKeyLengthForParams(params.paramSet)
+	if err != nil {
+		return err
 	}
-	return fmt.Errorf("invalid parameters: %v", params)
+	if length != expLength {
+		return fmt.Errorf("invalid private key length: %v", length)
+	}
+	return nil
 }
 
 // NewPublicKey creates a new SLH-DSA public key.
@@ -248,14 +288,20 @@ var _ key.Key = (*PrivateKey)(nil)
 
 // publicKeyForParameters assumes that len(privateKeyBytes) is correct and that params are not nil.
 func publicKeyForParameters(privateKeyBytes secretdata.Bytes, params *Parameters) ([]byte, error) {
-	if params.hashType == SHA2 && params.keySize == 64 && params.sigType == SmallSignature {
-		sk, err := slhdsa.SLH_DSA_SHA2_128s.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
-		if err != nil {
-			return nil, fmt.Errorf("invalid private key bytes: %v", err)
-		}
-		return sk.PublicKey().Encode(), nil
+	var sk *slhdsa.SecretKey
+	var err error
+	switch params.paramSet {
+	case slhDSASHA2128s():
+		sk, err = slhdsa.SLH_DSA_SHA2_128s.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHAKE256f():
+		sk, err = slhdsa.SLH_DSA_SHAKE_256f.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	default:
+		return nil, fmt.Errorf("invalid parameters: %v", params)
 	}
-	return nil, fmt.Errorf("invalid parameters: %v", params)
+	if err != nil {
+		return nil, fmt.Errorf("invalid private key bytes: %w", err)
+	}
+	return sk.PublicKey().Encode(), nil
 }
 
 // NewPrivateKey creates a new SLH-DSA private key from privateKeyBytes, with
@@ -265,7 +311,7 @@ func NewPrivateKey(privateKeyBytes secretdata.Bytes, idRequirement uint32, param
 		return nil, fmt.Errorf("slhdsa.NewPrivateKey: params must not be nil")
 	}
 	if err := checkPrivateKeyLengthForParameters(privateKeyBytes.Len(), params); err != nil {
-		return nil, fmt.Errorf("slhdsa.NewPrivateKey: %v", err)
+		return nil, fmt.Errorf("slhdsa.NewPrivateKey: %w", err)
 	}
 	pubKeyBytes, err := publicKeyForParameters(privateKeyBytes, params)
 	if err != nil {
@@ -291,7 +337,7 @@ func NewPrivateKeyWithPublicKey(privateKeyBytes secretdata.Bytes, pubKey *Public
 		return nil, fmt.Errorf("slhdsa.NewPrivateKeyWithPublicKey: pubKey.params must not be nil")
 	}
 	if err := checkPrivateKeyLengthForParameters(privateKeyBytes.Len(), pubKey.params); err != nil {
-		return nil, fmt.Errorf("slhdsa.NewPrivateKeyWithPublicKey: %v", err)
+		return nil, fmt.Errorf("slhdsa.NewPrivateKeyWithPublicKey: %w", err)
 	}
 	// Make sure the public key is correct.
 	pubKeyBytes, err := publicKeyForParameters(privateKeyBytes, pubKey.params)
@@ -341,10 +387,15 @@ func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid parameters type: %T", p)
 	}
-	// Make sure the parameters are not "empty"; only SLH-DSA-SHA2-128s is supported.
-	if slhDSAParams.hashType == SHA2 && slhDSAParams.keySize == 64 && slhDSAParams.sigType == SmallSignature {
-		sk, _ := slhdsa.SLH_DSA_SHA2_128s.KeyGen()
-		return NewPrivateKey(secretdata.NewBytesFromData(sk.Encode(), insecuresecretdataaccess.Token{}), idRequirement, slhDSAParams)
+	// Make sure the parameters are not "empty".
+	var sk *slhdsa.SecretKey
+	switch slhDSAParams.paramSet {
+	case slhDSASHA2128s():
+		sk, _ = slhdsa.SLH_DSA_SHA2_128s.KeyGen()
+	case slhDSASHAKE256f():
+		sk, _ = slhdsa.SLH_DSA_SHAKE_256f.KeyGen()
+	default:
+		return nil, fmt.Errorf("invalid parameters: %v", slhDSAParams)
 	}
-	return nil, fmt.Errorf("invalid parameters")
+	return NewPrivateKey(secretdata.NewBytesFromData(sk.Encode(), insecuresecretdataaccess.Token{}), idRequirement, slhDSAParams)
 }

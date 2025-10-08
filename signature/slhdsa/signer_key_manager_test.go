@@ -45,6 +45,12 @@ func TestSignerKeyManagerGetPrimitiveBasic(t *testing.T) {
 			keySize:  64,
 			sigType:  tinkslhdsa.SmallSignature,
 		},
+		{
+			name:     "SLH-DSA-SHAKE-256f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  128,
+			sigType:  tinkslhdsa.FastSigning,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			km, err := registry.GetKeyManager("type.googleapis.com/google.crypto.tink.SlhDsaPrivateKey")
@@ -56,10 +62,10 @@ func TestSignerKeyManagerGetPrimitiveBasic(t *testing.T) {
 			if err != nil {
 				t.Fatalf("tinkslhdsa.NewParameters(%v) err = %v, want nil", tinkslhdsa.VariantNoPrefix, err)
 			}
-			_, privateKeyBytes := getTestKeyPair(t, tc.hashType, tc.keySize, tc.sigType)
-			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}), 0, params)
+			keyPair := generateTestKeyPair(t, tc.hashType, tc.keySize, tc.sigType)
+			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(keyPair.privKey, insecuresecretdataaccess.Token{}), 0, params)
 			if err != nil {
-				t.Fatalf("tinkslhdsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", privateKeyBytes, 0, params, err)
+				t.Fatalf("tinkslhdsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", keyPair.privKey, 0, params, err)
 			}
 
 			keySerialization, err := protoserialization.SerializeKey(privateKey)
@@ -118,6 +124,12 @@ func TestSignerKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {
 			keySize:  64,
 			sigType:  tinkslhdsa.SmallSignature,
 		},
+		{
+			name:     "SLH-DSA-SHAKE-256f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  128,
+			sigType:  tinkslhdsa.FastSigning,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// invalid version
@@ -153,6 +165,12 @@ func TestSignerKeyManagerNewKeyDataBasic(t *testing.T) {
 			hashType: slhdsapb.SlhDsaHashType_SHA2,
 			keySize:  64,
 			sigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-256f",
+			hashType: slhdsapb.SlhDsaHashType_SHAKE,
+			keySize:  128,
+			sigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -199,6 +217,12 @@ func TestSignerKeyManagerPublicKeyDataBasic(t *testing.T) {
 			hashType: tinkslhdsa.SHA2,
 			keySize:  64,
 			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-256f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  128,
+			sigType:  tinkslhdsa.FastSigning,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -248,6 +272,12 @@ func TestSignerKeyManagerPublicKeyDataWithInvalidInput(t *testing.T) {
 			keySize:  64,
 			sigType:  tinkslhdsa.SmallSignature,
 		},
+		{
+			name:     "SLH-DSA-SHAKE-256f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  128,
+			sigType:  tinkslhdsa.FastSigning,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			km, err := registry.GetKeyManager("type.googleapis.com/google.crypto.tink.SlhDsaPrivateKey")
@@ -294,6 +324,23 @@ func newSLHDSAPrivateKey(hashType tinkslhdsa.HashType, keySize int, sigType tink
 			KeyValue:  private.Encode(),
 		}
 	}
+	if hashType == tinkslhdsa.SHAKE && keySize == 128 && sigType == tinkslhdsa.FastSigning {
+		private, public := slhdsa.SLH_DSA_SHAKE_256f.KeyGen()
+		publicProto := &slhdsapb.SlhDsaPublicKey{
+			Params: &slhdsapb.SlhDsaParams{
+				KeySize:  128,
+				HashType: slhdsapb.SlhDsaHashType_SHAKE,
+				SigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+			},
+			Version:  0,
+			KeyValue: public.Encode(),
+		}
+		return &slhdsapb.SlhDsaPrivateKey{
+			Version:   0,
+			PublicKey: publicProto,
+			KeyValue:  private.Encode(),
+		}
+	}
 	panic(fmt.Sprintf("Unsupported SLH-DSA parameters: %v, %v, %v", hashType, keySize, sigType))
 }
 
@@ -311,6 +358,12 @@ func validateSLHDSAPrivateKey(hashType slhdsapb.SlhDsaHashType, keySize int32, s
 	var secretKey *slhdsa.SecretKey
 	if hashType == slhdsapb.SlhDsaHashType_SHA2 && keySize == 64 && sigType == slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE {
 		sk, err := slhdsa.SLH_DSA_SHA2_128s.DecodeSecretKey(key.KeyValue)
+		if err != nil {
+			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
+		}
+		secretKey = sk
+	} else if hashType == slhdsapb.SlhDsaHashType_SHAKE && keySize == 128 && sigType == slhdsapb.SlhDsaSignatureType_FAST_SIGNING {
+		sk, err := slhdsa.SLH_DSA_SHAKE_256f.DecodeSecretKey(key.KeyValue)
 		if err != nil {
 			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
 		}
