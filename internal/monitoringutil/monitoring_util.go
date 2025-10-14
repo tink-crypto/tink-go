@@ -98,20 +98,18 @@ func KeysetInfoFromPrimitiveSet[T any](ps *primitiveset.PrimitiveSet[T]) (*monit
 	}
 
 	entries := []*monitoring.Entry{}
-	for _, pse := range ps.Entries {
-		for _, pe := range pse {
-			protoKey, err := protoserialization.SerializeKey(pe.Key)
-			if err != nil {
-				return nil, err
-			}
-			e := &monitoring.Entry{
-				KeyID:     pe.KeyID,
-				Status:    monitoring.Enabled, // Primitiveset only contains enabled keys.
-				KeyType:   parseKeyTypeURL(protoKey.KeyData().GetTypeUrl()),
-				KeyPrefix: protoKey.OutputPrefixType().String(),
-			}
-			entries = append(entries, e)
+	for _, pe := range ps.EntriesInKeysetOrder {
+		protoKey, err := protoserialization.SerializeKey(pe.Key)
+		if err != nil {
+			return nil, err
 		}
+		e := &monitoring.Entry{
+			KeyID:     pe.KeyID,
+			Status:    monitoring.Enabled, // Primitiveset only contains enabled keys.
+			KeyType:   parseKeyTypeURL(protoKey.KeyData().GetTypeUrl()),
+			KeyPrefix: protoKey.OutputPrefixType().String(),
+		}
+		entries = append(entries, e)
 	}
 	return &monitoring.KeysetInfo{
 		Annotations:  ps.Annotations,
