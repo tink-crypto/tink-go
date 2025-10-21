@@ -481,7 +481,7 @@ func (h *Handle) WriteWithNoSecrets(w Writer) error {
 		return err
 	}
 	if hasSecrets(protoKeyset) {
-		return fmt.Errorf("eyset.Handle: exporting unencrypted secret key material is forbidden")
+		return fmt.Errorf("keyset.Handle: exporting unencrypted secret key material is forbidden")
 	}
 	return w.Write(protoKeyset)
 }
