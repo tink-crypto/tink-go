@@ -96,7 +96,7 @@ func splitSignedCompact(compact string) ([]byte, string, error) {
 // decodeUnsignedTokenAndValidateHeader verifies the header on an unsigned JWT and decodes the payload into a RawJWT.
 // Expects the token to be in compact serialization format. The signature should be verified before calling this function.
 func decodeUnsignedTokenAndValidateHeader(unsigned, algorithm string, tinkKID, customKID *string) (*RawJWT, error) {
-	parts := strings.Split(unsigned, ".")
+	parts := strings.SplitN(unsigned, ".", 3)
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("only tokens in JWS compact serialization formats are supported")
 	}
