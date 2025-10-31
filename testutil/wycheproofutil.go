@@ -90,7 +90,7 @@ func PopulateSuite(suite any, filename string) error {
 }
 
 // Wycheproof version to fetch.
-const wycheproofModVer = "v0.0.0-20240408230514-cd27d6419bed"
+const wycheproofModVer = "v0.0.0-20250901140545-b51abcfb8daf"
 
 // downloadWycheproofTestVectors downloads the JSON test files from
 // the Wycheproof repository with `go mod download -json` and returns the
