@@ -35,7 +35,7 @@ and systems.
 To get a quick overview of Tink's design please take a look at
 [Tink's goals](https://developers.google.com/tink/design/goals_of_tink).
 
-The latest version is 2.5.0.
+The latest version is 2.5.0 ([godoc](https://pkg.go.dev/github.com/tink-crypto/tink-go/v2)).
 
 The official documentation is available at https://developers.google.com/tink.
 
