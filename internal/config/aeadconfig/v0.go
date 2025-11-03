@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+// Package aeadconfig provides an instance of the Config for AEAD primitives.
+package aeadconfig
 
 import (
 	"fmt"
@@ -22,19 +23,24 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
 	"github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 )
 
 var configV0 = mustCreateConfigV0()
 
-func mustCreateConfigV0() Config {
-	builder := NewBuilder()
+func mustCreateConfigV0() config.Config {
+	builder := config.NewBuilder()
 
 	if err := aesctrhmac.RegisterPrimitiveConstructor(builder, internalapi.Token{}); err != nil {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register AES-CTR-HMAC: %v", err))
 	}
 
 	if err := aesgcm.RegisterPrimitiveConstructor(builder, internalapi.Token{}); err != nil {
+		panic(fmt.Sprintf("mustCreateConfigV0() failed to register AES-GCM: %v", err))
+	}
+
+	if err := aesgcmsiv.RegisterPrimitiveConstructor(builder, internalapi.Token{}); err != nil {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register AES-GCM: %v", err))
 	}
 
@@ -46,14 +52,8 @@ func mustCreateConfigV0() Config {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register XCHACHA20-POLY1305: %v", err))
 	}
 
-	if err := aesgcmsiv.RegisterPrimitiveConstructor(builder, internalapi.Token{}); err != nil {
-		panic(fmt.Sprintf("mustCreateConfigV0() failed to register AES-SIV: %v", err))
-	}
-
 	return builder.Build()
 }
 
 // V0 returns an instance of the ConfigV0.
-func V0() Config {
-	return configV0
-}
+func V0() config.Config { return configV0 }

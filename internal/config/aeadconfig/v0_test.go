@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config_test
+package aeadconfig_test
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
-	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/config/aeadconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -54,7 +54,7 @@ func mustMarshal(t *testing.T, m proto.Message) []byte {
 }
 
 func TestConfigV0AEAD(t *testing.T) {
-	configV0 := config.V0()
+	configV0 := aeadconfig.V0()
 
 	// AES-CTR-HMAC.
 	aesCTRHMACParams, err := aesctrhmac.NewParameters(aesctrhmac.ParametersOpts{
