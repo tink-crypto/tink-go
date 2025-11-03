@@ -26,7 +26,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -498,21 +497,6 @@ type primitiveOptions struct {
 	config Config
 }
 
-// PrimitivesOption is used to configure Primitives(...).
-type PrimitivesOption func(*primitiveOptions) error
-
-// WithConfig sets the configuration used to create primitives via Primitives().
-// If this option is omitted, default to using the global registry.
-func WithConfig(c Config) PrimitivesOption {
-	return func(args *primitiveOptions) error {
-		if args.config != nil {
-			return fmt.Errorf("configuration has already been set")
-		}
-		args.config = c
-		return nil
-	}
-}
-
 // Primitives creates a [primitiveset.PrimitiveSet] with primitives of type T
 // from keys in h.
 //
@@ -527,12 +511,25 @@ func WithConfig(c Config) PrimitivesOption {
 // factories.
 //
 // NOTE: This is an internal API.
-func Primitives[T any](h *Handle, _ internalapi.Token, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet[T], error) {
-	p, err := primitives[T](h, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("keyset.Handle: %v", err)
+func Primitives[T any](h *Handle, config Config, _ internalapi.Token) (*primitiveset.PrimitiveSet[T], error) {
+	if h == nil {
+		return nil, fmt.Errorf("keyset.Handle: nil handle")
 	}
-	return p, nil
+	if h.Len() == 0 {
+		return nil, fmt.Errorf("keyset.Handle: empty keyset")
+	}
+	primitiveSet := primitiveset.New[T]()
+	primitiveSet.Annotations = h.annotations
+	for _, entry := range h.entries {
+		// Don't add disabled keys to the primitive set.
+		if entry.KeyStatus() != Enabled {
+			continue
+		}
+		if err := addToPrimitiveSet(primitiveSet, entry, config); err != nil {
+			return nil, fmt.Errorf("keyset.Handle: cannot add primitive: %v", err)
+		}
+	}
+	return primitiveSet, nil
 }
 
 func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry *Entry, config Config) error {
@@ -567,37 +564,6 @@ func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry 
 		psEntry.Primitive = actualPrimitive
 	}
 	return primitiveSet.Add(psEntry)
-}
-
-func primitives[T any](h *Handle, opts ...PrimitivesOption) (*primitiveset.PrimitiveSet[T], error) {
-	if h == nil {
-		return nil, fmt.Errorf("nil handle")
-	}
-	if h.Len() == 0 {
-		return nil, fmt.Errorf("empty keyset")
-	}
-	args := new(primitiveOptions)
-	for _, opt := range opts {
-		if err := opt(args); err != nil {
-			return nil, fmt.Errorf("failed to process primitiveOptions: %v", err)
-		}
-	}
-	config := args.config
-	if config == nil {
-		config = &registryconfig.RegistryConfig{}
-	}
-	primitiveSet := primitiveset.New[T]()
-	primitiveSet.Annotations = h.annotations
-	for _, entry := range h.entries {
-		// Don't add disabled keys to the primitive set.
-		if entry.KeyStatus() != Enabled {
-			continue
-		}
-		if err := addToPrimitiveSet(primitiveSet, entry, config); err != nil {
-			return nil, fmt.Errorf("cannot add primitive: %v", err)
-		}
-	}
-	return primitiveSet, nil
 }
 
 func decrypt(encryptedKeyset *tinkpb.EncryptedKeyset, keyEncryptionAEAD tink.AEAD, associatedData []byte) (*tinkpb.Keyset, error) {

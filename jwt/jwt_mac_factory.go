@@ -21,6 +21,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 )
@@ -43,7 +44,7 @@ func NewMAC(handle *keyset.Handle) (MAC, error) {
 	// Try to obtain full primitives first. If it fails, likely because there is no
 	// full primitive constructor registered, fall back to the "raw"
 	// macWithKID primitives.
-	ps, err := keyset.Primitives[MAC](handle, internalapi.Token{})
+	ps, err := keyset.Primitives[MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("jwt_mac_factory: cannot obtain primitive set: %v", err)
 	}

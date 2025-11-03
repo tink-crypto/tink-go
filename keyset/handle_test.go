@@ -32,6 +32,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
@@ -507,7 +508,7 @@ func TestPrimitivesReturnsError(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := keyset.Primitives[any](tc.handle, internalapi.Token{})
+			_, err := keyset.Primitives[any](tc.handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 			if err == nil {
 				t.Errorf("keyset.Primitives[any](tc.handle, internalapi.Token{}) err = nil, want err")
 			}
@@ -873,9 +874,9 @@ func TestPrimitives(t *testing.T) {
 	if err != nil {
 		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", mac.HMACSHA256Tag128KeyTemplate(), err)
 	}
-	primitives, err := keyset.Primitives[tink.MAC](handle, internalapi.Token{})
+	primitives, err := keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("keyset.Primitives[tink.MAC](handle, internalapi.Token{}) err = %v, want nil", err)
+		t.Fatalf("keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %v, want nil", err)
 	}
 	if len(primitives.EntriesInKeysetOrder) != 1 {
 		t.Fatalf("len(handle.Primitives(internalapi.Token{})) = %d, want 1", len(primitives.EntriesInKeysetOrder))
@@ -910,12 +911,12 @@ func TestPrimitivesWithConfig(t *testing.T) {
 			if err != nil {
 				t.Fatalf("keyset.NewHandle(%v) = %v, want nil", tc.keyTemplate, err)
 			}
-			primitives, err := keyset.Primitives[*stubPrimitive](handle, internalapi.Token{}, keyset.WithConfig(&testConfig{}))
+			primitives, err := keyset.Primitives[*stubPrimitive](handle, &testConfig{}, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("keyset.Primitives[*stubPrimitive](handle, internalapi.Token{}, keyset.WithConfig(&testConfig{})) err = %v, want nil", err)
+				t.Fatalf("keyset.Primitives[*stubPrimitive](handle, &testConfig{}, internalapi.Token{})) err = %v, want nil", err)
 			}
 			if len(primitives.EntriesInKeysetOrder) != 1 {
-				t.Fatalf("len(keyset.Primitives[*stubPrimitive](handle, internalapi.Token{})) = %d, want 1", len(primitives.EntriesInKeysetOrder))
+				t.Fatalf("len(keyset.Primitives[*stubPrimitive](handle, &testConfig{}, internalapi.Token{})) = %d, want 1", len(primitives.EntriesInKeysetOrder))
 			}
 			var p *stubPrimitive
 			if tc.wantFull {
@@ -924,25 +925,12 @@ func TestPrimitivesWithConfig(t *testing.T) {
 				p = primitives.Primary.Primitive
 			}
 			if p == nil {
-				t.Fatalf("handle.Primitives[*stubPrimitive](handle, internalapi.Token{}, keyset.WithConfig(&testConfig{})) = nil, want instance of `*stubPrimitive`")
+				t.Fatalf("keyset.Primitives[*stubPrimitive](handle, &testConfig{}, internalapi.Token{})) = nil, want instance of `*stubPrimitive`")
 			}
 			if p.isFull != tc.wantFull {
-				t.Errorf("keyset.Primitives[*stubPrimitive](handle, internalapi.Token{}).Primary.FullPrimitive.isFull = %v, want %v", p.isFull, tc.wantFull)
+				t.Errorf("keyset.Primitives[*stubPrimitive](handle, &testConfig{}, internalapi.Token{}).Primary.FullPrimitive.isFull = %v, want %v", p.isFull, tc.wantFull)
 			}
 		})
-	}
-}
-
-func TestPrimitivesWithMultipleConfigs(t *testing.T) {
-	template := mac.HMACSHA256Tag128KeyTemplate()
-	template.OutputPrefixType = tinkpb.OutputPrefixType_RAW
-	handle, err := keyset.NewHandle(template)
-	if err != nil {
-		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", template, err)
-	}
-	_, err = keyset.Primitives[tink.MAC](handle, internalapi.Token{}, keyset.WithConfig(&testConfig{}), keyset.WithConfig(&testConfig{}))
-	if err == nil { // if NO error
-		t.Error("keyset.Primitives[tink.MAC](handle, internalapi.Token{}, keyset.WithConfig(&testConfig{}), keyset.WithConfig(&testConfig{})) err = nil, want error")
 	}
 }
 
@@ -1188,9 +1176,9 @@ func TestPrimitivesIsThreadSafe(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
 			t.Parallel()
-			_, err := keyset.Primitives[tink.Signer](handle, internalapi.Token{})
+			_, err := keyset.Primitives[tink.Signer](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("keyset.Primitives[tink.Signer](handle, internalapi.Token{}) err = %v, want nil", err)
+				t.Fatalf("keyset.Primitives[tink.Signer](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %v, want nil", err)
 			}
 		})
 	}
@@ -1584,15 +1572,15 @@ func TestPublicAndPrimitivesGenerateNoKeyExport(t *testing.T) {
 	}
 
 	// Getting primitives should not trigger key export monitoring.
-	if _, err = keyset.Primitives[tink.Signer](handle, internalapi.Token{}); err != nil {
-		t.Fatalf("keyset.Primitives[tink.Signer](handle, internalapi.Token{}) err = %v, want nil", err)
+	if _, err = keyset.Primitives[tink.Signer](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}); err != nil {
+		t.Fatalf("keyset.Primitives[tink.Signer](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %v, want nil", err)
 	}
 	if fakeClient.KeyExportsLogs() != nil {
 		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
 	}
 
-	if _, err = keyset.Primitives[tink.Verifier](publicHandle, internalapi.Token{}); err != nil {
-		t.Fatalf("keyset.Primitives[tink.Verifier](publicHandle, internalapi.Token{}) err = %v, want nil", err)
+	if _, err = keyset.Primitives[tink.Verifier](publicHandle, &registryconfig.RegistryConfig{}, internalapi.Token{}); err != nil {
+		t.Fatalf("keyset.Primitives[tink.Verifier](publicHandle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %v, want nil", err)
 	}
 	if fakeClient.KeyExportsLogs() != nil {
 		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())

@@ -22,6 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/testutil"
@@ -103,7 +104,7 @@ func TestKeysetInfoFromPrimitiveSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("km.Handle() err = %v, want nil", err)
 	}
-	ps, err := keyset.Primitives[tink.AEAD](h, internalapi.Token{})
+	ps, err := keyset.Primitives[tink.AEAD](h, &registryconfig.RegistryConfig{}, internalapi.Token{})
 	if err != nil {
 		t.Fatalf("primitiveset.NewFromKeysetHandle() err = %v, want nil", err)
 	}

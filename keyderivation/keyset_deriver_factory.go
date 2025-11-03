@@ -19,6 +19,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -52,7 +53,7 @@ func (w *fullPrimitiveWrapper) DeriveKey(salt []byte) (key.Key, error) {
 
 // New generates a new instance of the Keyset Deriver primitive.
 func New(handle *keyset.Handle) (KeysetDeriver, error) {
-	ps, err := keyset.Primitives[keyderiver.KeyDeriver](handle, internalapi.Token{})
+	ps, err := keyset.Primitives[keyderiver.KeyDeriver](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("keyset_deriver_factory: cannot obtain primitive set: %v", err)
 	}

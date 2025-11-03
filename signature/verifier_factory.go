@@ -25,6 +25,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -34,7 +35,7 @@ import (
 
 // NewVerifier returns a Verifier primitive from the given keyset handle.
 func NewVerifier(handle *keyset.Handle) (tink.Verifier, error) {
-	ps, err := keyset.Primitives[tink.Verifier](handle, internalapi.Token{})
+	ps, err := keyset.Primitives[tink.Verifier](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("verifier_factory: cannot obtain primitive set: %s", err)
 	}

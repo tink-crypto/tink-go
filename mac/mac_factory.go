@@ -25,6 +25,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -38,7 +39,7 @@ const (
 
 // New creates a MAC primitive from the given keyset handle.
 func New(handle *keyset.Handle) (tink.MAC, error) {
-	ps, err := keyset.Primitives[tink.MAC](handle, internalapi.Token{})
+	ps, err := keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("mac_factory: cannot obtain primitive set: %s", err)
 	}

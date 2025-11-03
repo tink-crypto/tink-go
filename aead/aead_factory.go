@@ -23,6 +23,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -30,17 +31,13 @@ import (
 
 // New returns an AEAD primitive from the given keyset handle.
 func New(handle *keyset.Handle) (tink.AEAD, error) {
-	ps, err := keyset.Primitives[tink.AEAD](handle, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("aead_factory: cannot obtain primitive set: %s", err)
-	}
-	return newWrappedAead(ps)
+	return NewWithConfig(handle, &registryconfig.RegistryConfig{})
 }
 
 // NewWithConfig creates an AEAD primitive from the given [keyset.Handle] using
 // the provided [Config].
 func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.AEAD, error) {
-	ps, err := keyset.Primitives[tink.AEAD](handle, internalapi.Token{}, keyset.WithConfig(config))
+	ps, err := keyset.Primitives[tink.AEAD](handle, config, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("aead_factory: cannot obtain primitive set with config: %s", err)
 	}

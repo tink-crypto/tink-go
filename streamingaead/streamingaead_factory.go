@@ -20,13 +20,14 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 // New returns a StreamingAEAD primitive from the given keyset handle.
 func New(handle *keyset.Handle) (tink.StreamingAEAD, error) {
-	ps, err := keyset.Primitives[tink.StreamingAEAD](handle, internalapi.Token{})
+	ps, err := keyset.Primitives[tink.StreamingAEAD](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("streamingaead_factory: cannot obtain primitive set: %s", err)
 	}

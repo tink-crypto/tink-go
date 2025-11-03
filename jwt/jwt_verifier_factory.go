@@ -21,6 +21,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 )
@@ -35,7 +36,7 @@ func NewVerifier(handle *keyset.Handle) (Verifier, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := keyset.Primitives[Verifier](handle, internalapi.Token{})
+	ps, err := keyset.Primitives[Verifier](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("jwt_verifier_factory: cannot obtain primitive set: %v", err)
 	}

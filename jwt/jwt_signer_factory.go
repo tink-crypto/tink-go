@@ -21,6 +21,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 )
@@ -30,7 +31,7 @@ func NewSigner(handle *keyset.Handle) (Signer, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := keyset.Primitives[Signer](handle, internalapi.Token{})
+	ps, err := keyset.Primitives[Signer](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("jwt_signer_factory: cannot obtain primitive set: %v", err)
 	}

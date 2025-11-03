@@ -25,6 +25,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
@@ -843,9 +844,9 @@ func TestKeysetManager_AddKeyWithOptsAsPrimary_Succeeds(t *testing.T) {
 		}
 
 		// Make sure annotations are nil.
-		ps, err := keyset.Primitives[string](handle, internalapi.Token{})
+		ps, err := keyset.Primitives[string](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 		if err != nil {
-			t.Fatalf("keyset.Primitives[string](handle, internalapi.Token{}) err = %q, want nil", err)
+			t.Fatalf("keyset.Primitives[string](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %q, want nil", err)
 		}
 		if ps.Annotations != nil {
 			t.Errorf("ps.Annotations = %v, want nil", ps.Annotations)
@@ -1326,9 +1327,9 @@ func TestKeysetManagerSetAnnotations_ReadOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("manager.Handle() err = %q, want nil", err)
 	}
-	ps, err := keyset.Primitives[tink.MAC](handle, internalapi.Token{})
+	ps, err := keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("keyset.Primitives[tink.MAC](handle, internalapi.Token{}) err = %q, want nil", err)
+		t.Fatalf("keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %q, want nil", err)
 	}
 	// We expect them to be no longer equal.
 	if cmp.Equal(ps.Annotations, annotations) {
@@ -1359,9 +1360,9 @@ func TestKeysetManagerSetAnnotations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("manager.Handle() err = %q, want nil", err)
 	}
-	ps, err := keyset.Primitives[tink.MAC](handle, internalapi.Token{})
+	ps, err := keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("keyset.Primitives[tink.MAC](handle, internalapi.Token{}) err = %q, want nil", err)
+		t.Fatalf("keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %q, want nil", err)
 	}
 	if !cmp.Equal(ps.Annotations, annotations) {
 		t.Errorf("ps.Annotations = %v, want %v", ps.Annotations, annotations)
@@ -1379,9 +1380,9 @@ func TestKeysetManagerSetAnnotations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("manager.Handle() err = %q, want nil", err)
 		}
-		ps, err := keyset.Primitives[tink.MAC](handle, internalapi.Token{})
+		ps, err := keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 		if err != nil {
-			t.Fatalf("keyset.Primitives[tink.MAC](handle, internalapi.Token{}) err = %q, want nil", err)
+			t.Fatalf("keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %q, want nil", err)
 		}
 		if !cmp.Equal(ps.Annotations, annotations2) {
 			t.Errorf("ps.Annotations = %v, want %v", ps.Annotations, annotations2)
@@ -1396,9 +1397,9 @@ func TestKeysetManagerSetAnnotations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("manager.Handle() err = %q, want nil", err)
 		}
-		ps, err := keyset.Primitives[tink.MAC](handle, internalapi.Token{})
+		ps, err := keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 		if err != nil {
-			t.Fatalf("keyset.Primitives[tink.MAC](handle, internalapi.Token{}) err = %q, want nil", err)
+			t.Fatalf("keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %q, want nil", err)
 		}
 		if ps.Annotations != nil {
 			t.Errorf("ps.Annotations = %v, want nil", ps.Annotations)

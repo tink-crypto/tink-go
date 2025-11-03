@@ -23,6 +23,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -31,7 +32,7 @@ import (
 
 // NewSigner returns a Signer primitive from the given keyset handle.
 func NewSigner(handle *keyset.Handle) (tink.Signer, error) {
-	ps, err := keyset.Primitives[tink.Signer](handle, internalapi.Token{})
+	ps, err := keyset.Primitives[tink.Signer](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("public_key_sign_factory: cannot obtain primitive set: %s", err)
 	}
