@@ -31,7 +31,11 @@ import (
 
 // New returns an AEAD primitive from the given keyset handle.
 func New(handle *keyset.Handle) (tink.AEAD, error) {
-	return NewWithConfig(handle, &registryconfig.RegistryConfig{})
+	ps, err := keyset.Primitives[tink.AEAD](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
+	if err != nil {
+		return nil, fmt.Errorf("aead_factory: cannot obtain primitive set: %s", err)
+	}
+	return newWrappedAead(ps)
 }
 
 // NewWithConfig creates an AEAD primitive from the given [keyset.Handle] using
