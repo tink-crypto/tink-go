@@ -399,10 +399,11 @@ func TestPrimitiveCreator(t *testing.T) {
 	ciphertext2 := mustDecodeHex(t, "4f07afedfdc3b6c2361823d3cf332a12fdee800b602e8d7c4799d62c140c9bb834876b09")
 	wantMessage2 := mustDecodeHex(t, "be3308f72a2c6aed")
 
-	config := config.New()
-	if err := aesgcm.RegisterPrimitiveConstructor(config, internalapi.Token{}); err != nil {
+	builder := config.NewBuilder()
+	if err := aesgcm.RegisterPrimitiveConstructor(builder, internalapi.Token{}); err != nil {
 		t.Fatalf("aesgcm.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
+	c := builder.Build()
 
 	for _, testCase := range []struct {
 		name          string
@@ -478,9 +479,9 @@ func TestPrimitiveCreator(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			p, err := config.PrimitiveFromKey(testCase.key, internalapi.Token{})
+			p, err := c.PrimitiveFromKey(testCase.key, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("config.PrimitiveFromKey() err = %v, want nil", err)
+				t.Fatalf("c.PrimitiveFromKey() err = %v, want nil", err)
 			}
 			a, ok := p.(tink.AEAD)
 			if !ok {
@@ -498,10 +499,11 @@ func TestPrimitiveCreator(t *testing.T) {
 }
 
 func TestPrimitiveCreatorInvalidParameters(t *testing.T) {
-	config := config.New()
-	if err := aesgcm.RegisterPrimitiveConstructor(config, internalapi.Token{}); err != nil {
+	builder := config.NewBuilder()
+	if err := aesgcm.RegisterPrimitiveConstructor(builder, internalapi.Token{}); err != nil {
 		t.Fatalf("aesgcm.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
+	c := builder.Build()
 	for _, variant := range []aesgcm.Variant{aesgcm.VariantTink, aesgcm.VariantCrunchy, aesgcm.VariantNoPrefix} {
 		// Key allows keySize in {16, 24, 32}, but the primitive wants {16, 32}.
 		for _, keySize := range []uint32{24} {
@@ -522,8 +524,8 @@ func TestPrimitiveCreatorInvalidParameters(t *testing.T) {
 							idRequirement = 0x11223344
 						}
 						key := mustCreateKey(t, keyData, idRequirement, opts)
-						if _, err := config.PrimitiveFromKey(key, internalapi.Token{}); err == nil {
-							t.Errorf("config.PrimitiveFromKey(testCase.key, internalapi.Token{}) err = nil, want error")
+						if _, err := c.PrimitiveFromKey(key, internalapi.Token{}); err == nil {
+							t.Errorf("c.PrimitiveFromKey(testCase.key, internalapi.Token{}) err = nil, want error")
 						}
 					})
 				}

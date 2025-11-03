@@ -17,6 +17,7 @@ package config
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
@@ -60,6 +61,12 @@ func (c *Config) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
 	return creator(k)
 }
 
+// Builder keeps a collection of functions that create a primitive from
+// [key.Key].
+type Builder struct {
+	config Config
+}
+
 // RegisterPrimitiveConstructor registers a primitiveConstructor for the keyType.
 // Not thread-safe.
 //
@@ -69,11 +76,11 @@ func (c *Config) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
 // unless they are nil).
 //
 // This is an internal API.
-func (c *Config) RegisterPrimitiveConstructor(keyType reflect.Type, constructor func(key key.Key) (any, error), _ internalapi.Token) error {
-	if _, ok := c.primitiveConstructors[keyType]; ok {
+func (b *Builder) RegisterPrimitiveConstructor(keyType reflect.Type, constructor func(key key.Key) (any, error), _ internalapi.Token) error {
+	if _, ok := b.config.primitiveConstructors[keyType]; ok {
 		return fmt.Errorf("RegisterPrimitiveConstructor: attempt to register a different primitive constructor for the same key type %v", keyType)
 	}
-	c.primitiveConstructors[keyType] = constructor
+	b.config.primitiveConstructors[keyType] = constructor
 	return nil
 }
 
@@ -82,18 +89,29 @@ func (c *Config) RegisterPrimitiveConstructor(keyType reflect.Type, constructor 
 // Not thread-safe.
 //
 // This is an internal API.
-func (c *Config) RegisterKeyManager(keyTypeURL string, km registry.KeyManager, _ internalapi.Token) error {
-	if _, ok := c.keysetManagers[keyTypeURL]; ok {
+func (b *Builder) RegisterKeyManager(keyTypeURL string, km registry.KeyManager, _ internalapi.Token) error {
+	if _, ok := b.config.keysetManagers[keyTypeURL]; ok {
 		return fmt.Errorf("RegisterKeyManager: attempt to register a different key manager for %v", keyTypeURL)
 	}
-	c.keysetManagers[keyTypeURL] = km
+	b.config.keysetManagers[keyTypeURL] = km
 	return nil
 }
 
-// New creates an empty [Config].
-func New() *Config {
-	return &Config{
-		primitiveConstructors: map[reflect.Type]func(key key.Key) (any, error){},
-		keysetManagers:        map[string]registry.KeyManager{},
+// Build creates a [Config] from the [Builder].
+func (b *Builder) Build() Config {
+	c := Config{
+		primitiveConstructors: maps.Clone(b.config.primitiveConstructors),
+		keysetManagers:        maps.Clone(b.config.keysetManagers),
+	}
+	return c
+}
+
+// NewBuilder creates an empty [Builder].
+func NewBuilder() *Builder {
+	return &Builder{
+		config: Config{
+			primitiveConstructors: map[reflect.Type]func(key key.Key) (any, error){},
+			keysetManagers:        map[string]registry.KeyManager{},
+		},
 	}
 }
