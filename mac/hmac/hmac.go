@@ -17,9 +17,12 @@ package hmac
 
 import (
 	"fmt"
+	"reflect"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
@@ -28,6 +31,24 @@ import (
 	hmpb "github.com/tink-crypto/tink-go/v2/proto/hmac_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
+
+func newKeyManager() registry.KeyManager {
+	return legacykeymanager.New(typeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_SYMMETRIC, func(b []byte) (proto.Message, error) {
+		protoKey := &hmpb.HmacKey{}
+		if err := proto.Unmarshal(b, protoKey); err != nil {
+			return nil, err
+		}
+		return protoKey, nil
+	})
+}
+
+// RegisterPrimitiveConstructor accepts a config object and registers the HMAC
+// primitive constructor to the provided config.
+//
+// It is *NOT* part of the public API.
+func RegisterPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
+	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
+}
 
 func init() {
 	if err := protoserialization.RegisterKeyParser(typeURL, new(keyParser)); err != nil {
@@ -49,13 +70,7 @@ func init() {
 		panic(fmt.Sprintf("hmac.init() failed: %v", err))
 	}
 
-	if err := registry.RegisterKeyManager(legacykeymanager.New(typeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_SYMMETRIC, func(b []byte) (proto.Message, error) {
-		protoKey := &hmpb.HmacKey{}
-		if err := proto.Unmarshal(b, protoKey); err != nil {
-			return nil, err
-		}
-		return protoKey, nil
-	})); err != nil {
+	if err := registry.RegisterKeyManager(newKeyManager()); err != nil {
 		panic(fmt.Sprintf("hmac.init() failed: %v", err))
 	}
 }
