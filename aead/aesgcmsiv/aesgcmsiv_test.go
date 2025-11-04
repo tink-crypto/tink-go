@@ -17,16 +17,15 @@ package aesgcmsiv_test
 import (
 	"bytes"
 	"encoding/hex"
-	"reflect"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/testing/stubconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/testutil"
@@ -150,48 +149,24 @@ func TestCreateKeysetHandleFromParameters(t *testing.T) {
 	}
 }
 
-func TestRegisterKeyManager(t *testing.T) {
-	sc := stubconfig.NewStubConfig()
-	if len(sc.KeyManagers) != 0 {
-		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.KeyManagers))
-	}
-
-	err := aesgcmsiv.RegisterKeyManager(sc, internalapi.Token{})
-	if err != nil {
-		t.Fatalf("aesgcmsiv.RegisterKeyManager() err = %v, want nil", err)
-	}
-
-	if len(sc.PrimitiveConstructors) != 0 {
-		t.Errorf("Number of registered primitive constructors = %d, want 0", len(sc.PrimitiveConstructors))
-	}
-	if len(sc.KeyManagers) != 1 {
-		t.Errorf("Number of registered key types = %d, want 1", len(sc.KeyManagers))
-	}
-	if _, ok := sc.KeyManagers[testutil.AESGCMSIVTypeURL]; !ok {
-		t.Errorf("aesgcmsiv.RegisterKeyManager() registered wrong type URL, want \"%v\"", testutil.AESGCMSIVTypeURL)
-	}
-}
-
 func TestRegisterPrimitiveConstructor(t *testing.T) {
-	sc := stubconfig.NewStubConfig()
-	if len(sc.KeyManagers) != 0 {
-		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.KeyManagers))
-	}
-
-	err := aesgcmsiv.RegisterPrimitiveConstructor(sc, internalapi.Token{})
+	cb := config.NewBuilder()
+	err := aesgcmsiv.RegisterPrimitiveConstructor(cb, internalapi.Token{})
 	if err != nil {
 		t.Fatalf("aesgcmsiv.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
+	c := cb.Build()
 
-	if len(sc.PrimitiveConstructors) != 1 {
-		t.Errorf("Number of registered primitive constructors = %d, want 0", len(sc.PrimitiveConstructors))
+	params, err := aesgcmsiv.NewParameters(32, aesgcmsiv.VariantTink)
+	if err != nil {
+		t.Fatalf("aesgcmsiv.NewParameters(%v, %v) err = %v, want nil", 32, aesgcmsiv.VariantTink, err)
 	}
-	if len(sc.KeyManagers) != 0 {
-		t.Errorf("Number of registered key types = %d, want 1", len(sc.KeyManagers))
+	key, err := aesgcmsiv.NewKey(secretdata.NewBytesFromData([]byte("00000000000000000000000000000000"), insecuresecretdataaccess.Token{}), 0x1234, params)
+	if err != nil {
+		t.Fatalf("aesgcmsiv.NewKey() err = %v, want nil", err)
 	}
-	kt := reflect.TypeFor[*aesgcmsiv.Key]()
-	if _, ok := sc.PrimitiveConstructors[kt]; !ok {
-		t.Errorf("aesgcmsiv.RegisterPrimitiveConstructor() registered wrong key type, want \"%v\"", kt)
+	if _, err := c.PrimitiveFromKey(key, internalapi.Token{}); err != nil {
+		t.Errorf("c.PrimitiveFromKey(key) err = %v, want nil", err)
 	}
 }
 

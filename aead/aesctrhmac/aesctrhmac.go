@@ -21,21 +21,16 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
-	"github.com/tink-crypto/tink-go/v2/key"
 	aesctrhmacpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
-
-type config interface {
-	RegisterPrimitiveConstructor(keyType reflect.Type, primitiveConstructor func(key key.Key) (any, error), t internalapi.Token) error
-	RegisterKeyManager(keyTypeURL string, km registry.KeyManager, t internalapi.Token) error
-}
 
 func newKeyManager() registry.KeyManager {
 	return legacykeymanager.New(typeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_SYMMETRIC, func(b []byte) (proto.Message, error) {
@@ -47,20 +42,12 @@ func newKeyManager() registry.KeyManager {
 	})
 }
 
-// RegisterKeyManager registers an instance of an AES-CTR-HMAC AEAD KeyManager
-// to the config object provided as the first argument.
-//
-// It is *NOT* part of the public API.
-func RegisterKeyManager(c config, t internalapi.Token) error {
-	return c.RegisterKeyManager(typeURL, newKeyManager(), t)
-}
-
 // RegisterPrimitiveConstructor accepts a config object and registers the
 // AES-CTR-HMAC AEAD primitive constructor to the provided config.
 //
 // It is *NOT* part of the public API.
-func RegisterPrimitiveConstructor(c config, t internalapi.Token) error {
-	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
+func RegisterPrimitiveConstructor(b *config.Builder, t internalapi.Token) error {
+	return b.RegisterPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
 }
 
 func init() {

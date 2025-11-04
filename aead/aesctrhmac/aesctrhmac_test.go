@@ -16,7 +16,6 @@ package aesctrhmac_test
 
 import (
 	"bytes"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -24,9 +23,9 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/testing/stubconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/testutil"
@@ -172,48 +171,37 @@ func TestCreateKeysetHandleFromParameters(t *testing.T) {
 	}
 }
 
-func TestRegisterKeyManager(t *testing.T) {
-	sc := stubconfig.NewStubConfig()
-	if len(sc.KeyManagers) != 0 {
-		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.KeyManagers))
-	}
-
-	err := aesctrhmac.RegisterKeyManager(sc, internalapi.Token{})
-	if err != nil {
-		t.Fatalf("aesctrhmac.RegisterKeyManager() err = %v, want nil", err)
-	}
-
-	if len(sc.PrimitiveConstructors) != 0 {
-		t.Errorf("Number of registered primitive constructors = %d, want 0", len(sc.PrimitiveConstructors))
-	}
-	if len(sc.KeyManagers) != 1 {
-		t.Errorf("Number of registered key types = %d, want 1", len(sc.KeyManagers))
-	}
-	if _, ok := sc.KeyManagers[testutil.AESCTRHMACAEADTypeURL]; !ok {
-		t.Errorf("aesctrhmac.RegisterKeyManager() registered wrong type URL, want \"%v\"", testutil.AESCTRHMACAEADTypeURL)
-	}
-}
-
 func TestRegisterPrimitiveConstructor(t *testing.T) {
-	sc := stubconfig.NewStubConfig()
-	if len(sc.KeyManagers) != 0 {
-		t.Fatalf("Initial number of registered key types = %d, want 0", len(sc.KeyManagers))
-	}
-
-	err := aesctrhmac.RegisterPrimitiveConstructor(sc, internalapi.Token{})
+	cb := config.NewBuilder()
+	err := aesctrhmac.RegisterPrimitiveConstructor(cb, internalapi.Token{})
 	if err != nil {
 		t.Fatalf("aesctrhmac.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
+	c := cb.Build()
 
-	if len(sc.PrimitiveConstructors) != 1 {
-		t.Errorf("Number of registered primitive constructors = %d, want 0", len(sc.PrimitiveConstructors))
+	opts := aesctrhmac.ParametersOpts{
+		AESKeySizeInBytes:  16,
+		HMACKeySizeInBytes: 32,
+		IVSizeInBytes:      16,
+		TagSizeInBytes:     16,
+		HashType:           aesctrhmac.SHA256,
+		Variant:            aesctrhmac.VariantTink,
 	}
-	if len(sc.KeyManagers) != 0 {
-		t.Errorf("Number of registered key types = %d, want 1", len(sc.KeyManagers))
+	params, err := aesctrhmac.NewParameters(opts)
+	if err != nil {
+		t.Fatalf("aesctrhmac.NewParameters(%v) err = %v, want nil", opts, err)
 	}
-	kt := reflect.TypeFor[*aesctrhmac.Key]()
-	if _, ok := sc.PrimitiveConstructors[kt]; !ok {
-		t.Errorf("aesctrhmac.RegisterPrimitiveConstructor() registered wrong key type, want \"%v\"", kt)
+	key, err := aesctrhmac.NewKey(aesctrhmac.KeyOpts{
+		AESKeyBytes:   secretdata.NewBytesFromData(make([]byte, 16), insecuresecretdataaccess.Token{}),
+		HMACKeyBytes:  secretdata.NewBytesFromData(make([]byte, 32), insecuresecretdataaccess.Token{}),
+		IDRequirement: 0x1234,
+		Parameters:    params,
+	})
+	if err != nil {
+		t.Fatalf("aesctrhmac.NewKey() err = %v, want nil", err)
+	}
+	if _, err := c.PrimitiveFromKey(key, internalapi.Token{}); err != nil {
+		t.Errorf("c.PrimitiveFromKey(key) err = %v, want nil", err)
 	}
 }
 
