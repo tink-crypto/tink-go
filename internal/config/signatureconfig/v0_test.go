@@ -18,10 +18,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config/signatureconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
 	"github.com/tink-crypto/tink-go/v2/signature/ed25519"
 	"github.com/tink-crypto/tink-go/v2/signature/mldsa"
@@ -30,6 +34,26 @@ import (
 	"github.com/tink-crypto/tink-go/v2/signature/slhdsa"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
+
+func TestConfigV0MACFailsIfKeyNotSignerOrVerifier(t *testing.T) {
+	configV0 := signatureconfig.V0()
+	aesGCMParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+		IVSizeInBytes:  12,
+	})
+	if err != nil {
+		t.Fatalf("aescmac.NewParameters() err=%v, want nil", err)
+	}
+	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{}), 0, aesGCMParams)
+	if err != nil {
+		t.Fatalf(" aescmac.NewKey() err=%v, want nil", err)
+	}
+	if _, err := configV0.PrimitiveFromKey(aesGCMKey, internalapi.Token{}); err == nil {
+		t.Errorf("configV0.PrimitiveFromKey() err=nil, want error")
+	}
+}
 
 func TestConfigV0Signer(t *testing.T) {
 	configV0 := signatureconfig.V0()
@@ -130,6 +154,14 @@ func TestConfigV0Signer(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			ps, err := protoserialization.SerializeKey(test.key)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeKey() err = %v, want nil", err)
+			}
+			if _, err := configV0.PrimitiveFromKeyData(ps.KeyData(), internalapi.Token{}); err == nil {
+				t.Fatalf("configV0.PrimitiveFromKeyData() err = nil, want error")
+			}
+
 			primitive, err := configV0.PrimitiveFromKey(test.key, internalapi.Token{})
 			if err != nil {
 				t.Fatalf("configV0.PrimitiveFromKey() err = %v, want nil", err)

@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config/macconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -60,6 +61,26 @@ const (
 	aesCMACMsgHex = "6601"
 	aesCMACTagHex = "c7c44e31c466334992d6f9de3c771634"
 )
+
+func TestConfigV0MACFailsIfKeyNotMAC(t *testing.T) {
+	configV0 := macconfig.V0()
+	aesGCMParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 32,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantNoPrefix,
+		IVSizeInBytes:  12,
+	})
+	if err != nil {
+		t.Fatalf("aescmac.NewParameters() err=%v, want nil", err)
+	}
+	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, "ea3b016bdd387dd64d837c71683808f335dbdc53598a4ea8c5f952473fafaf5f"), insecuresecretdataaccess.Token{}), 0, aesGCMParams)
+	if err != nil {
+		t.Fatalf(" aescmac.NewKey() err=%v, want nil", err)
+	}
+	if _, err := configV0.PrimitiveFromKey(aesGCMKey, internalapi.Token{}); err == nil {
+		t.Errorf("configV0.PrimitiveFromKeyData() err=nil, want error")
+	}
+}
 
 func TestConfigV0MAC(t *testing.T) {
 	configV0 := macconfig.V0()
