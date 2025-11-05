@@ -31,9 +31,12 @@ package ecies
 
 import (
 	"fmt"
+	"reflect"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
@@ -89,4 +92,15 @@ func init() {
 	})); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
+}
+
+// RegisterPrimitiveConstructor accepts a config object and registers the
+// ECIES primitive constructors to the provided config.
+//
+// It is *NOT* part of the public API.
+func RegisterPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
+	if err := c.RegisterPrimitiveConstructor(reflect.TypeFor[*PrivateKey](), hybridDecryptConstructor, t); err != nil {
+		return err
+	}
+	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*PublicKey](), hybridEncryptConstructor, t)
 }
