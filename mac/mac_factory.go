@@ -37,13 +37,20 @@ const (
 	maxInt  = 1<<(intSize-1) - 1
 )
 
-// New creates a MAC primitive from the given keyset handle.
-func New(handle *keyset.Handle) (tink.MAC, error) {
-	ps, err := keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
+// NewWithConfig creates a [tink.MAC] primitive from the given [keyset.Handle]
+// and [keyset.Config].
+func NewWithConfig(handle *keyset.Handle, c keyset.Config) (tink.MAC, error) {
+	ps, err := keyset.Primitives[tink.MAC](handle, c, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("mac_factory: cannot obtain primitive set: %s", err)
 	}
 	return newWrappedMAC(ps)
+}
+
+// New creates a [tink.MAC] primitive from the given [keyset.Handle] using the
+// default set of available primitives.
+func New(handle *keyset.Handle) (tink.MAC, error) {
+	return NewWithConfig(handle, &registryconfig.RegistryConfig{})
 }
 
 type macAndKeyID struct {

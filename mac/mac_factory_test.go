@@ -17,6 +17,7 @@ package mac_test
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -27,6 +28,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -879,6 +882,86 @@ func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
 			}
 			if got, want := m, tc.wantMAC; !bytes.Equal(want, got) {
 				t.Errorf("m = %q, want: %q", got, want)
+			}
+		})
+	}
+}
+
+func TestNewWithConfig(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubKeyURL, &stubKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKey](&stubKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	builderWithFullPrimitive := config.NewBuilder()
+	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullMAC{}, nil }, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	configWithFullPrimitive := builderWithFullPrimitive.Build()
+
+	builderWithLegacyPrimitive := config.NewBuilder()
+	if err := builderWithLegacyPrimitive.RegisterKeyManager(stubKeyURL, &stubKeyManager{}, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithLegacyPrimitive.RegisterKeyManager() err = %v, want nil", err)
+	}
+	configWithLegacyPrimitive := builderWithLegacyPrimitive.Build()
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubKey{
+		prefixType:    tinkpb.OutputPrefixType_TINK,
+		idRequirement: 0x01020304,
+	})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	for _, tc := range []struct {
+		name       string
+		kh         *keyset.Handle
+		config     keyset.Config
+		wantPrefix []byte
+	}{
+		{
+			name:       "full primitive",
+			config:     &configWithFullPrimitive,
+			kh:         handle,
+			wantPrefix: slices.Concat(tinkPrefix, []byte("_full_mac_")),
+		},
+		{
+			name:       "legacy primitive",
+			config:     &configWithLegacyPrimitive,
+			kh:         handle,
+			wantPrefix: slices.Concat(tinkPrefix, []byte("_legacy_mac_")),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			defer internalregistry.ClearMonitoringClient()
+			client := fakemonitoring.NewClient("fake-client")
+			if err := internalregistry.RegisterMonitoringClient(client); err != nil {
+				t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+			}
+			macer, err := mac.NewWithConfig(tc.kh, tc.config)
+			if err != nil {
+				t.Fatalf("mac.NewWithConfig(tc.kh, config) err = %v, want nil", err)
+			}
+
+			m, err := macer.ComputeMAC([]byte("message"))
+			if err != nil {
+				t.Fatalf("macer.ComputeMAC() err = %v, want nil", err)
+			}
+			if !bytes.HasPrefix(m, tc.wantPrefix) {
+				t.Errorf("m = %q, want prefix: %q", m, tc.wantPrefix)
 			}
 		})
 	}
