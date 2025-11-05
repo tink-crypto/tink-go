@@ -17,6 +17,7 @@ package signature_test
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -25,6 +26,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -824,6 +827,113 @@ func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
 			verifier, err := signature.NewVerifier(publicHandle)
 			if err != nil {
 				t.Fatalf("signature.NewVerifier() err = %v, want nil", err)
+			}
+			if err := verifier.Verify(sig, data); err != nil {
+				t.Errorf("verifier.Verify() err = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestNewWithConfig(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
+	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubPublicKeyURL, &stubPublicKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPublicKey](&stubPublicKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(stubPrivateKeyURL, &stubPrivateKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	signerConstructor := func(key key.Key) (any, error) { return &stubFullSigner{}, nil }
+	verifierConstructor := func(key key.Key) (any, error) { return &stubFullVerifier{}, nil }
+	builderWithFullPrimitive := config.NewBuilder()
+	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPrivateKey](), signerConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPublicKey](), verifierConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	configWithFullPrimitive := builderWithFullPrimitive.Build()
+
+	builderWithLegacyPrimitive := config.NewBuilder()
+	if err := builderWithLegacyPrimitive.RegisterKeyManager(stubPrivateKeyURL, &stubPrivateKeyManager{}, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithLegacyPrimitive.RegisterKeyManager() err = %v, want nil", err)
+	}
+	if err := builderWithLegacyPrimitive.RegisterKeyManager(stubPublicKeyURL, &stubPublicKeyManager{}, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithLegacyPrimitive.RegisterKeyManager() err = %v, want nil", err)
+	}
+	configWithLegacyPrimitive := builderWithLegacyPrimitive.Build()
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubPrivateKey{
+		prefixType:    tinkpb.OutputPrefixType_RAW,
+		idRequirement: 0,
+	})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	privHandle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	pubHandle, err := privHandle.Public()
+	if err != nil {
+		t.Fatalf("privHandle.Public() err = %v, want nil", err)
+	}
+
+	for _, tc := range []struct {
+		name             string
+		privHandle       *keyset.Handle
+		pubHandle        *keyset.Handle
+		config           keyset.Config
+		wantSignerPrefix []byte
+	}{
+		{
+			name:             "full primitive",
+			config:           &configWithFullPrimitive,
+			privHandle:       privHandle,
+			pubHandle:        pubHandle,
+			wantSignerPrefix: []byte("full_primitive_prefix"),
+		},
+		{
+			name:             "legacy primitive",
+			config:           &configWithLegacyPrimitive,
+			privHandle:       privHandle,
+			pubHandle:        pubHandle,
+			wantSignerPrefix: []byte("legacy_signer_prefix"),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			signer, err := signature.NewSignerWithConfig(tc.privHandle, tc.config)
+			if err != nil {
+				t.Fatalf("signature.NewSignerWithConfig() err = %v, want nil", err)
+			}
+
+			data := []byte("message")
+			sig, err := signer.Sign(data)
+			if err != nil {
+				t.Fatalf("signer.Sign() err = %v, want nil", err)
+			}
+			if !bytes.HasPrefix(sig, tc.wantSignerPrefix) {
+				t.Errorf("sig = %q, want prefix: %q", sig, tc.wantSignerPrefix)
+			}
+
+			verifier, err := signature.NewVerifierWithConfig(tc.pubHandle, tc.config)
+			if err != nil {
+				t.Fatalf("signature.NewVerifierWithConfig() err = %v, want nil", err)
 			}
 			if err := verifier.Verify(sig, data); err != nil {
 				t.Errorf("verifier.Verify() err = %v, want nil", err)

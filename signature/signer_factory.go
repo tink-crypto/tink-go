@@ -30,13 +30,20 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-// NewSigner returns a Signer primitive from the given keyset handle.
-func NewSigner(handle *keyset.Handle) (tink.Signer, error) {
-	ps, err := keyset.Primitives[tink.Signer](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
+// NewSignerWithConfig returns a [tink.Signer] primitive from the given
+// [keyset.Handle] and [keyset.Config].
+func NewSignerWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Signer, error) {
+	ps, err := keyset.Primitives[tink.Signer](handle, config, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("public_key_sign_factory: cannot obtain primitive set: %s", err)
 	}
 	return newWrappedSigner(ps)
+}
+
+// NewSigner returns a [tink.Signer] primitive from the given
+// [keyset.Handle].
+func NewSigner(handle *keyset.Handle) (tink.Signer, error) {
+	return NewSignerWithConfig(handle, &registryconfig.RegistryConfig{})
 }
 
 // wrappedSigner is an Signer implementation that uses the underlying primitive set for signing.

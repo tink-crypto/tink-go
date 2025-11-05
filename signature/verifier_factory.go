@@ -33,13 +33,20 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-// NewVerifier returns a Verifier primitive from the given keyset handle.
-func NewVerifier(handle *keyset.Handle) (tink.Verifier, error) {
-	ps, err := keyset.Primitives[tink.Verifier](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
+// NewVerifierWithConfig returns a [tink.Verifier] primitive from the given
+// [keyset.Handle] and [keyset.Config].
+func NewVerifierWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Verifier, error) {
+	ps, err := keyset.Primitives[tink.Verifier](handle, config, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("verifier_factory: cannot obtain primitive set: %s", err)
 	}
 	return newWrappedVerifier(ps)
+}
+
+// NewVerifier returns a [tink.Verifier] primitive from the given
+// [keyset.Handle].
+func NewVerifier(handle *keyset.Handle) (tink.Verifier, error) {
+	return NewVerifierWithConfig(handle, &registryconfig.RegistryConfig{})
 }
 
 // verifierSet is a Verifier implementation that uses the
