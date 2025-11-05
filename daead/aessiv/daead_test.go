@@ -54,13 +54,19 @@ func mustCreateKey(t *testing.T, keyBytes []byte, idRequirement uint32, paramete
 	return p
 }
 
-func TestDeterministicAEAD(t *testing.T) {
-	// Test case from
+const (
 	// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/aes_siv_cmac_test.json#L2865.
-	keyBytes := mustHexDecode(t, "c25cafc6018b98dfbb79a40ec89c575a4f88c4116489bba27707479800c0130235334a45dbe8d8dae3da8dcb45bbe5dce031b0f68ded544fda7eca30d6749442")
-	ad := mustHexDecode(t, "deeb0ccf3aef47a296ed1ca8f4ae5907")
-	plaintext := mustHexDecode(t, "beec61030fa3d670337196beade6aeaa")
-	ciphertext := mustHexDecode(t, "5865208eab9163db85cab9f96d846234a2626aae22f5c17c9aad4b501f4416e4")
+	aesSIVKeyHex        = "c25cafc6018b98dfbb79a40ec89c575a4f88c4116489bba27707479800c0130235334a45dbe8d8dae3da8dcb45bbe5dce031b0f68ded544fda7eca30d6749442"
+	aesSIVMsgHex        = "beec61030fa3d670337196beade6aeaa"
+	aesSIVAad           = "deeb0ccf3aef47a296ed1ca8f4ae5907"
+	aesSIVCiphertextHex = "5865208eab9163db85cab9f96d846234a2626aae22f5c17c9aad4b501f4416e4"
+)
+
+func TestDeterministicAEAD(t *testing.T) {
+	keyBytes := mustHexDecode(t, aesSIVKeyHex)
+	ad := mustHexDecode(t, aesSIVAad)
+	plaintext := mustHexDecode(t, aesSIVMsgHex)
+	ciphertext := mustHexDecode(t, aesSIVCiphertextHex)
 
 	for _, tc := range []struct {
 		name           string

@@ -17,9 +17,12 @@ package aessiv
 
 import (
 	"fmt"
+	"reflect"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
@@ -28,6 +31,17 @@ import (
 	aessivpb "github.com/tink-crypto/tink-go/v2/proto/aes_siv_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
+
+// RegisterPrimitiveConstructor accepts a config object and registers the
+// AES-SIV primitive constructors to the provided config.
+//
+// It is *NOT* part of the public API.
+func RegisterPrimitiveConstructor(b *config.Builder, t internalapi.Token) error {
+	if err := b.RegisterPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t); err != nil {
+		return err
+	}
+	return nil
+}
 
 func init() {
 	if err := protoserialization.RegisterKeySerializer[*Key](&keySerializer{}); err != nil {
