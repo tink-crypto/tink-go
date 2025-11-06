@@ -21,11 +21,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	hkdfprfpb "github.com/tink-crypto/tink-go/v2/proto/hkdf_prf_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -166,7 +166,7 @@ func hkdfPRFSerializationTestCases(t *testing.T) []hkdfPRFSerializationTestCase 
 		{enum: hkdfprf.SHA512, proto: commonpb.HashType_SHA512},
 	} {
 		for _, salt := range [][]byte{nil, []byte("salt")} {
-			key, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("1234567890123456"), insecuresecretdataaccess.Token{}), mustCreateParameters(t, 16, hashType.enum, salt))
+			key, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("1234567890123456"), testonlyinsecuresecretdataaccess.Token()), mustCreateParameters(t, 16, hashType.enum, salt))
 			if err != nil {
 				t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
 			}

@@ -18,10 +18,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwthmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 
 	jwthmacpb "github.com/tink-crypto/tink-go/v2/proto/jwt_hmac_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -253,9 +253,9 @@ type keySerializationTestCase struct {
 }
 
 func getKeySerializationTestCases(t *testing.T) []*keySerializationTestCase {
-	keyBytes32 := secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{})
-	keyBytes48 := secretdata.NewBytesFromData([]byte("012345678901234567890123456789012345678901234567"), insecuresecretdataaccess.Token{})
-	keyBytes64 := secretdata.NewBytesFromData([]byte("0123456789012345678901234567890123456789012345678901234567890123"), insecuresecretdataaccess.Token{})
+	keyBytes32 := secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token())
+	keyBytes48 := secretdata.NewBytesFromData([]byte("012345678901234567890123456789012345678901234567"), testonlyinsecuresecretdataaccess.Token())
+	keyBytes64 := secretdata.NewBytesFromData([]byte("0123456789012345678901234567890123456789012345678901234567890123"), testonlyinsecuresecretdataaccess.Token())
 
 	return []*keySerializationTestCase{
 		{
@@ -267,7 +267,7 @@ func getKeySerializationTestCases(t *testing.T) []*keySerializationTestCase {
 			}),
 			keySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.JwtHmacKey",
-				Value:           mustMarshal(t, &jwthmacpb.JwtHmacKey{Version: 0, Algorithm: jwthmacpb.JwtHmacAlgorithm_HS256, KeyValue: keyBytes32.Data(insecuresecretdataaccess.Token{})}),
+				Value:           mustMarshal(t, &jwthmacpb.JwtHmacKey{Version: 0, Algorithm: jwthmacpb.JwtHmacAlgorithm_HS256, KeyValue: keyBytes32.Data(testonlyinsecuresecretdataaccess.Token())}),
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 			}, tinkpb.OutputPrefixType_TINK, 123),
 		},
@@ -280,7 +280,7 @@ func getKeySerializationTestCases(t *testing.T) []*keySerializationTestCase {
 			}),
 			keySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.JwtHmacKey",
-				Value:           mustMarshal(t, &jwthmacpb.JwtHmacKey{Version: 0, Algorithm: jwthmacpb.JwtHmacAlgorithm_HS384, KeyValue: keyBytes48.Data(insecuresecretdataaccess.Token{})}),
+				Value:           mustMarshal(t, &jwthmacpb.JwtHmacKey{Version: 0, Algorithm: jwthmacpb.JwtHmacAlgorithm_HS384, KeyValue: keyBytes48.Data(testonlyinsecuresecretdataaccess.Token())}),
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 			}, tinkpb.OutputPrefixType_TINK, 456),
 		},
@@ -293,7 +293,7 @@ func getKeySerializationTestCases(t *testing.T) []*keySerializationTestCase {
 			}),
 			keySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.JwtHmacKey",
-				Value:           mustMarshal(t, &jwthmacpb.JwtHmacKey{Version: 0, Algorithm: jwthmacpb.JwtHmacAlgorithm_HS512, KeyValue: keyBytes64.Data(insecuresecretdataaccess.Token{})}),
+				Value:           mustMarshal(t, &jwthmacpb.JwtHmacKey{Version: 0, Algorithm: jwthmacpb.JwtHmacAlgorithm_HS512, KeyValue: keyBytes64.Data(testonlyinsecuresecretdataaccess.Token())}),
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 			}, tinkpb.OutputPrefixType_TINK, 789),
 		},
@@ -305,7 +305,7 @@ func getKeySerializationTestCases(t *testing.T) []*keySerializationTestCase {
 			}),
 			keySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.JwtHmacKey",
-				Value:           mustMarshal(t, &jwthmacpb.JwtHmacKey{Version: 0, Algorithm: jwthmacpb.JwtHmacAlgorithm_HS256, KeyValue: keyBytes32.Data(insecuresecretdataaccess.Token{})}),
+				Value:           mustMarshal(t, &jwthmacpb.JwtHmacKey{Version: 0, Algorithm: jwthmacpb.JwtHmacAlgorithm_HS256, KeyValue: keyBytes32.Data(testonlyinsecuresecretdataaccess.Token())}),
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 			}, tinkpb.OutputPrefixType_RAW, 0),
 		},
@@ -322,7 +322,7 @@ func getKeySerializationTestCases(t *testing.T) []*keySerializationTestCase {
 				Value: mustMarshal(t, &jwthmacpb.JwtHmacKey{
 					Version:   0,
 					Algorithm: jwthmacpb.JwtHmacAlgorithm_HS256,
-					KeyValue:  keyBytes32.Data(insecuresecretdataaccess.Token{}),
+					KeyValue:  keyBytes32.Data(testonlyinsecuresecretdataaccess.Token()),
 					CustomKid: &jwthmacpb.JwtHmacKey_CustomKid{Value: "custom"},
 				}),
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,

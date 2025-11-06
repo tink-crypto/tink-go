@@ -20,10 +20,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	xcppb "github.com/tink-crypto/tink-go/v2/proto/xchacha20_poly1305_go_proto"
 )
@@ -196,7 +196,7 @@ func TestParseKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewParameters(%v) err = %v, want nil", tc.wantVariant, err)
 			}
-			keyMaterial := secretdata.NewBytesFromData(protoKey.GetKeyValue(), insecuresecretdataaccess.Token{})
+			keyMaterial := secretdata.NewBytesFromData(protoKey.GetKeyValue(), testonlyinsecuresecretdataaccess.Token())
 			keyID := uint32(0)
 			if tc.wantVariant != VariantNoPrefix {
 				keyID = 12345
@@ -319,7 +319,7 @@ func TestSerializeKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewParameters(%v) err = %v, want nil", tc.variant, err)
 			}
-			secretKey := secretdata.NewBytesFromData(keyValue, insecuresecretdataaccess.Token{})
+			secretKey := secretdata.NewBytesFromData(keyValue, testonlyinsecuresecretdataaccess.Token())
 			keyID := uint32(0)
 			if tc.variant != VariantNoPrefix {
 				keyID = 12345

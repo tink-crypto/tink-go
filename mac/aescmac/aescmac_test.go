@@ -20,11 +20,11 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac/aescmac"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestAESCMACKeyetGenerationFromParams(t *testing.T) {
@@ -80,7 +80,7 @@ func TestAESCMACKeysetGenerationFromKey(t *testing.T) {
 	wantTag := slices.Concat([]byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04}, mustHexDecode(t, "9d47482c2d9252bace43a75a8335b8b8"))
 	data := mustHexDecode(t, "40")
 
-	key, err := aescmac.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), params, 0x01020304)
+	key, err := aescmac.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), params, 0x01020304)
 	if err != nil {
 		t.Fatalf("aescmac.NewKey() err = %v, want nil", err)
 	}

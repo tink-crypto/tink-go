@@ -25,13 +25,13 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	tinked25519 "github.com/tink-crypto/tink-go/v2/signature/ed25519"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
@@ -92,7 +92,7 @@ func TestSignVerifyCorrectness(t *testing.T) {
 			if err != nil {
 				t.Fatalf("tinked25519.NewPublicKey(%v, %v, %v) err = %v, want nil", publicKeyBytes, tc.idRequirement, params, err)
 			}
-			privateKey, err := tinked25519.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}), tc.idRequirement, params)
+			privateKey, err := tinked25519.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, testonlyinsecuresecretdataaccess.Token()), tc.idRequirement, params)
 			if err != nil {
 				t.Fatalf("tinked25519.NewPrivateKey(%v, %v, %v) err = %v, want nil", privateKeyBytes, tc.idRequirement, params, err)
 			}
@@ -367,7 +367,7 @@ func keyPair(t *testing.T, public, priv []byte, variant tinked25519.Variant) (*t
 	if err != nil {
 		t.Fatalf("tinked25519.NewPublicKey(%v, %v	, %v) err = %v, want nil", public, idRequirement, params, err)
 	}
-	privKey, err := tinked25519.NewPrivateKey(secretdata.NewBytesFromData(priv[:32], insecuresecretdataaccess.Token{}), idRequirement, params)
+	privKey, err := tinked25519.NewPrivateKey(secretdata.NewBytesFromData(priv[:32], testonlyinsecuresecretdataaccess.Token()), idRequirement, params)
 	if err != nil {
 		t.Fatalf("tinked25519.NewPrivateKey(%v, %v, %v) err = %v, want nil", priv[:32], idRequirement, params, err)
 	}

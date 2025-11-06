@@ -21,12 +21,12 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -159,7 +159,7 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("xchacha20poly1305.NewParameters(%v) err = %v, want nil", xchacha20poly1305.VariantTink, err)
 	}
-	key, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData(make([]byte, 32), insecuresecretdataaccess.Token{}), 0x1234, params)
+	key, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData(make([]byte, 32), testonlyinsecuresecretdataaccess.Token()), 0x1234, params)
 	if err != nil {
 		t.Fatalf("xchacha20poly1305.NewKey() err = %v, want nil", err)
 	}
@@ -170,7 +170,7 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 
 func TestGetKeyManager(t *testing.T) {
 	// https://github.com/C2SP/wycheproof/blob/b063b4aedae951c69df014cd25fa6d69ae9e8cb9/testvectors/xchacha20_poly1305_test.json#L21
-	keyBytes := secretdata.NewBytesFromData(mustDecodeHex(t, "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f"), insecuresecretdataaccess.Token{})
+	keyBytes := secretdata.NewBytesFromData(mustDecodeHex(t, "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f"), testonlyinsecuresecretdataaccess.Token())
 	wantMessage := mustDecodeHex(t, "4c616469657320616e642047656e746c656d656e206f662074686520636c617373206f66202739393a204966204920636f756c64206f6666657220796f75206f6e6c79206f6e652074697020666f7220746865206675747572652c2073756e73637265656e20776f756c642062652069742e")
 
 	iv := "404142434445464748494a4b4c4d4e4f5051525354555657"

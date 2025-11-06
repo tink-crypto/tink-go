@@ -21,10 +21,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	aesctrpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_go_proto"
 	aesctrhmacpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
@@ -348,8 +348,8 @@ func testCases(t *testing.T) []*keyParsingTestCase {
 					t.Fatalf("NewParameters() err = %v, want nil", err)
 				}
 				keySHA1, err := NewKey(KeyOpts{
-					AESKeyBytes:   secretdata.NewBytesFromData(aesKey[:aesKeySize], insecuresecretdataaccess.Token{}),
-					HMACKeyBytes:  secretdata.NewBytesFromData(hmacKey[:hmacKeySize], insecuresecretdataaccess.Token{}),
+					AESKeyBytes:   secretdata.NewBytesFromData(aesKey[:aesKeySize], testonlyinsecuresecretdataaccess.Token()),
+					HMACKeyBytes:  secretdata.NewBytesFromData(hmacKey[:hmacKeySize], testonlyinsecuresecretdataaccess.Token()),
 					IDRequirement: 0,
 					Parameters:    paramsSHA1,
 				})
@@ -395,8 +395,8 @@ func testCases(t *testing.T) []*keyParsingTestCase {
 					t.Fatalf("NewParameters() err = %v, want nil", err)
 				}
 				keySHA224, err := NewKey(KeyOpts{
-					AESKeyBytes:   secretdata.NewBytesFromData(aesKey[:aesKeySize], insecuresecretdataaccess.Token{}),
-					HMACKeyBytes:  secretdata.NewBytesFromData(hmacKey[:hmacKeySize], insecuresecretdataaccess.Token{}),
+					AESKeyBytes:   secretdata.NewBytesFromData(aesKey[:aesKeySize], testonlyinsecuresecretdataaccess.Token()),
+					HMACKeyBytes:  secretdata.NewBytesFromData(hmacKey[:hmacKeySize], testonlyinsecuresecretdataaccess.Token()),
 					IDRequirement: 0x22334455,
 					Parameters:    paramsSHA224,
 				})
@@ -441,8 +441,8 @@ func testCases(t *testing.T) []*keyParsingTestCase {
 					t.Fatalf("NewParameters() err = %v, want nil", err)
 				}
 				keySHA256, err := NewKey(KeyOpts{
-					AESKeyBytes:   secretdata.NewBytesFromData(aesKey[:aesKeySize], insecuresecretdataaccess.Token{}),
-					HMACKeyBytes:  secretdata.NewBytesFromData(hmacKey[:hmacKeySize], insecuresecretdataaccess.Token{}),
+					AESKeyBytes:   secretdata.NewBytesFromData(aesKey[:aesKeySize], testonlyinsecuresecretdataaccess.Token()),
+					HMACKeyBytes:  secretdata.NewBytesFromData(hmacKey[:hmacKeySize], testonlyinsecuresecretdataaccess.Token()),
 					IDRequirement: 0x22334455,
 					Parameters:    paramsSHA256,
 				})
@@ -487,8 +487,8 @@ func testCases(t *testing.T) []*keyParsingTestCase {
 					t.Fatalf("NewParameters() err = %v, want nil", err)
 				}
 				keySHA384, err := NewKey(KeyOpts{
-					AESKeyBytes:   secretdata.NewBytesFromData(aesKey[:aesKeySize], insecuresecretdataaccess.Token{}),
-					HMACKeyBytes:  secretdata.NewBytesFromData(hmacKey[:hmacKeySize], insecuresecretdataaccess.Token{}),
+					AESKeyBytes:   secretdata.NewBytesFromData(aesKey[:aesKeySize], testonlyinsecuresecretdataaccess.Token()),
+					HMACKeyBytes:  secretdata.NewBytesFromData(hmacKey[:hmacKeySize], testonlyinsecuresecretdataaccess.Token()),
 					IDRequirement: 0x22334455,
 					Parameters:    paramsSHA384,
 				})
@@ -533,8 +533,8 @@ func testCases(t *testing.T) []*keyParsingTestCase {
 					t.Fatalf("NewParameters() err = %v, want nil", err)
 				}
 				key512, err := NewKey(KeyOpts{
-					AESKeyBytes:   secretdata.NewBytesFromData(aesKey[:aesKeySize], insecuresecretdataaccess.Token{}),
-					HMACKeyBytes:  secretdata.NewBytesFromData(hmacKey[:hmacKeySize], insecuresecretdataaccess.Token{}),
+					AESKeyBytes:   secretdata.NewBytesFromData(aesKey[:aesKeySize], testonlyinsecuresecretdataaccess.Token()),
+					HMACKeyBytes:  secretdata.NewBytesFromData(hmacKey[:hmacKeySize], testonlyinsecuresecretdataaccess.Token()),
 					IDRequirement: 0x11223344,
 					Parameters:    paramsSHA512,
 				})

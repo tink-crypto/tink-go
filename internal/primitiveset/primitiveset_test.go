@@ -21,10 +21,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -57,7 +57,7 @@ func mustCreateAESGCMKey(t *testing.T, variant aesgcm.Variant, keyID uint32) *ae
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
-	sd := secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{})
+	sd := secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token())
 	key, err := aesgcm.NewKey(sd, keyID, params)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
@@ -70,7 +70,7 @@ func mustCreateChaCha20Poly1305Key(t *testing.T, variant chacha20poly1305.Varian
 	if err != nil {
 		t.Fatalf("chacha20poly1305.NewParameters() err = %v, want nil", err)
 	}
-	sd := secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{})
+	sd := secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token())
 	key, err := chacha20poly1305.NewKey(sd, keyID, params)
 	if err != nil {
 		t.Fatalf("chacha20poly1305.NewKey() err = %v, want nil", err)

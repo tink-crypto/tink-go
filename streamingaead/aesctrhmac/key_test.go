@@ -20,13 +20,13 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/aesctrhmac"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -49,12 +49,12 @@ func TestNewKey_Fails(t *testing.T) {
 	}{
 		{
 			name:       "nil parameters",
-			keyBytes:   secretdata.NewBytesFromData([]byte("0123456789abcdef0123456789abcdef"), insecuresecretdataaccess.Token{}),
+			keyBytes:   secretdata.NewBytesFromData([]byte("0123456789abcdef0123456789abcdef"), testonlyinsecuresecretdataaccess.Token()),
 			parameters: nil,
 		},
 		{
 			name:       "invalid key size",
-			keyBytes:   secretdata.NewBytesFromData([]byte("0123456789abcdef"), insecuresecretdataaccess.Token{}),
+			keyBytes:   secretdata.NewBytesFromData([]byte("0123456789abcdef"), testonlyinsecuresecretdataaccess.Token()),
 			parameters: params,
 		},
 	} {
@@ -74,7 +74,7 @@ func TestNewKey_Success(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
 			}
-			secretKeyBytes := secretdata.NewBytesFromData(keyBytes[:tc.parameterOpts.KeySizeInBytes], insecuresecretdataaccess.Token{})
+			secretKeyBytes := secretdata.NewBytesFromData(keyBytes[:tc.parameterOpts.KeySizeInBytes], testonlyinsecuresecretdataaccess.Token())
 			k, err := aesctrhmac.NewKey(params, secretKeyBytes)
 			if err != nil {
 				t.Fatalf("aesctrhmac.NewKey() err = %v, want nil", err)
@@ -109,7 +109,7 @@ func TestKeyEqual_FalseIfDifferent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
 	}
-	keyBytes := secretdata.NewBytesFromData([]byte("0123456789abcdef0123456789abcdef"), insecuresecretdataaccess.Token{})
+	keyBytes := secretdata.NewBytesFromData([]byte("0123456789abcdef0123456789abcdef"), testonlyinsecuresecretdataaccess.Token())
 	k, err := aesctrhmac.NewKey(params, keyBytes)
 	if err != nil {
 		t.Fatalf("aesctrhmac.NewKey() err = %v, want nil", err)
@@ -134,7 +134,7 @@ func TestKeyEqual_FalseIfDifferent(t *testing.T) {
 				if err != nil {
 					t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
 				}
-				keyBytes := secretdata.NewBytesFromData([]byte("0123456789abcdef"), insecuresecretdataaccess.Token{})
+				keyBytes := secretdata.NewBytesFromData([]byte("0123456789abcdef"), testonlyinsecuresecretdataaccess.Token())
 				k, err := aesctrhmac.NewKey(params, keyBytes)
 				if err != nil {
 					t.Fatalf("aesctrhmac.NewKey() err = %v, want nil", err)
@@ -157,7 +157,7 @@ func TestKeyEqual_FalseIfDifferent(t *testing.T) {
 				if err != nil {
 					t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
 				}
-				keyBytes := secretdata.NewBytesFromData([]byte("fedcba9876543210fedcba9876543210"), insecuresecretdataaccess.Token{})
+				keyBytes := secretdata.NewBytesFromData([]byte("fedcba9876543210fedcba9876543210"), testonlyinsecuresecretdataaccess.Token())
 				k, err := aesctrhmac.NewKey(params, keyBytes)
 				if err != nil {
 					t.Fatalf("aesctrhmac.NewKey() err = %v, want nil", err)

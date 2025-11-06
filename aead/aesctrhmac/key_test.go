@@ -21,17 +21,17 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 var (
-	aes256KeyBytes  = secretdata.NewBytesFromData([]byte("11111111111111111111111111111111"), insecuresecretdataaccess.Token{})
-	hmac256KeyBytes = secretdata.NewBytesFromData([]byte("22222222222222222222222222222222"), insecuresecretdataaccess.Token{})
-	aes128KeyBytes  = secretdata.NewBytesFromData([]byte("1111111111111111"), insecuresecretdataaccess.Token{})
-	hmac128KeyBytes = secretdata.NewBytesFromData([]byte("2222222222222222"), insecuresecretdataaccess.Token{})
+	aes256KeyBytes  = secretdata.NewBytesFromData([]byte("11111111111111111111111111111111"), testonlyinsecuresecretdataaccess.Token())
+	hmac256KeyBytes = secretdata.NewBytesFromData([]byte("22222222222222222222222222222222"), testonlyinsecuresecretdataaccess.Token())
+	aes128KeyBytes  = secretdata.NewBytesFromData([]byte("1111111111111111"), testonlyinsecuresecretdataaccess.Token())
+	hmac128KeyBytes = secretdata.NewBytesFromData([]byte("2222222222222222"), testonlyinsecuresecretdataaccess.Token())
 )
 
 func TestNewKeyFails(t *testing.T) {
@@ -476,7 +476,7 @@ func TestKeyEqual_FalseIfDifferentType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
 	}
-	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{})
+	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token())
 	key, err := aesctrhmac.NewKey(aesctrhmac.KeyOpts{
 		AESKeyBytes:   keyBytes,
 		HMACKeyBytes:  keyBytes,
@@ -492,8 +492,8 @@ func TestKeyEqual_FalseIfDifferentType(t *testing.T) {
 }
 
 func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
-	aes128Key2Bytes := secretdata.NewBytesFromData([]byte("3333333333333333"), insecuresecretdataaccess.Token{})
-	hmac128Key2Bytes := secretdata.NewBytesFromData([]byte("4444444444444444"), insecuresecretdataaccess.Token{})
+	aes128Key2Bytes := secretdata.NewBytesFromData([]byte("3333333333333333"), testonlyinsecuresecretdataaccess.Token())
+	hmac128Key2Bytes := secretdata.NewBytesFromData([]byte("4444444444444444"), testonlyinsecuresecretdataaccess.Token())
 	for _, test := range []struct {
 		name   string
 		first  TestKey

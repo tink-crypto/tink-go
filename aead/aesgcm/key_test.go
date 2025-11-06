@@ -21,10 +21,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 var (
@@ -112,7 +112,7 @@ func TestNewKeyFailsIfKeySizeIsDifferentThanParameters(t *testing.T) {
 	}{
 		{
 			name:     "key size is 16 but parameters is 32",
-			keyBytes: secretdata.NewBytesFromData(key128Bits, insecuresecretdataaccess.Token{}),
+			keyBytes: secretdata.NewBytesFromData(key128Bits, testonlyinsecuresecretdataaccess.Token()),
 			opts: aesgcm.ParametersOpts{
 				KeySizeInBytes: 32,
 				IVSizeInBytes:  12,
@@ -122,7 +122,7 @@ func TestNewKeyFailsIfKeySizeIsDifferentThanParameters(t *testing.T) {
 		},
 		{
 			name:     "key size is 32 but parameters is 16",
-			keyBytes: secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{}),
+			keyBytes: secretdata.NewBytesFromData(key256Bits, testonlyinsecuresecretdataaccess.Token()),
 			opts: aesgcm.ParametersOpts{
 				KeySizeInBytes: 16,
 				IVSizeInBytes:  12,
@@ -169,7 +169,7 @@ func TestNewKeyFailsIfNoPrefixAndIDIsNotZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", opts, err)
 	}
-	keyBytes := secretdata.NewBytesFromData(key128Bits, insecuresecretdataaccess.Token{})
+	keyBytes := secretdata.NewBytesFromData(key128Bits, testonlyinsecuresecretdataaccess.Token())
 	if _, err := aesgcm.NewKey(keyBytes, 123, params); err == nil {
 		t.Errorf("aesgcm.NewKey(keyBytes, 123, %v) err = nil, want error", params)
 	}
@@ -416,7 +416,7 @@ func TestNewKeyWorks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", opts, err)
 			}
-			keyBytes := secretdata.NewBytesFromData(test.key, insecuresecretdataaccess.Token{})
+			keyBytes := secretdata.NewBytesFromData(test.key, testonlyinsecuresecretdataaccess.Token())
 
 			// Create two keys with the same parameters and key bytes.
 			key1, err := aesgcm.NewKey(keyBytes, test.id, params)
@@ -471,7 +471,7 @@ func TestKeyEqual_FalseIfDifferentType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
-	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{})
+	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token())
 	key, err := aesgcm.NewKey(keyBytes, 1234, params)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
@@ -562,7 +562,7 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", firstOpts, err)
 			}
-			firstKeyBytes := secretdata.NewBytesFromData(test.first.key, insecuresecretdataaccess.Token{})
+			firstKeyBytes := secretdata.NewBytesFromData(test.first.key, testonlyinsecuresecretdataaccess.Token())
 			firstKey, err := aesgcm.NewKey(firstKeyBytes, test.first.id, firstParams)
 			if err != nil {
 				t.Fatalf("aesgcm.NewKey(firstKeyBytes, %v, %v) err = %v, want nil", test.first.id, firstParams, err)
@@ -578,7 +578,7 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", secondOpts, err)
 			}
-			secondKeyBytes := secretdata.NewBytesFromData(test.second.key, insecuresecretdataaccess.Token{})
+			secondKeyBytes := secretdata.NewBytesFromData(test.second.key, testonlyinsecuresecretdataaccess.Token())
 			secondKey, err := aesgcm.NewKey(secondKeyBytes, test.second.id, secondParams)
 			if err != nil {
 				t.Fatalf("aesgcm.NewKey(secondKeyBytes, %v, %v) err = %v, want nil", test.second.id, secondParams, err)

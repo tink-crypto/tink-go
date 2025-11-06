@@ -22,11 +22,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -196,7 +196,7 @@ func aesCMACSerializationTestCases(t *testing.T) []aesCMACSerializationTestCase 
 				keyBytes := slices.Repeat([]byte{0x01}, keySize)
 				tcs = append(tcs, aesCMACSerializationTestCase{
 					name: fmt.Sprintf("keySize=%d,hashType=%s,variant=%s", keySize, hash.hashType, variantAndPrefix.variant),
-					key: mustCreateKey(t, secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), mustCreateParameters(t, hmac.ParametersOpts{
+					key: mustCreateKey(t, secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), mustCreateParameters(t, hmac.ParametersOpts{
 						KeySizeInBytes: keySize,
 						TagSizeInBytes: hash.maxTagSizeInBytes,
 						HashType:       hash.hashType,

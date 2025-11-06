@@ -22,11 +22,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/mac/aescmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	aescmacpb "github.com/tink-crypto/tink-go/v2/proto/aes_cmac_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -156,7 +156,7 @@ func aesCMACSerializationTestCases(t *testing.T) []aesCMACSerializationTestCase 
 			keyBytes := slices.Repeat([]byte{0x01}, keySize)
 			tcs = append(tcs, aesCMACSerializationTestCase{
 				name: fmt.Sprintf("AES%d-CMAC-%s", keySize*8, variantAndPrefix.variant),
-				key: mustCreateKey(t, secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), mustCreateParameters(t, aescmac.ParametersOpts{
+				key: mustCreateKey(t, secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), mustCreateParameters(t, aescmac.ParametersOpts{
 					KeySizeInBytes: keySize,
 					TagSizeInBytes: 16,
 					Variant:        variantAndPrefix.variant}), idRequirement),

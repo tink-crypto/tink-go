@@ -21,10 +21,10 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -42,8 +42,8 @@ func createAEAD(encryptionKey []byte, ivSize int, hashType aesctrhmac.HashType, 
 		return nil, err
 	}
 	key, err := aesctrhmac.NewKey(aesctrhmac.KeyOpts{
-		AESKeyBytes:   secretdata.NewBytesFromData(encryptionKey, insecuresecretdataaccess.Token{}),
-		HMACKeyBytes:  secretdata.NewBytesFromData(macKey, insecuresecretdataaccess.Token{}),
+		AESKeyBytes:   secretdata.NewBytesFromData(encryptionKey, testonlyinsecuresecretdataaccess.Token()),
+		HMACKeyBytes:  secretdata.NewBytesFromData(macKey, testonlyinsecuresecretdataaccess.Token()),
 		IDRequirement: idRequirement,
 		Parameters:    params,
 	})

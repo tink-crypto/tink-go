@@ -22,11 +22,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 type primtiveTesCase struct {
@@ -138,9 +138,9 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 	privateKey2048.Precompute()
 
 	privateValues2048 := rsassapss.PrivateKeyValues{
-		D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), insecuresecretdataaccess.Token{}),
-		P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), insecuresecretdataaccess.Token{}),
-		Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), insecuresecretdataaccess.Token{}),
+		D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
+		P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
+		Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
 	}
 
 	// Test vector 0.
@@ -319,9 +319,9 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		SaltLengthBytes: 32,
 	}, rsassapss.VariantNoPrefix))
 	privateValues4096 := rsassapss.PrivateKeyValues{
-		D: secretdata.NewBytesFromData(mustDecodeBase64(t, d4096Base64), insecuresecretdataaccess.Token{}),
-		P: secretdata.NewBytesFromData(mustDecodeBase64(t, p4096Base64), insecuresecretdataaccess.Token{}),
-		Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q4096Base64), insecuresecretdataaccess.Token{}),
+		D: secretdata.NewBytesFromData(mustDecodeBase64(t, d4096Base64), testonlyinsecuresecretdataaccess.Token()),
+		P: secretdata.NewBytesFromData(mustDecodeBase64(t, p4096Base64), testonlyinsecuresecretdataaccess.Token()),
+		Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q4096Base64), testonlyinsecuresecretdataaccess.Token()),
 	}
 	testVec6PrivateKey, err := rsassapss.NewPrivateKey(testVec6PublicKey, privateValues4096)
 	if err != nil {

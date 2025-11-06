@@ -21,12 +21,12 @@ import (
 	"time"
 
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config/jwtmacconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/jwt"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwthmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestConfigV0JWTMACFailsIfKeyNotMAC(t *testing.T) {
@@ -40,7 +40,7 @@ func TestConfigV0JWTMACFailsIfKeyNotMAC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
 	}
-	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{}), 0, aesGCMParams)
+	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token()), 0, aesGCMParams)
 	if err != nil {
 		t.Fatalf(" aessiv.NewKey() err = %v, want nil", err)
 	}
@@ -85,7 +85,7 @@ func TestConfigV0WithJWTHMACKey(t *testing.T) {
 	}
 	key, err := jwthmac.NewKey(jwthmac.KeyOpts{
 		Parameters: params,
-		KeyBytes:   secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}),
+		KeyBytes:   secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()),
 	})
 	if err != nil {
 		t.Fatalf("jwthmac.NewKey() err = %v, want nil", err)

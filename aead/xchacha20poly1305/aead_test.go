@@ -25,10 +25,10 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	testingaead "github.com/tink-crypto/tink-go/v2/internal/testing/aead"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -220,7 +220,7 @@ func mustDecodeHex(t *testing.T, hexStr string) []byte {
 func TestDecryptCorrectness(t *testing.T) {
 	// Test vectors from
 	// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/xchacha20_poly1305_test.json#L69
-	key := secretdata.NewBytesFromData(mustDecodeHex(t, "697c197c9e0023c8eee42ddf08c12c46718a436561b0c66d998c81879f7cb74c"), insecuresecretdataaccess.Token{})
+	key := secretdata.NewBytesFromData(mustDecodeHex(t, "697c197c9e0023c8eee42ddf08c12c46718a436561b0c66d998c81879f7cb74c"), testonlyinsecuresecretdataaccess.Token())
 	iv := "cd78f4533c94648feacd5aef0291b00b454ee3dcdb76dcc8"
 	ct := "b0"
 	aad := "6384f4714ff18c18"
@@ -312,7 +312,7 @@ func runXChaCha20Poly1305WycheproofCase(t *testing.T, tc *testingaead.Wycheproof
 	if err != nil {
 		t.Fatalf("xchacha20poly1305.NewParameters(%v) err = %v, want nil", xchacha20poly1305.VariantNoPrefix, err)
 	}
-	key, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData(tc.Key, insecuresecretdataaccess.Token{}), 0, params)
+	key, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData(tc.Key, testonlyinsecuresecretdataaccess.Token()), 0, params)
 	if err != nil {
 		t.Fatalf("xchacha20poly1305.NewKey() err = %v, want nil", err)
 	}

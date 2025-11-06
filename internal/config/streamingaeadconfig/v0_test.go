@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config/streamingaeadconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -29,6 +28,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/aesgcmhkdf"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -43,7 +43,7 @@ func TestConfigV0StreamingAEADFailsIfKeyNotStreamingAEAD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
-	keyMaterial := secretdata.NewBytesFromData([]byte("12345678901234567890123456789012"), insecuresecretdataaccess.Token{})
+	keyMaterial := secretdata.NewBytesFromData([]byte("12345678901234567890123456789012"), testonlyinsecuresecretdataaccess.Token())
 	aesGCMKey, err := aesgcm.NewKey(keyMaterial, 0, aesGCMParams)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
@@ -68,7 +68,7 @@ func TestConfigV0StreamingAEAD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
 	}
-	keyMaterialCTRHMAC := secretdata.NewBytesFromData([]byte("12345678901234567890123456789012"), insecuresecretdataaccess.Token{})
+	keyMaterialCTRHMAC := secretdata.NewBytesFromData([]byte("12345678901234567890123456789012"), testonlyinsecuresecretdataaccess.Token())
 	aesCTRHMACKey, err := aesctrhmac.NewKey(aesCTRHMACParams, keyMaterialCTRHMAC)
 	if err != nil {
 		t.Fatalf("aesctrhmac.NewKey() err = %v, want nil", err)
@@ -84,7 +84,7 @@ func TestConfigV0StreamingAEAD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcmhkdf.NewParameters() err = %v, want nil", err)
 	}
-	keyMaterialGCMHKDF := secretdata.NewBytesFromData([]byte("12345678901234567890123456789012"), insecuresecretdataaccess.Token{})
+	keyMaterialGCMHKDF := secretdata.NewBytesFromData([]byte("12345678901234567890123456789012"), testonlyinsecuresecretdataaccess.Token())
 	aesGCMHKDFKey, err := aesgcmhkdf.NewKey(aesGCMHKDFParams, keyMaterialGCMHKDF)
 	if err != nil {
 		t.Fatalf("aesgcmhkdf.NewKey() err = %v, want nil", err)

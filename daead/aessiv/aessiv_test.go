@@ -20,10 +20,10 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -32,7 +32,7 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
 	}
-	aesSIVKey, err := aessiv.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, aesSIVKeyHex), insecuresecretdataaccess.Token{}), 0, aesSIVParams)
+	aesSIVKey, err := aessiv.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, aesSIVKeyHex), testonlyinsecuresecretdataaccess.Token()), 0, aesSIVParams)
 	if err != nil {
 		t.Fatalf(" aessiv.NewKey() err = %v, want nil", err)
 	}

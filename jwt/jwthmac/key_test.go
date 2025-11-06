@@ -17,10 +17,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwthmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 type keyTestCase struct {
@@ -37,9 +37,9 @@ func keyTestCases(t *testing.T) []keyTestCase {
 		algorithm jwthmac.Algorithm
 		key       secretdata.Bytes
 	}{
-		{jwthmac.HS256, secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{})},
-		{jwthmac.HS384, secretdata.NewBytesFromData([]byte("012345678901234567890123456789012345678901234567"), insecuresecretdataaccess.Token{})},
-		{jwthmac.HS512, secretdata.NewBytesFromData([]byte("0123456789012345678901234567890101234567890123456789012345678901"), insecuresecretdataaccess.Token{})}} {
+		{jwthmac.HS256, secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token())},
+		{jwthmac.HS384, secretdata.NewBytesFromData([]byte("012345678901234567890123456789012345678901234567"), testonlyinsecuresecretdataaccess.Token())},
+		{jwthmac.HS512, secretdata.NewBytesFromData([]byte("0123456789012345678901234567890101234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token())}} {
 		for _, kidStrategyAndValues := range []struct {
 			strategy      jwthmac.KIDStrategy
 			idRequirement uint32
@@ -127,9 +127,9 @@ func TestKey(t *testing.T) {
 }
 
 func TestPublicKeyEqual_Different(t *testing.T) {
-	keyBytes1 := secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{})
-	keyBytes2 := secretdata.NewBytesFromData([]byte("012345678901234567890123456AAAAA"), insecuresecretdataaccess.Token{})
-	keyBytes3 := secretdata.NewBytesFromData([]byte("012345678901234567890123456789012"), insecuresecretdataaccess.Token{})
+	keyBytes1 := secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token())
+	keyBytes2 := secretdata.NewBytesFromData([]byte("012345678901234567890123456AAAAA"), testonlyinsecuresecretdataaccess.Token())
+	keyBytes3 := secretdata.NewBytesFromData([]byte("012345678901234567890123456789012"), testonlyinsecuresecretdataaccess.Token())
 	for _, tc := range []struct {
 		name         string
 		opts1, opts2 jwthmac.KeyOpts
@@ -195,7 +195,7 @@ func TestPublicKeyEqual_Different(t *testing.T) {
 				IDRequirement: 0x01020304,
 			},
 			opts2: jwthmac.KeyOpts{
-				KeyBytes:      secretdata.NewBytesFromData([]byte("012345678901234567890123456789012345678901234567"), insecuresecretdataaccess.Token{}),
+				KeyBytes:      secretdata.NewBytesFromData([]byte("012345678901234567890123456789012345678901234567"), testonlyinsecuresecretdataaccess.Token()),
 				Parameters:    mustCreateParameters(t, 48, jwthmac.Base64EncodedKeyIDAsKID, jwthmac.HS384), // Different algorithm
 				IDRequirement: 0x01020304,
 			},
@@ -219,7 +219,7 @@ func TestPublicKeyEqual_Different(t *testing.T) {
 }
 
 func TestNewKey_Errors(t *testing.T) {
-	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{})
+	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token())
 	for _, tc := range []struct {
 		name string
 		opts jwthmac.KeyOpts

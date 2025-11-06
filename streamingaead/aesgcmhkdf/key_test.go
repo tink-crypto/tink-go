@@ -20,19 +20,19 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/aesgcmhkdf"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 var (
-	keyBytes16 = secretdata.NewBytesFromData([]byte("1111111111111111"), insecuresecretdataaccess.Token{})
-	keyBytes32 = secretdata.NewBytesFromData([]byte("11111111111111111111111111111111"), insecuresecretdataaccess.Token{})
+	keyBytes16 = secretdata.NewBytesFromData([]byte("1111111111111111"), testonlyinsecuresecretdataaccess.Token())
+	keyBytes32 = secretdata.NewBytesFromData([]byte("11111111111111111111111111111111"), testonlyinsecuresecretdataaccess.Token())
 )
 
 func TestNewKey_Fails(t *testing.T) {
@@ -62,7 +62,7 @@ func TestNewKey_Fails(t *testing.T) {
 		},
 		{
 			name:     "invalid parameters and empty key",
-			keyBytes: secretdata.NewBytesFromData([]byte{}, insecuresecretdataaccess.Token{}),
+			keyBytes: secretdata.NewBytesFromData([]byte{}, testonlyinsecuresecretdataaccess.Token()),
 			params:   &aesgcmhkdf.Parameters{},
 		},
 		{
@@ -169,7 +169,7 @@ func TestKeyEqual_FalseIfDifferentType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcmhkdf.NewParameters() err = %v, want nil", err)
 	}
-	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{})
+	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token())
 	key, err := aesgcmhkdf.NewKey(params, keyBytes)
 	if err != nil {
 		t.Fatalf("aesgcmhkdf.NewKey() err = %v, want nil", err)
@@ -180,7 +180,7 @@ func TestKeyEqual_FalseIfDifferentType(t *testing.T) {
 }
 
 func TestKeyEqual_FalseIfDifferent(t *testing.T) {
-	key2Bytes16 := secretdata.NewBytesFromData([]byte("3333333333333333"), insecuresecretdataaccess.Token{})
+	key2Bytes16 := secretdata.NewBytesFromData([]byte("3333333333333333"), testonlyinsecuresecretdataaccess.Token())
 	for _, test := range []struct {
 		name   string
 		first  TestKey

@@ -22,11 +22,11 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/aesgcmhkdf"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	streamaeadpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_hkdf_streaming_go_proto"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -75,7 +75,7 @@ func testCases(t *testing.T) []*keyParsingTestCase {
 				if err != nil {
 					t.Fatalf("aesgcmhkdf.NewParameters() err = %v, want nil", err)
 				}
-				keySecretDataBytes := secretdata.NewBytesFromData(keyBytes[:keySize], insecuresecretdataaccess.Token{})
+				keySecretDataBytes := secretdata.NewBytesFromData(keyBytes[:keySize], testonlyinsecuresecretdataaccess.Token())
 				k, err := aesgcmhkdf.NewKey(params, keySecretDataBytes)
 				if err != nil {
 					t.Fatalf("aesgcmhkdf.NewKey() err = %v, want nil", err)
@@ -83,7 +83,7 @@ func testCases(t *testing.T) []*keyParsingTestCase {
 
 				serializedKey := mustMarshal(t, &streamaeadpb.AesGcmHkdfStreamingKey{
 					Version:  0,
-					KeyValue: keySecretDataBytes.Data(insecuresecretdataaccess.Token{}),
+					KeyValue: keySecretDataBytes.Data(testonlyinsecuresecretdataaccess.Token()),
 					Params: &streamaeadpb.AesGcmHkdfStreamingParams{
 						HkdfHashType:          hashType.protoHashType,
 						DerivedKeySize:        uint32(keySize),

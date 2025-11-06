@@ -21,7 +21,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config/macconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -29,6 +28,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/mac/aescmac"
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -73,7 +73,7 @@ func TestConfigV0MACFailsIfKeyNotMAC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aescmac.NewParameters() err=%v, want nil", err)
 	}
-	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, "ea3b016bdd387dd64d837c71683808f335dbdc53598a4ea8c5f952473fafaf5f"), insecuresecretdataaccess.Token{}), 0, aesGCMParams)
+	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, "ea3b016bdd387dd64d837c71683808f335dbdc53598a4ea8c5f952473fafaf5f"), testonlyinsecuresecretdataaccess.Token()), 0, aesGCMParams)
 	if err != nil {
 		t.Fatalf(" aescmac.NewKey() err=%v, want nil", err)
 	}
@@ -95,7 +95,7 @@ func TestConfigV0MAC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmac.NewParameters() err=%v, want nil", err)
 	}
-	hmacKey, err := hmac.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, hmacKeyHex), insecuresecretdataaccess.Token{}), hmacParams, 0)
+	hmacKey, err := hmac.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, hmacKeyHex), testonlyinsecuresecretdataaccess.Token()), hmacParams, 0)
 	if err != nil {
 		t.Fatalf(" hmac.NewKey() err=%v, want nil", err)
 	}
@@ -113,7 +113,7 @@ func TestConfigV0MAC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aescmac.NewParameters() err=%v, want nil", err)
 	}
-	aesCMACKey, err := aescmac.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, "ea3b016bdd387dd64d837c71683808f335dbdc53598a4ea8c5f952473fafaf5f"), insecuresecretdataaccess.Token{}), aesCMACParams, 0)
+	aesCMACKey, err := aescmac.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, "ea3b016bdd387dd64d837c71683808f335dbdc53598a4ea8c5f952473fafaf5f"), testonlyinsecuresecretdataaccess.Token()), aesCMACParams, 0)
 	if err != nil {
 		t.Fatalf(" aescmac.NewKey() err=%v, want nil", err)
 	}

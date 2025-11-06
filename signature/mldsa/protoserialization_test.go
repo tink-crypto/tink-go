@@ -22,10 +22,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	mldsapb "github.com/tink-crypto/tink-go/v2/proto/ml_dsa_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -548,7 +548,7 @@ func TestParsePrivateKey(t *testing.T) {
 				t.Fatalf("NewParameters(%v) err = %v, want nil", tc.wantVariant, err)
 			}
 			idRequirement, _ := tc.keySerialization.IDRequirement()
-			privateKeyBytes := secretdata.NewBytesFromData(protoPrivateKey.GetKeyValue(), insecuresecretdataaccess.Token{})
+			privateKeyBytes := secretdata.NewBytesFromData(protoPrivateKey.GetKeyValue(), testonlyinsecuresecretdataaccess.Token())
 			wantKey, err := NewPrivateKey(privateKeyBytes, idRequirement, wantParams)
 			if err != nil {
 				t.Fatalf("NewPrivateKey(%v, %v, %v) err = %v, want nil", privateKeyBytes, idRequirement, wantParams, err)
@@ -627,7 +627,7 @@ func TestSerializePrivateKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proto.Marshal(protoPrivateKey) err = %v, want nil", err)
 	}
-	privateKeyBytes := secretdata.NewBytesFromData(privKeyBytes, insecuresecretdataaccess.Token{})
+	privateKeyBytes := secretdata.NewBytesFromData(privKeyBytes, testonlyinsecuresecretdataaccess.Token())
 	for _, tc := range []struct {
 		name       string
 		privateKey *PrivateKey

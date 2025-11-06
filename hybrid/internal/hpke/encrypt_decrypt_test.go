@@ -19,10 +19,10 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/subtle"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestNewEncryptMissingPubKeyBytes(t *testing.T) {
@@ -35,10 +35,10 @@ func TestNewEncryptMissingPubKeyBytes(t *testing.T) {
 }
 
 func TestNewDecryptMissingPrivKeyBytes(t *testing.T) {
-	if _, err := NewDecrypt(secretdata.NewBytesFromData(nil, insecuresecretdataaccess.Token{}), P256HKDFSHA256, HKDFSHA256, AES256GCM); err == nil {
+	if _, err := NewDecrypt(secretdata.NewBytesFromData(nil, testonlyinsecuresecretdataaccess.Token()), P256HKDFSHA256, HKDFSHA256, AES256GCM); err == nil {
 		t.Error("NewDecrypt() err = nil, want err")
 	}
-	if _, err := NewDecrypt(secretdata.NewBytesFromData([]byte{}, insecuresecretdataaccess.Token{}), P256HKDFSHA256, HKDFSHA256, AES256GCM); err == nil {
+	if _, err := NewDecrypt(secretdata.NewBytesFromData([]byte{}, testonlyinsecuresecretdataaccess.Token()), P256HKDFSHA256, HKDFSHA256, AES256GCM); err == nil {
 		t.Error("NewDecrypt() err = nil, want err")
 	}
 }
@@ -193,7 +193,7 @@ func pubPrivKeys(t *testing.T) ([]byte, secretdata.Bytes) {
 	if err != nil {
 		t.Fatalf("PublicFromPrivateX25519: err %q", err)
 	}
-	return pub, secretdata.NewBytesFromData(priv, insecuresecretdataaccess.Token{})
+	return pub, secretdata.NewBytesFromData(priv, testonlyinsecuresecretdataaccess.Token())
 }
 
 func flipRandByte(t *testing.T, b []byte) []byte {

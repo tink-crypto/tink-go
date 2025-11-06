@@ -21,10 +21,10 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 const (
@@ -139,7 +139,7 @@ func TestAEADTestVectors(t *testing.T) {
 			if err != nil {
 				t.Fatalf("xaesgcm.NewParameters(%v, %v) err = %v, want nil", xaesgcm.VariantNoPrefix, tc.saltSize, err)
 			}
-			key, err := xaesgcm.NewKey(secretdata.NewBytesFromData(tc.keyBytes, insecuresecretdataaccess.Token{}), 0x00, params)
+			key, err := xaesgcm.NewKey(secretdata.NewBytesFromData(tc.keyBytes, testonlyinsecuresecretdataaccess.Token()), 0x00, params)
 			if err != nil {
 				t.Fatalf("xaesgcm.NewKey(%v, %v, %v) err = %v, want nil", tc.keyBytes, 0x00, params, err)
 			}
@@ -219,7 +219,7 @@ func TestAEADEncryptAndDecrypt(t *testing.T) {
 			if err != nil {
 				t.Fatalf("xaesgcm.NewParameters(%v, %v) err = %v, want nil", tc.variant, tc.saltSize, err)
 			}
-			key, err := xaesgcm.NewKey(secretdata.NewBytesFromData(tc.keyBytes, insecuresecretdataaccess.Token{}), tc.idRequirement, params)
+			key, err := xaesgcm.NewKey(secretdata.NewBytesFromData(tc.keyBytes, testonlyinsecuresecretdataaccess.Token()), tc.idRequirement, params)
 			if err != nil {
 				t.Fatalf("xaesgcm.NewKey(%v, %v, %v) err = %v, want nil", tc.keyBytes, tc.idRequirement, params, err)
 			}
@@ -265,10 +265,10 @@ func TestAEADDecryptModifiedCiphertext(t *testing.T) {
 			if err != nil {
 				t.Fatalf("xaesgcm.NewParameters(%v, %v) err = %v, want nil", xaesgcm.VariantNoPrefix, 12, err)
 			}
-			keyBytes := secretdata.NewBytesFromData([]byte("01010101010101010101010101010101"), insecuresecretdataaccess.Token{})
+			keyBytes := secretdata.NewBytesFromData([]byte("01010101010101010101010101010101"), testonlyinsecuresecretdataaccess.Token())
 			key, err := xaesgcm.NewKey(keyBytes, 0x00, params)
 			if err != nil {
-				t.Fatalf("xaesgcm.NewKey(%x, %v, %v) err = %v, want nil", keyBytes.Data(insecuresecretdataaccess.Token{}), 0x00, params, err)
+				t.Fatalf("xaesgcm.NewKey(%x, %v, %v) err = %v, want nil", keyBytes.Data(testonlyinsecuresecretdataaccess.Token()), 0x00, params, err)
 			}
 			a, err := xaesgcm.NewAEAD(key, internalapi.Token{})
 			if err != nil {

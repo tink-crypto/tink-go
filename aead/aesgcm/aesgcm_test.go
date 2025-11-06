@@ -26,13 +26,13 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -181,7 +181,7 @@ func mustCreateKey(t *testing.T, keyValue []byte, keyID uint32, opts aesgcm.Para
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", opts, err)
 	}
-	keyBytes := secretdata.NewBytesFromData(keyValue, insecuresecretdataaccess.Token{})
+	keyBytes := secretdata.NewBytesFromData(keyValue, testonlyinsecuresecretdataaccess.Token())
 	key, err := aesgcm.NewKey(keyBytes, keyID, params)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey(%v, %v, %v) err = %v, want nil", keyBytes, keyID, params, err)
@@ -356,7 +356,7 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters(%v) err = %v, want nil", opts, err)
 	}
-	key, err := aesgcm.NewKey(secretdata.NewBytesFromData(make([]byte, 32), insecuresecretdataaccess.Token{}), 0x1234, params)
+	key, err := aesgcm.NewKey(secretdata.NewBytesFromData(make([]byte, 32), testonlyinsecuresecretdataaccess.Token()), 0x1234, params)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
 	}
@@ -378,7 +378,7 @@ func TestGetKeyManager(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
-	key, err := aesgcm.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), 0x1234, aesGCMParams)
+	key, err := aesgcm.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), 0x1234, aesGCMParams)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
 	}

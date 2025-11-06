@@ -23,10 +23,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	rsassapkcs1pb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pkcs1_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -704,7 +704,7 @@ func TestParsePrivateKeyWithZeroPaddingValues(t *testing.T) {
 		Version: privateKeyProtoVersion,
 	}
 	serializedPrivateKey := mustMarshalProto(t, privateKey)
-	token := insecuresecretdataaccess.Token{}
+	token := testonlyinsecuresecretdataaccess.Token()
 	keySerialization := mustCreateKeySerialization(t, &tinkpb.KeyData{
 		TypeUrl:         "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey",
 		Value:           serializedPrivateKey,
@@ -783,7 +783,7 @@ func TestParseAndSerializePrivateKey(t *testing.T) {
 	}
 	serializedPrivateKey4096 := mustMarshalProto(t, privateKey4096)
 
-	token := insecuresecretdataaccess.Token{}
+	token := testonlyinsecuresecretdataaccess.Token()
 	for _, tc := range []struct {
 		name             string
 		keySerialization *protoserialization.KeySerialization

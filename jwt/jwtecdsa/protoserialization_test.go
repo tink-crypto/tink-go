@@ -21,11 +21,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/ec"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 
 	jwtecdsapb "github.com/tink-crypto/tink-go/v2/proto/jwt_ecdsa_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -753,7 +753,7 @@ func coordinateSizeFromAlgorithm(t *testing.T, a jwtecdsa.Algorithm) int {
 
 func mustCreatePrivateKeyFromPublicKey(t *testing.T, keyBytes []byte, publicKey *jwtecdsa.PublicKey) *jwtecdsa.PrivateKey {
 	t.Helper()
-	secretDataKeyValue := secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{})
+	secretDataKeyValue := secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token())
 	privateKey, err := jwtecdsa.NewPrivateKeyFromPublicKey(secretDataKeyValue, publicKey)
 	if err != nil {
 		t.Fatalf("jwtecdsa.NewPrivateKeyFromPublicKey() err = %v, want nil", err)

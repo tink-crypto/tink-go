@@ -24,11 +24,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 const (
@@ -821,9 +821,9 @@ func TestNewPrivateKeyInvalidValues(t *testing.T) {
 	p := mustDecodeBase64(t, p2048Base64)
 	q := mustDecodeBase64(t, q2048Base64)
 	privateKeyValues := rsassapss.PrivateKeyValues{
-		P: secretdata.NewBytesFromData(p, insecuresecretdataaccess.Token{}),
-		Q: secretdata.NewBytesFromData(q, insecuresecretdataaccess.Token{}),
-		D: secretdata.NewBytesFromData(d, insecuresecretdataaccess.Token{}),
+		P: secretdata.NewBytesFromData(p, testonlyinsecuresecretdataaccess.Token()),
+		Q: secretdata.NewBytesFromData(q, testonlyinsecuresecretdataaccess.Token()),
+		D: secretdata.NewBytesFromData(d, testonlyinsecuresecretdataaccess.Token()),
 	}
 	paramsValues := rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
@@ -852,7 +852,7 @@ func TestNewPrivateKeyInvalidValues(t *testing.T) {
 	differentN2048Base64 := "3ZBFkDl4CMQxQyliPZATRThDJRsTuLPE_vVFmBEq8-sxxxEDxiWZUWdOU72Tp-NtGUcuR06-gChobZUpSE2Lr-pKBLoZVVZnYWyEeGcFlACcm8aj7-UidMumTHJHR9ftwZTk_t3jKjKJ2Uwxk25-ehXXVvVISS9bNFuSfoxhi91VCsshoXrhSDBDg9ubPHuqPkyL2OhEqITao-GNVpmMsy-brk1B1WoY3dQxPICJt16du5EoRwusmwh_thkoqw-MTIk2CwIImQCNCOi9MfkHqAfoBWrWgA3_357Z2WSpOefkgRS4SXhVGsuFyd-RlvPv9VKG1s1LOagiqKd2Ohggjw"
 	differentPublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, differentN2048Base64), 0x11223344, params)
 
-	token := insecuresecretdataaccess.Token{}
+	token := testonlyinsecuresecretdataaccess.Token()
 	for _, tc := range []struct {
 		name             string
 		publicKey        *rsassapss.PublicKey
@@ -942,7 +942,7 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 			}
 
 			// 2048 bits
-			token := insecuresecretdataaccess.Token{}
+			token := testonlyinsecuresecretdataaccess.Token()
 			testCases = append(testCases, privateKeyTestCase{
 				name: fmt.Sprintf("%v-%v-%v-%v", 2048, hashType, hashType, variant),
 				publicKey: mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
@@ -1086,7 +1086,7 @@ func TestNewPrivateKeyEqualFailsIfKeysAreDifferent(t *testing.T) {
 	differentD2048Base64 := "K9aK3QFx7ZIcCSTcCkBCf9Sk_GeCHG59UNDoxzDGZeKoQ7HrJD52OnQNPGZrG7HU-UZrMrKy4JqeJuh3dZXaSKE7qfnEX20sIUueXlBL-z-vvOatsx6MFb3hloiZ7-4aXc3_DSqL8uJzAeqgeIJJRhCiPdNkTQ6wpghkUOOnvUtcRGwBgUvhbCCGGfilt0Y_ylg9k2hkv3TZZ4iq6OW648BSorQJ35oI65vnaz26uiiGPVxW7kLuzbhQdeBN6Qtt072UCNf6VpRpfBhRYjKaubV_IahMqwB8HBDZdfVJGXf-z2yUnzpWbYS-R33aqwLAdi0bIy-KYZEHFaD_pDikYQ"
 	differentP2048Base64 := "_aykrdsX5T7qB7lJITtX2lDWWQc4ZP08IeVw60UPkBT6Q85TtM5MVayhic6TqMHWao60reJ62vdkrXV3wRvwuvFmpU8IDF8HZaSz_TlObWYKswJUy4mZ8P1wOHfHHkzvA4rK-B8IkefdBtf9WywBTmc0dm0YrbI8q655mY_z47E"
 	differentQ2048Base64 := "35hEOarCZ7siiOU6ukmOSCWwAYJr-fgM8cChRQfziLNjRrfdWOo3FOnA5cr36lbHOsdBWysPB-sBp0oIU3RSvi7JGN6k2jMCVTQeDm_zS7JMok2V42mlulXpvRp9C6av8dpxjOsQbuHEY6f8MMEde4hcdrZfKLDzJD5ZHL6CmD8"
-	token := insecuresecretdataaccess.Token{}
+	token := testonlyinsecuresecretdataaccess.Token()
 	for _, tc := range []struct {
 		name string
 		this *rsassapss.PrivateKey

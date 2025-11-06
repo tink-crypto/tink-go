@@ -19,11 +19,11 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestKeysetGenerationFromParams(t *testing.T) {
@@ -66,7 +66,7 @@ func TestAddNewKeyFromParametersFailsWithInvalidKeySize(t *testing.T) {
 }
 
 func TestNewPRFSetFailsWithInvalidKeySize(t *testing.T) {
-	key, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}))
+	key, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), testonlyinsecuresecretdataaccess.Token()))
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
 	}
@@ -102,7 +102,7 @@ func TestKeysetGenerationFromKey(t *testing.T) {
 	wantPRFOutput := mustHexDecode(t, "9d47482c2d9252bace43a75a8335b8b8")
 	data := mustHexDecode(t, "40")
 
-	key, err := aescmacprf.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}))
+	key, err := aescmacprf.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()))
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
 	}

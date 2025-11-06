@@ -25,11 +25,11 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
 	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 type keyTestCase struct {
@@ -119,7 +119,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant:              ecies.VariantTink,
 			}),
 			publicKeyBytes:   x25519PublicKeyBytes,
-			privateKeyBytes:  secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			privateKeyBytes:  secretdata.NewBytesFromData(x25519PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			idRequirement:    uint32(0x01020304),
 			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
 		},
@@ -133,7 +133,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant:              ecies.VariantNoPrefix,
 			}),
 			publicKeyBytes:  x25519PublicKeyBytes,
-			privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			idRequirement:   0,
 		},
 		keyTestCase{
@@ -146,7 +146,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant:              ecies.VariantTink,
 			}),
 			publicKeyBytes:   p256SHA256PublicKeyBytes,
-			privateKeyBytes:  secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			privateKeyBytes:  secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			idRequirement:    uint32(0x01020304),
 			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
 		},
@@ -160,7 +160,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant:              ecies.VariantNoPrefix,
 			}),
 			publicKeyBytes:  p256SHA256PublicKeyBytes,
-			privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			idRequirement:   0,
 		},
 		keyTestCase{
@@ -173,7 +173,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant:              ecies.VariantTink,
 			}),
 			publicKeyBytes:   p256SHA512PublicKeyBytes,
-			privateKeyBytes:  secretdata.NewBytesFromData(p256SHA512PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			privateKeyBytes:  secretdata.NewBytesFromData(p256SHA512PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			idRequirement:    uint32(0x01020304),
 			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
 		},
@@ -187,7 +187,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant:              ecies.VariantNoPrefix,
 			}),
 			publicKeyBytes:  p256SHA512PublicKeyBytes,
-			privateKeyBytes: secretdata.NewBytesFromData(p256SHA512PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			privateKeyBytes: secretdata.NewBytesFromData(p256SHA512PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			idRequirement:   0,
 		},
 		keyTestCase{
@@ -200,7 +200,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant:              ecies.VariantTink,
 			}),
 			publicKeyBytes:   p521SHA512PublicKeyBytes,
-			privateKeyBytes:  secretdata.NewBytesFromData(p521SHA512PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			privateKeyBytes:  secretdata.NewBytesFromData(p521SHA512PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			idRequirement:    uint32(0x01020304),
 			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
 		},
@@ -214,7 +214,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant:              ecies.VariantCrunchy,
 			}),
 			publicKeyBytes:   p521SHA512PublicKeyBytes,
-			privateKeyBytes:  secretdata.NewBytesFromData(p521SHA512PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			privateKeyBytes:  secretdata.NewBytesFromData(p521SHA512PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			idRequirement:    uint32(0x01020304),
 			wantOutputPrefix: []byte{cryptofmt.LegacyStartByte, 0x01, 0x02, 0x03, 0x04},
 		},
@@ -228,7 +228,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant:              ecies.VariantNoPrefix,
 			}),
 			publicKeyBytes:  p521SHA512PublicKeyBytes,
-			privateKeyBytes: secretdata.NewBytesFromData(p521SHA512PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			privateKeyBytes: secretdata.NewBytesFromData(p521SHA512PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			idRequirement:   0,
 		},
 	}
@@ -602,7 +602,7 @@ func TestNewPrivateKeyFromPublicKeyFailsWithInvalidValues(t *testing.T) {
 				DEMParameters:        demParams,
 				Variant:              ecies.VariantTink,
 			})),
-			privateKeybytes: secretdata.NewBytesFromData([]byte("invalid"), insecuresecretdataaccess.Token{}),
+			privateKeybytes: secretdata.NewBytesFromData([]byte("invalid"), testonlyinsecuresecretdataaccess.Token()),
 		},
 		{
 			name: "incompatible X25519 private key bytes",
@@ -613,7 +613,7 @@ func TestNewPrivateKeyFromPublicKeyFailsWithInvalidValues(t *testing.T) {
 				DEMParameters:        demParams,
 				Variant:              ecies.VariantTink,
 			})),
-			privateKeybytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes2, insecuresecretdataaccess.Token{}),
+			privateKeybytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes2, testonlyinsecuresecretdataaccess.Token()),
 		},
 		{
 			name: "invalid NIST private key bytes",
@@ -624,7 +624,7 @@ func TestNewPrivateKeyFromPublicKeyFailsWithInvalidValues(t *testing.T) {
 				DEMParameters:        demParams,
 				Variant:              ecies.VariantTink,
 			})),
-			privateKeybytes: secretdata.NewBytesFromData([]byte("invalid"), insecuresecretdataaccess.Token{}),
+			privateKeybytes: secretdata.NewBytesFromData([]byte("invalid"), testonlyinsecuresecretdataaccess.Token()),
 		},
 		{
 			name: "incompatible NIST private key bytes",
@@ -635,7 +635,7 @@ func TestNewPrivateKeyFromPublicKeyFailsWithInvalidValues(t *testing.T) {
 				DEMParameters:        demParams,
 				Variant:              ecies.VariantTink,
 			})),
-			privateKeybytes: secretdata.NewBytesFromData(p256SHA512PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+			privateKeybytes: secretdata.NewBytesFromData(p256SHA512PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -730,7 +730,7 @@ func TestPrivateKey_Equal_FalseIfDifferentType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ecies.NewPublicKey(%x, %v, %v) err = %v, want nil", x25519PublicKeyBytes, 0x01020304, params, err)
 	}
-	privateKey, err := ecies.NewPrivateKeyFromPublicKey(secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}), publicKey)
+	privateKey, err := ecies.NewPrivateKeyFromPublicKey(secretdata.NewBytesFromData(x25519PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()), publicKey)
 	if err != nil {
 		t.Fatalf("ecies.NewPrivateKeyFromPublicKey(%x, %v) err = %v, want nil", x25519PrivateKeyBytes, publicKey, err)
 	}
@@ -817,7 +817,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					DEMParameters:        aesGCMDEMParams,
 					Variant:              ecies.VariantTink,
 				})),
-				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			},
 			key2: keyTestCase{
 				publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes, 0x01020304, mustCreateParameters(t, ecies.ParametersOpts{
@@ -827,7 +827,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					DEMParameters:        aesSIVDEMParams,
 					Variant:              ecies.VariantTink,
 				})),
-				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			},
 		},
 		{
@@ -840,7 +840,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					DEMParameters:        aesGCMDEMParams,
 					Variant:              ecies.VariantTink,
 				})),
-				privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+				privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			},
 			key2: keyTestCase{
 				publicKey: mustCreatePublicKey(t, p256SHA256PublicKeyBytes, 0x05060708, mustCreateParameters(t, ecies.ParametersOpts{
@@ -850,7 +850,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					DEMParameters:        aesGCMDEMParams,
 					Variant:              ecies.VariantTink,
 				})),
-				privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+				privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			},
 		},
 		{
@@ -863,7 +863,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					DEMParameters:        aesGCMDEMParams,
 					Variant:              ecies.VariantTink,
 				})),
-				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
+				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
 			},
 			key2: keyTestCase{
 				publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes2, 0x01020304, mustCreateParameters(t, ecies.ParametersOpts{
@@ -873,7 +873,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					DEMParameters:        aesGCMDEMParams,
 					Variant:              ecies.VariantTink,
 				})),
-				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes2, insecuresecretdataaccess.Token{}),
+				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes2, testonlyinsecuresecretdataaccess.Token()),
 			},
 		},
 	} {

@@ -19,11 +19,11 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestKeysetGenerationFromParams(t *testing.T) {
@@ -73,7 +73,7 @@ func TestKeysetGenerationFromKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmacprf.NewParameters() err = %v, want nil", err)
 	}
-	key, err := hmacprf.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), params)
+	key, err := hmacprf.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), params)
 	if err != nil {
 		t.Fatalf("hmacprf.NewKey() err = %v, want nil", err)
 	}

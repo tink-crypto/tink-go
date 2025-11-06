@@ -22,12 +22,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	tinked25519 "github.com/tink-crypto/tink-go/v2/signature/ed25519"
 	"github.com/tink-crypto/tink-go/v2/signature/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	ed25519pb "github.com/tink-crypto/tink-go/v2/proto/ed25519_go_proto"
@@ -52,7 +52,7 @@ func TestSignerKeyManagerGetPrimitiveBasic(t *testing.T) {
 		t.Fatalf("tinked25519.NewParameters(%v) err = %v, want nil", tinked25519.VariantNoPrefix, err)
 	}
 	_, privateKeyBytes := getTestKeyPair(t)
-	privateKey, err := tinked25519.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}), 0, params)
+	privateKey, err := tinked25519.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, testonlyinsecuresecretdataaccess.Token()), 0, params)
 	if err != nil {
 		t.Fatalf("tinked25519.NewPrivateKey(%v, %v, %v) err = %v, want nil", privateKeyBytes, 0, params, err)
 	}

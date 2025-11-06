@@ -19,13 +19,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/jwt"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwthmac"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func mustCreateJWTHMACParameters(t *testing.T, keySize int, kidStrategy jwthmac.KIDStrategy, algorithm jwthmac.Algorithm) *jwthmac.Parameters {
@@ -60,9 +60,9 @@ func mustCreateKeysetHandle(t *testing.T, k key.Key) *keyset.Handle {
 }
 
 func TestJWTFullMACSignAndVerify(t *testing.T) {
-	keyBytesHS256 := secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{})
-	keyBytesHS384 := secretdata.NewBytesFromData([]byte("012345678901234567890123456789012345678901234567"), insecuresecretdataaccess.Token{})
-	keyBytesHS512 := secretdata.NewBytesFromData([]byte("0123456789012345678901234567890123456789012345678901234567890123"), insecuresecretdataaccess.Token{})
+	keyBytesHS256 := secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token())
+	keyBytesHS384 := secretdata.NewBytesFromData([]byte("012345678901234567890123456789012345678901234567"), testonlyinsecuresecretdataaccess.Token())
+	keyBytesHS512 := secretdata.NewBytesFromData([]byte("0123456789012345678901234567890123456789012345678901234567890123"), testonlyinsecuresecretdataaccess.Token())
 
 	for _, tc := range []struct {
 		name    string
@@ -285,7 +285,7 @@ func TestJWTFullMACTestVectors(t *testing.T) {
 		params := mustCreateJWTHMACParameters(t, len(keyBytes), jwthmac.IgnoredKID, jwthmac.HS256)
 		jwtHMACKey := mustCreateJWTHMACKey(t, jwthmac.KeyOpts{
 			Parameters:    params,
-			KeyBytes:      secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}),
+			KeyBytes:      secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()),
 			IDRequirement: 0,
 		})
 
@@ -316,7 +316,7 @@ func TestJWTFullMACTestVectors(t *testing.T) {
 		params := mustCreateJWTHMACParameters(t, len(keyBytes), jwthmac.IgnoredKID, jwthmac.HS256)
 		jwtHMACKey := mustCreateJWTHMACKey(t, jwthmac.KeyOpts{
 			Parameters:    params,
-			KeyBytes:      secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}),
+			KeyBytes:      secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()),
 			IDRequirement: 0,
 		})
 
@@ -346,7 +346,7 @@ func TestJWTFullMACTestVectors(t *testing.T) {
 		params := mustCreateJWTHMACParameters(t, len(keyBytes), jwthmac.CustomKID, jwthmac.HS256)
 		jwtHMACKey := mustCreateJWTHMACKey(t, jwthmac.KeyOpts{
 			Parameters:    params,
-			KeyBytes:      secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}),
+			KeyBytes:      secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()),
 			IDRequirement: 0,
 			CustomKID:     "custom-kid",
 			HasCustomKID:  true,
@@ -379,7 +379,7 @@ func TestJWTFullMACTestVectors(t *testing.T) {
 		params := mustCreateJWTHMACParameters(t, len(keyBytes), jwthmac.IgnoredKID, jwthmac.HS384)
 		jwtHMACKey := mustCreateJWTHMACKey(t, jwthmac.KeyOpts{
 			Parameters:    params,
-			KeyBytes:      secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}),
+			KeyBytes:      secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()),
 			IDRequirement: 0,
 		})
 
@@ -410,7 +410,7 @@ func TestJWTFullMACTestVectors(t *testing.T) {
 		params := mustCreateJWTHMACParameters(t, len(keyBytes), jwthmac.IgnoredKID, jwthmac.HS384)
 		jwtHMACKey := mustCreateJWTHMACKey(t, jwthmac.KeyOpts{
 			Parameters:    params,
-			KeyBytes:      secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}),
+			KeyBytes:      secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()),
 			IDRequirement: 0,
 		})
 
@@ -440,7 +440,7 @@ func TestJWTFullMACTestVectors(t *testing.T) {
 		params := mustCreateJWTHMACParameters(t, len(keyBytes), jwthmac.CustomKID, jwthmac.HS384)
 		jwtHMACKey := mustCreateJWTHMACKey(t, jwthmac.KeyOpts{
 			Parameters:    params,
-			KeyBytes:      secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}),
+			KeyBytes:      secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()),
 			IDRequirement: 0,
 			CustomKID:     "custom-kid",
 			HasCustomKID:  true,
@@ -473,7 +473,7 @@ func TestJWTFullMACTestVectors(t *testing.T) {
 		params := mustCreateJWTHMACParameters(t, len(keyBytes), jwthmac.IgnoredKID, jwthmac.HS512)
 		jwtHMACKey := mustCreateJWTHMACKey(t, jwthmac.KeyOpts{
 			Parameters:    params,
-			KeyBytes:      secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}),
+			KeyBytes:      secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()),
 			IDRequirement: 0,
 		})
 
@@ -504,7 +504,7 @@ func TestJWTFullMACTestVectors(t *testing.T) {
 		params := mustCreateJWTHMACParameters(t, len(keyBytes), jwthmac.IgnoredKID, jwthmac.HS512)
 		jwtHMACKey := mustCreateJWTHMACKey(t, jwthmac.KeyOpts{
 			Parameters:    params,
-			KeyBytes:      secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}),
+			KeyBytes:      secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()),
 			IDRequirement: 0,
 		})
 
@@ -534,7 +534,7 @@ func TestJWTFullMACTestVectors(t *testing.T) {
 		params := mustCreateJWTHMACParameters(t, len(keyBytes), jwthmac.CustomKID, jwthmac.HS512)
 		jwtHMACKey := mustCreateJWTHMACKey(t, jwthmac.KeyOpts{
 			Parameters:    params,
-			KeyBytes:      secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}),
+			KeyBytes:      secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()),
 			IDRequirement: 0,
 			CustomKID:     "custom-kid",
 			HasCustomKID:  true,

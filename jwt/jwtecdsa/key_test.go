@@ -19,10 +19,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 const (
@@ -422,7 +422,7 @@ func TestNewPrivateKey(t *testing.T) {
 			t.Run(fmt.Sprintf("%v_%v", tc.opts.Parameters.Algorithm(), tc.opts.Parameters.KIDStrategy()), func(t *testing.T) {
 				publicKey := mustCreatePublicKey(t, tc.opts)
 
-				secretDataKeyValue := secretdata.NewBytesFromData([]byte(mustHexDecode(t, algorithmAndPointHex.privKeyHex)), insecuresecretdataaccess.Token{})
+				secretDataKeyValue := secretdata.NewBytesFromData([]byte(mustHexDecode(t, algorithmAndPointHex.privKeyHex)), testonlyinsecuresecretdataaccess.Token())
 
 				got, err := jwtecdsa.NewPrivateKeyFromPublicKey(secretDataKeyValue, publicKey)
 				if err != nil {
@@ -436,7 +436,7 @@ func TestNewPrivateKey(t *testing.T) {
 				if diff := cmp.Diff(publicKey, gotPublicKey.(*jwtecdsa.PublicKey)); diff != "" {
 					t.Errorf("unexpected diff (-want +got):\n%s", diff)
 				}
-				if diff := cmp.Diff(mustHexDecode(t, algorithmAndPointHex.privKeyHex), got.PrivateKeyValue().Data(insecuresecretdataaccess.Token{})); diff != "" {
+				if diff := cmp.Diff(mustHexDecode(t, algorithmAndPointHex.privKeyHex), got.PrivateKeyValue().Data(testonlyinsecuresecretdataaccess.Token())); diff != "" {
 					t.Errorf("unexpected diff (-want +got):\n%s", diff)
 				}
 				idRequirement, hasIDRequirement := got.IDRequirement()
@@ -462,7 +462,7 @@ func TestNewPrivateKey(t *testing.T) {
 func mustCreatePrivateKey(t *testing.T, keyBytes []byte, opts jwtecdsa.PublicKeyOpts) *jwtecdsa.PrivateKey {
 	t.Helper()
 	publicKey := mustCreatePublicKey(t, opts)
-	secretDataKeyValue := secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{})
+	secretDataKeyValue := secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token())
 	got, err := jwtecdsa.NewPrivateKeyFromPublicKey(secretDataKeyValue, publicKey)
 	if err != nil {
 		t.Fatalf("jwtecdsa.NewPrivateKeyFromPublicKey() err = %v, want nil", err)
@@ -528,7 +528,7 @@ func TestNewPrivateKey_Errors(t *testing.T) {
 		IDRequirement: 0x01020304,
 		Parameters:    mustCreateParameters(t, jwtecdsa.Base64EncodedKeyIDAsKID, jwtecdsa.ES256),
 	})
-	validPrivateKeyBytesForP256 := secretdata.NewBytesFromData(mustHexDecode(t, p256PrivateKeyHex), insecuresecretdataaccess.Token{})
+	validPrivateKeyBytesForP256 := secretdata.NewBytesFromData(mustHexDecode(t, p256PrivateKeyHex), testonlyinsecuresecretdataaccess.Token())
 
 	otherValidPublicKeyForP256 := mustCreatePublicKey(t, jwtecdsa.PublicKeyOpts{
 		PublicPoint:   mustHexDecode(t, otherP256PublicKeyPointHex),
@@ -549,7 +549,7 @@ func TestNewPrivateKey_Errors(t *testing.T) {
 		{
 			name: "invalid_private_key_bytes",
 			// shorter than 32 bytes for P-256
-			keyBytes:  secretdata.NewBytesFromData([]byte("invalid"), insecuresecretdataaccess.Token{}),
+			keyBytes:  secretdata.NewBytesFromData([]byte("invalid"), testonlyinsecuresecretdataaccess.Token()),
 			publicKey: validPublicKeyForP256,
 		},
 		{

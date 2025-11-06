@@ -19,12 +19,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/jwt"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwthmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestRegisterPrimitiveConstructor(t *testing.T) {
@@ -33,7 +33,7 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	params := mustCreateJWTHMACParameters(t, len(keyBytes), jwthmac.IgnoredKID, jwthmac.HS256)
 	jwtHMACKey := mustCreateJWTHMACKey(t, jwthmac.KeyOpts{
 		Parameters:    params,
-		KeyBytes:      secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}),
+		KeyBytes:      secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()),
 		IDRequirement: 0,
 	})
 	token := "eyJhbGciOiJIUzI1NiJ9" +
