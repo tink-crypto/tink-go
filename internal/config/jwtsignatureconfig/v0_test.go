@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config/jwtsignatureconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/jwt"
@@ -29,7 +30,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestConfigV0JWTSignatureFailsIfKeyNotSignature(t *testing.T) {
@@ -43,7 +43,7 @@ func TestConfigV0JWTSignatureFailsIfKeyNotSignature(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
 	}
-	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token()), 0, aesGCMParams)
+	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{}), 0, aesGCMParams)
 	if err != nil {
 		t.Fatalf(" aessiv.NewKey() err = %v, want nil", err)
 	}
@@ -95,7 +95,7 @@ func TestConfigV0WithJWTSignatureKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("jwtecdsa.NewPublicKey() err = %v, want nil", err)
 	}
-	secretDataKeyValue := secretdata.NewBytesFromData(mustBase64Decode(t, "jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI"), testonlyinsecuresecretdataaccess.Token())
+	secretDataKeyValue := secretdata.NewBytesFromData(mustBase64Decode(t, "jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI"), insecuresecretdataaccess.Token{})
 	jwtECDSAPrivateKey, err := jwtecdsa.NewPrivateKeyFromPublicKey(secretDataKeyValue, jwtECDSAPublicKey)
 	if err != nil {
 		t.Fatalf("jwtecdsa.NewPrivateKeyFromPublicKey() err = %v, want nil", err)
@@ -130,9 +130,9 @@ func TestConfigV0WithJWTSignatureKey(t *testing.T) {
 	}
 	jwtRSASSAPKCS1PrivateKey, err := jwtrsassapkcs1.NewPrivateKey(jwtrsassapkcs1.PrivateKeyOpts{
 		PublicKey: jwtRSASSAPKCS1PublicKey,
-		D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-		P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-		Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+		D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+		P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+		Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 	})
 	if err != nil {
 		t.Fatalf("jwtrsassapkcs1.NewPrivateKey() err = %v, want nil", err)
@@ -171,9 +171,9 @@ func TestConfigV0WithJWTSignatureKey(t *testing.T) {
 	}
 	jwtRSASSAPSSPrivateKey, err := jwtrsassapss.NewPrivateKey(jwtrsassapss.PrivateKeyOpts{
 		PublicKey: jwtRSASSAPSSPublicKey,
-		D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-		P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-		Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+		D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+		P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+		Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 	})
 	if err != nil {
 		t.Fatalf("jwtrsassapss.NewPrivateKey() err = %v, want nil", err)

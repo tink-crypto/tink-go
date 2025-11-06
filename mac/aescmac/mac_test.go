@@ -22,12 +22,12 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac/aescmac"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
@@ -137,7 +137,7 @@ func TestMACTestVectors(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aescmac.NewParameters(%v, %v) err = %v, want nil", tc.variant, 16, err)
 			}
-			key, err := aescmac.NewKey(secretdata.NewBytesFromData(tc.keyBytes, testonlyinsecuresecretdataaccess.Token()), params, tc.idRequirement)
+			key, err := aescmac.NewKey(secretdata.NewBytesFromData(tc.keyBytes, insecuresecretdataaccess.Token{}), params, tc.idRequirement)
 			if err != nil {
 				t.Fatalf("aescmac.NewKey(%v, %v, %v) err = %v, want nil", tc.keyBytes, params, tc.idRequirement, err)
 			}
@@ -170,7 +170,7 @@ func TestMACFromPublicAPITestVectors(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aescmac.NewParameters(%v, %v) err = %v, want nil", tc.variant, 16, err)
 			}
-			key, err := aescmac.NewKey(secretdata.NewBytesFromData(tc.keyBytes, testonlyinsecuresecretdataaccess.Token()), params, tc.idRequirement)
+			key, err := aescmac.NewKey(secretdata.NewBytesFromData(tc.keyBytes, insecuresecretdataaccess.Token{}), params, tc.idRequirement)
 			if err != nil {
 				t.Fatalf("aescmac.NewKey(%v, %v, %v) err = %v, want nil", tc.keyBytes, params, tc.idRequirement, err)
 			}
@@ -220,7 +220,7 @@ func TestDecryptFailsWithInvalidInputs(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aescmac.NewParameters() err = %v, want nil", err)
 			}
-			keyBytes := secretdata.NewBytesFromData([]byte("01010101010101010101010101010101"), testonlyinsecuresecretdataaccess.Token())
+			keyBytes := secretdata.NewBytesFromData([]byte("01010101010101010101010101010101"), insecuresecretdataaccess.Token{})
 			key, err := aescmac.NewKey(keyBytes, params, 0)
 			if err != nil {
 				t.Fatalf("aescmac.NewKey() err = %v, want nil", err)
@@ -317,7 +317,7 @@ func TestVectorsWycheproof(t *testing.T) {
 					TagSizeInBytes: int(g.TagSize / 8),
 					Variant:        aescmac.VariantNoPrefix,
 				})
-				key := mustCreateKey(t, secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), params, 0)
+				key := mustCreateKey(t, secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), params, 0)
 				valid := tc.Result == "valid"
 				mac, err := aescmac.NewMAC(key, internalapi.Token{})
 				if valid && err != nil {

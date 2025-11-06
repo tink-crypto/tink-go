@@ -23,12 +23,12 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config/daeadconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -69,7 +69,7 @@ func TestConfigV0MACFailsIfKeyNotMAC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
 	}
-	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, "ea3b016bdd387dd64d837c71683808f335dbdc53598a4ea8c5f952473fafaf5f"), testonlyinsecuresecretdataaccess.Token()), 0, aesGCMParams)
+	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, "ea3b016bdd387dd64d837c71683808f335dbdc53598a4ea8c5f952473fafaf5f"), insecuresecretdataaccess.Token{}), 0, aesGCMParams)
 	if err != nil {
 		t.Fatalf(" aessiv.NewKey() err = %v, want nil", err)
 	}
@@ -86,7 +86,7 @@ func TestConfigV0MAC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
 	}
-	aesSIVKey, err := aessiv.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, aesSIVKeyHex), testonlyinsecuresecretdataaccess.Token()), 0, aesSIVParams)
+	aesSIVKey, err := aessiv.NewKey(secretdata.NewBytesFromData(mustHexDecode(t, aesSIVKeyHex), insecuresecretdataaccess.Token{}), 0, aesSIVParams)
 	if err != nil {
 		t.Fatalf(" aessiv.NewKey() err = %v, want nil", err)
 	}

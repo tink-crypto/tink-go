@@ -21,11 +21,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	aescmacprfpb "github.com/tink-crypto/tink-go/v2/proto/aes_cmac_prf_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -114,7 +114,7 @@ type aesCMACPRFSerializationTestCase struct {
 
 func aesCMACPRFSerializationTestCases(t *testing.T) []aesCMACPRFSerializationTestCase {
 	var tcs []aesCMACPRFSerializationTestCase = nil
-	key128, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("1234567890123456"), testonlyinsecuresecretdataaccess.Token()))
+	key128, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("1234567890123456"), insecuresecretdataaccess.Token{}))
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
 	}
@@ -130,7 +130,7 @@ func aesCMACPRFSerializationTestCases(t *testing.T) []aesCMACPRFSerializationTes
 			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 		}, tinkpb.OutputPrefixType_RAW, 0),
 	})
-	key256, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("12345678901234561234567890123456"), testonlyinsecuresecretdataaccess.Token()))
+	key256, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("12345678901234561234567890123456"), insecuresecretdataaccess.Token{}))
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
 	}

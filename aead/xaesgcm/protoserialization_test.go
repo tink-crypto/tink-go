@@ -21,10 +21,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	xaesgcmpb "github.com/tink-crypto/tink-go/v2/proto/x_aes_gcm_go_proto"
 )
@@ -158,7 +158,7 @@ func mustCreateKey(t *testing.T, keyValue []byte, variant xaesgcm.Variant, saltS
 	if err != nil {
 		t.Fatalf("xaesgcm.NewParameters(%v, %v) err = %v, want nil", variant, saltSize, err)
 	}
-	keyMaterial := secretdata.NewBytesFromData(keyValue, testonlyinsecuresecretdataaccess.Token())
+	keyMaterial := secretdata.NewBytesFromData(keyValue, insecuresecretdataaccess.Token{})
 	key, err := xaesgcm.NewKey(keyMaterial, idRequirement, params)
 	if err != nil {
 		t.Fatalf("xaesgcm.NewKey(keyMaterial, %v, params) err = %v, want nil", idRequirement, err)

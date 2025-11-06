@@ -23,10 +23,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/hybrid/internal/hpke"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/subtle"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 )
@@ -205,7 +205,7 @@ func TestPublicKeyManagerPrimitiveEncryptDecrypt(t *testing.T) {
 					t.Fatal("primitive is not Encrypt")
 				}
 
-				privateKeyBytes := secretdata.NewBytesFromData(privKey.GetPrivateKey(), testonlyinsecuresecretdataaccess.Token())
+				privateKeyBytes := secretdata.NewBytesFromData(privKey.GetPrivateKey(), insecuresecretdataaccess.Token{})
 				dec, err := hpke.NewDecrypt(privateKeyBytes, kem.hpkeID, kdf.hpkeID, aead.hpkeID)
 				if err != nil {
 					t.Fatalf("hpke.NewDecrypt() err = %v, want nil", err)

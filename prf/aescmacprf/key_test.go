@@ -20,10 +20,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 var key128Bits = []byte{
@@ -37,7 +37,7 @@ var key256Bits = []byte{
 func TestNewKey(t *testing.T) {
 	for _, keySize := range []int{16, 32} {
 		t.Run(fmt.Sprintf("keySize=%d", keySize), func(t *testing.T) {
-			keyBytes := secretdata.NewBytesFromData(key256Bits[:keySize], testonlyinsecuresecretdataaccess.Token())
+			keyBytes := secretdata.NewBytesFromData(key256Bits[:keySize], insecuresecretdataaccess.Token{})
 			key, err := aescmacprf.NewKey(keyBytes)
 			if err != nil {
 				t.Errorf("aescmacprf.NewKey() err = %v, want nil", err)
@@ -64,14 +64,14 @@ func TestNewKey(t *testing.T) {
 }
 
 func TestNewKeyFails(t *testing.T) {
-	keyBytes := secretdata.NewBytesFromData(make([]byte, 33), testonlyinsecuresecretdataaccess.Token())
+	keyBytes := secretdata.NewBytesFromData(make([]byte, 33), insecuresecretdataaccess.Token{})
 	if _, err := aescmacprf.NewKey(keyBytes); err == nil {
 		t.Errorf("aescmacprf.NewKey() err = nil, want error")
 	}
 }
 
 func TestEqual(t *testing.T) {
-	keyBytes := secretdata.NewBytesFromData(key256Bits, testonlyinsecuresecretdataaccess.Token())
+	keyBytes := secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{})
 	key1, err := aescmacprf.NewKey(keyBytes)
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
@@ -86,7 +86,7 @@ func TestEqual(t *testing.T) {
 }
 
 func TestNotEqualIfDifferentKeyBytes(t *testing.T) {
-	keyBytes1 := secretdata.NewBytesFromData(key256Bits, testonlyinsecuresecretdataaccess.Token())
+	keyBytes1 := secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{})
 	key1, err := aescmacprf.NewKey(keyBytes1)
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
@@ -95,7 +95,7 @@ func TestNotEqualIfDifferentKeyBytes(t *testing.T) {
 	otherKey := bytes.Clone(key256Bits)
 	otherKey[0] ^= 0xff
 
-	keyBytes2 := secretdata.NewBytesFromData(otherKey, testonlyinsecuresecretdataaccess.Token())
+	keyBytes2 := secretdata.NewBytesFromData(otherKey, insecuresecretdataaccess.Token{})
 	key2, err := aescmacprf.NewKey(keyBytes2)
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
@@ -106,13 +106,13 @@ func TestNotEqualIfDifferentKeyBytes(t *testing.T) {
 }
 
 func TestNotEqualIfDifferentKeySizes(t *testing.T) {
-	keyBytes1 := secretdata.NewBytesFromData(key256Bits, testonlyinsecuresecretdataaccess.Token())
+	keyBytes1 := secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{})
 	key1, err := aescmacprf.NewKey(keyBytes1)
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
 	}
 
-	keyBytes2 := secretdata.NewBytesFromData(key128Bits, testonlyinsecuresecretdataaccess.Token())
+	keyBytes2 := secretdata.NewBytesFromData(key128Bits, insecuresecretdataaccess.Token{})
 	key2, err := aescmacprf.NewKey(keyBytes2)
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)

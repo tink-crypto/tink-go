@@ -22,10 +22,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	aessivpb "github.com/tink-crypto/tink-go/v2/proto/aes_siv_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -182,7 +182,7 @@ func TestParseKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aessiv.NewParameters(%v, %v) err = %v, want nil", keySizeInBytes, tc.wantVariant, err)
 			}
-			keyMaterial := secretdata.NewBytesFromData(protoKey.GetKeyValue(), testonlyinsecuresecretdataaccess.Token())
+			keyMaterial := secretdata.NewBytesFromData(protoKey.GetKeyValue(), insecuresecretdataaccess.Token{})
 			keyID := uint32(0)
 			if tc.wantVariant != aessiv.VariantNoPrefix {
 				keyID = 12345
@@ -304,7 +304,7 @@ func TestSerializeKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aessiv.NewParameters(32, %v) err = %v, want nil", tc.variant, err)
 			}
-			secretKey := secretdata.NewBytesFromData([]byte("12345678901234561234567890123456"), testonlyinsecuresecretdataaccess.Token())
+			secretKey := secretdata.NewBytesFromData([]byte("12345678901234561234567890123456"), insecuresecretdataaccess.Token{})
 			keyID := uint32(0)
 			if tc.variant != aessiv.VariantNoPrefix {
 				keyID = 12345

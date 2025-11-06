@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/prfbasedkeyderivation"
@@ -28,7 +29,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	aescmacprfpb "github.com/tink-crypto/tink-go/v2/proto/aes_cmac_prf_go_proto"
 	aesgcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
@@ -65,7 +65,7 @@ type keyParsingTestCase struct {
 
 func keyParsingTestCases(t *testing.T) []keyParsingTestCase {
 	// PRF keys.
-	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token()))
+	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{}))
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() failed: %v", err)
 	}
@@ -75,7 +75,7 @@ func keyParsingTestCases(t *testing.T) []keyParsingTestCase {
 	if err != nil {
 		t.Fatalf("hmacprf.NewParameters(32, hmacprf.SHA256) failed: %v", err)
 	}
-	hmacPRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token()), hmacPRFParams)
+	hmacPRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{}), hmacPRFParams)
 	if err != nil {
 		t.Fatalf("hmacprf.NewKey() failed: %v", err)
 	}
@@ -84,7 +84,7 @@ func keyParsingTestCases(t *testing.T) []keyParsingTestCase {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters(32, hkdfprf.SHA25, []byte(\"salt\")) failed: %v", err)
 	}
-	hkdfPRFKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"), testonlyinsecuresecretdataaccess.Token()), hkdfPRFParams)
+	hkdfPRFKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"), insecuresecretdataaccess.Token{}), hkdfPRFParams)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() failed: %v", err)
 	}
@@ -523,7 +523,7 @@ func (p *stubParams) Equal(_ key.Parameters) bool { return true }
 func (p *stubParams) HasIDRequirement() bool      { return true }
 
 func TestSerializeKey_Failure(t *testing.T) {
-	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token()))
+	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{}))
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() failed: %v", err)
 	}

@@ -22,12 +22,12 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesctrhmac"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -192,8 +192,8 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("aesctrhmac.NewParameters(%v) err = %v, want nil", opts, err)
 	}
 	key, err := aesctrhmac.NewKey(aesctrhmac.KeyOpts{
-		AESKeyBytes:   secretdata.NewBytesFromData(make([]byte, 16), testonlyinsecuresecretdataaccess.Token()),
-		HMACKeyBytes:  secretdata.NewBytesFromData(make([]byte, 32), testonlyinsecuresecretdataaccess.Token()),
+		AESKeyBytes:   secretdata.NewBytesFromData(make([]byte, 16), insecuresecretdataaccess.Token{}),
+		HMACKeyBytes:  secretdata.NewBytesFromData(make([]byte, 32), insecuresecretdataaccess.Token{}),
 		IDRequirement: 0x1234,
 		Parameters:    params,
 	})
@@ -242,8 +242,8 @@ func TestGetKeyManager(t *testing.T) {
 		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
 	}
 	key, err := aesctrhmac.NewKey(aesctrhmac.KeyOpts{
-		AESKeyBytes:   secretdata.NewBytesFromData(aesKeyBytes, testonlyinsecuresecretdataaccess.Token()),
-		HMACKeyBytes:  secretdata.NewBytesFromData(macKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+		AESKeyBytes:   secretdata.NewBytesFromData(aesKeyBytes, insecuresecretdataaccess.Token{}),
+		HMACKeyBytes:  secretdata.NewBytesFromData(macKeyBytes, insecuresecretdataaccess.Token{}),
 		IDRequirement: 0x1234,
 		Parameters:    params,
 	})

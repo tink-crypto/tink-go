@@ -20,13 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestKeysetGenerationFromParams(t *testing.T) {
@@ -83,7 +83,7 @@ func TestKeysetGenerationFromKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmacprf.NewParameters() err = %v, want nil", err)
 	}
-	key, err := hmacprf.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), params)
+	key, err := hmacprf.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), params)
 	if err != nil {
 		t.Fatalf("hmacprf.NewKey() err = %v, want nil", err)
 	}
@@ -123,7 +123,7 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmacprf.NewParameters() err = %v, want nil", err)
 	}
-	hmacSHA256PRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData(hmacSHA256KeyBytes, testonlyinsecuresecretdataaccess.Token()), hmacSHA256PRFParams)
+	hmacSHA256PRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData(hmacSHA256KeyBytes, insecuresecretdataaccess.Token{}), hmacSHA256PRFParams)
 	if err != nil {
 		t.Fatalf("hmacprf.NewKey() err = %v, want nil", err)
 	}

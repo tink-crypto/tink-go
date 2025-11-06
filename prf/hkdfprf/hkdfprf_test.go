@@ -20,13 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestKeysetGenerationFromParams(t *testing.T) {
@@ -73,7 +73,7 @@ func TestNewPRFSetFailsWithInvalidKeySize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 	}
-	key, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), testonlyinsecuresecretdataaccess.Token()), params)
+	key, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}), params)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
 	}
@@ -99,7 +99,7 @@ func TestNewPRFSetFailsWithInvalidHashFunction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 	}
-	key, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), params)
+	key, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), params)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
 	}
@@ -164,7 +164,7 @@ func TestKeysetGenerationFromKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 	}
-	key, err := hkdfprf.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), params)
+	key, err := hkdfprf.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), params)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
 	}
@@ -204,7 +204,7 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err=%v, want nil", err)
 	}
-	hkdfprfKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData(hkdfKeyBytes, testonlyinsecuresecretdataaccess.Token()), hkdfprfParams)
+	hkdfprfKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData(hkdfKeyBytes, insecuresecretdataaccess.Token{}), hkdfprfParams)
 	if err != nil {
 		t.Fatalf("keygenregistry.CreateKey() err=%v, want nil", err)
 	}

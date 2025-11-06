@@ -18,11 +18,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/aesctrhmac"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -38,7 +38,7 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesctrhmac.NewParameters() err = %v, want nil", err)
 	}
-	keyMaterialCTRHMAC := secretdata.NewBytesFromData([]byte("12345678901234567890123456789012"), testonlyinsecuresecretdataaccess.Token())
+	keyMaterialCTRHMAC := secretdata.NewBytesFromData([]byte("12345678901234567890123456789012"), insecuresecretdataaccess.Token{})
 	aesCTRHMACKey, err := aesctrhmac.NewKey(aesCTRHMACParams, keyMaterialCTRHMAC)
 	if err != nil {
 		t.Fatalf("aesctrhmac.NewKey() err = %v, want nil", err)

@@ -22,12 +22,12 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -161,7 +161,7 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcmsiv.NewParameters(%v, %v) err = %v, want nil", 32, aesgcmsiv.VariantTink, err)
 	}
-	key, err := aesgcmsiv.NewKey(secretdata.NewBytesFromData([]byte("00000000000000000000000000000000"), testonlyinsecuresecretdataaccess.Token()), 0x1234, params)
+	key, err := aesgcmsiv.NewKey(secretdata.NewBytesFromData([]byte("00000000000000000000000000000000"), insecuresecretdataaccess.Token{}), 0x1234, params)
 	if err != nil {
 		t.Fatalf("aesgcmsiv.NewKey() err = %v, want nil", err)
 	}
@@ -180,7 +180,7 @@ func mustDecodeHex(t *testing.T, hexStr string) []byte {
 }
 
 func TestGetKeyManager(t *testing.T) {
-	keyBytes := secretdata.NewBytesFromData(mustDecodeHex(t, "01000000000000000000000000000000"), testonlyinsecuresecretdataaccess.Token())
+	keyBytes := secretdata.NewBytesFromData(mustDecodeHex(t, "01000000000000000000000000000000"), insecuresecretdataaccess.Token{})
 	wantMessage := mustDecodeHex(t, "01000000000000000000000000000000")
 	ciphertext := mustDecodeHex(t, "030000000000000000000000743f7c8077ab25f8624e2e948579cf77303aaf90f6fe21199c6068577437a0c4")
 	params, err := aesgcmsiv.NewParameters(keyBytes.Len(), aesgcmsiv.VariantTink)

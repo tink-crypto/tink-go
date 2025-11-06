@@ -22,6 +22,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/daead"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -33,7 +34,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -43,7 +43,7 @@ func TestNewKeyDeriver_Fails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aescmacprf.NewParameters(32) failed: %v", err)
 	}
-	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token()))
+	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{}))
 	if err != nil {
 		t.Fatalf("aescmacprf.NewParameters(32) failed: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() failed: %v", err)
 	}
-	hkdfPRFSHA256Key, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token()), hkdfPRFSHA256Params)
+	hkdfPRFSHA256Key, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{}), hkdfPRFSHA256Params)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() failed: %v", err)
 	}
@@ -233,7 +233,7 @@ func mustCreateAESGCMParams(t *testing.T, opts aesgcm.ParametersOpts) *aesgcm.Pa
 
 func mustCreateAESGCMKey(t *testing.T, keyBytes []byte, params *aesgcm.Parameters, idRequirement uint32) key.Key {
 	t.Helper()
-	key, err := aesgcm.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), idRequirement, params)
+	key, err := aesgcm.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), idRequirement, params)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() failed: %v", err)
 	}
@@ -251,7 +251,7 @@ func mustCreateHMACParameters(t *testing.T, opts hmac.ParametersOpts) *hmac.Para
 
 func mustCreateHMACKey(t *testing.T, keyBytes []byte, params *hmac.Parameters, idRequirement uint32) key.Key {
 	t.Helper()
-	key, err := hmac.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), params, idRequirement)
+	key, err := hmac.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), params, idRequirement)
 	if err != nil {
 		t.Fatalf("hmac.NewKey() failed: %v", err)
 	}
@@ -264,7 +264,7 @@ func mustCreateHKDFPRFKey(t *testing.T, keyBytes []byte, salt []byte) key.Key {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() failed: %v", err)
 	}
-	key, err := hkdfprf.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), params)
+	key, err := hkdfprf.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), params)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() failed: %v", err)
 	}

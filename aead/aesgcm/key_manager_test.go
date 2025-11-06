@@ -23,8 +23,8 @@ import (
 	aeadtestutil "github.com/tink-crypto/tink-go/v2/aead/internal/testutil"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
@@ -284,7 +284,7 @@ func validateAESGCMKey(key *gcmpb.AesGcmKey, format *gcmpb.AesGcmKeyFormat) erro
 	if key.Version != testutil.AESGCMKeyVersion {
 		return fmt.Errorf("incorrect key version")
 	}
-	keyValue := secretdata.NewBytesFromData(key.GetKeyValue(), testonlyinsecuresecretdataaccess.Token())
+	keyValue := secretdata.NewBytesFromData(key.GetKeyValue(), insecuresecretdataaccess.Token{})
 	opts := aesgcm.ParametersOpts{
 		KeySizeInBytes: keyValue.Len(),
 		IVSizeInBytes:  12,

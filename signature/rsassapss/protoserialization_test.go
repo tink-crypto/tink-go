@@ -23,10 +23,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	rsassapsspb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pss_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -841,7 +841,7 @@ func TestParsePrivateKeyWithZeroPaddingValues(t *testing.T) {
 		Version: privateKeyProtoVersion,
 	}
 	serializedPrivateKey := mustMarshalProto(t, privateKey)
-	token := testonlyinsecuresecretdataaccess.Token()
+	token := insecuresecretdataaccess.Token{}
 	keySerialization := mustCreateKeySerialization(t, &tinkpb.KeyData{
 		TypeUrl:         "type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey",
 		Value:           serializedPrivateKey,
@@ -926,7 +926,7 @@ func TestParseAndSerializePrivateKey(t *testing.T) {
 	}
 	serializedPrivateKey4096 := mustMarshalProto(t, privateKey4096)
 
-	token := testonlyinsecuresecretdataaccess.Token()
+	token := insecuresecretdataaccess.Token{}
 	for _, tc := range []struct {
 		name             string
 		keySerialization *protoserialization.KeySerialization
@@ -1420,7 +1420,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "3072-SHA384-VariantLegacy",
+			name: "3072-SHA384-VariantLegacy",
 			parameters: mustCreateParameters(t, 3072, SHA384, f4, 42, VariantLegacy),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1433,7 +1433,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "3072-SHA384-VariantNoPrefix",
+			name: "3072-SHA384-VariantNoPrefix",
 			parameters: mustCreateParameters(t, 3072, SHA384, f4, 42, VariantNoPrefix),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1446,7 +1446,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "3072-SHA512-VariantTink",
+			name: "3072-SHA512-VariantTink",
 			parameters: mustCreateParameters(t, 3072, SHA512, f4, 42, VariantTink),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1459,7 +1459,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "3072-SHA512-VariantCrunchy",
+			name: "3072-SHA512-VariantCrunchy",
 			parameters: mustCreateParameters(t, 3072, SHA512, f4, 42, VariantCrunchy),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1472,7 +1472,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "3072-SHA512-VariantLegacy",
+			name: "3072-SHA512-VariantLegacy",
 			parameters: mustCreateParameters(t, 3072, SHA512, f4, 42, VariantLegacy),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1485,7 +1485,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "3072-SHA512-VariantNoPrefix",
+			name: "3072-SHA512-VariantNoPrefix",
 			parameters: mustCreateParameters(t, 3072, SHA512, f4, 42, VariantNoPrefix),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1498,7 +1498,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "4096-SHA256-VariantTink",
+			name: "4096-SHA256-VariantTink",
 			parameters: mustCreateParameters(t, 4096, SHA256, f4, 42, VariantTink),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1511,7 +1511,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "4096-SHA256-VariantCrunchy",
+			name: "4096-SHA256-VariantCrunchy",
 			parameters: mustCreateParameters(t, 4096, SHA256, f4, 42, VariantCrunchy),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1524,7 +1524,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "4096-SHA256-VariantLegacy",
+			name: "4096-SHA256-VariantLegacy",
 			parameters: mustCreateParameters(t, 4096, SHA256, f4, 42, VariantLegacy),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1537,7 +1537,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "4096-SHA256-VariantNoPrefix",
+			name: "4096-SHA256-VariantNoPrefix",
 			parameters: mustCreateParameters(t, 4096, SHA256, f4, 42, VariantNoPrefix),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1550,7 +1550,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "4096-SHA384-VariantTink",
+			name: "4096-SHA384-VariantTink",
 			parameters: mustCreateParameters(t, 4096, SHA384, f4, 42, VariantTink),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1563,7 +1563,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "4096-SHA384-VariantCrunchy",
+			name: "4096-SHA384-VariantCrunchy",
 			parameters: mustCreateParameters(t, 4096, SHA384, f4, 42, VariantCrunchy),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1576,7 +1576,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "4096-SHA384-VariantLegacy",
+			name: "4096-SHA384-VariantLegacy",
 			parameters: mustCreateParameters(t, 4096, SHA384, f4, 42, VariantLegacy),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1589,7 +1589,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "4096-SHA384-VariantNoPrefix",
+			name: "4096-SHA384-VariantNoPrefix",
 			parameters: mustCreateParameters(t, 4096, SHA384, f4, 42, VariantNoPrefix),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1602,7 +1602,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "4096-SHA512-VariantTink",
+			name: "4096-SHA512-VariantTink",
 			parameters: mustCreateParameters(t, 4096, SHA512, f4, 42, VariantTink),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_TINK, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1615,7 +1615,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "4096-SHA512-VariantCrunchy",
+			name: "4096-SHA512-VariantCrunchy",
 			parameters: mustCreateParameters(t, 4096, SHA512, f4, 42, VariantCrunchy),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_CRUNCHY, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1628,7 +1628,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "4096-SHA512-VariantLegacy",
+			name: "4096-SHA512-VariantLegacy",
 			parameters: mustCreateParameters(t, 4096, SHA512, f4, 42, VariantLegacy),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_LEGACY, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{
@@ -1641,7 +1641,7 @@ func mustCreateParametersParserTests(t *testing.T) []parametersParserTest {
 			}),
 		},
 		{
-			name:       "4096-SHA512-VariantNoPrefix",
+			name: "4096-SHA512-VariantNoPrefix",
 			parameters: mustCreateParameters(t, 4096, SHA512, f4, 42, VariantNoPrefix),
 			keyTemplate: mustCreateKeyTemplate(t, tinkpb.OutputPrefixType_RAW, &rsassapsspb.RsaSsaPssKeyFormat{
 				Params: &rsassapsspb.RsaSsaPssParams{

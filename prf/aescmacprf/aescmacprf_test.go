@@ -20,13 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestKeysetGenerationFromParams(t *testing.T) {
@@ -69,7 +69,7 @@ func TestAddNewKeyFromParametersFailsWithInvalidKeySize(t *testing.T) {
 }
 
 func TestNewPRFSetFailsWithInvalidKeySize(t *testing.T) {
-	key, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), testonlyinsecuresecretdataaccess.Token()))
+	key, err := aescmacprf.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}))
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
 	}
@@ -112,7 +112,7 @@ func TestKeysetGenerationFromKey(t *testing.T) {
 	wantPRFOutput := mustHexDecode(t, aesCMACPRFWantOutputHex)
 	data := mustHexDecode(t, aesCMACPRFDataHex)
 
-	key, err := aescmacprf.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()))
+	key, err := aescmacprf.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}))
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
 	}
@@ -153,7 +153,7 @@ func TestKeysetGenerationFromKey(t *testing.T) {
 
 func TestRegisterPrimitiveConstructor(t *testing.T) {
 	aesCMACPRFKeyBytes := mustHexDecode(t, aesCMACPRFKeyHex)
-	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData(aesCMACPRFKeyBytes, testonlyinsecuresecretdataaccess.Token()))
+	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData(aesCMACPRFKeyBytes, insecuresecretdataaccess.Token{}))
 	if err != nil {
 		t.Fatalf("keygenregistry.CreateKey() err = %v, want nil", err)
 	}

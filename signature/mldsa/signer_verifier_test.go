@@ -18,13 +18,13 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	tinkmldsa "github.com/tink-crypto/tink-go/v2/signature/mldsa"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestSignVerifyManager(t *testing.T) {
@@ -58,7 +58,7 @@ func TestSignVerifyManager(t *testing.T) {
 			if err != nil {
 				t.Fatalf("tinkmldsa.NewPublicKey(%v, %v, %v) err = %v, want nil", publicKeyBytes, tc.idRequirement, params, err)
 			}
-			privateKey, err := tinkmldsa.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, testonlyinsecuresecretdataaccess.Token()), tc.idRequirement, params)
+			privateKey, err := tinkmldsa.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}), tc.idRequirement, params)
 			if err != nil {
 				t.Fatalf("tinkmldsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", privateKeyBytes, tc.idRequirement, params, err)
 			}
@@ -142,7 +142,7 @@ func TestVerifyFails(t *testing.T) {
 			if err != nil {
 				t.Fatalf("tinkmldsa.NewParameters(%v, %v) err = %v, want nil", tc.instance, tc.variant, err)
 			}
-			privateKey, err := tinkmldsa.NewPrivateKey(secretdata.NewBytesFromData(seed, testonlyinsecuresecretdataaccess.Token()), 0, params)
+			privateKey, err := tinkmldsa.NewPrivateKey(secretdata.NewBytesFromData(seed, insecuresecretdataaccess.Token{}), 0, params)
 			if err != nil {
 				t.Fatalf("tinkmldsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", seed, 0, params, err)
 			}
@@ -227,7 +227,7 @@ func TestSignVerifyCorrectness(t *testing.T) {
 			if err != nil {
 				t.Fatalf("tinkmldsa.NewParameters(%v, %v) err = %v, want nil", tc.instance, tc.variant, err)
 			}
-			privateKey, err := tinkmldsa.NewPrivateKey(secretdata.NewBytesFromData(seed, testonlyinsecuresecretdataaccess.Token()), 0, params)
+			privateKey, err := tinkmldsa.NewPrivateKey(secretdata.NewBytesFromData(seed, insecuresecretdataaccess.Token{}), 0, params)
 			if err != nil {
 				t.Fatalf("tinkmldsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", seed, 0, params, err)
 			}

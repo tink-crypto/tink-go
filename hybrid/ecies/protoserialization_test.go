@@ -28,11 +28,11 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	eciespb "github.com/tink-crypto/tink-go/v2/proto/ecies_aead_hkdf_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -106,7 +106,7 @@ type protoSerializationTestCase struct {
 
 func mustCreatePrivateKey(t *testing.T, privateKeyBytes []byte, idRequirement uint32, params *ecies.Parameters) *ecies.PrivateKey {
 	t.Helper()
-	pk, err := ecies.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, testonlyinsecuresecretdataaccess.Token()), idRequirement, params)
+	pk, err := ecies.NewPrivateKey(secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{}), idRequirement, params)
 	if err != nil {
 		t.Fatalf("ecies.NewPrivateKey() err = %v, want nil", err)
 	}

@@ -21,11 +21,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	hmacprfpb "github.com/tink-crypto/tink-go/v2/proto/hmac_prf_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -160,7 +160,7 @@ func hmacPRFSerializationTestCases(t *testing.T) []hmacPRFSerializationTestCase 
 		{enum: hmacprf.SHA384, proto: commonpb.HashType_SHA384},
 		{enum: hmacprf.SHA512, proto: commonpb.HashType_SHA512},
 	} {
-		key, err := hmacprf.NewKey(secretdata.NewBytesFromData([]byte("1234567890123456"), testonlyinsecuresecretdataaccess.Token()), mustCreateParameters(t, 16, hashType.enum))
+		key, err := hmacprf.NewKey(secretdata.NewBytesFromData([]byte("1234567890123456"), insecuresecretdataaccess.Token{}), mustCreateParameters(t, 16, hashType.enum))
 		if err != nil {
 			t.Fatalf("hmacprf.NewKey() err = %v, want nil", err)
 		}

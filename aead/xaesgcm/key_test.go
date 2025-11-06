@@ -21,10 +21,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 var (
@@ -197,7 +197,7 @@ func TestNewKeyWorks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("xaesgcm.NewParameters(%v, 12) err = %v, want nil", tc.variant, err)
 			}
-			keyBytes := secretdata.NewBytesFromData(tc.key, testonlyinsecuresecretdataaccess.Token())
+			keyBytes := secretdata.NewBytesFromData(tc.key, insecuresecretdataaccess.Token{})
 			firstKey, err := xaesgcm.NewKey(keyBytes, tc.id, params)
 			if err != nil {
 				t.Fatalf("xaesgcm.NewKey(keyBytes, %v, %v) err = %v, want nil", tc.id, params, err)
@@ -233,7 +233,7 @@ func TestNewKeyFailsIfNoPrefixAndIDIsNotZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("xaesgcm.NewParameters(%v, 12) err = %v, want nil", xaesgcm.VariantNoPrefix, err)
 	}
-	keyBytes := secretdata.NewBytesFromData(rawKey, testonlyinsecuresecretdataaccess.Token())
+	keyBytes := secretdata.NewBytesFromData(rawKey, insecuresecretdataaccess.Token{})
 	if _, err := xaesgcm.NewKey(keyBytes, 123, params); err == nil {
 		t.Errorf("xaesgcm.NewKey(keyBytes, 123, %v) err = nil, want error", params)
 	}
@@ -252,7 +252,7 @@ func TestKeyEqual_FalseIfDifferentType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("xaesgcm.NewParameters(%v) err = %v, want nil", xaesgcm.VariantTink, err)
 	}
-	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token())
+	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{})
 	key, err := xaesgcm.NewKey(keyBytes, 1234, params)
 	if err != nil {
 		t.Fatalf("xaesgcm.NewKey(keyBytes, %v, %v) err = %v, want nil", 1234, params, err)
@@ -318,7 +318,7 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 			if err != nil {
 				t.Fatalf("xaesgcm.NewParameters(%v, 12) err = %v, want nil", tc.first.variant, err)
 			}
-			firstKeyBytes := secretdata.NewBytesFromData(tc.first.key, testonlyinsecuresecretdataaccess.Token())
+			firstKeyBytes := secretdata.NewBytesFromData(tc.first.key, insecuresecretdataaccess.Token{})
 			firstKey, err := xaesgcm.NewKey(firstKeyBytes, tc.first.id, firstParams)
 			if err != nil {
 				t.Fatalf("xaesgcm.NewKey(firstKeyBytes, %v, %v) err = %v, want nil", tc.first.id, firstParams, err)
@@ -327,7 +327,7 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 			if err != nil {
 				t.Fatalf("xaesgcm.NewParameters(%v, 12) err = %v, want nil", tc.second.variant, err)
 			}
-			secondKeyBytes := secretdata.NewBytesFromData(tc.second.key, testonlyinsecuresecretdataaccess.Token())
+			secondKeyBytes := secretdata.NewBytesFromData(tc.second.key, insecuresecretdataaccess.Token{})
 			secondKey, err := xaesgcm.NewKey(secondKeyBytes, tc.second.id, secondParams)
 			if err != nil {
 				t.Fatalf("xaesgcm.NewKey(secondKeyBytes, %v, %v) err = %v, want nil", tc.second.id, secondParams, err)

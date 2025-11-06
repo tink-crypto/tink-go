@@ -20,11 +20,11 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestHMACKeyetGenerationFromParams(t *testing.T) {
@@ -82,7 +82,7 @@ func TestHMACKeysetGenerationFromKey(t *testing.T) {
 	wantTag := slices.Concat([]byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04}, mustHexDecode(t, "0fe2f13bba2198f6dda1a084be928e304e9cb16a56bc0b7b939a073280244373")[:opts.TagSizeInBytes])
 	data := mustHexDecode(t, "a59b")
 
-	key, err := hmac.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), params, 0x01020304)
+	key, err := hmac.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), params, 0x01020304)
 	if err != nil {
 		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
 	}

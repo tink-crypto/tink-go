@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestEncryptDecrypt(t *testing.T) {
@@ -178,7 +178,7 @@ func mustDecodeHex(t *testing.T, hexStr string) []byte {
 func TestDecryptCorrectness(t *testing.T) {
 	// Test vectors from
 	// https://github.com/C2SP/wycheproof/blob/b063b4aedae951c69df014cd25fa6d69ae9e8cb9/testvectors/aes_gcm_siv_test.json#L58
-	key := secretdata.NewBytesFromData(mustDecodeHex(t, "01000000000000000000000000000000"), testonlyinsecuresecretdataaccess.Token())
+	key := secretdata.NewBytesFromData(mustDecodeHex(t, "01000000000000000000000000000000"), insecuresecretdataaccess.Token{})
 	iv := "030000000000000000000000"
 	msg := "01000000000000000000000000000000"
 	aad := ""

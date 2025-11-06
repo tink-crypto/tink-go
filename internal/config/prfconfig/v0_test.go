@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config/prfconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -30,7 +31,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestConfigV0FailsIfKeyNotPRF(t *testing.T) {
@@ -44,7 +44,7 @@ func TestConfigV0FailsIfKeyNotPRF(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aescmac.NewParameters() err = %v, want nil", err)
 	}
-	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token()), 0, aesGCMParams)
+	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{}), 0, aesGCMParams)
 	if err != nil {
 		t.Fatalf(" aescmac.NewKey() err = %v, want nil", err)
 	}
@@ -101,7 +101,7 @@ func TestConfigV0WithPRFKeys(t *testing.T) {
 	configV0 := prfconfig.V0()
 
 	aesCMACPRFKeyBytes := mustHexDecode(t, aesCMACPRFKeyHex)
-	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData(aesCMACPRFKeyBytes, testonlyinsecuresecretdataaccess.Token()))
+	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData(aesCMACPRFKeyBytes, insecuresecretdataaccess.Token{}))
 	if err != nil {
 		t.Fatalf("keygenregistry.CreateKey() err = %v, want nil", err)
 	}
@@ -111,7 +111,7 @@ func TestConfigV0WithPRFKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 	}
-	hkdfprfKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData(hkdfKeyBytes, testonlyinsecuresecretdataaccess.Token()), hkdfprfParams)
+	hkdfprfKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData(hkdfKeyBytes, insecuresecretdataaccess.Token{}), hkdfprfParams)
 	if err != nil {
 		t.Fatalf("keygenregistry.CreateKey() err = %v, want nil", err)
 	}
@@ -121,7 +121,7 @@ func TestConfigV0WithPRFKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmacprf.NewParameters() err = %v, want nil", err)
 	}
-	hmacSHA256PRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData(hmacSHA256KeyBytes, testonlyinsecuresecretdataaccess.Token()), hmacSHA256PRFParams)
+	hmacSHA256PRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData(hmacSHA256KeyBytes, insecuresecretdataaccess.Token{}), hmacSHA256PRFParams)
 	if err != nil {
 		t.Fatalf("hmacprf.NewKey() err = %v, want nil", err)
 	}

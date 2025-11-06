@@ -21,12 +21,12 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/signature/slhdsa"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	tinkslhdsa "github.com/tink-crypto/tink-go/v2/signature/slhdsa"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	slhdsapb "github.com/tink-crypto/tink-go/v2/proto/slh_dsa_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -63,7 +63,7 @@ func TestSignerKeyManagerGetPrimitiveBasic(t *testing.T) {
 				t.Fatalf("tinkslhdsa.NewParameters(%v) err = %v, want nil", tinkslhdsa.VariantNoPrefix, err)
 			}
 			keyPair := generateTestKeyPair(t, tc.hashType, tc.keySize, tc.sigType)
-			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(keyPair.privKey, testonlyinsecuresecretdataaccess.Token()), 0, params)
+			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(keyPair.privKey, insecuresecretdataaccess.Token{}), 0, params)
 			if err != nil {
 				t.Fatalf("tinkslhdsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", keyPair.privKey, 0, params, err)
 			}

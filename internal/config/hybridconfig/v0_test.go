@@ -21,13 +21,13 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid/hpke"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config/hybridconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -42,7 +42,7 @@ func TestConfigV0EncryptDecryptFailsIfKeyNotHybrid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aescmac.NewParameters() err=%v, want nil", err)
 	}
-	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token()), 0, aesGCMParams)
+	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{}), 0, aesGCMParams)
 	if err != nil {
 		t.Fatalf(" aescmac.NewKey() err=%v, want nil", err)
 	}

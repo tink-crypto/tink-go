@@ -22,10 +22,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 const (
@@ -487,13 +487,13 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 					name: fmt.Sprintf("%s_%d_%s", algorithm, km.size, kidStrategyAndValues.strategy),
 					opts: jwtrsassapkcs1.PrivateKeyOpts{
 						PublicKey: pk,
-						D:         secretdata.NewBytesFromData(decodedD, testonlyinsecuresecretdataaccess.Token()),
-						P:         secretdata.NewBytesFromData(decodedP, testonlyinsecuresecretdataaccess.Token()),
-						Q:         secretdata.NewBytesFromData(decodedQ, testonlyinsecuresecretdataaccess.Token()),
+						D:         secretdata.NewBytesFromData(decodedD, insecuresecretdataaccess.Token{}),
+						P:         secretdata.NewBytesFromData(decodedP, insecuresecretdataaccess.Token{}),
+						Q:         secretdata.NewBytesFromData(decodedQ, insecuresecretdataaccess.Token{}),
 					},
-					wantDP:   secretdata.NewBytesFromData(decodedDP, testonlyinsecuresecretdataaccess.Token()),
-					wantDQ:   secretdata.NewBytesFromData(decodedDQ, testonlyinsecuresecretdataaccess.Token()),
-					wantQInv: secretdata.NewBytesFromData(decodedQInv, testonlyinsecuresecretdataaccess.Token()),
+					wantDP:   secretdata.NewBytesFromData(decodedDP, insecuresecretdataaccess.Token{}),
+					wantDQ:   secretdata.NewBytesFromData(decodedDQ, insecuresecretdataaccess.Token{}),
+					wantQInv: secretdata.NewBytesFromData(decodedQInv, insecuresecretdataaccess.Token{}),
 				})
 			}
 		}
@@ -579,9 +579,9 @@ func TestPrivateKeyEqual_Different(t *testing.T) {
 					}),
 					IDRequirement: 0x01020304,
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 			pk2: mustCreatePrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
 				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
@@ -594,9 +594,9 @@ func TestPrivateKeyEqual_Different(t *testing.T) {
 					}),
 					IDRequirement: 0x01020304,
 				}),
-				D: secretdata.NewBytesFromData(mustStringToBigInt(t, d2048BigInt10, 10).Bytes(), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustStringToBigInt(t, p2048BigInt10, 10).Bytes(), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustStringToBigInt(t, q2048BigInt10, 10).Bytes(), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustStringToBigInt(t, d2048BigInt10, 10).Bytes(), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustStringToBigInt(t, p2048BigInt10, 10).Bytes(), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustStringToBigInt(t, q2048BigInt10, 10).Bytes(), insecuresecretdataaccess.Token{}),
 			}),
 		},
 		{
@@ -612,9 +612,9 @@ func TestPrivateKeyEqual_Different(t *testing.T) {
 					}),
 					IDRequirement: 0x01020304,
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 			pk2: mustCreatePrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
 				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
@@ -627,9 +627,9 @@ func TestPrivateKeyEqual_Different(t *testing.T) {
 					}),
 					IDRequirement: 0x020304005,
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 		},
 		{
@@ -646,9 +646,9 @@ func TestPrivateKeyEqual_Different(t *testing.T) {
 					HasCustomKID:  true,
 					IDRequirement: 0,
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 			pk2: mustCreatePrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
 				PublicKey: mustCreatePublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
@@ -661,9 +661,9 @@ func TestPrivateKeyEqual_Different(t *testing.T) {
 					}),
 					IDRequirement: 0,
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 		},
 	} {
@@ -696,9 +696,9 @@ func TestNewPrivateKey_Errors(t *testing.T) {
 			name: "NilPublicKey",
 			opts: jwtrsassapkcs1.PrivateKeyOpts{
 				PublicKey: nil,
-				D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			},
 		},
 		{
@@ -713,9 +713,9 @@ func TestNewPrivateKey_Errors(t *testing.T) {
 						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
 					}),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), testonlyinsecuresecretdataaccess.Token()), // Wrong size D
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), insecuresecretdataaccess.Token{}), // Wrong size D
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			},
 		},
 		{
@@ -730,9 +730,9 @@ func TestNewPrivateKey_Errors(t *testing.T) {
 						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
 					}),
 				}),
-				D: secretdata.NewBytesFromData(mustStringToBigInt(t, d2048BigInt10, 10).Bytes(), testonlyinsecuresecretdataaccess.Token()), // Mismatched D
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustStringToBigInt(t, d2048BigInt10, 10).Bytes(), insecuresecretdataaccess.Token{}), // Mismatched D
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			},
 		},
 		{
@@ -747,9 +747,9 @@ func TestNewPrivateKey_Errors(t *testing.T) {
 						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
 					}),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), testonlyinsecuresecretdataaccess.Token()), // Wrong size P
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}), // Wrong size P
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			},
 		},
 		{
@@ -764,9 +764,9 @@ func TestNewPrivateKey_Errors(t *testing.T) {
 						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
 					}),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustStringToBigInt(t, p2048BigInt10, 10).Bytes(), testonlyinsecuresecretdataaccess.Token()), // Mismatched P
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustStringToBigInt(t, p2048BigInt10, 10).Bytes(), insecuresecretdataaccess.Token{}), // Mismatched P
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			},
 		},
 		{
@@ -781,9 +781,9 @@ func TestNewPrivateKey_Errors(t *testing.T) {
 						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
 					}),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), testonlyinsecuresecretdataaccess.Token()), // Wrong size Q
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}), // Wrong size Q
 			},
 		},
 		{
@@ -798,9 +798,9 @@ func TestNewPrivateKey_Errors(t *testing.T) {
 						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
 					}),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustStringToBigInt(t, q2048BigInt10, 10).Bytes(), testonlyinsecuresecretdataaccess.Token()), // Mismatched Q
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustStringToBigInt(t, q2048BigInt10, 10).Bytes(), insecuresecretdataaccess.Token{}), // Mismatched Q
 			},
 		},
 		{
@@ -815,9 +815,9 @@ func TestNewPrivateKey_Errors(t *testing.T) {
 						KidStrategy:       jwtrsassapkcs1.IgnoredKID,
 					}),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			},
 		},
 	} {

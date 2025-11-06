@@ -23,6 +23,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderivers"
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
@@ -31,7 +32,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/ed25519"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/aesgcmhkdf"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestDeriveKey(t *testing.T) {
@@ -45,7 +45,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
-	aes128GCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), testonlyinsecuresecretdataaccess.Token()), 123, aes128GCMParams)
+	aes128GCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}), 123, aes128GCMParams)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
 	}
@@ -58,7 +58,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
-	aes128GCMNoPrefixKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), testonlyinsecuresecretdataaccess.Token()), 0, aes128GCMNoPrefixParams)
+	aes128GCMNoPrefixKey, err := aesgcm.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}), 0, aes128GCMNoPrefixParams)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
 	}
@@ -68,7 +68,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("xchacha20poly1305.NewParameters() err = %v, want nil", err)
 	}
-	xChaCha20Poly1305Key, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), 123, xChaCha20Poly1305Params)
+	xChaCha20Poly1305Key, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 123, xChaCha20Poly1305Params)
 	if err != nil {
 		t.Fatalf("xchacha20poly1305.NewKey() err = %v, want nil", err)
 	}
@@ -76,7 +76,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("xchacha20poly1305.NewParameters() err = %v, want nil", err)
 	}
-	xChaCha20Poly1305NoPrefixKey, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), 0, xChaCha20Poly1305NoPrefixParams)
+	xChaCha20Poly1305NoPrefixKey, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 0, xChaCha20Poly1305NoPrefixParams)
 	if err != nil {
 		t.Fatalf("xchacha20poly1305.NewKey() err = %v, want nil", err)
 	}
@@ -86,7 +86,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
 	}
-	aes256SIVKey, err := aessiv.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), 123, aes256SIVParams)
+	aes256SIVKey, err := aessiv.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 123, aes256SIVParams)
 	if err != nil {
 		t.Fatalf("aessiv.NewKey() err = %v, want nil", err)
 	}
@@ -94,7 +94,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
 	}
-	aes256SIVNoPrefixKey, err := aessiv.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), 0, aes256SIVNoPrefixParams)
+	aes256SIVNoPrefixKey, err := aessiv.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 0, aes256SIVNoPrefixParams)
 	if err != nil {
 		t.Fatalf("aessiv.NewKey() err = %v, want nil", err)
 	}
@@ -109,7 +109,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
 	}
-	hmacSHA256Tag128Key, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), hmacSHA256Tag128Params, 123)
+	hmacSHA256Tag128Key, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA256Tag128Params, 123)
 	if err != nil {
 		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
 	}
@@ -122,7 +122,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
 	}
-	hmacSHA256Tag128NoPrefixKey, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), hmacSHA256Tag128NoPrefixParams, 0)
+	hmacSHA256Tag128NoPrefixKey, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA256Tag128NoPrefixParams, 0)
 	if err != nil {
 		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
 	}
@@ -135,7 +135,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
 	}
-	hmacSHA256Tag256Key, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), hmacSHA256Tag256Params, 123)
+	hmacSHA256Tag256Key, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA256Tag256Params, 123)
 	if err != nil {
 		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
 	}
@@ -148,7 +148,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
 	}
-	hmacSHA256Tag256NoPrefixKey, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), hmacSHA256Tag256NoPrefixParams, 0)
+	hmacSHA256Tag256NoPrefixKey, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA256Tag256NoPrefixParams, 0)
 	if err != nil {
 		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
 	}
@@ -161,7 +161,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
 	}
-	hmacSHA512Tag256Key, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), hmacSHA512Tag256Params, 123)
+	hmacSHA512Tag256Key, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA512Tag256Params, 123)
 	if err != nil {
 		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
 	}
@@ -174,7 +174,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
 	}
-	hmacSHA512Tag256NoPrefixKey, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), hmacSHA512Tag256NoPrefixParams, 0)
+	hmacSHA512Tag256NoPrefixKey, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA512Tag256NoPrefixParams, 0)
 	if err != nil {
 		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
 	}
@@ -187,7 +187,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
 	}
-	hmacSHA512Tag512Key, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), hmacSHA512Tag512Params, 123)
+	hmacSHA512Tag512Key, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA512Tag512Params, 123)
 	if err != nil {
 		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
 	}
@@ -200,7 +200,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
 	}
-	hmacSHA512Tag512NoPrefixKey, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), hmacSHA512Tag512NoPrefixParams, 0)
+	hmacSHA512Tag512NoPrefixKey, err := hmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA512Tag512NoPrefixParams, 0)
 	if err != nil {
 		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
 	}
@@ -210,7 +210,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 	}
-	hkdfPRFSHA256Key, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), hkdfPRFSHA256Params)
+	hkdfPRFSHA256Key, err := hkdfprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hkdfPRFSHA256Params)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
 	}
@@ -218,7 +218,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmacprf.NewParameters() err = %v, want nil", err)
 	}
-	hmacSHA256PRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), hmacSHA256PRFParams)
+	hmacSHA256PRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA256PRFParams)
 	if err != nil {
 		t.Fatalf("hmacprf.NewKey() err = %v, want nil", err)
 	}
@@ -226,7 +226,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmacprf.NewParameters() err = %v, want nil", err)
 	}
-	hmacSHA512PRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), hmacSHA512PRFParams)
+	hmacSHA512PRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345012345678901234501234567890123450123456789012345"), insecuresecretdataaccess.Token{}), hmacSHA512PRFParams)
 	if err != nil {
 		t.Fatalf("hmacprf.NewKey() err = %v, want nil", err)
 	}
@@ -236,7 +236,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ed25519.NewParameters() err = %v, want nil", err)
 	}
-	ed25519Key, err := ed25519.NewPrivateKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), 123, ed25519Params)
+	ed25519Key, err := ed25519.NewPrivateKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 123, ed25519Params)
 	if err != nil {
 		t.Fatalf("ed25519.NewPrivateKey() err = %v, want nil", err)
 	}
@@ -244,7 +244,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ed25519.NewParameters() err = %v, want nil", err)
 	}
-	ed25519KeyNoPrefixKey, err := ed25519.NewPrivateKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), testonlyinsecuresecretdataaccess.Token()), 0, ed25519NoPrefixParams)
+	ed25519KeyNoPrefixKey, err := ed25519.NewPrivateKey(secretdata.NewBytesFromData([]byte("01234567890123450123456789012345"), insecuresecretdataaccess.Token{}), 0, ed25519NoPrefixParams)
 	if err != nil {
 		t.Fatalf("ed25519.NewPrivateKey() err = %v, want nil", err)
 	}
@@ -259,7 +259,7 @@ func TestDeriveKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcmhkdf.NewParameters() err = %v, want nil", err)
 	}
-	aesGCMHKDFKey, err := aesgcmhkdf.NewKey(aesGCMHKDFParams, secretdata.NewBytesFromData([]byte("0123456789012345"), testonlyinsecuresecretdataaccess.Token()))
+	aesGCMHKDFKey, err := aesgcmhkdf.NewKey(aesGCMHKDFParams, secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}))
 	if err != nil {
 		t.Fatalf("aesgcmhkdf.NewPrivateKey() err = %v, want nil", err)
 	}
@@ -497,7 +497,7 @@ func TestDeriveKey(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			derivedKey, err := keyderivers.DeriveKey(tc.params, tc.idRequirement, bytes.NewBuffer(tc.randomBytes), testonlyinsecuresecretdataaccess.Token())
+			derivedKey, err := keyderivers.DeriveKey(tc.params, tc.idRequirement, bytes.NewBuffer(tc.randomBytes), insecuresecretdataaccess.Token{})
 			if err != nil {
 				t.Fatalf("keyderivation.DeriveKey() err = %v, want nil", err)
 			}
@@ -670,7 +670,7 @@ func TestDeriveKey_Failures(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := keyderivers.DeriveKey(tc.params, tc.idRequirement, bytes.NewBuffer(tc.randomnessBytes), testonlyinsecuresecretdataaccess.Token()); err == nil {
+			if _, err := keyderivers.DeriveKey(tc.params, tc.idRequirement, bytes.NewBuffer(tc.randomnessBytes), insecuresecretdataaccess.Token{}); err == nil {
 				t.Errorf("keyderivers.DeriveKey() err = nil, want error")
 			}
 		})

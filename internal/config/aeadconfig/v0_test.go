@@ -26,11 +26,11 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcmsiv"
 	"github.com/tink-crypto/tink-go/v2/aead/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/aead/xchacha20poly1305"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config/aeadconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	ctrpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_go_proto"
@@ -69,8 +69,8 @@ func TestConfigV0AEAD(t *testing.T) {
 		t.Fatalf("aesctrhmac.NewParameters() err=%v, want nil", err)
 	}
 	aesCTRHMACKey, err := aesctrhmac.NewKey(aesctrhmac.KeyOpts{
-		AESKeyBytes:   secretdata.NewBytesFromData(make([]byte, 32), testonlyinsecuresecretdataaccess.Token()),
-		HMACKeyBytes:  secretdata.NewBytesFromData(make([]byte, 32), testonlyinsecuresecretdataaccess.Token()),
+		AESKeyBytes:   secretdata.NewBytesFromData(make([]byte, 32), insecuresecretdataaccess.Token{}),
+		HMACKeyBytes:  secretdata.NewBytesFromData(make([]byte, 32), insecuresecretdataaccess.Token{}),
 		IDRequirement: 0,
 		Parameters:    aesCTRHMACParams,
 	})
@@ -88,7 +88,7 @@ func TestConfigV0AEAD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err=%v, want nil", err)
 	}
-	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(make([]byte, 32), testonlyinsecuresecretdataaccess.Token()), 0, aesGCMParams)
+	aesGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(make([]byte, 32), insecuresecretdataaccess.Token{}), 0, aesGCMParams)
 	if err != nil {
 		t.Fatalf(" aesgcm.NewKey() err=%v, want nil", err)
 	}
@@ -98,7 +98,7 @@ func TestConfigV0AEAD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcmsiv.NewParameters() err=%v, want nil", err)
 	}
-	aesGCMSIVKey, err := aesgcmsiv.NewKey(secretdata.NewBytesFromData(make([]byte, 32), testonlyinsecuresecretdataaccess.Token()), 0, aesGCMSIVParams)
+	aesGCMSIVKey, err := aesgcmsiv.NewKey(secretdata.NewBytesFromData(make([]byte, 32), insecuresecretdataaccess.Token{}), 0, aesGCMSIVParams)
 	if err != nil {
 		t.Fatalf(" aesgcmsiv.NewKey() err=%v, want nil", err)
 	}
@@ -108,7 +108,7 @@ func TestConfigV0AEAD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("chacha20poly1305.NewParameters() err=%v, want nil", err)
 	}
-	chaCha20Poly1305Key, err := chacha20poly1305.NewKey(secretdata.NewBytesFromData(make([]byte, 32), testonlyinsecuresecretdataaccess.Token()), 0, chaCha20Poly1305Params)
+	chaCha20Poly1305Key, err := chacha20poly1305.NewKey(secretdata.NewBytesFromData(make([]byte, 32), insecuresecretdataaccess.Token{}), 0, chaCha20Poly1305Params)
 	if err != nil {
 		t.Fatalf(" chacha20poly1305.NewKey() err=%v, want nil", err)
 	}
@@ -118,7 +118,7 @@ func TestConfigV0AEAD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("xchacha20poly1305.NewParameters() err=%v, want nil", err)
 	}
-	xchaCha20Poly1305Key, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData(make([]byte, 32), testonlyinsecuresecretdataaccess.Token()), 0, xchaCha20Poly1305Params)
+	xchaCha20Poly1305Key, err := xchacha20poly1305.NewKey(secretdata.NewBytesFromData(make([]byte, 32), insecuresecretdataaccess.Token{}), 0, xchaCha20Poly1305Params)
 	if err != nil {
 		t.Fatalf(" xchacha20poly1305.NewKey() err=%v, want nil", err)
 	}

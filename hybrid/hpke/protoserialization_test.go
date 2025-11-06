@@ -24,10 +24,10 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid/hpke"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	hpkepb "github.com/tink-crypto/tink-go/v2/proto/hpke_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -100,7 +100,7 @@ func mustCreateKeySerialization(t *testing.T, url string, keyMaterialType tinkpb
 
 func mustCreatePrivateKey(t *testing.T, privateKeyBytes []byte, publicKey *hpke.PublicKey) *hpke.PrivateKey {
 	t.Helper()
-	secretData := secretdata.NewBytesFromData(privateKeyBytes, testonlyinsecuresecretdataaccess.Token())
+	secretData := secretdata.NewBytesFromData(privateKeyBytes, insecuresecretdataaccess.Token{})
 	pk, err := hpke.NewPrivateKeyFromPublicKey(secretData, publicKey)
 	if err != nil {
 		t.Fatalf("hpke.NewPrivateKeyFromPublicKey(%x, %v) err = %v, want nil", secretData, publicKey, err)

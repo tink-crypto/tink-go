@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1"
@@ -28,7 +29,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 const (
@@ -111,7 +111,7 @@ func mustCreateJWTECDSAPublicKey(t *testing.T, opts jwtecdsa.PublicKeyOpts) *jwt
 
 func mustCreateJWTECDSAPrivateKey(t *testing.T, keyBytes []byte, pub *jwtecdsa.PublicKey) *jwtecdsa.PrivateKey {
 	t.Helper()
-	secretDataKeyValue := secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token())
+	secretDataKeyValue := secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{})
 	key, err := jwtecdsa.NewPrivateKeyFromPublicKey(secretDataKeyValue, pub)
 	if err != nil {
 		t.Fatalf("jwtecdsa.NewPrivateKeyFromPublicKey() err = %v, want nil", err)
@@ -332,9 +332,9 @@ func jwtSignatureTestVectors(t *testing.T) []jwtSignatureTestVector {
 		})
 		privateKey := mustCreateJWTRSASSAPKCS1PrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
 			PublicKey: publicKey,
-			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 		})
 
 		iss := "joe"
@@ -382,9 +382,9 @@ func jwtSignatureTestVectors(t *testing.T) []jwtSignatureTestVector {
 		})
 		privateKey := mustCreateJWTRSASSAPKCS1PrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
 			PublicKey: publicKey,
-			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 		})
 
 		iss := "issuer"
@@ -430,9 +430,9 @@ func jwtSignatureTestVectors(t *testing.T) []jwtSignatureTestVector {
 		})
 		privateKey := mustCreateJWTRSASSAPKCS1PrivateKey(t, jwtrsassapkcs1.PrivateKeyOpts{
 			PublicKey: publicKey,
-			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 		})
 
 		iss := "issuer"
@@ -479,9 +479,9 @@ func jwtSignatureTestVectors(t *testing.T) []jwtSignatureTestVector {
 		})
 		privateKey := mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
 			PublicKey: publicKey,
-			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 		})
 
 		iss := "joe"
@@ -530,9 +530,9 @@ func jwtSignatureTestVectors(t *testing.T) []jwtSignatureTestVector {
 		})
 		privateKey := mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
 			PublicKey: publicKey,
-			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 		})
 
 		iss := "issuer"
@@ -578,9 +578,9 @@ func jwtSignatureTestVectors(t *testing.T) []jwtSignatureTestVector {
 		})
 		privateKey := mustCreateJWTRSASSAPSSPrivateKey(t, jwtrsassapss.PrivateKeyOpts{
 			PublicKey: publicKey,
-			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+			D:         secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+			P:         secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+			Q:         secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 		})
 
 		iss := "issuer"
@@ -842,9 +842,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					Modulus:       mustBase64Decode(t, n2048Base64),
 					IDRequirement: 0x01020304,
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
@@ -873,9 +873,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					HasCustomKID:  true,
 					CustomKID:     "custom-kid",
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
@@ -901,9 +901,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					}),
 					Modulus: mustBase64Decode(t, n2048Base64),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
@@ -933,9 +933,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					Modulus:       mustBase64Decode(t, n3072Base64),
 					IDRequirement: 0x01020304,
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
@@ -964,9 +964,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					HasCustomKID:  true,
 					CustomKID:     "custom-kid",
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
@@ -992,9 +992,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					}),
 					Modulus: mustBase64Decode(t, n3072Base64),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
@@ -1024,9 +1024,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					Modulus:       mustBase64Decode(t, n4096Base64),
 					IDRequirement: 0x01020304,
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
@@ -1055,9 +1055,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					HasCustomKID:  true,
 					CustomKID:     "custom-kid",
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
@@ -1083,9 +1083,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					}),
 					Modulus: mustBase64Decode(t, n4096Base64),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPKCS1PublicKey(t, jwtrsassapkcs1.PublicKeyOpts{
@@ -1115,9 +1115,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					Modulus:       mustBase64Decode(t, n2048Base64),
 					IDRequirement: 0x01020304,
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
@@ -1146,9 +1146,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					HasCustomKID:  true,
 					CustomKID:     "custom-kid",
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
@@ -1174,9 +1174,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					}),
 					Modulus: mustBase64Decode(t, n2048Base64),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
@@ -1206,9 +1206,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					Modulus:       mustBase64Decode(t, n3072Base64),
 					IDRequirement: 0x01020304,
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
@@ -1237,9 +1237,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					HasCustomKID:  true,
 					CustomKID:     "custom-kid",
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
@@ -1265,9 +1265,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					}),
 					Modulus: mustBase64Decode(t, n3072Base64),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
@@ -1297,9 +1297,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					Modulus:       mustBase64Decode(t, n4096Base64),
 					IDRequirement: 0x01020304,
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
@@ -1328,9 +1328,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					HasCustomKID:  true,
 					CustomKID:     "custom-kid",
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{
@@ -1356,9 +1356,9 @@ func TestSignerVerfierCreator(t *testing.T) {
 					}),
 					Modulus: mustBase64Decode(t, n4096Base64),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
 			otherVerifyingKeys: []key.Key{
 				mustCreateJWTRSASSAPSSPublicKey(t, jwtrsassapss.PublicKeyOpts{

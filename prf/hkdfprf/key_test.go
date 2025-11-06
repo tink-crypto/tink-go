@@ -20,10 +20,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 var key128Bits = []byte{
@@ -43,7 +43,7 @@ func TestNewKey(t *testing.T) {
 					if err != nil {
 						t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 					}
-					keyBytes := secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token())
+					keyBytes := secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{})
 					key, err := hkdfprf.NewKey(keyBytes, params)
 					if err != nil {
 						t.Errorf("hkdfprf.NewKey() err = %v, want nil", err)
@@ -83,7 +83,7 @@ func TestNewKeyFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 	}
-	keyBytes := secretdata.NewBytesFromData(key128Bits, testonlyinsecuresecretdataaccess.Token())
+	keyBytes := secretdata.NewBytesFromData(key128Bits, insecuresecretdataaccess.Token{})
 	if _, err := hkdfprf.NewKey(keyBytes, params); err == nil {
 		t.Errorf("hkdfprf.NewKey() err = nil, want error")
 	}
@@ -94,7 +94,7 @@ func TestNotEqualIfDifferentKeyBytes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 	}
-	keyBytes1 := secretdata.NewBytesFromData(key256Bits, testonlyinsecuresecretdataaccess.Token())
+	keyBytes1 := secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{})
 	key1, err := hkdfprf.NewKey(keyBytes1, params)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
@@ -103,7 +103,7 @@ func TestNotEqualIfDifferentKeyBytes(t *testing.T) {
 	otherKey := bytes.Clone(key256Bits)
 	otherKey[0] ^= 0xff
 
-	keyBytes2 := secretdata.NewBytesFromData(otherKey, testonlyinsecuresecretdataaccess.Token())
+	keyBytes2 := secretdata.NewBytesFromData(otherKey, insecuresecretdataaccess.Token{})
 	key2, err := hkdfprf.NewKey(keyBytes2, params)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
@@ -118,7 +118,7 @@ func TestNotEqualIfDifferentKeySizes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 	}
-	keyBytes1 := secretdata.NewBytesFromData(key256Bits, testonlyinsecuresecretdataaccess.Token())
+	keyBytes1 := secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{})
 	key1, err := hkdfprf.NewKey(keyBytes1, params)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
@@ -128,7 +128,7 @@ func TestNotEqualIfDifferentKeySizes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 	}
-	keyBytes2 := secretdata.NewBytesFromData(key128Bits, testonlyinsecuresecretdataaccess.Token())
+	keyBytes2 := secretdata.NewBytesFromData(key128Bits, insecuresecretdataaccess.Token{})
 	key2, err := hkdfprf.NewKey(keyBytes2, params2)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
@@ -143,7 +143,7 @@ func TestNotEqualIfDifferentParams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 	}
-	keyBytes1 := secretdata.NewBytesFromData(key256Bits, testonlyinsecuresecretdataaccess.Token())
+	keyBytes1 := secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{})
 	key1, err := hkdfprf.NewKey(keyBytes1, params)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
@@ -153,7 +153,7 @@ func TestNotEqualIfDifferentParams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 	}
-	keyBytes2 := secretdata.NewBytesFromData(key256Bits, testonlyinsecuresecretdataaccess.Token())
+	keyBytes2 := secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{})
 	key2, err := hkdfprf.NewKey(keyBytes2, params2)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)

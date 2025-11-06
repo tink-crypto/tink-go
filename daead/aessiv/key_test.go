@@ -22,12 +22,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/daead/aessiv"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -77,13 +77,13 @@ func TestNewKeyFailsIfKeySizeIsDifferentThanParameters(t *testing.T) {
 	}{
 		{
 			name:     "key size is 48 but parameters is 32",
-			keyBytes: secretdata.NewBytesFromData(key384Bits, testonlyinsecuresecretdataaccess.Token()),
+			keyBytes: secretdata.NewBytesFromData(key384Bits, insecuresecretdataaccess.Token{}),
 			keySize:  32,
 			variant:  aessiv.VariantTink,
 		},
 		{
 			name:     "key size is 32 but parameters is 48",
-			keyBytes: secretdata.NewBytesFromData(key256Bits, testonlyinsecuresecretdataaccess.Token()),
+			keyBytes: secretdata.NewBytesFromData(key256Bits, insecuresecretdataaccess.Token{}),
 			keySize:  48,
 			variant:  aessiv.VariantTink,
 		},
@@ -120,7 +120,7 @@ func TestNewKeyFailsIfNoPrefixAndIDIsNotZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aessiv.NewParameters(%v, %v) err = %v, want nil", 32, aessiv.VariantNoPrefix, err)
 	}
-	keyBytes := secretdata.NewBytesFromData(key384Bits, testonlyinsecuresecretdataaccess.Token())
+	keyBytes := secretdata.NewBytesFromData(key384Bits, insecuresecretdataaccess.Token{})
 	if _, err := aessiv.NewKey(keyBytes, 123, params); err == nil {
 		t.Errorf("aessiv.NewKey(keyBytes, 123, %v) err = nil, want error", params)
 	}
@@ -252,7 +252,7 @@ func TestNewKeyWorks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aessiv.NewParameters(%v, %v) err = %v, want nil", test.keySize, test.variant, err)
 			}
-			keyBytes := secretdata.NewBytesFromData(test.key, testonlyinsecuresecretdataaccess.Token())
+			keyBytes := secretdata.NewBytesFromData(test.key, insecuresecretdataaccess.Token{})
 
 			// Create two keys with the same parameters and key bytes.
 			key1, err := aessiv.NewKey(keyBytes, test.id, params)
@@ -302,7 +302,7 @@ func TestKey_Equal_FalseIfDifferentType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aessiv.NewParameters() err = %v, want nil", err)
 	}
-	keyBytes := secretdata.NewBytesFromData([]byte("12345678901234567890123456789012"), testonlyinsecuresecretdataaccess.Token())
+	keyBytes := secretdata.NewBytesFromData([]byte("12345678901234567890123456789012"), insecuresecretdataaccess.Token{})
 	key, err := aessiv.NewKey(keyBytes, 1234, params)
 	if err != nil {
 		t.Fatalf("aessiv.NewKey(keyBytes, %v, %v) err = %v, want nil", 1234, params, err)
@@ -388,7 +388,7 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aessiv.NewParameters(%v, %v) err = %v, want nil", test.first.keySize, test.first.variant, err)
 			}
-			firstKeyBytes := secretdata.NewBytesFromData(test.first.key, testonlyinsecuresecretdataaccess.Token())
+			firstKeyBytes := secretdata.NewBytesFromData(test.first.key, insecuresecretdataaccess.Token{})
 			firstKey, err := aessiv.NewKey(firstKeyBytes, test.first.id, firstParams)
 			if err != nil {
 				t.Fatalf("aessiv.NewKey(firstKeyBytes, %v, %v) err = %v, want nil", test.first.id, firstParams, err)
@@ -397,7 +397,7 @@ func TestKeyEqualReturnsFalseIfDifferent(t *testing.T) {
 			if err != nil {
 				t.Fatalf("aessiv.NewParameters(%v, %v) err = %v, want nil", test.second.keySize, test.second.variant, err)
 			}
-			secondKeyBytes := secretdata.NewBytesFromData(test.second.key, testonlyinsecuresecretdataaccess.Token())
+			secondKeyBytes := secretdata.NewBytesFromData(test.second.key, insecuresecretdataaccess.Token{})
 			secondKey, err := aessiv.NewKey(secondKeyBytes, test.second.id, secondParams)
 			if err != nil {
 				t.Fatalf("aessiv.NewKey(secondKeyBytes, %v, %v) err = %v, want nil", test.second.id, secondParams, err)

@@ -29,7 +29,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestRegisterJWTHMACPrimitiveConstructor(t *testing.T) {
@@ -38,7 +37,7 @@ func TestRegisterJWTHMACPrimitiveConstructor(t *testing.T) {
 	params := mustCreateJWTHMACParameters(t, len(keyBytes), jwthmac.IgnoredKID, jwthmac.HS256)
 	jwtHMACKey := mustCreateJWTHMACKey(t, jwthmac.KeyOpts{
 		Parameters:    params,
-		KeyBytes:      secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()),
+		KeyBytes:      secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}),
 		IDRequirement: 0,
 	})
 	token := "eyJhbGciOiJIUzI1NiJ9" +
@@ -99,7 +98,7 @@ func TestRegisterJWTECDSAPrimitiveConstructor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("jwtecdsa.NewPublicKey() err = %v, want nil", err)
 	}
-	secretDataKeyValue := secretdata.NewBytesFromData(mustBase64Dec(t, "jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI"), testonlyinsecuresecretdataaccess.Token())
+	secretDataKeyValue := secretdata.NewBytesFromData(mustBase64Dec(t, "jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI"), insecuresecretdataaccess.Token{})
 	privateKey, err := jwtecdsa.NewPrivateKeyFromPublicKey(secretDataKeyValue, publicKey)
 	if err != nil {
 		t.Fatalf("jwtecdsa.NewPrivateKeyFromPublicKey() err = %v, want nil", err)

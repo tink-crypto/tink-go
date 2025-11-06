@@ -21,16 +21,16 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 var (
-	hmac128Key = secretdata.NewBytesFromData([]byte("0123456789012345"), testonlyinsecuresecretdataaccess.Token())
-	hmac256Key = secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token())
+	hmac128Key = secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{})
+	hmac256Key = secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{})
 )
 
 func TestNewKeyFailsIfKeySizeIsInvalid(t *testing.T) {
@@ -44,7 +44,7 @@ func TestNewKeyFailsIfKeySizeIsInvalid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewParameters(%v) err = %v, want nil", opts, err)
 	}
-	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token())
+	keyBytes := secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{})
 	_, err = hmac.NewKey(keyBytes, params, 0x01020304)
 	if err == nil {
 		t.Errorf("NewKey(%x, params, 0x01020304) err = nil, want error", keyBytes)
@@ -62,7 +62,7 @@ func TestNewKeyFailsWithInvalidIDRequirement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewParameters(%v) err = %v, want nil", opts, err)
 	}
-	keyBytes := secretdata.NewBytesFromData([]byte("0123456789012345"), testonlyinsecuresecretdataaccess.Token())
+	keyBytes := secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{})
 	if _, err = hmac.NewKey(keyBytes, params, 0x01020304); err == nil {
 		t.Errorf("NewKey(%x, params, 0x01020304) err = nil, want error", keyBytes)
 	}
@@ -227,7 +227,7 @@ func TestKeyEqualFalseIfDifferent(t *testing.T) {
 				HashType:       hmac.SHA256,
 				Variant:        hmac.VariantTink,
 			}), 0x01020304),
-			key2: mustCreateKey(t, secretdata.NewBytesFromData([]byte("0000000000000000"), testonlyinsecuresecretdataaccess.Token()), mustCreateParameters(t, hmac.ParametersOpts{
+			key2: mustCreateKey(t, secretdata.NewBytesFromData([]byte("0000000000000000"), insecuresecretdataaccess.Token{}), mustCreateParameters(t, hmac.ParametersOpts{
 				KeySizeInBytes: 16,
 				TagSizeInBytes: 16,
 				HashType:       hmac.SHA256,

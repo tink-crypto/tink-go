@@ -21,10 +21,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 
 	jwtrsapb "github.com/tink-crypto/tink-go/v2/proto/jwt_rsa_ssa_pkcs1_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -642,9 +642,9 @@ func protoserializationPrivateKeyTestCases(t *testing.T) []*protoserializationPr
 					IDRequirement: 0x01020304,
 					Parameters:    mustCreateParameters(t, jwtrsassapkcs1.Base64EncodedKeyIDAsKID, jwtrsassapkcs1.RS256, 2048),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 			privateKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PrivateKey",
@@ -675,9 +675,9 @@ func protoserializationPrivateKeyTestCases(t *testing.T) []*protoserializationPr
 					CustomKID:    "custom123",
 					Parameters:   mustCreateParameters(t, jwtrsassapkcs1.CustomKID, jwtrsassapkcs1.RS384, 3072),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d3072Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p3072Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q3072Base64), insecuresecretdataaccess.Token{}),
 			}),
 			privateKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PrivateKey",
@@ -708,9 +708,9 @@ func protoserializationPrivateKeyTestCases(t *testing.T) []*protoserializationPr
 					HasCustomKID: false,
 					Parameters:   mustCreateParameters(t, jwtrsassapkcs1.IgnoredKID, jwtrsassapkcs1.RS512, 4096),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d4096Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p4096Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q4096Base64), insecuresecretdataaccess.Token{}),
 			}),
 			privateKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PrivateKey",
@@ -759,9 +759,9 @@ func TestPrivateKeyParser(t *testing.T) {
 					IDRequirement: 0x01020304,
 					Parameters:    mustCreateParameters(t, jwtrsassapkcs1.Base64EncodedKeyIDAsKID, jwtrsassapkcs1.RS256, 2048),
 				}),
-				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), testonlyinsecuresecretdataaccess.Token()),
-				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), testonlyinsecuresecretdataaccess.Token()),
+				D: secretdata.NewBytesFromData(mustBase64Decode(t, d2048Base64), insecuresecretdataaccess.Token{}),
+				P: secretdata.NewBytesFromData(mustBase64Decode(t, p2048Base64), insecuresecretdataaccess.Token{}),
+				Q: secretdata.NewBytesFromData(mustBase64Decode(t, q2048Base64), insecuresecretdataaccess.Token{}),
 			}),
 			privateKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PrivateKey",

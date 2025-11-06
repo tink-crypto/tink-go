@@ -23,10 +23,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	ecdsapb "github.com/tink-crypto/tink-go/v2/proto/ecdsa_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -402,7 +402,7 @@ func testCases(t *testing.T) []testCase {
 		} {
 			for _, curveType := range []commonpb.EllipticCurveType{commonpb.EllipticCurveType_NIST_P256, commonpb.EllipticCurveType_NIST_P384, commonpb.EllipticCurveType_NIST_P521} {
 				for _, hasLeadingZeros := range []bool{false, true} {
-					token := testonlyinsecuresecretdataaccess.Token()
+					token := insecuresecretdataaccess.Token{}
 					switch curveType {
 					case commonpb.EllipticCurveType_NIST_P256:
 						{
@@ -849,7 +849,7 @@ func TestParsePrivateKey(t *testing.T) {
 			Value:           serializedProtoPrivateKey,
 			KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 		}, tinkpb.OutputPrefixType_TINK, 12345)
-		want, err := NewPrivateKey(secretdata.NewBytesFromData(privKeyBytesP521, testonlyinsecuresecretdataaccess.Token()), 12345, &Parameters{
+		want, err := NewPrivateKey(secretdata.NewBytesFromData(privKeyBytesP521, insecuresecretdataaccess.Token{}), 12345, &Parameters{
 			curveType:         NistP521,
 			hashType:          SHA512,
 			signatureEncoding: DER,

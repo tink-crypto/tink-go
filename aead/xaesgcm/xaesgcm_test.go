@@ -22,11 +22,11 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/xaesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -88,9 +88,9 @@ func TestCreateKeysetHandleFromKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("xaesgcm.NewParameters(%v, %v) err = %v, want nil", xaesgcm.VariantTink, 12, err)
 	}
-	key, err := xaesgcm.NewKey(secretdata.NewBytesFromData([]byte("01010101010101010101010101010101"), testonlyinsecuresecretdataaccess.Token()), 0x11223344, params)
+	key, err := xaesgcm.NewKey(secretdata.NewBytesFromData([]byte("01010101010101010101010101010101"), insecuresecretdataaccess.Token{}), 0x11223344, params)
 	if err != nil {
-		t.Fatalf("xaesgcm.NewKey(%x, %v, %v) err = %v, want nil", key.KeyBytes().Data(testonlyinsecuresecretdataaccess.Token()), 0x11223344, params, err)
+		t.Fatalf("xaesgcm.NewKey(%x, %v, %v) err = %v, want nil", key.KeyBytes().Data(insecuresecretdataaccess.Token{}), 0x11223344, params, err)
 	}
 	a1, err := xaesgcm.NewAEAD(key, internalapi.Token{})
 	if err != nil {
@@ -165,7 +165,7 @@ func TestCreateKeysetHandleFromParameters(t *testing.T) {
 
 func TestGetKeyManager(t *testing.T) {
 	// https://github.com/C2SP/wycheproof/blob/b063b4aedae951c69df014cd25fa6d69ae9e8cb9/testvectors/xchacha20_poly1305_test.json#L21
-	keyBytes := secretdata.NewBytesFromData(mustHexDecode(t, "0101010101010101010101010101010101010101010101010101010101010101"), testonlyinsecuresecretdataaccess.Token())
+	keyBytes := secretdata.NewBytesFromData(mustHexDecode(t, "0101010101010101010101010101010101010101010101010101010101010101"), insecuresecretdataaccess.Token{})
 	wantMessage := []byte("XAES-256-GCM")
 
 	iv := []byte("ABCDEFGHIJKLMNOPQRSTUVWX")

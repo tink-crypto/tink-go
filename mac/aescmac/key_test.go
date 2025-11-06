@@ -20,16 +20,16 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/mac/aescmac"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 var (
-	aes128Key = secretdata.NewBytesFromData([]byte("0123456789012345"), testonlyinsecuresecretdataaccess.Token())
-	aes256Key = secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token())
+	aes128Key = secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{})
+	aes256Key = secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{})
 )
 
 func TestNewKeyFailsIfKeySizeIsInvalid(t *testing.T) {
@@ -41,9 +41,9 @@ func TestNewKeyFailsIfKeySizeIsInvalid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewParameters(16, 16, VariantTink) err = %v, want nil", err)
 	}
-	_, err = aescmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), testonlyinsecuresecretdataaccess.Token()), params, 0x01020304)
+	_, err = aescmac.NewKey(secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{}), params, 0x01020304)
 	if err == nil {
-		t.Errorf("NewKey(secretdata.NewBytesFromData([]byte(\"01234567890123456789012345678901\"), testonlyinsecuresecretdataaccess.Token()), params, 0x01020304) err = nil, want error")
+		t.Errorf("NewKey(secretdata.NewBytesFromData([]byte(\"01234567890123456789012345678901\"), insecuresecretdataaccess.Token{}), params, 0x01020304) err = nil, want error")
 	}
 }
 
@@ -56,8 +56,8 @@ func TestNewKeyFailsWithInvalidIDRequirement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewParameters(16, 16, VariantTink) err = %v, want nil", err)
 	}
-	if _, err = aescmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), testonlyinsecuresecretdataaccess.Token()), params, 0x01020304); err == nil {
-		t.Errorf("NewKey(secretdata.NewBytesFromData([]byte(\"0123456789012345\"), testonlyinsecuresecretdataaccess.Token()), params, 0x01020304) err = nil, want error")
+	if _, err = aescmac.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}), params, 0x01020304); err == nil {
+		t.Errorf("NewKey(secretdata.NewBytesFromData([]byte(\"0123456789012345\"), insecuresecretdataaccess.Token{}), params, 0x01020304) err = nil, want error")
 	}
 }
 
@@ -180,7 +180,7 @@ func TestKeyEqualFalseIfDifferent(t *testing.T) {
 		{
 			name: "Different Key Bytes",
 			key1: mustCreateKey(t, aes128Key, mustCreateParameters(t, aescmac.ParametersOpts{KeySizeInBytes: 16, TagSizeInBytes: 16, Variant: aescmac.VariantTink}), 0x01020304),
-			key2: mustCreateKey(t, secretdata.NewBytesFromData([]byte("0000000000000000"), testonlyinsecuresecretdataaccess.Token()), mustCreateParameters(t, aescmac.ParametersOpts{KeySizeInBytes: 16, TagSizeInBytes: 16, Variant: aescmac.VariantTink}), 0x01020304),
+			key2: mustCreateKey(t, secretdata.NewBytesFromData([]byte("0000000000000000"), insecuresecretdataaccess.Token{}), mustCreateParameters(t, aescmac.ParametersOpts{KeySizeInBytes: 16, TagSizeInBytes: 16, Variant: aescmac.VariantTink}), 0x01020304),
 		},
 		{
 			name: "Different IDRequirement",

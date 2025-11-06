@@ -31,6 +31,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/hybrid/ecies"
 	"github.com/tink-crypto/tink-go/v2/hybrid"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
@@ -42,7 +43,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -88,11 +88,11 @@ func TestHybridFactoryTest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hex.DecodeString() err = %v, want nil", err)
 	}
-	primaryPrivateKey, err := ecies.NewPrivateKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), 0, primaryKeyParams)
+	primaryPrivateKey, err := ecies.NewPrivateKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), 0, primaryKeyParams)
 	if err != nil {
 		t.Fatalf("ecies.NewPrivateKey() err = %v, want nil", err)
 	}
-	otherPrivateKey, err := ecies.NewPrivateKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), 0, otherKeyParams)
+	otherPrivateKey, err := ecies.NewPrivateKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), 0, otherKeyParams)
 	if err != nil {
 		t.Fatalf("ecies.NewPrivateKey() err = %v, want nil", err)
 	}

@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyderivation"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/prfbasedkeyderivation"
@@ -29,7 +30,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/ed25519"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/aesgcmhkdf"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestKeyderivation_EndToEnd(t *testing.T) {
@@ -42,7 +42,7 @@ func TestKeyderivation_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
 	}
-	prfKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()), prfParams)
+	prfKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), prfParams)
 	if err != nil {
 		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
 	}
@@ -56,7 +56,7 @@ func TestKeyderivation_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
-	want128AESGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(outputBytes[:aes128GCMParams.KeySizeInBytes()], testonlyinsecuresecretdataaccess.Token()), 0x1234, aes128GCMParams)
+	want128AESGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(outputBytes[:aes128GCMParams.KeySizeInBytes()], insecuresecretdataaccess.Token{}), 0x1234, aes128GCMParams)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
 	}
@@ -70,7 +70,7 @@ func TestKeyderivation_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
-	want128AESGCMNoPrefixKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(outputBytes[:aes128GCMNoPrefixParams.KeySizeInBytes()], testonlyinsecuresecretdataaccess.Token()), 0, aes128GCMNoPrefixParams)
+	want128AESGCMNoPrefixKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(outputBytes[:aes128GCMNoPrefixParams.KeySizeInBytes()], insecuresecretdataaccess.Token{}), 0, aes128GCMNoPrefixParams)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
 	}
@@ -84,7 +84,7 @@ func TestKeyderivation_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
 	}
-	want256AESGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(outputBytes[:aes256GCMParams.KeySizeInBytes()], testonlyinsecuresecretdataaccess.Token()), 0x1234, aes256GCMParams)
+	want256AESGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(outputBytes[:aes256GCMParams.KeySizeInBytes()], insecuresecretdataaccess.Token{}), 0x1234, aes256GCMParams)
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
 	}
@@ -98,7 +98,7 @@ func TestKeyderivation_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmac.NewParameters() err = %v, want nil", err)
 	}
-	wantHMACSHA512Key, err := hmac.NewKey(secretdata.NewBytesFromData(outputBytes[:hmacSHA512Params.KeySizeInBytes()], testonlyinsecuresecretdataaccess.Token()), hmacSHA512Params, 0x1234)
+	wantHMACSHA512Key, err := hmac.NewKey(secretdata.NewBytesFromData(outputBytes[:hmacSHA512Params.KeySizeInBytes()], insecuresecretdataaccess.Token{}), hmacSHA512Params, 0x1234)
 	if err != nil {
 		t.Fatalf("hmac.NewKey() err = %v, want nil", err)
 	}
@@ -112,7 +112,7 @@ func TestKeyderivation_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcmhkdf.NewParameters() err = %v, want nil", err)
 	}
-	wantStreamingAEADAES128GCMHKDFKey, err := aesgcmhkdf.NewKey(streamingAEADAES128GCMHKDFParams, secretdata.NewBytesFromData(outputBytes[:streamingAEADAES128GCMHKDFParams.KeySizeInBytes()], testonlyinsecuresecretdataaccess.Token()))
+	wantStreamingAEADAES128GCMHKDFKey, err := aesgcmhkdf.NewKey(streamingAEADAES128GCMHKDFParams, secretdata.NewBytesFromData(outputBytes[:streamingAEADAES128GCMHKDFParams.KeySizeInBytes()], insecuresecretdataaccess.Token{}))
 	if err != nil {
 		t.Fatalf("aesgcmhkdf.NewKey() err = %v, want nil", err)
 	}
@@ -121,7 +121,7 @@ func TestKeyderivation_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ed25519.NewParameters() err = %v, want nil", err)
 	}
-	wantED25519Key, err := ed25519.NewPrivateKey(secretdata.NewBytesFromData(outputBytes[:32], testonlyinsecuresecretdataaccess.Token()), 0x1234, ed25519Params)
+	wantED25519Key, err := ed25519.NewPrivateKey(secretdata.NewBytesFromData(outputBytes[:32], insecuresecretdataaccess.Token{}), 0x1234, ed25519Params)
 	if err != nil {
 		t.Fatalf("ed25519.NewPrivateKey() err = %v, want nil", err)
 	}
@@ -129,7 +129,7 @@ func TestKeyderivation_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ed25519.NewParameters() err = %v, want nil", err)
 	}
-	wantED25519KeyNoPrefixKey, err := ed25519.NewPrivateKey(secretdata.NewBytesFromData(outputBytes[:32], testonlyinsecuresecretdataaccess.Token()), 0, ed25519NoPrefixParams)
+	wantED25519KeyNoPrefixKey, err := ed25519.NewPrivateKey(secretdata.NewBytesFromData(outputBytes[:32], insecuresecretdataaccess.Token{}), 0, ed25519NoPrefixParams)
 	if err != nil {
 		t.Fatalf("ed25519.NewPrivateKey() err = %v, want nil", err)
 	}

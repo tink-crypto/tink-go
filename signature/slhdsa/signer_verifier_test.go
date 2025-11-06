@@ -18,6 +18,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/signature/slhdsa"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -25,7 +26,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/signature"
 	tinkslhdsa "github.com/tink-crypto/tink-go/v2/signature/slhdsa"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestSignVerifyManager(t *testing.T) {
@@ -81,7 +81,7 @@ func TestSignVerifyManager(t *testing.T) {
 			if err != nil {
 				t.Fatalf("tinkslhdsa.NewPublicKey(%v, %v, %v) err = %v, want nil", keyPair.pubKey, tc.idRequirement, params, err)
 			}
-			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(keyPair.privKey, testonlyinsecuresecretdataaccess.Token()), tc.idRequirement, params)
+			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(keyPair.privKey, insecuresecretdataaccess.Token{}), tc.idRequirement, params)
 			if err != nil {
 				t.Fatalf("tinkslhdsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", keyPair.privKey, tc.idRequirement, params, err)
 			}
@@ -174,7 +174,7 @@ func TestVerifyFails(t *testing.T) {
 			if err != nil {
 				t.Fatalf("tinkslhdsa.NewParameters(%v, %v, %v, %v) err = %v, want nil", tc.hashType, tc.keySize, tc.sigType, tc.variant, err)
 			}
-			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(sk.Encode(), testonlyinsecuresecretdataaccess.Token()), 0, params)
+			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(sk.Encode(), insecuresecretdataaccess.Token{}), 0, params)
 			if err != nil {
 				t.Fatalf("tinkslhdsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", sk.Encode(), 0, params, err)
 			}
@@ -279,7 +279,7 @@ func TestSignVerifyCorrectness(t *testing.T) {
 			if err != nil {
 				t.Fatalf("tinkslhdsa.NewParameters(%v, %v, %v, %v) err = %v, want nil", tc.hashType, tc.keySize, tc.sigType, tc.variant, err)
 			}
-			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(sk.Encode(), testonlyinsecuresecretdataaccess.Token()), 0, params)
+			privateKey, err := tinkslhdsa.NewPrivateKey(secretdata.NewBytesFromData(sk.Encode(), insecuresecretdataaccess.Token{}), 0, params)
 			if err != nil {
 				t.Fatalf("tinkslhdsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", sk.Encode(), 0, params, err)
 			}

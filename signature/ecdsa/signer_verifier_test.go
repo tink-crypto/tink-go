@@ -22,13 +22,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
@@ -44,7 +44,7 @@ type primitiveTestCase struct {
 
 func mustCreatePrivateKey(t *testing.T, keyValue []byte, id uint32, params *ecdsa.Parameters) *ecdsa.PrivateKey {
 	t.Helper()
-	token := testonlyinsecuresecretdataaccess.Token()
+	token := insecuresecretdataaccess.Token{}
 	privateKey, err := ecdsa.NewPrivateKey(secretdata.NewBytesFromData(keyValue, token), id, params)
 	if err != nil {
 		t.Fatalf("ecdsa.NewPrivateKey() err = %v, want nil", err)

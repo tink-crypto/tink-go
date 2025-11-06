@@ -23,11 +23,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/hybrid/hpke"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 type keyTestCase struct {
@@ -108,7 +108,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant: hpke.VariantTink,
 			}),
 			publicKeyBytes:   x25519PublicKeyBytes,
-			privateKeyBytes:  secretdata.NewBytesFromData(x25519PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+			privateKeyBytes:  secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			idRequirement:    uint32(0x01020304),
 			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
 		},
@@ -121,7 +121,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant: hpke.VariantNoPrefix,
 			}),
 			publicKeyBytes:  x25519PublicKeyBytes,
-			privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+			privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			idRequirement:   0,
 		},
 		keyTestCase{
@@ -133,7 +133,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant: hpke.VariantTink,
 			}),
 			publicKeyBytes:   p256SHA256PublicKeyBytes,
-			privateKeyBytes:  secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+			privateKeyBytes:  secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			idRequirement:    uint32(0x01020304),
 			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
 		},
@@ -146,7 +146,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant: hpke.VariantNoPrefix,
 			}),
 			publicKeyBytes:  p256SHA256PublicKeyBytes,
-			privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+			privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			idRequirement:   0,
 		},
 		keyTestCase{
@@ -158,7 +158,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant: hpke.VariantTink,
 			}),
 			publicKeyBytes:   p384PublicKeyBytes,
-			privateKeyBytes:  secretdata.NewBytesFromData(p384PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+			privateKeyBytes:  secretdata.NewBytesFromData(p384PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			idRequirement:    uint32(0x01020304),
 			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
 		},
@@ -171,7 +171,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant: hpke.VariantNoPrefix,
 			}),
 			publicKeyBytes:  p384PublicKeyBytes,
-			privateKeyBytes: secretdata.NewBytesFromData(p384PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+			privateKeyBytes: secretdata.NewBytesFromData(p384PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			idRequirement:   0,
 		},
 		keyTestCase{
@@ -183,7 +183,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant: hpke.VariantTink,
 			}),
 			publicKeyBytes:   p521SHA512PublicKeyBytes,
-			privateKeyBytes:  secretdata.NewBytesFromData(p521SHA512PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+			privateKeyBytes:  secretdata.NewBytesFromData(p521SHA512PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			idRequirement:    uint32(0x01020304),
 			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
 		},
@@ -196,7 +196,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant: hpke.VariantCrunchy,
 			}),
 			publicKeyBytes:   p521SHA512PublicKeyBytes,
-			privateKeyBytes:  secretdata.NewBytesFromData(p521SHA512PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+			privateKeyBytes:  secretdata.NewBytesFromData(p521SHA512PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			idRequirement:    uint32(0x01020304),
 			wantOutputPrefix: []byte{cryptofmt.LegacyStartByte, 0x01, 0x02, 0x03, 0x04},
 		},
@@ -209,7 +209,7 @@ func mustCreateKeyTestCases(t *testing.T) []keyTestCase {
 				Variant: hpke.VariantNoPrefix,
 			}),
 			publicKeyBytes:  p521SHA512PublicKeyBytes,
-			privateKeyBytes: secretdata.NewBytesFromData(p521SHA512PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+			privateKeyBytes: secretdata.NewBytesFromData(p521SHA512PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			idRequirement:   0,
 		},
 	}
@@ -500,7 +500,7 @@ func TestNewPrivateKeyFromPublicKeyFailsWithInvalidValues(t *testing.T) {
 				AEADID:  hpke.AES256GCM,
 				Variant: hpke.VariantTink,
 			})),
-			privateKeybytes: secretdata.NewBytesFromData([]byte("invalid"), testonlyinsecuresecretdataaccess.Token()),
+			privateKeybytes: secretdata.NewBytesFromData([]byte("invalid"), insecuresecretdataaccess.Token{}),
 		},
 		{
 			name: "incompatible X25519 private key bytes",
@@ -510,7 +510,7 @@ func TestNewPrivateKeyFromPublicKeyFailsWithInvalidValues(t *testing.T) {
 				AEADID:  hpke.AES256GCM,
 				Variant: hpke.VariantCrunchy,
 			})),
-			privateKeybytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes2, testonlyinsecuresecretdataaccess.Token()),
+			privateKeybytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes2, insecuresecretdataaccess.Token{}),
 		},
 		{
 			name: "invalid NIST private key bytes",
@@ -520,7 +520,7 @@ func TestNewPrivateKeyFromPublicKeyFailsWithInvalidValues(t *testing.T) {
 				AEADID:  hpke.AES256GCM,
 				Variant: hpke.VariantTink,
 			})),
-			privateKeybytes: secretdata.NewBytesFromData([]byte("invalid"), testonlyinsecuresecretdataaccess.Token()),
+			privateKeybytes: secretdata.NewBytesFromData([]byte("invalid"), insecuresecretdataaccess.Token{}),
 		},
 		{
 			name: "incompatible NIST private key bytes",
@@ -530,7 +530,7 @@ func TestNewPrivateKeyFromPublicKeyFailsWithInvalidValues(t *testing.T) {
 				AEADID:  hpke.AES256GCM,
 				Variant: hpke.VariantCrunchy,
 			})),
-			privateKeybytes: secretdata.NewBytesFromData(p256SHA512PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+			privateKeybytes: secretdata.NewBytesFromData(p256SHA512PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -552,7 +552,7 @@ func TestPrivateKey_Equal_FalseIfDifferentType(t *testing.T) {
 		Variant: hpke.VariantTink,
 	})
 	publicKey := mustCreatePublicKey(t, x25519PublicKeyBytes, 0x01020304, params)
-	privateKey, err := hpke.NewPrivateKeyFromPublicKey(secretdata.NewBytesFromData(x25519PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()), publicKey)
+	privateKey, err := hpke.NewPrivateKeyFromPublicKey(secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}), publicKey)
 	if err != nil {
 		t.Fatalf("hpke.NewPrivateKeyFromPublicKey() err = %v, want nil", err)
 	}
@@ -684,7 +684,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					AEADID:  hpke.AES256GCM,
 					Variant: hpke.VariantTink,
 				})),
-				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			},
 			key2: keyTestCase{
 				publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes, 0x01020304, mustCreateParameters(t, hpke.ParametersOpts{
@@ -693,7 +693,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					AEADID:  hpke.AES128GCM,
 					Variant: hpke.VariantTink,
 				})),
-				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			},
 		},
 		{
@@ -705,7 +705,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					AEADID:  hpke.AES256GCM,
 					Variant: hpke.VariantTink,
 				})),
-				privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+				privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			},
 			key2: keyTestCase{
 				publicKey: mustCreatePublicKey(t, p256SHA256PublicKeyBytes, 0x05060708, mustCreateParameters(t, hpke.ParametersOpts{
@@ -714,7 +714,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					AEADID:  hpke.AES256GCM,
 					Variant: hpke.VariantTink,
 				})),
-				privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+				privateKeyBytes: secretdata.NewBytesFromData(p256SHA256PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			},
 		},
 		{
@@ -726,7 +726,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					AEADID:  hpke.AES256GCM,
 					Variant: hpke.VariantTink,
 				})),
-				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes, insecuresecretdataaccess.Token{}),
 			},
 			key2: keyTestCase{
 				publicKey: mustCreatePublicKey(t, x25519PublicKeyBytes2, 0x01020304, mustCreateParameters(t, hpke.ParametersOpts{
@@ -735,7 +735,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 					AEADID:  hpke.AES256GCM,
 					Variant: hpke.VariantTink,
 				})),
-				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes2, testonlyinsecuresecretdataaccess.Token()),
+				privateKeyBytes: secretdata.NewBytesFromData(x25519PrivateKeyBytes2, insecuresecretdataaccess.Token{}),
 			},
 		},
 	} {

@@ -22,11 +22,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/mldsa"
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 )
 
 func TestNewParameters(t *testing.T) {
@@ -643,7 +643,7 @@ func TestPrivateKeyNewPrivateKeyWithPublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("mldsa.NewPublicKey(%v, %v, %v) err = %v, want nil", pubKeyBytes, tc.idRequirement, params, err)
 			}
-			secretSeed := secretdata.NewBytesFromData(privKeyBytes, testonlyinsecuresecretdataaccess.Token())
+			secretSeed := secretdata.NewBytesFromData(privKeyBytes, insecuresecretdataaccess.Token{})
 			privKey, err := mldsa.NewPrivateKeyWithPublicKey(secretSeed, pubKey)
 			if err != nil {
 				t.Fatalf("mldsa.NewPrivateKeyWithPublicKey(%v, %v) err = %v, want nil", secretSeed, pubKey, err)
@@ -701,7 +701,7 @@ func TestPrivateKeyNewPrivateKey(t *testing.T) {
 				t.Fatalf("mldsa.NewParameters(%v) err = %v, want nil", tc.variant, err)
 			}
 			pubKeyBytes, privKeyBytes := getTestKeyPair(t, tc.instance)
-			secretSeed := secretdata.NewBytesFromData(privKeyBytes, testonlyinsecuresecretdataaccess.Token())
+			secretSeed := secretdata.NewBytesFromData(privKeyBytes, insecuresecretdataaccess.Token{})
 			privKey, err := mldsa.NewPrivateKey(secretSeed, tc.idRequirement, params)
 			if err != nil {
 				t.Fatalf("mldsa.NewPrivateKey(%v, %v, %v) err = %v, want nil", secretSeed, tc.idRequirement, params, err)
@@ -774,25 +774,25 @@ func TestNewPrivateKeyFails(t *testing.T) {
 					name:         "nil private key bytes",
 					params:       paramsTink,
 					idRequrement: 123,
-					privKeyBytes: secretdata.NewBytesFromData(nil, testonlyinsecuresecretdataaccess.Token()),
+					privKeyBytes: secretdata.NewBytesFromData(nil, insecuresecretdataaccess.Token{}),
 				},
 				{
 					name:         "invalid private key bytes size",
 					params:       paramsTink,
 					idRequrement: 123,
-					privKeyBytes: secretdata.NewBytesFromData([]byte("123"), testonlyinsecuresecretdataaccess.Token()),
+					privKeyBytes: secretdata.NewBytesFromData([]byte("123"), insecuresecretdataaccess.Token{}),
 				},
 				{
 					name:         "empty params",
 					params:       &mldsa.Parameters{},
 					idRequrement: 123,
-					privKeyBytes: secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), testonlyinsecuresecretdataaccess.Token()),
+					privKeyBytes: secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), insecuresecretdataaccess.Token{}),
 				},
 				{
 					name:         "invalid ID requiremet",
 					idRequrement: 123,
 					params:       paramsNoPrefix,
-					privKeyBytes: secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), testonlyinsecuresecretdataaccess.Token()),
+					privKeyBytes: secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), insecuresecretdataaccess.Token{}),
 				},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
@@ -828,27 +828,27 @@ func TestNewPrivateKeyWithPublicKeyFails(t *testing.T) {
 				{
 					name:            "nil private key bytes",
 					pubKey:          pubKey,
-					privateKeyBytes: secretdata.NewBytesFromData(nil, testonlyinsecuresecretdataaccess.Token()),
+					privateKeyBytes: secretdata.NewBytesFromData(nil, insecuresecretdataaccess.Token{}),
 				},
 				{
 					name:            "invalid private key bytes size",
 					pubKey:          pubKey,
-					privateKeyBytes: secretdata.NewBytesFromData([]byte("123"), testonlyinsecuresecretdataaccess.Token()),
+					privateKeyBytes: secretdata.NewBytesFromData([]byte("123"), insecuresecretdataaccess.Token{}),
 				},
 				{
 					name:            "empty public key",
 					pubKey:          &mldsa.PublicKey{},
-					privateKeyBytes: secretdata.NewBytesFromData(privKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+					privateKeyBytes: secretdata.NewBytesFromData(privKeyBytes, insecuresecretdataaccess.Token{}),
 				},
 				{
 					name:            "nil public key",
 					pubKey:          nil,
-					privateKeyBytes: secretdata.NewBytesFromData(privKeyBytes, testonlyinsecuresecretdataaccess.Token()),
+					privateKeyBytes: secretdata.NewBytesFromData(privKeyBytes, insecuresecretdataaccess.Token{}),
 				},
 				{
 					name:            "invalid public key",
 					pubKey:          pubKey,
-					privateKeyBytes: secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), testonlyinsecuresecretdataaccess.Token()),
+					privateKeyBytes: secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), insecuresecretdataaccess.Token{}),
 				},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
@@ -875,7 +875,7 @@ func TestPrivateKeyEqualSelf(t *testing.T) {
 			if err != nil {
 				t.Fatalf("mldsa.NewPublicKey(%v, %v, %v) err = %v", pubKeyBytes, 123, params, err)
 			}
-			secretSeed := secretdata.NewBytesFromData(privKeyBytes, testonlyinsecuresecretdataaccess.Token())
+			secretSeed := secretdata.NewBytesFromData(privKeyBytes, insecuresecretdataaccess.Token{})
 			privKey, err := mldsa.NewPrivateKeyWithPublicKey(secretSeed, pubKey)
 			if err != nil {
 				t.Fatalf("mldsa.NewPrivateKeyWithPublicKey(%v, %v) err = %v", secretSeed, pubKey, err)
@@ -901,7 +901,7 @@ func TestPrivateKeyEqual_FalseIfDifferentType(t *testing.T) {
 			if err != nil {
 				t.Fatalf("mldsa.NewPublicKey(%v, %v, %v) err = %v", pubKeyBytes, 123, params, err)
 			}
-			secretSeed := secretdata.NewBytesFromData(privKeyBytes, testonlyinsecuresecretdataaccess.Token())
+			secretSeed := secretdata.NewBytesFromData(privKeyBytes, insecuresecretdataaccess.Token{})
 			privKey, err := mldsa.NewPrivateKeyWithPublicKey(secretSeed, pubKey)
 			if err != nil {
 				t.Fatalf("mldsa.NewPrivateKeyWithPublicKey(%v, %v) err = %v", secretSeed, pubKey, err)
@@ -937,28 +937,28 @@ func TestPrivateKeyEqualFalse(t *testing.T) {
 			}{
 				{
 					name:           "different private key bytes",
-					privKeyBytes1:  secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), testonlyinsecuresecretdataaccess.Token()),
+					privKeyBytes1:  secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), insecuresecretdataaccess.Token{}),
 					params1:        paramsTink,
 					idRequirement1: 123,
-					privKeyBytes2:  secretdata.NewBytesFromData([]byte("12345678123456781234567812345679"), testonlyinsecuresecretdataaccess.Token()),
+					privKeyBytes2:  secretdata.NewBytesFromData([]byte("12345678123456781234567812345679"), insecuresecretdataaccess.Token{}),
 					params2:        paramsTink,
 					idRequirement2: 123,
 				},
 				{
 					name:           "different ID requirement",
-					privKeyBytes1:  secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), testonlyinsecuresecretdataaccess.Token()),
+					privKeyBytes1:  secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), insecuresecretdataaccess.Token{}),
 					params1:        paramsTink,
 					idRequirement1: 123,
-					privKeyBytes2:  secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), testonlyinsecuresecretdataaccess.Token()),
+					privKeyBytes2:  secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), insecuresecretdataaccess.Token{}),
 					params2:        paramsTink,
 					idRequirement2: 456,
 				},
 				{
 					name:           "different params",
-					privKeyBytes1:  secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), testonlyinsecuresecretdataaccess.Token()),
+					privKeyBytes1:  secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), insecuresecretdataaccess.Token{}),
 					params1:        paramsTink,
 					idRequirement1: 0,
-					privKeyBytes2:  secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), testonlyinsecuresecretdataaccess.Token()),
+					privKeyBytes2:  secretdata.NewBytesFromData([]byte("12345678123456781234567812345678"), insecuresecretdataaccess.Token{}),
 					params2:        paramsNoPrefix,
 					idRequirement2: 0,
 				},
@@ -995,12 +995,12 @@ func TestPrivateKeyKeyBytes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("mldsa.NewPublicKey(%v, %v, %v) err = %v, want nil", []byte(pubKeyBytes), 123, params, err)
 			}
-			secretSeed := secretdata.NewBytesFromData([]byte(privKeyBytes), testonlyinsecuresecretdataaccess.Token())
+			secretSeed := secretdata.NewBytesFromData([]byte(privKeyBytes), insecuresecretdataaccess.Token{})
 			privKey, err := mldsa.NewPrivateKeyWithPublicKey(secretSeed, pubKey)
 			if err != nil {
 				t.Fatalf("mldsa.NewPrivateKeyWithPublicKey(%v, %v) err = %v, want nil", secretSeed, pubKey, err)
 			}
-			if got, want := privKey.PrivateKeyBytes().Data(testonlyinsecuresecretdataaccess.Token()), []byte(privKeyBytes); !bytes.Equal(got, want) {
+			if got, want := privKey.PrivateKeyBytes().Data(insecuresecretdataaccess.Token{}), []byte(privKeyBytes); !bytes.Equal(got, want) {
 				t.Errorf("bytes.Equal(got, want) = false, want true")
 			}
 		})

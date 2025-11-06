@@ -23,11 +23,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1"
 	_ "github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1" // Register the key managers.
-	"github.com/tink-crypto/tink-go/v2/testutil/testonlyinsecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	cpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	rsassapkcs1pb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pkcs1_go_proto"
@@ -107,16 +107,16 @@ func TestSignerKeyManagerPrimitiveSignVerify(t *testing.T) {
 	privateKey, err := rsassapkcs1.NewPrivateKey(publicKey, rsassapkcs1.PrivateKeyValues{
 		P: secretdata.NewBytesFromData(mustDecodeBase64(t, "2rnSOV4hKSN8sS4CgcQHFbs08XboFDqKum3sc4h3GRxrTmQdl1ZK9uw-PIHf"+
 			"QP0FkxXVrx-WE-ZEbrqivH_2iCLUS7wAl6XvARt1KkIaUxPPSYB9yk31s0Q8"+
-			"UK96E3_OrADAYtAJs-M3JxCLfNgqh56HDnETTQhH3rCT5T3yJws"), testonlyinsecuresecretdataaccess.Token()),
+			"UK96E3_OrADAYtAJs-M3JxCLfNgqh56HDnETTQhH3rCT5T3yJws"), insecuresecretdataaccess.Token{}),
 		Q: secretdata.NewBytesFromData(mustDecodeBase64(t, "1u_RiFDP7LBYh3N4GXLT9OpSKYP0uQZyiaZwBtOCBNJgQxaj10RWjsZu0c6I"+
 			"edis4S7B_coSKB0Kj9PaPaBzg-IySRvvcQuPamQu66riMhjVtG6TlV8CLCYK"+
-			"rYl52ziqK0E_ym2QnkwsUX7eYTB7LbAHRK9GqocDE5B0f808I4s"), testonlyinsecuresecretdataaccess.Token()),
+			"rYl52ziqK0E_ym2QnkwsUX7eYTB7LbAHRK9GqocDE5B0f808I4s"), insecuresecretdataaccess.Token{}),
 		D: secretdata.NewBytesFromData(mustDecodeBase64(t, "GRtbIQmhOZtyszfgKdg4u_N-R_mZGU_9k7JQ_jn1DnfTuMdSNprTeaSTyWfS"+
 			"NkuaAwnOEbIQVy1IQbWVV25NY3ybc_IhUJtfri7bAXYEReWaCl3hdlPKXy9U"+
 			"vqPYGR0kIXTQRqns-dVJ7jahlI7LyckrpTmrM8dWBo4_PMaenNnPiQgO0xnu"+
 			"ToxutRZJfJvG4Ox4ka3GORQd9CsCZ2vsUDmsXOfUENOyMqADC6p1M3h33tsu"+
 			"rY15k9qMSpG9OX_IJAXmxzAh_tWiZOwk2K4yxH9tS3Lq1yX8C1EWmeRDkK2a"+
-			"hecG85-oLKQt5VEpWHKmjOi_gJSdSgqcN96X52esAQ"), testonlyinsecuresecretdataaccess.Token()),
+			"hecG85-oLKQt5VEpWHKmjOi_gJSdSgqcN96X52esAQ"), insecuresecretdataaccess.Token{}),
 	})
 	if err != nil {
 		t.Fatalf("rsassapkcs1.NewPrivateKey() err = %v, want nil", err)
