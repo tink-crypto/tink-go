@@ -17,8 +17,11 @@ package hkdfprf_test
 import (
 	"bytes"
 	"encoding/hex"
+	"reflect"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
@@ -126,29 +129,36 @@ func mustHexDecode(t *testing.T, s string) []byte {
 	return b
 }
 
-func TestKeysetGenerationFromKey(t *testing.T) {
+const (
 	// https://datatracker.ietf.org/doc/html/rfc5869#appendix-A.2
-	keyBytes := mustHexDecode(t, "000102030405060708090a0b0c0d0e0f"+
-		"101112131415161718191a1b1c1d1e1f"+
-		"202122232425262728292a2b2c2d2e2f"+
-		"303132333435363738393a3b3c3d3e3f"+
-		"404142434445464748494a4b4c4d4e4f")
-	salt := mustHexDecode(t, "606162636465666768696a6b6c6d6e6f"+
-		"707172737475767778797a7b7c7d7e7f"+
-		"808182838485868788898a8b8c8d8e8f"+
-		"909192939495969798999a9b9c9d9e9f"+
-		"a0a1a2a3a4a5a6a7a8a9aaabacadaeaf")
-	data := mustHexDecode(t, "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"+
-		"c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"+
-		"d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"+
-		"e0e1e2e3e4e5e6e7e8e9eaebecedeeef"+
-		"f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff")
-	wantPRFOutput := mustHexDecode(t, "b11e398dc80327a1c8e7f78c596a4934"+
-		"4f012eda2d4efad8a050cc4c19afa97c"+
-		"59045a99cac7827271cb41c65e590e09"+
-		"da3275600c2f09b8367793a9aca3db71"+
-		"cc30c58179ec3e87c14c01d5c1f3434f"+
-		"1d87")
+	hkdfKeyHex = "000102030405060708090a0b0c0d0e0f" +
+		"101112131415161718191a1b1c1d1e1f" +
+		"202122232425262728292a2b2c2d2e2f" +
+		"303132333435363738393a3b3c3d3e3f" +
+		"404142434445464748494a4b4c4d4e4f"
+	hkdfSaltHex = "606162636465666768696a6b6c6d6e6f" +
+		"707172737475767778797a7b7c7d7e7f" +
+		"808182838485868788898a8b8c8d8e8f" +
+		"909192939495969798999a9b9c9d9e9f" +
+		"a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
+	hkdfDataHex = "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf" +
+		"c0c1c2c3c4c5c6c7c8c9cacbcccdcecf" +
+		"d0d1d2d3d4d5d6d7d8d9dadbdcdddedf" +
+		"e0e1e2e3e4e5e6e7e8e9eaebecedeeef" +
+		"f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
+	hkdfWantOutputHex = "b11e398dc80327a1c8e7f78c596a4934" +
+		"4f012eda2d4efad8a050cc4c19afa97c" +
+		"59045a99cac7827271cb41c65e590e09" +
+		"da3275600c2f09b8367793a9aca3db71" +
+		"cc30c58179ec3e87c14c01d5c1f3434f" +
+		"1d87"
+)
+
+func TestKeysetGenerationFromKey(t *testing.T) {
+	keyBytes := mustHexDecode(t, hkdfKeyHex)
+	salt := mustHexDecode(t, hkdfSaltHex)
+	data := mustHexDecode(t, hkdfDataHex)
+	wantPRFOutput := mustHexDecode(t, hkdfWantOutputHex)
 
 	params, err := hkdfprf.NewParameters(len(keyBytes), hkdfprf.SHA256, salt)
 	if err != nil {
@@ -185,5 +195,47 @@ func TestKeysetGenerationFromKey(t *testing.T) {
 	}
 	if got, want := gotPRFOutput, wantPRFOutput[:32]; !bytes.Equal(got, want) {
 		t.Errorf("gotPRFOutput = %x, want %x", got, want)
+	}
+}
+
+func TestRegisterPrimitiveConstructor(t *testing.T) {
+	hkdfKeyBytes := mustHexDecode(t, hkdfKeyHex)
+	hkdfprfParams, err := hkdfprf.NewParameters(len(hkdfKeyBytes), hkdfprf.SHA256, mustHexDecode(t, hkdfSaltHex))
+	if err != nil {
+		t.Fatalf("hkdfprf.NewParameters() err=%v, want nil", err)
+	}
+	hkdfprfKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData(hkdfKeyBytes, testonlyinsecuresecretdataaccess.Token()), hkdfprfParams)
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey() err=%v, want nil", err)
+	}
+
+	b := config.NewBuilder()
+	configWithoutHKDFPRF := b.Build()
+
+	// Should fail because hkdfprf.RegisterPrimitiveConstructor() was not called.
+	if _, err := configWithoutHKDFPRF.PrimitiveFromKey(hkdfprfKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutHKDFPRF.PrimitiveFromKey() err = nil, want error")
+	}
+
+	// Register hkdfprf.RegisterPrimitiveConstructor() and check that it now works.
+	if err := hkdfprf.RegisterPrimitiveConstructor(b, internalapi.Token{}); err != nil {
+		t.Fatalf("hkdfprf.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	configWithHKDFPRF := b.Build()
+	primitive, err := configWithHKDFPRF.PrimitiveFromKey(hkdfprfKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf(" configWithHKDFPRF.PrimitiveFromKey() err = %v, want nil", err)
+	}
+	p, ok := primitive.(prf.PRF)
+	if !ok {
+		t.Fatalf("p was of type %v, want prf.PRF", reflect.TypeOf(p))
+	}
+	want := mustHexDecode(t, hkdfWantOutputHex)
+	got, err := p.ComputePRF(mustHexDecode(t, hkdfDataHex), uint32(len(want)))
+	if err != nil {
+		t.Fatalf("d.ComputePRF() err = %v, want nil", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("d.ComputePRF() = %x, want %x", got, want)
 	}
 }

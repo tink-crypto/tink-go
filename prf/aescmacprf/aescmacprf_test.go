@@ -17,8 +17,11 @@ package aescmacprf_test
 import (
 	"bytes"
 	"encoding/hex"
+	"reflect"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
@@ -96,20 +99,27 @@ func mustHexDecode(t *testing.T, s string) []byte {
 	return b
 }
 
+const (
+	// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/aes_cmac_test.json#L1860
+	aesCMACPRFKeyHex        = "e754076ceab3fdaf4f9bcab7d4f0df0cbbafbc87731b8f9b7cd2166472e8eebc"
+	aesCMACPRFWantOutputHex = "9d47482c2d9252bace43a75a8335b8b8"
+	aesCMACPRFDataHex       = "40"
+)
+
 func TestKeysetGenerationFromKey(t *testing.T) {
 	// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/aes_cmac_test.json#L1860
-	keyBytes := mustHexDecode(t, "e754076ceab3fdaf4f9bcab7d4f0df0cbbafbc87731b8f9b7cd2166472e8eebc")
-	wantPRFOutput := mustHexDecode(t, "9d47482c2d9252bace43a75a8335b8b8")
-	data := mustHexDecode(t, "40")
+	keyBytes := mustHexDecode(t, aesCMACPRFKeyHex)
+	wantPRFOutput := mustHexDecode(t, aesCMACPRFWantOutputHex)
+	data := mustHexDecode(t, aesCMACPRFDataHex)
 
 	key, err := aescmacprf.NewKey(secretdata.NewBytesFromData(keyBytes, testonlyinsecuresecretdataaccess.Token()))
 	if err != nil {
 		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
 	}
 
-	params, err := aescmacprf.NewParameters(32)
+	params, err := aescmacprf.NewParameters(len(keyBytes))
 	if err != nil {
-		t.Fatalf("aescmacprf.NewParameters(%v) err = %v, want nil", 32, err)
+		t.Fatalf("aescmacprf.NewParameters(%v) err = %v, want nil", len(keyBytes), err)
 	}
 
 	km := keyset.NewManager()
@@ -138,5 +148,43 @@ func TestKeysetGenerationFromKey(t *testing.T) {
 	}
 	if got, want := gotPRFOutput, wantPRFOutput; !bytes.Equal(got, want) {
 		t.Errorf("gotPRFOutput = %x, want %x", got, want)
+	}
+}
+
+func TestRegisterPrimitiveConstructor(t *testing.T) {
+	aesCMACPRFKeyBytes := mustHexDecode(t, aesCMACPRFKeyHex)
+	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData(aesCMACPRFKeyBytes, testonlyinsecuresecretdataaccess.Token()))
+	if err != nil {
+		t.Fatalf("keygenregistry.CreateKey() err = %v, want nil", err)
+	}
+
+	b := config.NewBuilder()
+	configWithoutAESCMACPRF := b.Build()
+
+	// Should fail because aescmacprf.RegisterPrimitiveConstructor() was not called.
+	if _, err := configWithoutAESCMACPRF.PrimitiveFromKey(aesCMACPRFKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutAESCMACPRF.PrimitiveFromKey() err = nil, want error")
+	}
+
+	// Register aescmacprf.RegisterPrimitiveConstructor() and check that it now works.
+	if err := aescmacprf.RegisterPrimitiveConstructor(b, internalapi.Token{}); err != nil {
+		t.Fatalf("aescmacprf.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	configWithAESCMACPRF := b.Build()
+	primitive, err := configWithAESCMACPRF.PrimitiveFromKey(aesCMACPRFKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf(" configWithAESCMACPRF.PrimitiveFromKey() err = %v, want nil", err)
+	}
+	p, ok := primitive.(prf.PRF)
+	if !ok {
+		t.Fatalf("p was of type %v, want prf.PRF", reflect.TypeOf(p))
+	}
+	want := mustHexDecode(t, aesCMACPRFWantOutputHex)
+	got, err := p.ComputePRF(mustHexDecode(t, aesCMACPRFDataHex), uint32(len(want)))
+	if err != nil {
+		t.Fatalf("d.ComputePRF() err = %v, want nil", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("d.ComputePRF() = %x, want %x", got, want)
 	}
 }

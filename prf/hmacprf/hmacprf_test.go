@@ -17,8 +17,11 @@ package hmacprf_test
 import (
 	"bytes"
 	"encoding/hex"
+	"reflect"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
@@ -63,11 +66,18 @@ func mustHexDecode(t *testing.T, s string) []byte {
 	return b
 }
 
+const (
+	// https://github.com/C2SP/wycheproof/blob/3bfb67fca7c7a2ef436e263da53cdabe0fa1dd36/testvectors/hmac_sha256_test.json#L31
+	hmacSHA256KeyHex        = "8159fd15133cd964c9a6964c94f0ea269a806fd9f43f0da58b6cd1b33d189b2a"
+	hmacSHA256WantOutputHex = "dfc5105d5eecf7ae7b8b8de3930e7659e84c4172f2555142f1e568fc1872ad93"
+	hmacSHA256DataHex       = "77"
+)
+
 func TestKeysetGenerationFromKey(t *testing.T) {
 	// https://github.com/C2SP/wycheproof/blob/3bfb67fca7c7a2ef436e263da53cdabe0fa1dd36/testvectors/hmac_sha256_test.json#L31
-	keyBytes := mustHexDecode(t, "8159fd15133cd964c9a6964c94f0ea269a806fd9f43f0da58b6cd1b33d189b2a")
-	data := mustHexDecode(t, "77")
-	wantPRFOutput := mustHexDecode(t, "dfc5105d5eecf7ae7b8b8de3930e7659e84c4172f2555142f1e568fc1872ad93")
+	keyBytes := mustHexDecode(t, hmacSHA256KeyHex)
+	data := mustHexDecode(t, hmacSHA256DataHex)
+	wantPRFOutput := mustHexDecode(t, hmacSHA256WantOutputHex)
 
 	params, err := hmacprf.NewParameters(len(keyBytes), hmacprf.SHA256)
 	if err != nil {
@@ -104,5 +114,47 @@ func TestKeysetGenerationFromKey(t *testing.T) {
 	}
 	if got, want := gotPRFOutput, wantPRFOutput[:]; !bytes.Equal(got, want) {
 		t.Errorf("gotPRFOutput = %x, want %x", got, want)
+	}
+}
+
+func TestRegisterPrimitiveConstructor(t *testing.T) {
+	hmacSHA256KeyBytes := mustHexDecode(t, hmacSHA256KeyHex)
+	hmacSHA256PRFParams, err := hmacprf.NewParameters(len(hmacSHA256KeyBytes), hmacprf.SHA256)
+	if err != nil {
+		t.Fatalf("hmacprf.NewParameters() err = %v, want nil", err)
+	}
+	hmacSHA256PRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData(hmacSHA256KeyBytes, testonlyinsecuresecretdataaccess.Token()), hmacSHA256PRFParams)
+	if err != nil {
+		t.Fatalf("hmacprf.NewKey() err = %v, want nil", err)
+	}
+
+	b := config.NewBuilder()
+	configWithoutHMACSHA256PRF := b.Build()
+
+	// Should fail because hmacprf.RegisterPrimitiveConstructor() was not called.
+	if _, err := configWithoutHMACSHA256PRF.PrimitiveFromKey(hmacSHA256PRFKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutHMACSHA256PRF.PrimitiveFromKey() err = nil, want error")
+	}
+
+	// Register hmacprf.RegisterPrimitiveConstructor() and check that it now works.
+	if err := hmacprf.RegisterPrimitiveConstructor(b, internalapi.Token{}); err != nil {
+		t.Fatalf("hmacprf.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	configWithHMACSHA256PRF := b.Build()
+	primitive, err := configWithHMACSHA256PRF.PrimitiveFromKey(hmacSHA256PRFKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf(" configWithHMACSHA256PRF.PrimitiveFromKey() err = %v, want nil", err)
+	}
+	p, ok := primitive.(prf.PRF)
+	if !ok {
+		t.Fatalf("p was of type %v, want prf.PRF", reflect.TypeOf(p))
+	}
+	want := mustHexDecode(t, hmacSHA256WantOutputHex)
+	got, err := p.ComputePRF(mustHexDecode(t, hmacSHA256DataHex), uint32(len(want)))
+	if err != nil {
+		t.Fatalf("d.ComputePRF() err = %v, want nil", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("d.ComputePRF() = %x, want %x", got, want)
 	}
 }
