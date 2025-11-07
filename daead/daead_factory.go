@@ -31,7 +31,13 @@ import (
 
 // New returns a DeterministicAEAD primitive from the given keyset handle.
 func New(handle *keyset.Handle) (tink.DeterministicAEAD, error) {
-	ps, err := keyset.Primitives[tink.DeterministicAEAD](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
+	return NewWithConfig(handle, &registryconfig.RegistryConfig{})
+}
+
+// NewWithConfig creates a DeterministicAEAD primitive from the given [keyset.Handle] using
+// the provided [keyset.Config].
+func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.DeterministicAEAD, error) {
+	ps, err := keyset.Primitives[tink.DeterministicAEAD](handle, config, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("daead_factory: cannot obtain primitive set: %s", err)
 	}
