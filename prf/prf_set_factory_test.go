@@ -18,12 +18,20 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"reflect"
+	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -421,5 +429,139 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsComputePRF(t *testing.T) {
 	}
 	if !cmp.Equal(got, want) {
 		t.Errorf("got = %v, want = %v, with diff: %v", got, want, cmp.Diff(got, want))
+	}
+}
+
+const keyURL = "type.googleapis.com/google.crypto.tink.KeyURL"
+
+type stubParams struct{}
+
+var _ key.Parameters = (*stubParams)(nil)
+
+func (p *stubParams) Equal(_ key.Parameters) bool { return true }
+func (p *stubParams) HasIDRequirement() bool      { return true }
+
+type stubKey struct{}
+
+var _ key.Key = (*stubKey)(nil)
+
+func (p *stubKey) Equal(_ key.Key) bool          { return true }
+func (p *stubKey) Parameters() key.Parameters    { return &stubParams{} }
+func (p *stubKey) IDRequirement() (uint32, bool) { return 0, false }
+func (p *stubKey) HasIDRequirement() bool        { return false }
+func (p *stubKey) OutputPrefix() []byte          { return nil }
+
+type stubKeySerialization struct{}
+
+var _ protoserialization.KeySerializer = (*stubKeySerialization)(nil)
+
+func (s *stubKeySerialization) SerializeKey(key key.Key) (*protoserialization.KeySerialization, error) {
+	return protoserialization.NewKeySerialization(
+		&tinkpb.KeyData{
+			TypeUrl:         keyURL,
+			Value:           []byte("serialized_key"),
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+		},
+		tinkpb.OutputPrefixType_RAW,
+		0,
+	)
+}
+
+type stubKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*stubKeyParser)(nil)
+
+func (s *stubKeyParser) ParseKey(serialization *protoserialization.KeySerialization) (key.Key, error) {
+	return &stubKey{}, nil
+}
+
+type stubFullPRF struct{}
+
+var _ prf.PRF = (*stubFullPRF)(nil)
+
+func (s *stubFullPRF) ComputePRF(input []byte, outputLength uint32) ([]byte, error) {
+	return slices.Concat([]byte("full_primitive"), input, []byte(strconv.Itoa(int(outputLength)))), nil
+}
+
+type legacyPRF struct{}
+
+var _ prf.PRF = (*legacyPRF)(nil)
+
+func (s *legacyPRF) ComputePRF(input []byte, outputLength uint32) ([]byte, error) {
+	return slices.Concat([]byte("legacy_primitive"), input, []byte(strconv.Itoa(int(outputLength)))), nil
+}
+
+func TestNewWithConfig(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(keyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKey]()
+	if err := protoserialization.RegisterKeyParser(keyURL, &stubKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKey](&stubKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	builderWithFullPrimitive := config.NewBuilder()
+	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullPRF{}, nil }, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	configWithFullPrimitive := builderWithFullPrimitive.Build()
+
+	builderWithLegacyPrimitive := config.NewBuilder()
+	keyManager := &stubkeymanager.StubKeyManager{
+		URL:  keyURL,
+		Prim: &legacyPRF{},
+		KeyData: &tinkpb.KeyData{
+			TypeUrl:         keyURL,
+			Value:           []byte("serialized_key"),
+			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+		},
+	}
+	if err := builderWithLegacyPrimitive.RegisterKeyManager(keyURL, keyManager, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithLegacyPrimitive.RegisterKeyManager() err = %v, want nil", err)
+	}
+	configWithLegacyPrimitive := builderWithLegacyPrimitive.Build()
+
+	km := keyset.NewManager()
+	if _, err := km.AddKeyWithOpts(&stubKey{}, internalapi.Token{}, keyset.AsPrimary()); err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	for _, tc := range []struct {
+		name       string
+		kh         *keyset.Handle
+		config     keyset.Config
+		wantPrefix []byte
+	}{
+		{
+			name:       "full primitive",
+			config:     &configWithFullPrimitive,
+			kh:         handle,
+			wantPrefix: []byte("full_primitive"),
+		},
+		{
+			name:       "legacy primitive",
+			config:     &configWithLegacyPrimitive,
+			kh:         handle,
+			wantPrefix: []byte("legacy_primitive"),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prfSet, err := prf.NewPRFSetWithConfig(tc.kh, tc.config)
+			if err != nil {
+				t.Fatalf("prf.NewPRFSetWithConfig(tc.kh, config) err = %v, want nil", err)
+			}
+			out, err := prfSet.ComputePrimaryPRF([]byte("message"), 10)
+			if err != nil {
+				t.Fatalf("prfSet.ComputePrimaryPRF() err = %v, want nil", err)
+			}
+			if !bytes.HasPrefix(out, tc.wantPrefix) {
+				t.Errorf("out = %q, want prefix: %q", out, tc.wantPrefix)
+			}
+		})
 	}
 }

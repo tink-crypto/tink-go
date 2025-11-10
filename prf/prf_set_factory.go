@@ -26,9 +26,16 @@ import (
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 )
 
-// NewPRFSet creates a prf.Set primitive from the given keyset handle.
+// NewPRFSet creates a [prf.Set] primitive from the given [keyset.Handle]
+// using the global registry.
 func NewPRFSet(handle *keyset.Handle) (*Set, error) {
-	ps, err := keyset.Primitives[PRF](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
+	return NewPRFSetWithConfig(handle, &registryconfig.RegistryConfig{})
+}
+
+// NewPRFSetWithConfig creates a [prf.Set] primitive from the given [keyset.Handle] and
+// [keyset.Config].
+func NewPRFSetWithConfig(handle *keyset.Handle, config keyset.Config) (*Set, error) {
+	ps, err := keyset.Primitives[PRF](handle, config, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("prf_set_factory: cannot obtain primitive set: %s", err)
 	}
