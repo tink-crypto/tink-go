@@ -31,29 +31,36 @@ type macAndKeyID struct {
 	keyID uint32
 }
 
-// NewMAC generates a new instance of the JWT MAC primitive.
+// NewMAC generates a new [jwt.MAC] primitive with the global registry.
 func NewMAC(handle *keyset.Handle) (MAC, error) {
+	return NewMACWithConfig(handle, &registryconfig.RegistryConfig{})
+}
+
+// NewMACWithConfig generates a new [jwt.MAC] primitive with the provided
+// [keyset.Config].
+func NewMACWithConfig(handle *keyset.Handle, config keyset.Config) (MAC, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("jwt_mac_factory: keyset handle can't be nil")
 	}
+	ps, err := keyset.Primitives[MAC](handle, config, internalapi.Token{})
+	if err != nil {
+		return nil, fmt.Errorf("jwt_mac_factory: cannot obtain primitive set: %v", err)
+	}
+	return newWrappedJWTMAC(ps)
+}
+
+func newWrappedJWTMAC(ps *primitiveset.PrimitiveSet[MAC]) (*wrappedJWTMAC, error) {
 	var macs []macAndKeyID
 	var primary macAndKeyID
 	var computeLogger monitoring.Logger
 	var verifyLogger monitoring.Logger
-
-	// Try to obtain full primitives first. If it fails, likely because there is no
-	// full primitive constructor registered, fall back to the "raw"
-	// macWithKID primitives.
-	ps, err := keyset.Primitives[MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("jwt_mac_factory: cannot obtain primitive set: %v", err)
-	}
-	computeLogger, verifyLogger, err = createMacLoggers(ps)
+	computeLogger, verifyLogger, err := createMacLoggers(ps)
 	if err != nil {
 		return nil, err
 	}
 	for _, primitives := range ps.Entries {
 		for _, p := range primitives {
+			// Only full primitives are supported.
 			if p.FullPrimitive == nil {
 				// Something is wrong, this should not happen.
 				return nil, fmt.Errorf("jwt_mac_factory: full primitive is nil")

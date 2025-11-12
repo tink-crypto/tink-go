@@ -17,11 +17,14 @@ package jwt_test
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -637,5 +640,114 @@ func TestVerifyFailureEmitsMonitoring(t *testing.T) {
 	}
 	if len(client.Events()) != 0 {
 		t.Errorf("len(client.Events()) = %d, want = 0", len(client.Events()))
+	}
+}
+
+func TestNewMACWithConfigFailsIfNoPrimitiveConstructorRegistered(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubKeyTypeURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKey]()
+	if err := protoserialization.RegisterKeyParser(stubKeyTypeURL, &stubKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKey](&stubKeySerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubKey{
+		prefixType:    tinkpb.OutputPrefixType_TINK,
+		idRequirement: 0x01020304,
+	})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	configBuilder := config.NewBuilder()
+	if err := jwt.RegisterJWTHMACPrimitiveConstructor(configBuilder, internalapi.Token{}); err != nil {
+		t.Fatalf("jwt.RegisterJWTHMACPrimitiveConstructor() err = %v, want nil", err)
+	}
+	config := config.NewBuilder().Build()
+
+	if _, err := jwt.NewMACWithConfig(handle, &config); err == nil {
+		t.Errorf("jwt.NewMACWithConfig() err = nil, want error")
+	} else {
+		t.Logf("jwt.NewMACWithConfig() err = %v", err)
+	}
+}
+
+func TestNewMACWithConfig(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubKeyTypeURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKey]()
+	if err := protoserialization.RegisterKeyParser(stubKeyTypeURL, &stubKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKey](&stubKeySerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	// Register primitive constructor to make sure that the factory uses full primitives.
+	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubKey]()
+	macConstructor := func(key key.Key) (any, error) {
+		kid := "AQIDBA" // for 0x01020304
+		return &stubFullMAC{&kid}, nil
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubKey](macConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+
+	builderWithFullPrimitive := config.NewBuilder()
+	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubKey](), macConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	configWithFullPrimitive := builderWithFullPrimitive.Build()
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubKey{
+		prefixType:    tinkpb.OutputPrefixType_TINK,
+		idRequirement: 0x01020304,
+	})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	defer internalregistry.ClearMonitoringClient()
+	client := fakemonitoring.NewClient("fake-client")
+	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+	mac, err := jwt.NewMACWithConfig(handle, &configWithFullPrimitive)
+	if err != nil {
+		t.Fatalf("jwt.NewMAC() err = %v, want nil", err)
+	}
+	data, err := jwt.NewRawJWT(&jwt.RawJWTOptions{WithoutExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewRawJWT() err = %v, want nil", err)
+	}
+	token, err := mac.ComputeMACAndEncode(data)
+	if err != nil {
+		t.Fatalf("mac.ComputeMACAndEncode() err = %v, want nil", err)
+	}
+	if token != "AQIDBA_stub_full_mac" {
+		t.Errorf("token = %q, want: %q", token, "AQIDBA_stub_full_mac")
+	}
+	validator, err := jwt.NewValidator(&jwt.ValidatorOpts{AllowMissingExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewValidator() err = %v, want nil", err)
+	}
+	if _, err := mac.VerifyMACAndDecode(token, validator); err != nil {
+		t.Fatalf("mac.VerifyMACAndDecode() err = %v, want nil", err)
 	}
 }
