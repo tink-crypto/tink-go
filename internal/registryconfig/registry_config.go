@@ -38,9 +38,3 @@ func (c *RegistryConfig) PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ interna
 func (c *RegistryConfig) PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error) {
 	return primitiveregistry.Primitive(key)
 }
-
-// RegisterKeyManager registers a provided [registry.KeyManager] by forwarding
-// it directly to the Registry.
-func (c *RegistryConfig) RegisterKeyManager(km registry.KeyManager, _ internalapi.Token) error {
-	return registry.RegisterKeyManager(km)
-}

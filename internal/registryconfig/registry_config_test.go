@@ -19,7 +19,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead"
-	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
@@ -143,23 +142,6 @@ func (km *stubKeyManager) NewKey(_ []byte) (proto.Message, error)       { return
 func (km *stubKeyManager) DoesSupport(typeURL string) bool              { return typeURL == "stubKeyManager" }
 func (km *stubKeyManager) TypeURL() string                              { return "stubKeyManager" }
 func (km *stubKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) { return nil, nil }
-
-func TestRegisterKeyManager(t *testing.T) {
-	registryConfig := &registryconfig.RegistryConfig{}
-	if err := registryConfig.RegisterKeyManager(new(stubKeyManager), internalapi.Token{}); err != nil {
-		t.Fatalf("registryConfig.RegisterKeyManager() err = %v, want nil", err)
-	}
-	if _, err := registry.GetKeyManager("stubKeyManager"); err != nil {
-		t.Fatalf("registry.GetKeyManager(\"stubKeyManager\") err = %v, want nil", err)
-	}
-	primitive, err := registry.Primitive(new(stubKeyManager).TypeURL(), []byte{0, 1, 2, 3})
-	if err != nil {
-		t.Fatalf("registry.Primitive() err = %v, want nil", err)
-	}
-	if _, ok := primitive.(*stubPrimitive); !ok {
-		t.Error("primitive is not of type *stubPrimitive")
-	}
-}
 
 type stubKey struct{}
 
