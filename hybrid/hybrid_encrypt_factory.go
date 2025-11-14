@@ -28,9 +28,19 @@ import (
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
-// NewHybridEncrypt returns an HybridEncrypt primitive from the given keyset handle.
+// NewHybridEncrypt returns a [tink.HybridEncrypt] primitive from the given
+// [keyset.Handle] using the global registry.
 func NewHybridEncrypt(handle *keyset.Handle) (tink.HybridEncrypt, error) {
-	ps, err := keyset.Primitives[tink.HybridEncrypt](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
+	return NewHybridEncryptWithConfig(handle, &registryconfig.RegistryConfig{})
+}
+
+// NewHybridEncryptWithConfig returns a [tink.HybridEncrypt] primitive from
+// the given [keyset.Handle] and [keyset.Config].
+//
+// NOTE: [keyset.Config] is currently a type that can only be used internally;
+// thus this function is not part of the public API.
+func NewHybridEncryptWithConfig(handle *keyset.Handle, config keyset.Config) (tink.HybridEncrypt, error) {
+	ps, err := keyset.Primitives[tink.HybridEncrypt](handle, config, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("hybrid_factory: cannot obtain primitive set: %s", err)
 	}

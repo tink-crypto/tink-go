@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/hybrid"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
@@ -740,7 +742,7 @@ var stubPrefix = []byte{0x01, 0x01, 0x02, 0x03, 0x04}
 type stubFullHybridEncrypt struct{}
 
 func (s *stubFullHybridEncrypt) Encrypt(data []byte, contextInfo []byte) ([]byte, error) {
-	return slices.Concat(stubPrefix, data, contextInfo), nil
+	return slices.Concat(stubPrefix, []byte("full_primitive"), data, contextInfo), nil
 }
 
 type stubParams struct{}
@@ -797,13 +799,14 @@ func (s *stubPublicKeyParser) ParseKey(serialization *protoserialization.KeySeri
 type stubFullHybridDecrypt struct{}
 
 func (s *stubFullHybridDecrypt) Decrypt(ct []byte, contextInfo []byte) ([]byte, error) {
-	if !bytes.HasPrefix(ct, stubPrefix) {
+	prefix := slices.Concat(stubPrefix, []byte("full_primitive"))
+	if !bytes.HasPrefix(ct, prefix) {
 		return nil, fmt.Errorf("invalid prefix")
 	}
 	if !bytes.HasSuffix(ct, contextInfo) {
 		return nil, fmt.Errorf("invalid contextInfo")
 	}
-	return bytes.TrimSuffix(bytes.TrimPrefix(ct, stubPrefix), contextInfo), nil
+	return bytes.TrimSuffix(bytes.TrimPrefix(ct, prefix), contextInfo), nil
 }
 
 type stubPrivateKey struct {
@@ -910,7 +913,7 @@ func TestPrimitivesFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encrypter.Encrypt() err = %v, want nil", err)
 	}
-	if !bytes.Equal(ciphertext, slices.Concat(stubPrefix, data, contextInfo)) {
+	if !bytes.Equal(ciphertext, slices.Concat(stubPrefix, []byte("full_primitive"), data, contextInfo)) {
 		t.Errorf("ciphertext = %q, want: %q", ciphertext, data)
 	}
 
@@ -1089,6 +1092,110 @@ func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
 			}
 			if got, want := plaintext, data; !bytes.Equal(got, want) {
 				t.Errorf("plaintext = %q, want: %q", got, want)
+			}
+		})
+	}
+}
+
+func TestNewWithConfig(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
+	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubPublicKeyURL, &stubPublicKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPublicKey](&stubPublicKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(stubPrivateKeyURL, &stubPrivateKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	builderWithFullPrimitive := config.NewBuilder()
+	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPublicKey](), func(key key.Key) (any, error) { return &stubFullHybridEncrypt{}, nil }, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPrivateKey](), func(key key.Key) (any, error) { return &stubFullHybridDecrypt{}, nil }, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	configWithFullPrimitive := builderWithFullPrimitive.Build()
+
+	builderWithLegacyPrimitive := config.NewBuilder()
+	if err := builderWithLegacyPrimitive.RegisterKeyManager(stubPublicKeyURL, &stubPublicKeyManager{}, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithLegacyPrimitive.RegisterKeyManager() err = %v, want nil", err)
+	}
+	if err := builderWithLegacyPrimitive.RegisterKeyManager(stubPrivateKeyURL, &stubPrivateKeyManager{}, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithLegacyPrimitive.RegisterKeyManager() err = %v, want nil", err)
+	}
+	configWithLegacyPrimitive := builderWithLegacyPrimitive.Build()
+
+	km := keyset.NewManager()
+	privateKey := &stubPrivateKey{
+		publicKey: &stubPublicKey{
+			prefixType:    tinkpb.OutputPrefixType_TINK,
+			idRequirement: 0x01020304,
+		},
+	}
+	if _, err := km.AddKeyWithOpts(privateKey, internalapi.Token{}, keyset.AsPrimary()); err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	for _, tc := range []struct {
+		name       string
+		kh         *keyset.Handle
+		config     keyset.Config
+		wantPrefix []byte
+	}{
+		{
+			name:       "full primitive",
+			config:     &configWithFullPrimitive,
+			kh:         handle,
+			wantPrefix: slices.Concat(stubPrefix, []byte("full_primitive")),
+		},
+		{
+			name:       "legacy primitive",
+			config:     &configWithLegacyPrimitive,
+			kh:         handle,
+			wantPrefix: slices.Concat(stubPrefix, []byte("legacy_primitive")),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			publicHandle, err := tc.kh.Public()
+			if err != nil {
+				t.Fatalf("handle.Public() err = %v, want nil", err)
+			}
+
+			encrypter, err := hybrid.NewHybridEncryptWithConfig(publicHandle, tc.config)
+			if err != nil {
+				t.Fatalf("hybrid.NewHybridEncryptWithConfig(tc.kh, config) err = %v, want nil", err)
+			}
+			decrypter, err := hybrid.NewHybridDecryptWithConfig(tc.kh, tc.config)
+			if err != nil {
+				t.Fatalf("hybrid.NewHybridDecryptWithConfig(tc.kh, config) err = %v, want nil", err)
+			}
+
+			ct, err := encrypter.Encrypt([]byte("message"), nil)
+			if err != nil {
+				t.Fatalf("encrypter.Encrypt() err = %v, want nil", err)
+			}
+			if !bytes.HasPrefix(ct, tc.wantPrefix) {
+				t.Errorf("m = %q, want prefix: %q", ct, tc.wantPrefix)
+			}
+			pt, err := decrypter.Decrypt(ct, nil)
+			if err != nil {
+				t.Fatalf("decrypter.Decrypt() err = %v, want nil", err)
+			}
+			if !bytes.Equal(pt, []byte("message")) {
+				t.Errorf("pt = %q, want: %q", pt, []byte("message"))
 			}
 		})
 	}
