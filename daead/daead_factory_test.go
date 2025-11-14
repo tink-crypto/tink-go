@@ -886,17 +886,11 @@ func TestNewWithConfig(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
 	}
 
-	builderWithFullPrimitive := config.NewBuilder()
-	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullDEAD{}, nil }, internalapi.Token{}); err != nil {
-		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	configBuilder := config.NewBuilder()
+	if err := configBuilder.RegisterPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullDEAD{}, nil }, internalapi.Token{}); err != nil {
+		t.Fatalf("configBuilder.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
-	configWithFullPrimitive := builderWithFullPrimitive.Build()
-
-	builderWithLegacyPrimitive := config.NewBuilder()
-	if err := builderWithLegacyPrimitive.RegisterKeyManager(stubKeyURL, &stubKeyManager{}, internalapi.Token{}); err != nil {
-		t.Fatalf("builderWithLegacyPrimitive.RegisterKeyManager() err = %v, want nil", err)
-	}
-	configWithLegacyPrimitive := builderWithLegacyPrimitive.Build()
+	config := configBuilder.Build()
 
 	km := keyset.NewManager()
 	keyID, err := km.AddKey(&stubKey{
@@ -914,43 +908,22 @@ func TestNewWithConfig(t *testing.T) {
 		t.Fatalf("km.Handle() err = %v, want nil", err)
 	}
 
-	for _, tc := range []struct {
-		name       string
-		kh         *keyset.Handle
-		config     keyset.Config
-		wantPrefix []byte
-	}{
-		{
-			name:       "full primitive",
-			config:     &configWithFullPrimitive,
-			kh:         handle,
-			wantPrefix: slices.Concat([]byte(fullDAEADPrefix)),
-		},
-		{
-			name:       "legacy primitive",
-			config:     &configWithLegacyPrimitive,
-			kh:         handle,
-			wantPrefix: slices.Concat([]byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04}, []byte(legacyDAEADPrefix)),
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			defer internalregistry.ClearMonitoringClient()
-			client := fakemonitoring.NewClient("fake-client")
-			if err := internalregistry.RegisterMonitoringClient(client); err != nil {
-				t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
-			}
-			encrypter, err := daead.NewWithConfig(tc.kh, tc.config)
-			if err != nil {
-				t.Fatalf("daead.NewWithConfig(tc.kh, config) err = %v, want nil", err)
-			}
+	defer internalregistry.ClearMonitoringClient()
+	client := fakemonitoring.NewClient("fake-client")
+	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+	encrypter, err := daead.NewWithConfig(handle, &config)
+	if err != nil {
+		t.Fatalf("daead.NewWithConfig() err = %v, want nil", err)
+	}
 
-			m, err := encrypter.EncryptDeterministically([]byte("message"), nil)
-			if err != nil {
-				t.Fatalf("encrypter.EncryptDeterministically() err = %v, want nil", err)
-			}
-			if !bytes.HasPrefix(m, tc.wantPrefix) {
-				t.Errorf("m = %q, want prefix: %q", m, tc.wantPrefix)
-			}
-		})
+	m, err := encrypter.EncryptDeterministically([]byte("message"), nil)
+	if err != nil {
+		t.Fatalf("encrypter.EncryptDeterministically() err = %v, want nil", err)
+	}
+	wantPrefix := slices.Concat([]byte(fullDAEADPrefix))
+	if !bytes.HasPrefix(m, wantPrefix) {
+		t.Errorf("m = %q, want prefix: %q", m, wantPrefix)
 	}
 }

@@ -23,35 +23,19 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/key"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // Config keeps a collection of functions that create a primitive from
 // [key.Key].
-//
-// This is an internal API.
 type Config struct {
 	primitiveConstructors map[reflect.Type]func(key key.Key) (any, error)
 	keysetManagers        map[string]registry.KeyManager
 }
 
-// PrimitiveFromKeyData creates a primitive from the given [tinkpb.KeyData].
-// Returns an error if there is no key manager registered for the given key
-// type URL.
-//
-// This is an internal API.
-func (c *Config) PrimitiveFromKeyData(kd *tinkpb.KeyData, _ internalapi.Token) (any, error) {
-	km, ok := c.keysetManagers[kd.GetTypeUrl()]
-	if !ok {
-		return nil, fmt.Errorf("PrimitiveFromKeyData: no key manager for key URL %v", kd.GetTypeUrl())
-	}
-	return km.Primitive(kd.GetValue())
-}
-
 // PrimitiveFromKey creates a primitive from the given [key.Key]. Returns an
 // error if there is no primitiveConstructor registered for the given key.
 //
-// This is an internal API.
+// This implements [keyset.Config].
 func (c *Config) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
 	keyType := reflect.TypeOf(k)
 	creator, ok := c.primitiveConstructors[keyType]
@@ -74,26 +58,11 @@ type Builder struct {
 // registered (no matter whether it's the same object or different, since
 // constructors are of type [Func] and they are never considered equal in Go
 // unless they are nil).
-//
-// This is an internal API.
 func (b *Builder) RegisterPrimitiveConstructor(keyType reflect.Type, constructor func(key key.Key) (any, error), _ internalapi.Token) error {
 	if _, ok := b.config.primitiveConstructors[keyType]; ok {
 		return fmt.Errorf("RegisterPrimitiveConstructor: attempt to register a different primitive constructor for the same key type %v", keyType)
 	}
 	b.config.primitiveConstructors[keyType] = constructor
-	return nil
-}
-
-// RegisterKeyManager registers a key manager for a key type URL.
-//
-// Not thread-safe.
-//
-// This is an internal API.
-func (b *Builder) RegisterKeyManager(keyTypeURL string, km registry.KeyManager, _ internalapi.Token) error {
-	if _, ok := b.config.keysetManagers[keyTypeURL]; ok {
-		return fmt.Errorf("RegisterKeyManager: attempt to register a different key manager for %v", keyTypeURL)
-	}
-	b.config.keysetManagers[keyTypeURL] = km
 	return nil
 }
 

@@ -23,7 +23,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/config/signatureconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
-	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
@@ -154,14 +153,6 @@ func TestConfigV0Signer(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			ps, err := protoserialization.SerializeKey(test.key)
-			if err != nil {
-				t.Fatalf("protoserialization.SerializeKey() err = %v, want nil", err)
-			}
-			if _, err := configV0.PrimitiveFromKeyData(ps.KeyData(), internalapi.Token{}); err == nil {
-				t.Fatalf("configV0.PrimitiveFromKeyData() err = nil, want error")
-			}
-
 			primitive, err := configV0.PrimitiveFromKey(test.key, internalapi.Token{})
 			if err != nil {
 				t.Fatalf("configV0.PrimitiveFromKey() err = %v, want nil", err)

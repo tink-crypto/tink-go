@@ -18,11 +18,9 @@ import (
 	"reflect"
 	"testing"
 
-	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/key"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 type testParameters0 struct{}
@@ -89,47 +87,6 @@ const (
 	typeURL1 = "type_url_1"
 )
 
-type stubKeyManager0 struct{}
-
-func (km *stubKeyManager0) Primitive(_ []byte) (any, error)              { return &testPrimitive0{}, nil }
-func (km *stubKeyManager0) NewKeyData(_ []byte) (*tinkpb.KeyData, error) { return nil, nil }
-func (km *stubKeyManager0) DoesSupport(t string) bool                    { return t == typeURL0 }
-func (km *stubKeyManager0) TypeURL() string                              { return typeURL0 }
-func (km *stubKeyManager0) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
-	return nil, nil
-}
-
-type stubKeyManager1 struct{}
-
-func (km *stubKeyManager1) Primitive(_ []byte) (any, error)                          { return &testPrimitive1{}, nil }
-func (km *stubKeyManager1) NewKeyData(_ []byte) (*tinkpb.KeyData, error)             { return nil, nil }
-func (km *stubKeyManager1) DoesSupport(t string) bool                                { return t == typeURL1 }
-func (km *stubKeyManager1) TypeURL() string                                          { return typeURL1 }
-func (km *stubKeyManager1) NewKey(serializedKeyFormat []byte) (proto.Message, error) { return nil, nil }
-
-func TestConfigPrimitiveFromKeDataWorks(t *testing.T) {
-	builder := config.NewBuilder()
-	token := internalapi.Token{}
-
-	if err := builder.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token); err != nil {
-		t.Fatalf("builder.RegisterKeyManager() err = %v, want nil", err)
-	}
-
-	config := builder.Build()
-
-	keyData := &tinkpb.KeyData{
-		TypeUrl: typeURL0,
-		Value:   []byte("key"),
-	}
-	p0, err := config.PrimitiveFromKeyData(keyData, token)
-	if err != nil {
-		t.Fatalf("config.PrimitiveFromKeyData() err = %v, want nil", err)
-	}
-	if p0.(*testPrimitive0) == nil {
-		t.Errorf("Wrong primitive returned: got %T, want testPrimitive0", p0)
-	}
-}
-
 func TestMultiplePrimitiveConstructors(t *testing.T) {
 	builder := config.NewBuilder()
 	token := internalapi.Token{}
@@ -159,35 +116,6 @@ func TestMultiplePrimitiveConstructors(t *testing.T) {
 	}
 }
 
-func TestMultipleKeyManagers(t *testing.T) {
-	builder := config.NewBuilder()
-	token := internalapi.Token{}
-
-	if err := builder.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token); err != nil {
-		t.Fatalf("builder.RegisterKeyManager() err = %v, want nil", err)
-	}
-	if err := builder.RegisterKeyManager(typeURL1, &stubKeyManager1{}, token); err != nil {
-		t.Fatalf("builder.RegisterKeyManager() err = %v, want nil", err)
-	}
-
-	config := builder.Build()
-
-	p0, err := config.PrimitiveFromKeyData(&tinkpb.KeyData{TypeUrl: typeURL0, Value: []byte("key")}, token)
-	if err != nil {
-		t.Fatalf("config.PrimitiveFromKeyData() err = %v, want nil", err)
-	}
-	if p0.(*testPrimitive0) == nil {
-		t.Errorf("Wrong primitive returned: got %T, want testPrimitive0", p0)
-	}
-	p1, err := config.PrimitiveFromKeyData(&tinkpb.KeyData{TypeUrl: typeURL1, Value: []byte("key")}, token)
-	if err != nil {
-		t.Fatalf("config.PrimitiveFromKeyData() err = %v, want nil", err)
-	}
-	if p1.(*testPrimitive1) == nil {
-		t.Errorf("Wrong primitive returned: got %T, want testPrimitive0", p1)
-	}
-}
-
 func TestRegisterDifferentPrimitiveConstructor(t *testing.T) {
 	builder := config.NewBuilder()
 	token := internalapi.Token{}
@@ -199,20 +127,6 @@ func TestRegisterDifferentPrimitiveConstructor(t *testing.T) {
 	// Register another primitiveCreator for the same key type fails.
 	if err := builder.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), primitive0Constructor, token); err == nil {
 		t.Errorf("builder.RegisterPrimitiveConstructor() err = nil, want error")
-	}
-}
-
-func TestRegisterDifferentKeyManagers(t *testing.T) {
-	builder := config.NewBuilder()
-	token := internalapi.Token{}
-
-	if err := builder.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token); err != nil {
-		t.Fatalf("builder.RegisterKeyManager() err = %v, want nil", err)
-	}
-
-	// Register another primitiveCreator for the same key type fails.
-	if err := builder.RegisterKeyManager(typeURL0, &stubKeyManager1{}, token); err == nil {
-		t.Errorf("builder.RegisterKeyManager() err = nil, want error")
 	}
 }
 
@@ -231,20 +145,6 @@ func TestUnregisteredPrimitive(t *testing.T) {
 	}
 	if res != nil {
 		t.Errorf("config.PrimitiveFromKey() return value = %v, want nil", res)
-	}
-}
-
-func TestUnregisteredKeyManager(t *testing.T) {
-	builder := config.NewBuilder()
-	token := internalapi.Token{}
-
-	if err := builder.RegisterKeyManager(typeURL0, &stubKeyManager0{}, token); err != nil {
-		t.Fatalf("builder.RegisterKeyManager() err = %v, want nil", err)
-	}
-	config := builder.Build()
-
-	if _, err := config.PrimitiveFromKeyData(&tinkpb.KeyData{TypeUrl: typeURL1, Value: []byte("key")}, token); err == nil {
-		t.Errorf("config.PrimitiveFromKey() err = nil, want error")
 	}
 }
 

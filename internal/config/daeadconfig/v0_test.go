@@ -26,7 +26,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config/daeadconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -74,7 +73,7 @@ func TestConfigV0MACFailsIfKeyNotMAC(t *testing.T) {
 		t.Fatalf(" aessiv.NewKey() err = %v, want nil", err)
 	}
 	if _, err := configV0.PrimitiveFromKey(aesGCMKey, internalapi.Token{}); err == nil {
-		t.Errorf("configV0.PrimitiveFromKeyData() err = nil, want error")
+		t.Errorf("configV0.PrimitiveFromKey() err = nil, want error")
 	}
 }
 
@@ -107,14 +106,6 @@ func TestConfigV0MAC(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			ps, err := protoserialization.SerializeKey(test.key)
-			if err != nil {
-				t.Fatalf("protoserialization.SerializeKey() err = %v, want nil", err)
-			}
-			if _, err := configV0.PrimitiveFromKeyData(ps.KeyData(), internalapi.Token{}); err == nil {
-				t.Fatalf("configV0.PrimitiveFromKeyData() err = nil, want error")
-			}
-
 			d, err := configV0.PrimitiveFromKey(test.key, internalapi.Token{})
 			if err != nil {
 				t.Fatalf("configV0.PrimitiveFromKey() err = %v, want nil", err)

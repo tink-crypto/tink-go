@@ -30,7 +30,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
@@ -501,26 +500,11 @@ func TestNewWithConfig(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
 	}
 
-	builderWithFullPrimitive := config.NewBuilder()
-	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullPRF{}, nil }, internalapi.Token{}); err != nil {
-		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	configBuilder := config.NewBuilder()
+	if err := configBuilder.RegisterPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullPRF{}, nil }, internalapi.Token{}); err != nil {
+		t.Fatalf("configBuilder.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
-	configWithFullPrimitive := builderWithFullPrimitive.Build()
-
-	builderWithLegacyPrimitive := config.NewBuilder()
-	keyManager := &stubkeymanager.StubKeyManager{
-		URL:  keyURL,
-		Prim: &legacyPRF{},
-		KeyData: &tinkpb.KeyData{
-			TypeUrl:         keyURL,
-			Value:           []byte("serialized_key"),
-			KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
-		},
-	}
-	if err := builderWithLegacyPrimitive.RegisterKeyManager(keyURL, keyManager, internalapi.Token{}); err != nil {
-		t.Fatalf("builderWithLegacyPrimitive.RegisterKeyManager() err = %v, want nil", err)
-	}
-	configWithLegacyPrimitive := builderWithLegacyPrimitive.Build()
+	config := configBuilder.Build()
 
 	km := keyset.NewManager()
 	if _, err := km.AddKeyWithOpts(&stubKey{}, internalapi.Token{}, keyset.AsPrimary()); err != nil {
@@ -531,37 +515,15 @@ func TestNewWithConfig(t *testing.T) {
 		t.Fatalf("km.Handle() err = %v, want nil", err)
 	}
 
-	for _, tc := range []struct {
-		name       string
-		kh         *keyset.Handle
-		config     keyset.Config
-		wantPrefix []byte
-	}{
-		{
-			name:       "full primitive",
-			config:     &configWithFullPrimitive,
-			kh:         handle,
-			wantPrefix: []byte("full_primitive"),
-		},
-		{
-			name:       "legacy primitive",
-			config:     &configWithLegacyPrimitive,
-			kh:         handle,
-			wantPrefix: []byte("legacy_primitive"),
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			prfSet, err := prf.NewPRFSetWithConfig(tc.kh, tc.config)
-			if err != nil {
-				t.Fatalf("prf.NewPRFSetWithConfig(tc.kh, config) err = %v, want nil", err)
-			}
-			out, err := prfSet.ComputePrimaryPRF([]byte("message"), 10)
-			if err != nil {
-				t.Fatalf("prfSet.ComputePrimaryPRF() err = %v, want nil", err)
-			}
-			if !bytes.HasPrefix(out, tc.wantPrefix) {
-				t.Errorf("out = %q, want prefix: %q", out, tc.wantPrefix)
-			}
-		})
+	prfSet, err := prf.NewPRFSetWithConfig(handle, &config)
+	if err != nil {
+		t.Fatalf("prf.NewPRFSetWithConfig() err = %v, want nil", err)
+	}
+	out, err := prfSet.ComputePrimaryPRF([]byte("message"), 10)
+	if err != nil {
+		t.Fatalf("prfSet.ComputePrimaryPRF() err = %v, want nil", err)
+	}
+	if !bytes.HasPrefix(out, []byte("full_primitive")) {
+		t.Errorf("out = %q, want prefix: %q", out, []byte("full_primitive"))
 	}
 }

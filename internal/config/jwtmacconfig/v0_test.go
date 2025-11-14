@@ -45,7 +45,7 @@ func TestConfigV0JWTMACFailsIfKeyNotMAC(t *testing.T) {
 		t.Fatalf(" aessiv.NewKey() err = %v, want nil", err)
 	}
 	if _, err := configV0.PrimitiveFromKey(aesGCMKey, internalapi.Token{}); err == nil {
-		t.Errorf("configV0.PrimitiveFromKeyData() err = nil, want error")
+		t.Errorf("configV0.PrimitiveFromKey() err = nil, want error")
 	}
 }
 

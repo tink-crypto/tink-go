@@ -205,11 +205,6 @@ func TestConfigV0AEAD(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			// No key manager for this key type.
-			if _, err := configV0.PrimitiveFromKeyData(test.keyData, internalapi.Token{}); err == nil {
-				t.Fatalf("configV0.PrimitiveFromKeyData() err=nil, want error")
-			}
-
 			aead, err := configV0.PrimitiveFromKey(test.key, internalapi.Token{})
 			if err != nil {
 				t.Fatalf("configV0.PrimitiveFromKey() err=%v, want nil", err)

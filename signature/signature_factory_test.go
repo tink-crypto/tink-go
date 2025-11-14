@@ -856,23 +856,15 @@ func TestNewWithConfig(t *testing.T) {
 
 	signerConstructor := func(key key.Key) (any, error) { return &stubFullSigner{}, nil }
 	verifierConstructor := func(key key.Key) (any, error) { return &stubFullVerifier{}, nil }
-	builderWithFullPrimitive := config.NewBuilder()
-	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPrivateKey](), signerConstructor, internalapi.Token{}); err != nil {
-		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
-	}
-	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPublicKey](), verifierConstructor, internalapi.Token{}); err != nil {
-		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
-	}
-	configWithFullPrimitive := builderWithFullPrimitive.Build()
 
-	builderWithLegacyPrimitive := config.NewBuilder()
-	if err := builderWithLegacyPrimitive.RegisterKeyManager(stubPrivateKeyURL, &stubPrivateKeyManager{}, internalapi.Token{}); err != nil {
-		t.Fatalf("builderWithLegacyPrimitive.RegisterKeyManager() err = %v, want nil", err)
+	configBuilder := config.NewBuilder()
+	if err := configBuilder.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPrivateKey](), signerConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("configBuilder.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
-	if err := builderWithLegacyPrimitive.RegisterKeyManager(stubPublicKeyURL, &stubPublicKeyManager{}, internalapi.Token{}); err != nil {
-		t.Fatalf("builderWithLegacyPrimitive.RegisterKeyManager() err = %v, want nil", err)
+	if err := configBuilder.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPublicKey](), verifierConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("configBuilder.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
-	configWithLegacyPrimitive := builderWithLegacyPrimitive.Build()
+	config := configBuilder.Build()
 
 	km := keyset.NewManager()
 	keyID, err := km.AddKey(&stubPrivateKey{
@@ -894,50 +886,26 @@ func TestNewWithConfig(t *testing.T) {
 		t.Fatalf("privHandle.Public() err = %v, want nil", err)
 	}
 
-	for _, tc := range []struct {
-		name             string
-		privHandle       *keyset.Handle
-		pubHandle        *keyset.Handle
-		config           keyset.Config
-		wantSignerPrefix []byte
-	}{
-		{
-			name:             "full primitive",
-			config:           &configWithFullPrimitive,
-			privHandle:       privHandle,
-			pubHandle:        pubHandle,
-			wantSignerPrefix: []byte("full_primitive_prefix"),
-		},
-		{
-			name:             "legacy primitive",
-			config:           &configWithLegacyPrimitive,
-			privHandle:       privHandle,
-			pubHandle:        pubHandle,
-			wantSignerPrefix: []byte("legacy_signer_prefix"),
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			signer, err := signature.NewSignerWithConfig(tc.privHandle, tc.config)
-			if err != nil {
-				t.Fatalf("signature.NewSignerWithConfig() err = %v, want nil", err)
-			}
+	signer, err := signature.NewSignerWithConfig(privHandle, &config)
+	if err != nil {
+		t.Fatalf("signature.NewSignerWithConfig() err = %v, want nil", err)
+	}
 
-			data := []byte("message")
-			sig, err := signer.Sign(data)
-			if err != nil {
-				t.Fatalf("signer.Sign() err = %v, want nil", err)
-			}
-			if !bytes.HasPrefix(sig, tc.wantSignerPrefix) {
-				t.Errorf("sig = %q, want prefix: %q", sig, tc.wantSignerPrefix)
-			}
+	data := []byte("message")
+	sig, err := signer.Sign(data)
+	if err != nil {
+		t.Fatalf("signer.Sign() err = %v, want nil", err)
+	}
+	wantPrefix := []byte("full_primitive_prefix")
+	if !bytes.HasPrefix(sig, wantPrefix) {
+		t.Errorf("sig = %q, want prefix: %q", sig, wantPrefix)
+	}
 
-			verifier, err := signature.NewVerifierWithConfig(tc.pubHandle, tc.config)
-			if err != nil {
-				t.Fatalf("signature.NewVerifierWithConfig() err = %v, want nil", err)
-			}
-			if err := verifier.Verify(sig, data); err != nil {
-				t.Errorf("verifier.Verify() err = %v, want nil", err)
-			}
-		})
+	verifier, err := signature.NewVerifierWithConfig(pubHandle, &config)
+	if err != nil {
+		t.Fatalf("signature.NewVerifierWithConfig() err = %v, want nil", err)
+	}
+	if err := verifier.Verify(sig, data); err != nil {
+		t.Errorf("verifier.Verify() err = %v, want nil", err)
 	}
 }

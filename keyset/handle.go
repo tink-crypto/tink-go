@@ -485,12 +485,16 @@ func (h *Handle) WriteWithNoSecrets(w Writer) error {
 	return w.Write(protoKeyset)
 }
 
-// Config defines methods in the config.Config concrete type that are used by keyset.Handle.
-// The config.Config concrete type is not used directly due to circular dependencies.
+// Config provides methods to create primitives from [key.Key]s.
 type Config interface {
-	PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error)
 	// PrimitiveFromKey creates a primitive from a [key.Key].
 	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
+}
+
+type configWithLegacyFallback interface {
+	Config
+	// PrimitiveFromKeyData creates a primitive from a [tinkpb.KeyData].
+	PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error)
 }
 
 type primitiveOptions struct {
@@ -543,8 +547,13 @@ func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry 
 	isFullPrimitive := true
 	primitive, err = config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
 	if err != nil {
+		// Check if we can have a fallback.
+		configWithLegacyFallback, ok := config.(configWithLegacyFallback)
+		if !ok {
+			return fmt.Errorf("cannot get primitive from key: %v", err)
+		}
 		isFullPrimitive = false
-		primitive, err = config.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})
+		primitive, err = configWithLegacyFallback.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})
 		if err != nil {
 			return fmt.Errorf("cannot get primitive from key data: %v", err)
 		}
