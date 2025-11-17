@@ -34,15 +34,14 @@ type config interface {
 	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
 }
 
-type primitiveFunc func(serializedKey []byte) (any, error)
+type primitiveConstructor func(key key.Key) (any, error)
 
 // KeyManager implements the [registry.KeyManager] interface.
 type KeyManager struct {
-	typeURL             string
-	config              config
-	protoKeyUnmashaller func([]byte) (proto.Message, error)
-	keyMaterialType     tinkpb.KeyData_KeyMaterialType
-	primitiveFunc       primitiveFunc
+	typeURL              string
+	protoKeyUnmashaller  func([]byte) (proto.Message, error)
+	keyMaterialType      tinkpb.KeyData_KeyMaterialType
+	primitiveConstructor primitiveConstructor
 }
 
 var _ registry.KeyManager = (*KeyManager)(nil)
@@ -50,31 +49,17 @@ var _ registry.KeyManager = (*KeyManager)(nil)
 // New creates a new [LegacyKeyManager].
 //
 // Assumes parameters are not nil.
-func New(typeURL string, config config, keyMaterialType tinkpb.KeyData_KeyMaterialType, protoKeyUnmashaller func([]byte) (proto.Message, error)) *KeyManager {
-	km := &KeyManager{
-		typeURL:             typeURL,
-		config:              config,
-		protoKeyUnmashaller: protoKeyUnmashaller,
-		keyMaterialType:     keyMaterialType,
-	}
-	km.primitiveFunc = km.defaultPrimitiveFunc
-	return km
-}
-
-// NewWithCustomPrimitive creates a new [LegacyKeyManager] with a custom primitive function.
-//
-// Assumes parameters are not nil.
-func NewWithCustomPrimitive(typeURL string, config config, keyMaterialType tinkpb.KeyData_KeyMaterialType, protoKeyUnmashaller func([]byte) (proto.Message, error), pf primitiveFunc) *KeyManager {
+func New(typeURL string, primitiveConstructor primitiveConstructor, keyMaterialType tinkpb.KeyData_KeyMaterialType, protoKeyUnmashaller func([]byte) (proto.Message, error)) *KeyManager {
 	return &KeyManager{
-		typeURL:             typeURL,
-		config:              config,
-		protoKeyUnmashaller: protoKeyUnmashaller,
-		keyMaterialType:     keyMaterialType,
-		primitiveFunc:       pf,
+		typeURL:              typeURL,
+		protoKeyUnmashaller:  protoKeyUnmashaller,
+		keyMaterialType:      keyMaterialType,
+		primitiveConstructor: primitiveConstructor,
 	}
 }
 
-func (m *KeyManager) defaultPrimitiveFunc(serializedKey []byte) (any, error) {
+// Primitive creates a primitive from the given serialized key.
+func (m *KeyManager) Primitive(serializedKey []byte) (any, error) {
 	keySerialization, err := protoserialization.NewKeySerialization(&tinkpb.KeyData{
 		TypeUrl:         m.typeURL,
 		Value:           serializedKey,
@@ -87,12 +72,7 @@ func (m *KeyManager) defaultPrimitiveFunc(serializedKey []byte) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return m.config.PrimitiveFromKey(key, internalapi.Token{})
-}
-
-// Primitive creates a primitive from the given serialized key.
-func (m *KeyManager) Primitive(serializedKey []byte) (any, error) {
-	return m.primitiveFunc(serializedKey)
+	return m.primitiveConstructor(key)
 }
 
 // NewKey creates a new key from the given serialized key format.
@@ -150,16 +130,9 @@ type PrivateKeyManager struct {
 var _ registry.PrivateKeyManager = (*PrivateKeyManager)(nil)
 
 // NewPrivateKeyManager creates a new [PrivateKeyManager].
-func NewPrivateKeyManager(typeURL string, config config, keyMaterialType tinkpb.KeyData_KeyMaterialType, protoKeyUnmashaller func([]byte) (proto.Message, error)) *PrivateKeyManager {
+func NewPrivateKeyManager(typeURL string, primitiveConstructor primitiveConstructor, keyMaterialType tinkpb.KeyData_KeyMaterialType, protoKeyUnmashaller func([]byte) (proto.Message, error)) *PrivateKeyManager {
 	return &PrivateKeyManager{
-		KeyManager: *New(typeURL, config, keyMaterialType, protoKeyUnmashaller),
-	}
-}
-
-// NewPrivateKeyManagerWithCustomPrimitive creates a new [PrivateKeyManager] with a custom primitive function.
-func NewPrivateKeyManagerWithCustomPrimitive(typeURL string, config config, keyMaterialType tinkpb.KeyData_KeyMaterialType, protoKeyUnmashaller func([]byte) (proto.Message, error), pf primitiveFunc) *PrivateKeyManager {
-	return &PrivateKeyManager{
-		KeyManager: *NewWithCustomPrimitive(typeURL, config, keyMaterialType, protoKeyUnmashaller, pf),
+		KeyManager: *New(typeURL, primitiveConstructor, keyMaterialType, protoKeyUnmashaller),
 	}
 }
 

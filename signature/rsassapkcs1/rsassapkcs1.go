@@ -27,13 +27,12 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	rsassapkcs1pb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pkcs1_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func init() {
-	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManager(signerTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func(b []byte) (proto.Message, error) {
+	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManager(signerTypeURL, signerConstructor, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func(b []byte) (proto.Message, error) {
 		protoKey := &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{}
 		if err := proto.Unmarshal(b, protoKey); err != nil {
 			return nil, err
@@ -42,7 +41,7 @@ func init() {
 	})); err != nil {
 		panic(fmt.Sprintf("rsassapkcs1.init() failed: %v", err))
 	}
-	if err := registry.RegisterKeyManager(legacykeymanager.New(verifierTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PUBLIC, func(b []byte) (proto.Message, error) {
+	if err := registry.RegisterKeyManager(legacykeymanager.New(verifierTypeURL, verifierConstructor, tinkpb.KeyData_ASYMMETRIC_PUBLIC, func(b []byte) (proto.Message, error) {
 		protoKey := &rsassapkcs1pb.RsaSsaPkcs1PublicKey{}
 		if err := proto.Unmarshal(b, protoKey); err != nil {
 			return nil, err

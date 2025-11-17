@@ -41,7 +41,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	eciespb "github.com/tink-crypto/tink-go/v2/proto/ecies_aead_hkdf_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -74,7 +73,7 @@ func init() {
 	if err := keygenregistry.RegisterKeyCreator[*Parameters](createPrivateKey); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
-	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManager(privateKeyTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func(b []byte) (proto.Message, error) {
+	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManager(privateKeyTypeURL, hybridDecryptConstructor, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func(b []byte) (proto.Message, error) {
 		protoKey := &eciespb.EciesAeadHkdfPrivateKey{}
 		if err := proto.Unmarshal(b, protoKey); err != nil {
 			return nil, err
@@ -83,7 +82,7 @@ func init() {
 	})); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
-	if err := registry.RegisterKeyManager(legacykeymanager.New(publicKeyTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PUBLIC, func(b []byte) (proto.Message, error) {
+	if err := registry.RegisterKeyManager(legacykeymanager.New(publicKeyTypeURL, hybridEncryptConstructor, tinkpb.KeyData_ASYMMETRIC_PUBLIC, func(b []byte) (proto.Message, error) {
 		protoKey := &eciespb.EciesAeadHkdfPublicKey{}
 		if err := proto.Unmarshal(b, protoKey); err != nil {
 			return nil, err

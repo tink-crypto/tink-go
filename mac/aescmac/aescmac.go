@@ -27,13 +27,12 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	cmacpb "github.com/tink-crypto/tink-go/v2/proto/aes_cmac_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func newKeyManager() registry.KeyManager {
-	return legacykeymanager.New(typeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_SYMMETRIC, func(b []byte) (proto.Message, error) {
+	return legacykeymanager.New(typeURL, primitiveConstructor, tinkpb.KeyData_SYMMETRIC, func(b []byte) (proto.Message, error) {
 		protoKey := &cmacpb.AesCmacKey{}
 		if err := proto.Unmarshal(b, protoKey); err != nil {
 			return nil, err

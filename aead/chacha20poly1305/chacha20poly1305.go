@@ -26,13 +26,12 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	chacha20poly1305pb "github.com/tink-crypto/tink-go/v2/proto/chacha20_poly1305_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 func newKeyManager() registry.KeyManager {
-	return legacykeymanager.New(typeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_SYMMETRIC, func(b []byte) (proto.Message, error) {
+	return legacykeymanager.New(typeURL, primitiveConstructor, tinkpb.KeyData_SYMMETRIC, func(b []byte) (proto.Message, error) {
 		protoKey := &chacha20poly1305pb.ChaCha20Poly1305Key{}
 		if err := proto.Unmarshal(b, protoKey); err != nil {
 			return nil, err

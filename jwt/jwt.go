@@ -23,11 +23,11 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/legacykeymanager"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"             // Also registers jwtecdsa keys and proto serialization.
 	"github.com/tink-crypto/tink-go/v2/jwt/jwthmac"               // Also registers jwthmac keys and proto serialization.
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1" // Also registers jwtrsassapkcs1 keys and proto serialization.
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"     // Also registers jwtrsassapss keys and proto serialization.
+	"github.com/tink-crypto/tink-go/v2/key"
 	jepb "github.com/tink-crypto/tink-go/v2/proto/jwt_ecdsa_go_proto"
 	jwtmacpb "github.com/tink-crypto/tink-go/v2/proto/jwt_hmac_go_proto"
 	jrsppb "github.com/tink-crypto/tink-go/v2/proto/jwt_rsa_ssa_pkcs1_go_proto"
@@ -59,19 +59,19 @@ const (
 	jwtJWTRSASSAPSSSignerTypeURL     = "type.googleapis.com/google.crypto.tink.JwtRsaSsaPssPrivateKey"
 )
 
-func jwtHMACPrimitive(_ []byte) (any, error) {
+func jwtHMACPrimitive(_ key.Key) (any, error) {
 	return nil, fmt.Errorf("the key manager should not be used to obtain a new primitive from a JWT HMAC key")
 }
 
-func jwtECDSASignerPrimitive(_ []byte) (any, error) {
+func jwtECDSASignerPrimitive(_ key.Key) (any, error) {
 	return nil, fmt.Errorf("the key manager should not be used to obtain a new primitive from a JWT ECDSA key")
 }
 
-func jwtRSASSAPKCS1Primitive(_ []byte) (any, error) {
+func jwtRSASSAPKCS1Primitive(_ key.Key) (any, error) {
 	return nil, fmt.Errorf("the key manager should not be used to obtain a new primitive from a JWT RSA SSA PKCS1 key")
 }
 
-func jwtRSASSAPSSPrimitive(_ []byte) (any, error) {
+func jwtRSASSAPSSPrimitive(_ key.Key) (any, error) {
 	return nil, fmt.Errorf("the key manager should not be used to obtain a new primitive from a JWT RSA SSA PSS key")
 }
 
@@ -132,28 +132,28 @@ func unmarshalJWTRSASSAPSSPublicKey(serializedKey []byte) (proto.Message, error)
 }
 
 func init() {
-	if err := registry.RegisterKeyManager(legacykeymanager.NewWithCustomPrimitive(jwtHMACTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_SYMMETRIC, unmarshalJWTHMACKey, jwtHMACPrimitive)); err != nil {
+	if err := registry.RegisterKeyManager(legacykeymanager.New(jwtHMACTypeURL, jwtHMACPrimitive, tinkpb.KeyData_SYMMETRIC, unmarshalJWTHMACKey)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT HMAC key manager: %v", err))
 	}
 
-	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManagerWithCustomPrimitive(jwtECDSASignerTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, unmarshalJWTECDSAPrivateKey, jwtECDSASignerPrimitive)); err != nil {
+	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManager(jwtECDSASignerTypeURL, jwtECDSASignerPrimitive, tinkpb.KeyData_ASYMMETRIC_PRIVATE, unmarshalJWTECDSAPrivateKey)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT ECDSA signer key manager: %v", err))
 	}
-	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManagerWithCustomPrimitive(jwtJWTRSASSAPKCS1SignerTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, unmarshalJWTRSASSAPKCS1PrivateKey, jwtRSASSAPKCS1Primitive)); err != nil {
+	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManager(jwtJWTRSASSAPKCS1SignerTypeURL, jwtRSASSAPKCS1Primitive, tinkpb.KeyData_ASYMMETRIC_PRIVATE, unmarshalJWTRSASSAPKCS1PrivateKey)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PKCS1 signer key manager: %v", err))
 	}
-	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManagerWithCustomPrimitive(jwtJWTRSASSAPSSSignerTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, unmarshalJWTRSASSAPSSPrivateKey, jwtRSASSAPSSPrimitive)); err != nil {
+	if err := registry.RegisterKeyManager(legacykeymanager.NewPrivateKeyManager(jwtJWTRSASSAPSSSignerTypeURL, jwtRSASSAPSSPrimitive, tinkpb.KeyData_ASYMMETRIC_PRIVATE, unmarshalJWTRSASSAPSSPrivateKey)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PSS signer key manager: %v", err))
 	}
 
 	// Verifier key managers.
-	if err := registry.RegisterKeyManager(legacykeymanager.NewWithCustomPrimitive(jwtECDSAVerifierTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PUBLIC, unmarshalJWTECDSAPublicKey, jwtECDSASignerPrimitive)); err != nil {
+	if err := registry.RegisterKeyManager(legacykeymanager.New(jwtECDSAVerifierTypeURL, jwtECDSASignerPrimitive, tinkpb.KeyData_ASYMMETRIC_PUBLIC, unmarshalJWTECDSAPublicKey)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT ECDSA verifier key manager: %v", err))
 	}
-	if err := registry.RegisterKeyManager(legacykeymanager.NewWithCustomPrimitive(jwtJWTRSASSAPKCS1VerifierTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PUBLIC, unmarshalJWTRSASSAPKCS1PublicKey, jwtRSASSAPKCS1Primitive)); err != nil {
+	if err := registry.RegisterKeyManager(legacykeymanager.New(jwtJWTRSASSAPKCS1VerifierTypeURL, jwtRSASSAPKCS1Primitive, tinkpb.KeyData_ASYMMETRIC_PUBLIC, unmarshalJWTRSASSAPKCS1PublicKey)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PKCS1 verifier key manager: %v", err))
 	}
-	if err := registry.RegisterKeyManager(legacykeymanager.NewWithCustomPrimitive(jwtJWTRSASSAPSSVerifierTypeURL, &registryconfig.RegistryConfig{}, tinkpb.KeyData_ASYMMETRIC_PUBLIC, unmarshalJWTRSASSAPSSPublicKey, jwtRSASSAPSSPrimitive)); err != nil {
+	if err := registry.RegisterKeyManager(legacykeymanager.New(jwtJWTRSASSAPSSVerifierTypeURL, jwtRSASSAPSSPrimitive, tinkpb.KeyData_ASYMMETRIC_PUBLIC, unmarshalJWTRSASSAPSSPublicKey)); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PSS verifier key manager: %v", err))
 	}
 

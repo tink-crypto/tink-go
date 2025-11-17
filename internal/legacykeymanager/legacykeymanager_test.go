@@ -23,7 +23,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -40,21 +39,8 @@ var (
 	errFake = errors.New("fake error")
 )
 
-// fakeConfig is a fake implementation of the config interface.
-type fakeConfig struct {
-	primitive any
-	err       error
-}
-
-func (c *fakeConfig) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
-	if c.err != nil {
-		return nil, c.err
-	}
-	return c.primitive, nil
-}
-
-func (c *fakeConfig) PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error) {
-	return nil, errors.New("unimplemented")
+func fakePrimitiveConstructor(_ key.Key) (any, error) {
+	return "123", nil
 }
 
 type fakeKey struct{}
@@ -82,25 +68,25 @@ func TestDoesSupport(t *testing.T) {
 	}{
 		{
 			name:    "KeyManager",
-			km:      New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil),
+			km:      New(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, nil),
 			typeURL: fakeKeyTypeURL,
 			want:    true,
 		},
 		{
 			name:    "PrivateKeyManager",
-			km:      NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil),
+			km:      NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, nil),
 			typeURL: fakeKeyTypeURL,
 			want:    true,
 		},
 		{
 			name:    "KeyManager_invalidTypeURL",
-			km:      New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil),
+			km:      New(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, nil),
 			typeURL: "invalid type URL",
 			want:    false,
 		},
 		{
 			name:    "PrivateKeyManager_invalidTypeURL",
-			km:      NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil),
+			km:      NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, nil),
 			typeURL: "invalid type URL",
 			want:    false,
 		},
@@ -121,12 +107,12 @@ func TestTypeURL(t *testing.T) {
 	}{
 		{
 			name: "KeyManager",
-			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil),
+			km:   New(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, nil),
 			want: fakeKeyTypeURL,
 		},
 		{
 			name: "PrivateKeyManager",
-			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil),
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, nil),
 			want: fakeKeyTypeURL,
 		},
 	} {
@@ -146,12 +132,12 @@ func TestPrimitive_Success(t *testing.T) {
 	}{
 		{
 			name:          "KeyManager",
-			km:            New(fakeKeyTypeURL, &fakeConfig{primitive: "primitive"}, tinkpb.KeyData_SYMMETRIC, nil),
+			km:            New(fakeKeyTypeURL, func(_ key.Key) (any, error) { return "primitive", nil }, tinkpb.KeyData_SYMMETRIC, nil),
 			wantPrimitive: "primitive",
 		},
 		{
 			name:          "PrivateKeyManager",
-			km:            NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{primitive: "primitive"}, tinkpb.KeyData_SYMMETRIC, nil),
+			km:            NewPrivateKeyManager(fakeKeyTypeURL, func(_ key.Key) (any, error) { return "primitive", nil }, tinkpb.KeyData_SYMMETRIC, nil),
 			wantPrimitive: "primitive",
 		},
 	} {
@@ -205,67 +191,11 @@ func (p *fakeParametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Param
 	return p.params, nil
 }
 
-func TestPrimitive_WithCustomPrimitiveFunc(t *testing.T) {
-	customPrimitive := "custom primitive"
-	customErr := errors.New("custom error")
-
-	tests := []struct {
-		name          string
-		km            registry.KeyManager
-		pFunc         primitiveFunc
-		wantPrimitive any
-		wantErr       error
-	}{
-		{
-			name: "KeyManager_CustomFuncReturnsPrimitive",
-			km: NewWithCustomPrimitive(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil, func(serializedKey []byte) (any, error) {
-				return customPrimitive, nil
-			}),
-			wantPrimitive: customPrimitive,
-			wantErr:       nil,
-		},
-		{
-			name: "KeyManager_CustomFuncReturnsError",
-			km: NewWithCustomPrimitive(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil, func(serializedKey []byte) (any, error) {
-				return nil, customErr
-			}),
-			wantPrimitive: nil,
-			wantErr:       customErr,
-		},
-		{
-			name: "PrivateKeyManager_CustomFuncReturnsPrimitive",
-			km: NewPrivateKeyManagerWithCustomPrimitive(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil, func(serializedKey []byte) (any, error) {
-				return customPrimitive, nil
-			}),
-			wantPrimitive: customPrimitive,
-			wantErr:       nil,
-		},
-		{
-			name: "PrivateKeyManager_CustomFuncReturnsError",
-			km: NewPrivateKeyManagerWithCustomPrimitive(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, nil, func(serializedKey []byte) (any, error) {
-				return nil, customErr
-			}),
-			wantPrimitive: nil,
-			wantErr:       customErr,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			serializedKey := random.GetRandomBytes(16)
-			gotPrimitive, err := tc.km.Primitive(serializedKey)
-
-			if !errors.Is(err, tc.wantErr) {
-				t.Fatalf("Primitive() error = %v, want %v", err, tc.wantErr)
-			}
-			if gotPrimitive != tc.wantPrimitive {
-				t.Errorf("Primitive() = %v, want %v", gotPrimitive, tc.wantPrimitive)
-			}
-		})
-	}
+func failingPrimitiveConstructor(_ key.Key) (any, error) {
+	return nil, errFake
 }
 
-func TestPrimitive_FailsIfConfigFails(t *testing.T) {
+func TestPrimitive_FailsIfPrimitiveConstructorFails(t *testing.T) {
 	defer protoserialization.UnregisterKeyParser(fakeKeyTypeURL)
 	defer protoserialization.UnregisterKeySerializer[*fakeKey]()
 
@@ -281,11 +211,11 @@ func TestPrimitive_FailsIfConfigFails(t *testing.T) {
 	}{
 		{
 			name: "KeyManager",
-			km:   New(fakeKeyTypeURL, &fakeConfig{err: errFake}, tinkpb.KeyData_SYMMETRIC, nil),
+			km:   New(fakeKeyTypeURL, failingPrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, nil),
 		},
 		{
 			name: "PrivateKeyManager",
-			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{err: errFake}, tinkpb.KeyData_SYMMETRIC, nil),
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, failingPrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, nil),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -337,13 +267,13 @@ func TestNewKeyAndNewKeyData_Success(t *testing.T) {
 	}{
 		{
 			name:            "KeyManager",
-			km:              New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:              New(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 			keyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			wantKey:         &aesgcmpb.AesGcmKey{},
 		},
 		{
 			name:            "PrivateKeyManager",
-			km:              NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:              NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 			keyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			wantKey:         &aesgcmpb.AesGcmKey{},
 		},
@@ -396,11 +326,11 @@ func TestNewKeyAndNewKeyData_FailsIfNoParametersParserRegistered(t *testing.T) {
 	}{
 		{
 			name: "KeyManager",
-			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:   New(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 		},
 		{
 			name: "PrivateKeyManager",
-			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -458,11 +388,11 @@ func TestNewKeyAndNewKeyData_FailsIfParametersParserFails(t *testing.T) {
 	}{
 		{
 			name: "KeyManager",
-			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:   New(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 		},
 		{
 			name: "PrivateKeyManager",
-			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -509,11 +439,11 @@ func TestNewKeyAndNewKeyData_FailsIfNoKeyCreatorRegistered(t *testing.T) {
 	}{
 		{
 			name: "KeyManager",
-			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:   New(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 		},
 		{
 			name: "PrivateKeyManager",
-			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -567,11 +497,11 @@ func TestNewKeyAndNewKeyData_FailsIfKeyCreatorFails(t *testing.T) {
 	}{
 		{
 			name: "KeyManager",
-			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:   New(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 		},
 		{
 			name: "PrivateKeyManager",
-			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -619,11 +549,11 @@ func TestNewKeyAndNewKeyData_FailsIfNoKeySerializerRegistered(t *testing.T) {
 	}{
 		{
 			name: "KeyManager",
-			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:   New(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 		},
 		{
 			name: "PrivateKeyManager",
-			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -676,11 +606,11 @@ func TestNewKeyAndNewKeyData_FailsIfKeySerializerFails(t *testing.T) {
 	}{
 		{
 			name: "KeyManager",
-			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:   New(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 		},
 		{
 			name: "PrivateKeyManager",
-			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil }),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -737,11 +667,11 @@ func TestNewKey_FailsIfKeyMashallerFails(t *testing.T) {
 	}{
 		{
 			name: "KeyManager",
-			km:   New(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return nil, errFake }),
+			km:   New(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return nil, errFake }),
 		},
 		{
 			name: "PrivateKeyManager",
-			km:   NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return nil, errFake }),
+			km:   NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_SYMMETRIC, func([]byte) (proto.Message, error) { return nil, errFake }),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -788,7 +718,7 @@ func TestPublicKeyData_Success(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v", err)
 	}
 
-	km := NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil })
+	km := NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil })
 	got, err := km.PublicKeyData([]byte("private key format"))
 	if err != nil {
 		t.Errorf("PublicKeyData() err = %v, want nil", err)
@@ -804,7 +734,7 @@ func TestPublicKeyData_Success(t *testing.T) {
 }
 
 func TestPublicKeyData_FailsIfNoKeyParserRegistered(t *testing.T) {
-	km := NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil })
+	km := NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil })
 	if _, err := km.PublicKeyData([]byte("private key format")); err == nil {
 		t.Errorf("NewKeyData() err = nil, want error")
 	}
@@ -827,7 +757,7 @@ func TestPublicKeyData_FailsIfKeyNotPrivateKey(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v", err)
 	}
 
-	km := NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil })
+	km := NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil })
 	if _, err := km.PublicKeyData([]byte("private key format")); err == nil {
 		t.Errorf("NewKeyData() err = nil, want error")
 	}
@@ -840,7 +770,7 @@ func TestPublicKeyData_FailsIfNoPublicKeySerializerRegistered(t *testing.T) {
 		t.Fatalf("protoserialization.RegisterKeyParser() err = %v", err)
 	}
 
-	km := NewPrivateKeyManager(fakeKeyTypeURL, &fakeConfig{}, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil })
+	km := NewPrivateKeyManager(fakeKeyTypeURL, fakePrimitiveConstructor, tinkpb.KeyData_ASYMMETRIC_PRIVATE, func([]byte) (proto.Message, error) { return &aesgcmpb.AesGcmKey{}, nil })
 	if _, err := km.PublicKeyData([]byte("private key format")); err == nil {
 		t.Errorf("NewKeyData() err = nil, want error")
 	}
