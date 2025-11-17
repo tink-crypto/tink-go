@@ -25,9 +25,16 @@ import (
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
-// New returns a StreamingAEAD primitive from the given keyset handle.
+// New returns a [tink.StreamingAEAD] primitive from the given keyset handle using
+// the global registry.
 func New(handle *keyset.Handle) (tink.StreamingAEAD, error) {
-	ps, err := keyset.Primitives[tink.StreamingAEAD](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
+	return NewWithConfig(handle, &registryconfig.RegistryConfig{})
+}
+
+// NewWithConfig returns a [tink.StreamingAEAD] primitive from the given keyset
+// handle with the provided [keyset.Config].
+func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.StreamingAEAD, error) {
+	ps, err := keyset.Primitives[tink.StreamingAEAD](handle, config, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("streamingaead_factory: cannot obtain primitive set: %s", err)
 	}

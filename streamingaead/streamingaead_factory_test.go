@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/streamingaead"
@@ -214,5 +216,30 @@ func TestFactoryWithKeysetWithTinkKeys(t *testing.T) {
 
 	if err := validateFactoryCipher(a, a); err != nil {
 		t.Errorf("Encryption & Decryption with TINK key should succeed")
+	}
+}
+
+func TestNewWithConfig(t *testing.T) {
+	handle, err := keyset.NewHandle(streamingaead.AES128GCMHKDF4KBKeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.NewHandle(streamingaead.AES128GCMHKDF4KBKeyTemplate()) err = %v, want nil", err)
+	}
+	sa, err := streamingaead.NewWithConfig(handle, &registryconfig.RegistryConfig{})
+	if err != nil {
+		t.Fatalf("streamingaead.NewWithConfig(handle, &registryconfig.RegistryConfig{}) err = %v, want nil", err)
+	}
+	if err := validateFactoryCipher(sa, sa); err != nil {
+		t.Errorf("invalid cipher: %s", err)
+	}
+}
+
+func TestNewWithConfigFailsWithEmptyConfig(t *testing.T) {
+	kh, err := keyset.NewHandle(streamingaead.AES128GCMHKDF4KBKeyTemplate())
+	if err != nil {
+		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
+	}
+	cfg := config.NewBuilder().Build()
+	if _, err := streamingaead.NewWithConfig(kh, &cfg); err == nil {
+		t.Errorf("streamingaead.NewWithConfig(kh, &cfg) err = nil, want error")
 	}
 }
