@@ -20,13 +20,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
-	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
-	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -50,29 +47,6 @@ func TestPrimitiveFromKey(t *testing.T) {
 	}
 }
 
-func TestPrimitiveFromKeyData(t *testing.T) {
-	keyset, err := keyset.NewHandle(aead.AES256GCMKeyTemplate())
-	if err != nil {
-		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
-	}
-	entry, err := keyset.Entry(0)
-	if err != nil {
-		t.Fatalf("keyset.Entry() err = %v, want nil", err)
-	}
-	protoKey, err := protoserialization.SerializeKey(entry.Key())
-	if err != nil {
-		t.Fatalf("protoserialization.SerializeKey() err = %v, want nil", err)
-	}
-	registryConfig := &registryconfig.RegistryConfig{}
-	p, err := registryConfig.PrimitiveFromKeyData(protoKey.KeyData(), internalapi.Token{})
-	if err != nil {
-		t.Errorf("registryConfig.PrimitiveFromKey() err = %v, want nil", err)
-	}
-	if _, ok := p.(tink.AEAD); !ok {
-		t.Errorf("p is of type %T; want tink.AEAD", p)
-	}
-}
-
 func TestPrimitiveFromKeyErrors(t *testing.T) {
 	registryConfig := &registryconfig.RegistryConfig{}
 	testCases := []struct {
@@ -91,44 +65,6 @@ func TestPrimitiveFromKeyErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := registryConfig.PrimitiveFromKey(tc.key, internalapi.Token{}); err == nil {
 				t.Errorf("registryConfig.PrimitiveFromKey() err = nil, want error")
-			}
-		})
-	}
-}
-
-func TestPrimitiveFromKeyDataErrors(t *testing.T) {
-	registryConfig := &registryconfig.RegistryConfig{}
-
-	testCases := []struct {
-		name    string
-		keyData *tinkpb.KeyData
-	}{
-		{
-			name: "unregistered url",
-			keyData: func() *tinkpb.KeyData {
-				kd := testutil.NewHMACKeyData(commonpb.HashType_SHA256, 16)
-				kd.TypeUrl = "some url"
-				return kd
-			}(),
-		},
-		{
-			name: "mismatching url",
-			keyData: func() *tinkpb.KeyData {
-				kd := testutil.NewHMACKeyData(commonpb.HashType_SHA256, 16)
-				kd.TypeUrl = testutil.AESGCMTypeURL
-				return kd
-			}(),
-		},
-		{
-			name:    "nil KeyData",
-			keyData: nil,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if _, err := registryConfig.PrimitiveFromKeyData(tc.keyData, internalapi.Token{}); err == nil {
-				t.Errorf("registryConfig.Primitive() err = nil, want not-nil")
 			}
 		})
 	}

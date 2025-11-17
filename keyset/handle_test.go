@@ -32,9 +32,11 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig/legacyprimitive"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/signature"
@@ -858,15 +860,15 @@ type stubPrimitive struct {
 	isFull bool
 }
 
-func (c *testConfig) PrimitiveFromKeyData(_ *tinkpb.KeyData, _ internalapi.Token) (any, error) {
-	return &stubPrimitive{false}, nil
-}
-
 func (c *testConfig) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
-	if _, ok := k.(*aesgcm.Key); !ok {
+	switch k.(type) {
+	case *aesgcm.Key:
+		return &stubPrimitive{true}, nil
+	case *hmac.Key:
+		return legacyprimitive.New(&stubPrimitive{false}), nil
+	default:
 		return nil, fmt.Errorf("Unable to create primitive from key")
 	}
-	return &stubPrimitive{true}, nil
 }
 
 func TestPrimitives(t *testing.T) {

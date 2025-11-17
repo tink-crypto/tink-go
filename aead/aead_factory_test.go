@@ -122,21 +122,9 @@ func (a *stubAEAD) Decrypt(c, _ []byte) ([]byte, error) {
 	return c[len(a.prefix):], nil
 }
 
-type stubConfig struct {
-	useFullPrimitive bool
-}
-
-func (sc *stubConfig) PrimitiveFromKeyData(_ *tinkpb.KeyData, _ internalapi.Token) (any, error) {
-	if sc.useFullPrimitive {
-		return nil, errors.New("using full primitives")
-	}
-	return new(stubAEAD), nil
-}
+type stubConfig struct{}
 
 func (sc *stubConfig) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
-	if !sc.useFullPrimitive {
-		return nil, errors.New("not using full primitives")
-	}
 	aesGCMKey, ok := k.(*aesgcm.Key)
 	if !ok {
 		return nil, errors.New("not an AES GCM key")
@@ -157,23 +145,12 @@ func TestNewWithConfig(t *testing.T) {
 	}{
 		{
 			name:       "full primitive primary with prefix",
-			config:     &stubConfig{useFullPrimitive: true},
-			kh:         keysetHandleWithPrimaryWithPrefix,
-			wantPrefix: true,
-		},
-		{
-			name:       "legacy primitive primary with prefix",
 			config:     &stubConfig{},
 			kh:         keysetHandleWithPrimaryWithPrefix,
 			wantPrefix: true,
 		},
 		{
 			name:   "full primitive primary without prefix",
-			config: &stubConfig{useFullPrimitive: true},
-			kh:     keysetHandleWithPrimaryWithoutPrefix,
-		},
-		{
-			name:   "legacy primitive primary without prefix",
 			config: &stubConfig{},
 			kh:     keysetHandleWithPrimaryWithoutPrefix,
 		},

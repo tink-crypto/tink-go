@@ -21,20 +21,29 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig/legacyprimitive"
 	"github.com/tink-crypto/tink-go/v2/key"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // RegistryConfig is an internal way for the keyset handle to access the
 // old global Registry through the new Configuration interface.
 type RegistryConfig struct{}
 
-// PrimitiveFromKeyData constructs a primitive from a [key.Key] using the registry.
-func (c *RegistryConfig) PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error) {
-	return registry.PrimitiveFromKeyData(keyData)
-}
-
 // PrimitiveFromKey constructs a primitive from a [key.Key] using the registry.
 func (c *RegistryConfig) PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error) {
-	return primitiveregistry.Primitive(key)
+	p, err := primitiveregistry.Primitive(key)
+	if err == nil {
+		return p, nil
+	}
+	// Fallback to legacy primitive.
+	ps, err := protoserialization.SerializeKey(key)
+	if err != nil {
+		return nil, err
+	}
+	legacyPrimitive, err := registry.PrimitiveFromKeyData(ps.KeyData())
+	if err != nil {
+		return nil, err
+	}
+	return legacyprimitive.New(legacyPrimitive), nil
 }

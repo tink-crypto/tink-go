@@ -26,6 +26,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig/legacyprimitive"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -491,12 +492,6 @@ type Config interface {
 	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
 }
 
-type configWithLegacyFallback interface {
-	Config
-	// PrimitiveFromKeyData creates a primitive from a [tinkpb.KeyData].
-	PrimitiveFromKeyData(keyData *tinkpb.KeyData, _ internalapi.Token) (any, error)
-}
-
 type primitiveOptions struct {
 	config Config
 }
@@ -547,16 +542,12 @@ func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry 
 	isFullPrimitive := true
 	primitive, err = config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
 	if err != nil {
-		// Check if we can have a fallback.
-		configWithLegacyFallback, ok := config.(configWithLegacyFallback)
-		if !ok {
-			return fmt.Errorf("cannot get primitive from key: %v", err)
-		}
+		return err
+	}
+	// Check if the primitive is a legacy primitive.
+	if legacyPrimitive, ok := primitive.(legacyprimitive.LegacyPrimitive); ok {
 		isFullPrimitive = false
-		primitive, err = configWithLegacyFallback.PrimitiveFromKeyData(protoKey.GetKeyData(), internalapi.Token{})
-		if err != nil {
-			return fmt.Errorf("cannot get primitive from key data: %v", err)
-		}
+		primitive = legacyPrimitive.Primitive()
 	}
 	actualPrimitive, ok := primitive.(T)
 	if !ok {
