@@ -20,11 +20,14 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -852,5 +855,218 @@ func TestPrimitiveFactoryMultipleKeys(t *testing.T) {
 	}
 	if _, err := jwt.NewVerifier(publicHandle); err != nil {
 		t.Fatalf("jwt.NewVerifier() err = %v, want nil", err)
+	}
+}
+
+func TestNewSignerWithConfigFailsIfNoPrimitiveConstructorRegistered(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
+	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubPublicKeyURL, &stubPublicKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPublicKey](&stubPublicKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(stubPrivateKeyURL, &stubPrivateKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubPrivateKey{
+		prefixType:    tinkpb.OutputPrefixType_TINK,
+		idRequirement: 0x01020304,
+	})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	config := config.NewBuilder().Build()
+
+	if _, err := jwt.NewSignerWithConfig(handle, &config); err == nil {
+		t.Errorf("jwt.NewSignerWithConfig() err = nil, want error")
+	} else {
+		t.Logf("jwt.NewSignerWithConfig() err = %v", err)
+	}
+}
+
+func TestNewSignerWithConfig(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
+	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubPublicKeyURL, &stubPublicKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPublicKey](&stubPublicKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(stubPrivateKeyURL, &stubPrivateKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	signerConstructor := func(key key.Key) (any, error) {
+		kid := "AQIDBA" // for 0x01020304
+		return &stubFullSigner{&kid}, nil
+	}
+	builderWithFullPrimitive := config.NewBuilder()
+	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPrivateKey](), signerConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	configWithFullPrimitive := builderWithFullPrimitive.Build()
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubPrivateKey{
+		prefixType:    tinkpb.OutputPrefixType_TINK,
+		idRequirement: 0x01020304,
+	})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	signer, err := jwt.NewSignerWithConfig(handle, &configWithFullPrimitive)
+	if err != nil {
+		t.Fatalf("jwt.NewSigner() err = %v, want nil", err)
+	}
+	data, err := jwt.NewRawJWT(&jwt.RawJWTOptions{WithoutExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewRawJWT() err = %v, want nil", err)
+	}
+	token, err := signer.SignAndEncode(data)
+	if err != nil {
+		t.Fatalf("signer.SignAndEncode(() err = %v, want nil", err)
+	}
+	if !cmp.Equal(token, "AQIDBA_full_signer") {
+		t.Errorf("token = %q, want: %q", token, "AQIDBA_full_signer")
+	}
+}
+
+func TestNewVerifierWithConfigFailsIfNoPrimitiveConstructorRegistered(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
+	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubPublicKeyURL, &stubPublicKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPublicKey](&stubPublicKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(stubPrivateKeyURL, &stubPrivateKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubPrivateKey{
+		prefixType:    tinkpb.OutputPrefixType_TINK,
+		idRequirement: 0x01020304,
+	})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	publicHandle, err := handle.Public()
+	if err != nil {
+		t.Fatalf("handle.Public() err = %v, want nil", err)
+	}
+	config := config.NewBuilder().Build()
+
+	if _, err := jwt.NewVerifierWithConfig(publicHandle, &config); err == nil {
+		t.Errorf("jwt.NewVerifierWithConfig() err = nil, want error")
+	} else {
+		t.Logf("jwt.NewVerifierWithConfig() err = %v", err)
+	}
+}
+
+func TestNewVerifierWithConfig(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
+	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
+	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
+
+	if err := protoserialization.RegisterKeyParser(stubPublicKeyURL, &stubPublicKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPublicKey](&stubPublicKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(stubPrivateKeyURL, &stubPrivateKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubPrivateKey](&stubPrivateKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	verifierConstructor := func(key key.Key) (any, error) {
+		return &stubFullVerifier{}, nil
+	}
+	builderWithFullPrimitive := config.NewBuilder()
+	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPublicKey](), verifierConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	configWithFullPrimitive := builderWithFullPrimitive.Build()
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubPrivateKey{
+		prefixType:    tinkpb.OutputPrefixType_TINK,
+		idRequirement: 0x01020304,
+	})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	publicHandle, err := handle.Public()
+	if err != nil {
+		t.Fatalf("handle.Public() err = %v, want nil", err)
+	}
+
+	verifier, err := jwt.NewVerifierWithConfig(publicHandle, &configWithFullPrimitive)
+	if err != nil {
+		t.Fatalf("jwt.NewVerifier() err = %v, want nil", err)
+	}
+	validator, err := jwt.NewValidator(&jwt.ValidatorOpts{AllowMissingExpiration: true})
+	if err != nil {
+		t.Fatalf("jwt.NewValidator() err = %v, want nil", err)
+	}
+	if _, err := verifier.VerifyAndDecode("AQIDBA_full_signer", validator); err != nil {
+		t.Fatalf("verifier.VerifyAndDecode() err = %v, want nil", err)
 	}
 }

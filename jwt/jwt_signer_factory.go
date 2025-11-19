@@ -26,15 +26,29 @@ import (
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 )
 
-// NewSigner generates a new instance of the JWT Signer primitive.
+// NewSigner generates a new [jwt.Signer] primitive with the
+// global registry.
 func NewSigner(handle *keyset.Handle) (Signer, error) {
+	return NewSignerWithConfig(handle, &registryconfig.RegistryConfig{})
+}
+
+// NewSignerWithConfig generates a new [jwt.Signer] primitive
+// with the provided [keyset.Config].
+//
+// NOTE: This is currently not usable in OSS because [keyset.Config]
+// is not user-implementable.
+func NewSignerWithConfig(handle *keyset.Handle, config keyset.Config) (Signer, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := keyset.Primitives[Signer](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
+	ps, err := keyset.Primitives[Signer](handle, config, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("jwt_signer_factory: cannot obtain primitive set: %v", err)
 	}
+	return newWrappedSigner(ps)
+}
+
+func newWrappedSigner(ps *primitiveset.PrimitiveSet[Signer]) (Signer, error) {
 	logger, err := createSignerLogger(ps)
 	if err != nil {
 		return nil, err

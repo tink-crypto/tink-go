@@ -31,15 +31,29 @@ type verifierAndKeyID struct {
 	keyID    uint32
 }
 
-// NewVerifier generates a new instance of the JWT Verifier primitive.
+// NewVerifier generates a new [jwt.Verifier] primitive with the
+// global registry.
 func NewVerifier(handle *keyset.Handle) (Verifier, error) {
+	return NewVerifierWithConfig(handle, &registryconfig.RegistryConfig{})
+}
+
+// NewVerifierWithConfig generates a new [jwt.Verifier] primitive
+// with the provided [keyset.Config].
+//
+// NOTE: This is currently not usable in OSS because [keyset.Config]
+// is not user-implementable.
+func NewVerifierWithConfig(handle *keyset.Handle, config keyset.Config) (Verifier, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := keyset.Primitives[Verifier](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
+	ps, err := keyset.Primitives[Verifier](handle, config, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("jwt_verifier_factory: cannot obtain primitive set: %v", err)
 	}
+	return newWrappedVerifier(ps)
+}
+
+func newWrappedVerifier(ps *primitiveset.PrimitiveSet[Verifier]) (Verifier, error) {
 	logger, err := createVerifierLogger(ps)
 	if err != nil {
 		return nil, err
