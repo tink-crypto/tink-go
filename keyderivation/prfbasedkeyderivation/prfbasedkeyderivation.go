@@ -17,12 +17,23 @@ package prfbasedkeyderivation
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
+
+// RegisterPrimitiveConstructor accepts a config object and registers the
+// PRF-based key derivation primitive constructor to the provided config.
+//
+// It is *NOT* part of the public API.
+func RegisterPrimitiveConstructor(b *config.Builder, t internalapi.Token) error {
+	return b.RegisterPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
+}
 
 func init() {
 	if err := protoserialization.RegisterKeyParser(typeURL, new(keyParser)); err != nil {

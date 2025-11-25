@@ -21,7 +21,10 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/keyderivation/internal/keyderiver"
 	"github.com/tink-crypto/tink-go/v2/keyderivation"
 	"github.com/tink-crypto/tink-go/v2/keyderivation/prfbasedkeyderivation"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -227,5 +230,80 @@ func TestKeyderivation_EndToEnd(t *testing.T) {
 				t.Errorf("derived keyset returned unexpected diff (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func mustCreateKeys(t *testing.T) (*prfbasedkeyderivation.Key, key.Key) {
+	t.Helper()
+	// From https://www.rfc-editor.org/rfc/rfc5869#appendix-A.2.
+	keyBytes := mustHexDecode(t, "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f")
+	outputBytes := mustHexDecode(t, "b11e398dc80327a1c8e7f78c596a49344f012eda2d4efad8a050cc4c19afa97c59045a99cac7827271cb41c65e590e09da3275600c2f09b8367793a9aca3db71cc30c58179ec3e87c14c01d5c1f3434f1d87")
+	prfSalt := mustHexDecode(t, "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf")
+	prfParams, err := hkdfprf.NewParameters(len(keyBytes), hkdfprf.SHA256, prfSalt)
+	if err != nil {
+		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
+	}
+	prfKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), prfParams)
+	if err != nil {
+		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
+	}
+
+	aes128GCMParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
+		KeySizeInBytes: 16,
+		IVSizeInBytes:  12,
+		TagSizeInBytes: 16,
+		Variant:        aesgcm.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("aesgcm.NewParameters() err = %v, want nil", err)
+	}
+	want128AESGCMKey, err := aesgcm.NewKey(secretdata.NewBytesFromData(outputBytes[:aes128GCMParams.KeySizeInBytes()], insecuresecretdataaccess.Token{}), 0x1234, aes128GCMParams)
+	if err != nil {
+		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
+	}
+
+	keyDerivationParams, err := prfbasedkeyderivation.NewParameters(prfParams, aes128GCMParams)
+	if err != nil {
+		t.Fatalf("prfbasedkeyderivation.NewParameters() err = %v, want nil", err)
+	}
+	keyDerivationKey, err := prfbasedkeyderivation.NewKey(keyDerivationParams, prfKey, 0x1234)
+	if err != nil {
+		t.Fatalf("prfbasedkeyderivation.NewKey() err = %v, want nil", err)
+	}
+
+	return keyDerivationKey, want128AESGCMKey
+}
+
+func TestRegisterPrimitiveConstructor(t *testing.T) {
+	prfBasedKeyDerivationKey, want := mustCreateKeys(t)
+
+	b := config.NewBuilder()
+	configWithout := b.Build()
+
+	// Should fail because prfbasedkeyderivation.RegisterPrimitiveConstructor() was not called.
+	if _, err := configWithout.PrimitiveFromKey(prfBasedKeyDerivationKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithout.PrimitiveFromKey() err = nil, want error")
+	}
+
+	// Register prfbasedkeyderivation.RegisterPrimitiveConstructor() and check that it now works.
+	if err := prfbasedkeyderivation.RegisterPrimitiveConstructor(b, internalapi.Token{}); err != nil {
+		t.Fatalf("prfbasedkeyderivation.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	configWith := b.Build()
+	p, err := configWith.PrimitiveFromKey(prfBasedKeyDerivationKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("configWith.PrimitiveFromKey() err = %v, want nil", err)
+	}
+	kd, ok := p.(keyderiver.KeyDeriver)
+	if !ok {
+		t.Fatalf("primitive was of type %T, want %T", kd, (*keyderiver.KeyDeriver)(nil))
+	}
+	derivationSalt := mustHexDecode(t, "b0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff")
+	got, err := kd.DeriveKey(derivationSalt)
+	if err != nil {
+		t.Fatalf("prfbasedkeyderivationKey.ComputePRF() err = %v, want nil", err)
+	}
+	if !cmp.Equal(want, got) {
+		t.Errorf("derived key returned unexpected diff (-want +got):\n%s", cmp.Diff(want, got))
 	}
 }
