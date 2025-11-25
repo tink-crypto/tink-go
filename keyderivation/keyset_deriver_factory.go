@@ -51,9 +51,19 @@ func (w *fullPrimitiveWrapper) DeriveKey(salt []byte) (key.Key, error) {
 	return protoserialization.ParseKey(newKeySerialization)
 }
 
-// New generates a new instance of the Keyset Deriver primitive.
+// New generates a new [keyderivation.KeysetDeriver] primitive with the
+// global registry.
 func New(handle *keyset.Handle) (KeysetDeriver, error) {
-	ps, err := keyset.Primitives[keyderiver.KeyDeriver](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
+	return NewWithConfig(handle, &registryconfig.RegistryConfig{})
+}
+
+// NewWithConfig generates a new [keyderivation.KeysetDeriver] primitive
+// with the provided [keyset.Config].
+//
+// NOTE: This is currently not usable in OSS because [keyset.Config]
+// is not user-implementable.
+func NewWithConfig(handle *keyset.Handle, config keyset.Config) (KeysetDeriver, error) {
+	ps, err := keyset.Primitives[keyderiver.KeyDeriver](handle, config, internalapi.Token{})
 	if err != nil {
 		return nil, fmt.Errorf("keyset_deriver_factory: cannot obtain primitive set: %v", err)
 	}

@@ -16,6 +16,7 @@ package keyderivation_test
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -24,6 +25,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -626,5 +628,113 @@ func TestPrimitiveFactory_KeysetDeriverFailsIfFullPrimitiveFails(t *testing.T) {
 
 	if _, err := keysetDeriver.DeriveKeyset([]byte("a_very_unique_salt")); err == nil {
 		t.Errorf("keysetDeriver.DeriveKeyset() err = %v, want nil", err)
+	}
+}
+
+func TestNewWithConfigFailsIfNoPrimitiveConstructorRegistered(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubKeysetDeriverURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKeysetDeriverKey]()
+	defer protoserialization.UnregisterKeyParser(derivedKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*derivedKey]()
+	if err := protoserialization.RegisterKeyParser(stubKeysetDeriverURL, &stubKeysetDeriverKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKeysetDeriverKey](&stubKeysetDeriverKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(derivedKeyURL, &derivedKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*derivedKey](&derivedKeySerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubKeysetDeriverKey{tinkpb.OutputPrefixType_TINK, 0x1234})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	c := config.NewBuilder().Build()
+
+	if _, err := keyderivation.NewWithConfig(handle, &c); err == nil {
+		t.Errorf("keyderivation.NewWithConfig() err = nil, want error")
+	}
+}
+
+func TestNewWithConfig(t *testing.T) {
+	defer protoserialization.UnregisterKeyParser(stubKeysetDeriverURL)
+	defer protoserialization.UnregisterKeySerializer[*stubKeysetDeriverKey]()
+	defer protoserialization.UnregisterKeyParser(derivedKeyURL)
+	defer protoserialization.UnregisterKeySerializer[*derivedKey]()
+	if err := protoserialization.RegisterKeyParser(stubKeysetDeriverURL, &stubKeysetDeriverKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*stubKeysetDeriverKey](&stubKeysetDeriverKeySerialization{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeyParser(derivedKeyURL, &derivedKeyParser{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeyParser() err = %v, want nil", err)
+	}
+	if err := protoserialization.RegisterKeySerializer[*derivedKey](&derivedKeySerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterKeySerializer() err = %v, want nil", err)
+	}
+
+	primitiveConstructor := func(k key.Key) (any, error) {
+		that, ok := k.(*stubKeysetDeriverKey)
+		if !ok {
+			return nil, fmt.Errorf("key is not a stubKeysetDeriverKey")
+		}
+		return &fullKeyDeriver{k: that}, nil
+	}
+	builder := config.NewBuilder()
+	if err := builder.RegisterPrimitiveConstructor(reflect.TypeOf(&stubKeysetDeriverKey{}), primitiveConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("builder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	c := builder.Build()
+
+	km := keyset.NewManager()
+	keyID, err := km.AddKey(&stubKeysetDeriverKey{tinkpb.OutputPrefixType_TINK, 0x1234})
+	if err != nil {
+		t.Fatalf("km.AddKey() err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	deriver, err := keyderivation.NewWithConfig(handle, &c)
+	if err != nil {
+		t.Fatalf("keyderivation.NewWithConfig() err = %v, want nil", err)
+	}
+	gotHandle, err := deriver.DeriveKeyset([]byte("a_very_unique_salt"))
+	if err != nil {
+		t.Fatalf("deriver.DeriveKeyset() err = %v, want nil", err)
+	}
+
+	wantKeyset := testutil.NewKeyset(0x1234, []*tinkpb.Keyset_Key{
+		{
+			KeyData: &tinkpb.KeyData{
+				TypeUrl:         derivedKeyURL,
+				Value:           []byte("a_very_unique_salt_full_derived_key"),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			},
+			Status:           tinkpb.KeyStatusType_ENABLED,
+			KeyId:            0x1234,
+			OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+		},
+	})
+	got := testkeyset.KeysetMaterial(gotHandle)
+	if diff := cmp.Diff(wantKeyset, got, protocmp.Transform()); diff != "" {
+		t.Errorf("deriver.DeriveKeyset() returned unexpected diff (-want +got):\n%s", diff)
 	}
 }
