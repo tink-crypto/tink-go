@@ -37,6 +37,8 @@ func mldsaPublicKeyFromPublicKey(publicKey *PublicKey) (*mldsa.PublicKey, error)
 	switch publicKey.params.instance {
 	case MLDSA65:
 		return mldsa.MLDSA65.DecodePublicKey(publicKey.KeyBytes())
+	case MLDSA87:
+		return mldsa.MLDSA87.DecodePublicKey(publicKey.KeyBytes())
 	default:
 		return &mldsa.PublicKey{}, fmt.Errorf("invalid instance: %v", publicKey.params.instance)
 	}

@@ -38,6 +38,8 @@ func mldsaSecretKeyFromPrivateKey(privateKey *PrivateKey) (*mldsa.SecretKey, err
 	switch privateKey.publicKey.params.Instance() {
 	case MLDSA65:
 		return mldsa.MLDSA65.DecodeSecretKey(privateKey.expandedKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	case MLDSA87:
+		return mldsa.MLDSA87.DecodeSecretKey(privateKey.expandedKeyBytes.Data(insecuresecretdataaccess.Token{}))
 	default:
 		return &mldsa.SecretKey{}, fmt.Errorf("invalid instance: %v", privateKey.publicKey.params.Instance())
 	}

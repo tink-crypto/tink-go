@@ -27,8 +27,12 @@ func TestCreateKeysetHandleFromParameters(t *testing.T) {
 		instance mldsa.Instance
 	}{
 		{
-			name:     "MLDSA65",
+			name:     "ML-DSA-65",
 			instance: mldsa.MLDSA65,
+		},
+		{
+			name:     "ML-DSA-87",
+			instance: mldsa.MLDSA87,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

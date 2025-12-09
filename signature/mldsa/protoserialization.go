@@ -61,6 +61,8 @@ func protoMlDsaInstanceFromInstance(instance Instance) (mldsapb.MlDsaInstance, e
 	switch instance {
 	case MLDSA65:
 		return mldsapb.MlDsaInstance_ML_DSA_65, nil
+	case MLDSA87:
+		return mldsapb.MlDsaInstance_ML_DSA_87, nil
 	default:
 		return mldsapb.MlDsaInstance_ML_DSA_UNKNOWN_INSTANCE, fmt.Errorf("unknown instance: %v", instance)
 	}
@@ -171,6 +173,8 @@ func instanceFromProto(instanceType mldsapb.MlDsaInstance) (Instance, error) {
 	switch instanceType {
 	case mldsapb.MlDsaInstance_ML_DSA_65:
 		return MLDSA65, nil
+	case mldsapb.MlDsaInstance_ML_DSA_87:
+		return MLDSA87, nil
 	default:
 		return UnknownInstance, fmt.Errorf("unsupported instance type: %v", instanceType)
 	}

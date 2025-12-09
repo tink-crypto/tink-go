@@ -36,14 +36,26 @@ func TestSignVerifyManager(t *testing.T) {
 		idRequirement uint32
 	}{
 		{
-			name:          "TINK",
+			name:          "TINK ML-DSA-65",
 			instance:      tinkmldsa.MLDSA65,
 			variant:       tinkmldsa.VariantTink,
 			idRequirement: uint32(0x01020304),
 		},
 		{
-			name:          "RAW",
+			name:          "TINK ML-DSA-87",
+			instance:      tinkmldsa.MLDSA87,
+			variant:       tinkmldsa.VariantTink,
+			idRequirement: uint32(0x01020304),
+		},
+		{
+			name:          "RAW ML-DSA-65",
 			instance:      tinkmldsa.MLDSA65,
+			variant:       tinkmldsa.VariantNoPrefix,
+			idRequirement: uint32(0),
+		},
+		{
+			name:          "RAW ML-DSA-87",
+			instance:      tinkmldsa.MLDSA87,
 			variant:       tinkmldsa.VariantNoPrefix,
 			idRequirement: uint32(0),
 		},
@@ -126,13 +138,23 @@ func TestVerifyFails(t *testing.T) {
 		variant  tinkmldsa.Variant
 	}{
 		{
-			name:     "TINK",
+			name:     "TINK ML-DSA-65",
 			instance: tinkmldsa.MLDSA65,
 			variant:  tinkmldsa.VariantTink,
 		},
 		{
-			name:     "RAW",
+			name:     "TINK ML-DSA-87",
+			instance: tinkmldsa.MLDSA87,
+			variant:  tinkmldsa.VariantTink,
+		},
+		{
+			name:     "RAW ML-DSA-65",
 			instance: tinkmldsa.MLDSA65,
+			variant:  tinkmldsa.VariantNoPrefix,
+		},
+		{
+			name:     "RAW ML-DSA-87",
+			instance: tinkmldsa.MLDSA87,
 			variant:  tinkmldsa.VariantNoPrefix,
 		},
 	} {
@@ -211,13 +233,23 @@ func TestSignVerifyCorrectness(t *testing.T) {
 		variant  tinkmldsa.Variant
 	}{
 		{
-			name:     "TINK",
+			name:     "TINK ML-DSA-65",
 			instance: tinkmldsa.MLDSA65,
 			variant:  tinkmldsa.VariantTink,
 		},
 		{
-			name:     "RAW",
+			name:     "TINK ML-DSA-87",
+			instance: tinkmldsa.MLDSA87,
+			variant:  tinkmldsa.VariantTink,
+		},
+		{
+			name:     "RAW ML-DSA-65",
 			instance: tinkmldsa.MLDSA65,
+			variant:  tinkmldsa.VariantNoPrefix,
+		},
+		{
+			name:     "RAW ML-DSA-87",
+			instance: tinkmldsa.MLDSA87,
 			variant:  tinkmldsa.VariantNoPrefix,
 		},
 	} {
