@@ -194,7 +194,7 @@ func setEntryMonitoringIfNeeded(h *Handle) error {
 	if len(h.annotations) == 0 {
 		return nil
 	}
-	monitorinKeysetInfo, err := monitoringutil.MonitoringKeysetInfoFromKeysetInfo(h.KeysetInfo(), h.annotations)
+	monitoringKeysetInfo, err := monitoringutil.MonitoringKeysetInfoFromKeysetInfo(h.KeysetInfo(), h.annotations)
 	if err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func setEntryMonitoringIfNeeded(h *Handle) error {
 		l, err := h.monitoringClient.NewLogger(&monitoring.Context{
 			Primitive:   "keyset",
 			APIFunction: "get_key",
-			KeysetInfo:  monitorinKeysetInfo,
+			KeysetInfo:  monitoringKeysetInfo,
 		})
 		if err != nil {
 			return err

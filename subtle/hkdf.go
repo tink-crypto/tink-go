@@ -29,26 +29,28 @@ const (
 
 var errHKDFInvalidInput = errors.New("HKDF: invalid input")
 
-// validateHKDFParams validates parameters of HKDF constructor.
-func validateHKDFParams(hash string, keySize uint32, tagSize uint32) error {
+// validateHKDFParamsAndGetHashSize validates parameters of HKDF constructor
+// and returns the hash size.
+func validateHKDFParamsAndGetHashSize(hash string, keySize uint32, tagSize uint32) (uint32, error) {
 	// validate tag size
 	digestSize, err := GetHashDigestSize(hash)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if tagSize > 255*digestSize {
-		return fmt.Errorf("tag size too big")
+		return 0, fmt.Errorf("tag size too big")
 	}
 	if tagSize < minTagSizeInBytes {
-		return fmt.Errorf("tag size too small")
+		return 0, fmt.Errorf("tag size too small")
 	}
-	return nil
+	return digestSize, nil
 }
 
 // ComputeHKDF extracts a pseudorandom key.
 func ComputeHKDF(hashAlg string, key []byte, salt []byte, info []byte, tagSize uint32) ([]byte, error) {
 	keySize := uint32(len(key))
-	if err := validateHKDFParams(hashAlg, keySize, tagSize); err != nil {
+	digestSize, err := validateHKDFParamsAndGetHashSize(hashAlg, keySize, tagSize)
+	if err != nil {
 		return nil, fmt.Errorf("hkdf: %s", err)
 	}
 	hashFunc := GetHashFunc(hashAlg)
@@ -56,7 +58,7 @@ func ComputeHKDF(hashAlg string, key []byte, salt []byte, info []byte, tagSize u
 		return nil, fmt.Errorf("hkdf: invalid hash algorithm")
 	}
 	if len(salt) == 0 {
-		salt = make([]byte, hashFunc().Size())
+		salt = make([]byte, digestSize)
 	}
 
 	result := make([]byte, tagSize)
