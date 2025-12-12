@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -27,6 +28,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
@@ -854,21 +856,8 @@ func TestPrimitivesWithRegistry(t *testing.T) {
 	}
 }
 
-type testConfig struct{}
-
 type stubPrimitive struct {
 	isFull bool
-}
-
-func (c *testConfig) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
-	switch k.(type) {
-	case *aesgcm.Key:
-		return &stubPrimitive{true}, nil
-	case *hmac.Key:
-		return legacyprimitive.New(&stubPrimitive{false}), nil
-	default:
-		return nil, fmt.Errorf("Unable to create primitive from key")
-	}
 }
 
 func TestPrimitives(t *testing.T) {
@@ -892,6 +881,19 @@ func TestPrimitives(t *testing.T) {
 }
 
 func TestPrimitivesWithConfig(t *testing.T) {
+	cb := config.NewBuilder()
+	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*aesgcm.Key](), func(key key.Key) (any, error) {
+		return &stubPrimitive{true}, nil
+	}, internalapi.Token{}); err != nil {
+		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*hmac.Key](), func(key key.Key) (any, error) {
+		return legacyprimitive.New(&stubPrimitive{false}), nil
+	}, internalapi.Token{}); err != nil {
+		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	c := cb.Build()
+
 	for _, tc := range []struct {
 		name        string
 		keyTemplate *tinkpb.KeyTemplate
@@ -913,12 +915,12 @@ func TestPrimitivesWithConfig(t *testing.T) {
 			if err != nil {
 				t.Fatalf("keyset.NewHandle(%v) = %v, want nil", tc.keyTemplate, err)
 			}
-			primitives, err := keyset.Primitives[*stubPrimitive](handle, &testConfig{}, internalapi.Token{})
+			primitives, err := keyset.Primitives[*stubPrimitive](handle, &c, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("keyset.Primitives[*stubPrimitive](handle, &testConfig{}, internalapi.Token{})) err = %v, want nil", err)
+				t.Fatalf("keyset.Primitives[*stubPrimitive](handle, &c, internalapi.Token{})) err = %v, want nil", err)
 			}
 			if len(primitives.EntriesInKeysetOrder) != 1 {
-				t.Fatalf("len(keyset.Primitives[*stubPrimitive](handle, &testConfig{}, internalapi.Token{})) = %d, want 1", len(primitives.EntriesInKeysetOrder))
+				t.Fatalf("len(keyset.Primitives[*stubPrimitive](handle, &c, internalapi.Token{})) = %d, want 1", len(primitives.EntriesInKeysetOrder))
 			}
 			var p *stubPrimitive
 			if tc.wantFull {
@@ -927,10 +929,10 @@ func TestPrimitivesWithConfig(t *testing.T) {
 				p = primitives.Primary.Primitive
 			}
 			if p == nil {
-				t.Fatalf("keyset.Primitives[*stubPrimitive](handle, &testConfig{}, internalapi.Token{})) = nil, want instance of `*stubPrimitive`")
+				t.Fatalf("keyset.Primitives[*stubPrimitive](handle, &c, internalapi.Token{})) = nil, want instance of `*stubPrimitive`")
 			}
 			if p.isFull != tc.wantFull {
-				t.Errorf("keyset.Primitives[*stubPrimitive](handle, &testConfig{}, internalapi.Token{}).Primary.FullPrimitive.isFull = %v, want %v", p.isFull, tc.wantFull)
+				t.Errorf("keyset.Primitives[*stubPrimitive](handle, &c, internalapi.Token{}).Primary.FullPrimitive.isFull = %v, want %v", p.isFull, tc.wantFull)
 			}
 		})
 	}

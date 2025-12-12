@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"reflect"
 	"slices"
 	"testing"
 
@@ -30,7 +29,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/testutil"
@@ -316,26 +314,6 @@ func TestAESGCMAEADWorks(t *testing.T) {
 			}
 		})
 	}
-}
-
-type stubConfig struct {
-	keyManagers           map[string]registry.KeyManager
-	primitiveConstructors map[reflect.Type]func(key key.Key) (any, error)
-}
-
-func newStubConfig() *stubConfig {
-	return &stubConfig{make(map[string]registry.KeyManager), make(map[reflect.Type]func(key key.Key) (any, error))}
-}
-
-func (sc *stubConfig) RegisterPrimitiveConstructor(keyType reflect.Type, primitiveConstructor func(key key.Key) (any, error), _ internalapi.Token) error {
-	sc.primitiveConstructors[keyType] = primitiveConstructor
-	return nil
-}
-
-type alwaysFailingStubConfig struct{}
-
-func (sc *alwaysFailingStubConfig) RegisterPrimitiveConstructor(keyType reflect.Type, primitiveConstructor func(key key.Key) (any, error), _ internalapi.Token) error {
-	return fmt.Errorf("oh no :(")
 }
 
 func TestRegisterPrimitiveConstructor(t *testing.T) {

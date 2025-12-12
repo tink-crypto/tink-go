@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -29,6 +30,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/stubkeymanager"
@@ -122,37 +124,33 @@ func (a *stubAEAD) Decrypt(c, _ []byte) ([]byte, error) {
 	return c[len(a.prefix):], nil
 }
 
-type stubConfig struct{}
-
-func (sc *stubConfig) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
-	aesGCMKey, ok := k.(*aesgcm.Key)
-	if !ok {
-		return nil, errors.New("not an AES GCM key")
-	}
-	return &stubAEAD{prefix: aesGCMKey.OutputPrefix()}, nil
-}
-
 func TestNewWithConfig(t *testing.T) {
 	annotations := map[string]string{"foo": "bar"}
 	// Last key is primary.
 	keysetHandleWithPrimaryWithPrefix := mustCreateHandle(t, annotations, aead.AES256GCMNoPrefixKeyTemplate(), aead.AES256GCMKeyTemplate())
 	keysetHandleWithPrimaryWithoutPrefix := mustCreateHandle(t, annotations, aead.AES256GCMKeyTemplate(), aead.AES256GCMNoPrefixKeyTemplate())
+
+	cb := config.NewBuilder()
+	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*aesgcm.Key](), func(key key.Key) (any, error) {
+		return &stubAEAD{prefix: key.(*aesgcm.Key).OutputPrefix()}, nil
+	}, internalapi.Token{}); err != nil {
+		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	c := cb.Build()
+
 	for _, tc := range []struct {
 		name       string
-		config     *stubConfig
 		kh         *keyset.Handle
 		wantPrefix bool
 	}{
 		{
 			name:       "full primitive primary with prefix",
-			config:     &stubConfig{},
 			kh:         keysetHandleWithPrimaryWithPrefix,
 			wantPrefix: true,
 		},
 		{
-			name:   "full primitive primary without prefix",
-			config: &stubConfig{},
-			kh:     keysetHandleWithPrimaryWithoutPrefix,
+			name: "full primitive primary without prefix",
+			kh:   keysetHandleWithPrimaryWithoutPrefix,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -161,7 +159,7 @@ func TestNewWithConfig(t *testing.T) {
 			if err := internalregistry.RegisterMonitoringClient(client); err != nil {
 				t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 			}
-			a, err := aead.NewWithConfig(tc.kh, tc.config)
+			a, err := aead.NewWithConfig(tc.kh, &c)
 			if err != nil {
 				t.Fatalf("aead.NewWithConfig(tc.kh, config) err = %v, want nil", err)
 			}
