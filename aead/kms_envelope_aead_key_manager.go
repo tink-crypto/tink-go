@@ -119,7 +119,7 @@ func (km *kmsEnvelopeAEADKeyManager) validateKey(key *kmsepb.KmsEnvelopeAeadKey)
 
 func (km *kmsEnvelopeAEADKeyManager) validateKeyFormat(keyFormat *kmsepb.KmsEnvelopeAeadKeyFormat) error {
 	dekKeyType := keyFormat.GetDekTemplate().GetTypeUrl()
-	if !isSupporedKMSEnvelopeDEK(dekKeyType) {
+	if !isSupportedKMSEnvelopeDEK(dekKeyType) {
 		return fmt.Errorf("unsupported DEK key type %s. Only Tink AEAD key types are supported with KMSEnvelopeAEAD", dekKeyType)
 	}
 	return nil

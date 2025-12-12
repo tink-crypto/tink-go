@@ -48,7 +48,7 @@ var tinkAEADKeyTypes map[string]bool = map[string]bool{
 	aesGCMSIVTypeURL:         true,
 }
 
-func isSupporedKMSEnvelopeDEK(dekKeyTypeURL string) bool {
+func isSupportedKMSEnvelopeDEK(dekKeyTypeURL string) bool {
 	_, found := tinkAEADKeyTypes[dekKeyTypeURL]
 	return found
 }
@@ -73,7 +73,7 @@ type KMSEnvelopeAEADWithContext struct {
 // keyEncryptionAEAD is used to encrypt the DEK, and is usually a remote AEAD
 // provided by a KMS.
 func NewKMSEnvelopeAEADWithContext(dekTemplate *tinkpb.KeyTemplate, keyEncryptionAEAD tink.AEADWithContext) (*KMSEnvelopeAEADWithContext, error) {
-	if !isSupporedKMSEnvelopeDEK(dekTemplate.GetTypeUrl()) {
+	if !isSupportedKMSEnvelopeDEK(dekTemplate.GetTypeUrl()) {
 		return nil, errors.New("unsupported DEK key type")
 	}
 	return &KMSEnvelopeAEADWithContext{
@@ -96,7 +96,7 @@ func NewKMSEnvelopeAEADWithContext(dekTemplate *tinkpb.KeyTemplate, keyEncryptio
 // keyEncryptionAEAD is used to encrypt the DEK, and is usually a remote AEAD
 // provided by a KMS. It is preferable to use [NewKMSEnvelopeAEADWithContext] instead.
 func NewKMSEnvelopeAEAD2(dekTemplate *tinkpb.KeyTemplate, keyEncryptionAEAD tink.AEAD) *KMSEnvelopeAEAD {
-	if !isSupporedKMSEnvelopeDEK(dekTemplate.GetTypeUrl()) {
+	if !isSupportedKMSEnvelopeDEK(dekTemplate.GetTypeUrl()) {
 		return &KMSEnvelopeAEAD{
 			kekAEAD:     nil,
 			dekTemplate: nil,
