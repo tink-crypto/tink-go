@@ -15,11 +15,9 @@
 package testutil
 
 import (
+	"embed"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 )
 
@@ -67,18 +65,27 @@ func (a *HexBytes) UnmarshalText(text []byte) error {
 	return nil
 }
 
-const testvectorsDir = "testvectors"
-
-var (
-	// This is populated in init() depending on whether the test is running with
-	// Bazel or not.
-	wycheproofDir string
-)
+// wycheproofModVerLegacyTestVectors is a copy of the legacy pre-v1 Wycheproof
+// test vectors from github.com/c2sp/wycheproof before they were migrated to the
+// v1 format. This directory is from its git commit b51abcfb8daf (Go module
+// version v0.0.0-20250901140545-b51abcfb8daf).
+//
+// If you'd like verification that this is an exact copy that hasn't been tampered
+// with, check for yourself with:
+//
+//	$ git fetch https://github.com/c2sp/wycheproof
+//	$ (cd testutil/wycheproofv0 && for x in *.json; do sha256sum $x | awk '{print $1}'; git cat-file -p b51abcfb8daf:testvectors/$x | sha256sum | awk '{print $1}'; done) | uniq -c
+//
+// and see that each hash starts with " 2 ", indicating that the hash of the
+// local file matches the hash of the file in the git repository at that commit.
+//
+//go:embed wycheproofv0/*.json
+var wycheproofModVerLegacyTestVectors embed.FS
 
 // PopulateSuite opens filename from the Wycheproof test vectors directory and
 // populates suite with the decoded JSON data.
 func PopulateSuite(suite any, filename string) error {
-	f, err := os.Open(filepath.Join(wycheproofDir, testvectorsDir, filename))
+	f, err := wycheproofModVerLegacyTestVectors.Open(filepath.Join("wycheproofv0", filename))
 	if err != nil {
 		return err
 	}
@@ -87,45 +94,4 @@ func PopulateSuite(suite any, filename string) error {
 		return err
 	}
 	return nil
-}
-
-// Wycheproof version to fetch.
-const wycheproofModVer = "v0.0.0-20250901140545-b51abcfb8daf"
-
-// downloadWycheproofTestVectors downloads the JSON test files from
-// the Wycheproof repository with `go mod download -json` and returns the
-// absolute path to the root of the downloaded source tree.
-func downloadWycheproofTestVectors() (string, error) {
-	path := "github.com/C2SP/wycheproof@" + wycheproofModVer
-	cmd := exec.Command("go", "mod", "download", "-json", path)
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to run `go mod download -json %s`, output: %s", path, output)
-	}
-	var dm struct {
-		Dir string // absolute path to cached source root directory
-	}
-	if err := json.Unmarshal(output, &dm); err != nil {
-		return "", err
-	}
-	return dm.Dir, nil
-}
-
-const testdataDir = "testdata"
-
-func init() {
-	srcDir, ok := os.LookupEnv("TEST_SRCDIR")
-	if ok {
-		// If running with `bazel test` TEST_WORKSPACE is set.
-		// We don't panic if TEST_WORKSPACE is not set to allow running benchmarks
-		// internally at Google, which set TEST_SRCDIR but not TEST_WORKSPACE.
-		wycheproofDir = filepath.Join(srcDir, os.Getenv("TEST_WORKSPACE"), testdataDir)
-	} else {
-		// Running tests with `go test`.
-		var err error
-		wycheproofDir, err = downloadWycheproofTestVectors()
-		if err != nil {
-			panic(err)
-		}
-	}
 }
