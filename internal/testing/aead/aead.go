@@ -15,11 +15,21 @@
 // Package aead contains types for testing AEAD primitives.
 package aead
 
-import "github.com/tink-crypto/tink-go/v2/testutil"
+import (
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+)
 
 // WycheproofSuite is a Wycheproof test suite for AEAD primitives.
 type WycheproofSuite struct {
 	testutil.WycheproofSuite
+	TestGroups []*WycheproofGroup `json:"testGroups"`
+}
+
+// WycheproofSuiteV1 is a Wycheproof test suite for AEAD primitives using the
+// v1 test vector format.
+type WycheproofSuiteV1 struct {
+	wycheproof.SuiteV1
 	TestGroups []*WycheproofGroup `json:"testGroups"`
 }
 

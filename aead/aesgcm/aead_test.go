@@ -26,8 +26,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	testingaead "github.com/tink-crypto/tink-go/v2/internal/testing/aead"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
-	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -338,10 +338,8 @@ func TestAEADEncryptUsesRandomNonce(t *testing.T) {
 }
 
 func TestAEADWycheproofCases(t *testing.T) {
-	suite := new(testingaead.WycheproofSuite)
-	if err := testutil.PopulateSuite(suite, "aes_gcm_test.json"); err != nil {
-		t.Fatalf("failed populating suite: %s", err)
-	}
+	suite := new(testingaead.WycheproofSuiteV1)
+	wycheproof.PopulateSuiteV1(t, suite, "aes_gcm_test.json")
 	for _, group := range suite.TestGroups {
 		// Skip unsupported key and IV sizes.
 		if err := aead.ValidateAESKeySize(group.KeySize / 8); err != nil {

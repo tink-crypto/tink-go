@@ -22,8 +22,8 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/internal/testing/aead"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
-	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 var aesKeySizes = []uint32{
@@ -196,10 +196,8 @@ func TestAESGCMRandomNonce(t *testing.T) {
 }
 
 func TestAESGCMWycheproofCases(t *testing.T) {
-	suite := new(aead.WycheproofSuite)
-	if err := testutil.PopulateSuite(suite, "aes_gcm_test.json"); err != nil {
-		t.Fatalf("failed populating suite: %s", err)
-	}
+	suite := new(aead.WycheproofSuiteV1)
+	wycheproof.PopulateSuiteV1(t, suite, "aes_gcm_test.json")
 	for _, group := range suite.TestGroups {
 		if err := subtle.ValidateAESKeySize(group.KeySize / 8); err != nil {
 			continue
