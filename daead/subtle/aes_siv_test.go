@@ -20,30 +20,10 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/daead/subtle"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
-
-type AESSIVSuite struct {
-	Algorithm     string
-	NumberOfTests uint32
-	TestGroups    []*testGroup
-}
-
-type testGroup struct {
-	KeySize uint32
-	Type    string
-	Tests   []*testCase
-}
-
-type testCase struct {
-	TcID   uint32
-	Key    string
-	Aad    string
-	Msg    string
-	Ct     string
-	Result string
-}
 
 func TestAESSIV_EncryptDecrypt(t *testing.T) {
 	keyStr :=
@@ -266,11 +246,28 @@ func TestAESSIV_CiphertextModifications(t *testing.T) {
 	}
 }
 
+type AESSIVSuite struct {
+	wycheproof.SuiteV1
+	TestGroups []*testGroup `json:"testGroups"`
+}
+
+type testGroup struct {
+	testutil.WycheproofGroup
+	KeySize uint32      `json:"keySize"`
+	Tests   []*testCase `json:"tests"`
+}
+
+type testCase struct {
+	testutil.WycheproofCase
+	Key testutil.HexBytes `json:"key"`
+	Aad testutil.HexBytes `json:"aad"`
+	Msg testutil.HexBytes `json:"msg"`
+	Ct  testutil.HexBytes `json:"ct"`
+}
+
 func TestAESSIV_WycheproofVectors(t *testing.T) {
 	suite := new(AESSIVSuite)
-	if err := testutil.PopulateSuite(suite, "aes_siv_cmac_test.json"); err != nil {
-		t.Fatalf("testutil.PopulateSuite: %v", err)
-	}
+	wycheproof.PopulateSuiteV1(t, suite, "aes_siv_cmac_test.json")
 
 	for _, g := range suite.TestGroups {
 		if g.KeySize/8 != subtle.AESSIVKeySize {
@@ -278,52 +275,35 @@ func TestAESSIV_WycheproofVectors(t *testing.T) {
 		}
 
 		for _, tc := range g.Tests {
-			key, err := hex.DecodeString(tc.Key)
-			if err != nil {
-				t.Errorf("#%d, cannot decode key: %s", tc.TcID, err)
-			}
-			aad, err := hex.DecodeString(tc.Aad)
-			if err != nil {
-				t.Errorf("#%d, cannot decode aad: %s", tc.TcID, err)
-			}
-			msg, err := hex.DecodeString(tc.Msg)
-			if err != nil {
-				t.Errorf("#%d, cannot decode msg: %s", tc.TcID, err)
-			}
-			ct, err := hex.DecodeString(tc.Ct)
-			if err != nil {
-				t.Errorf("#%d, cannot decode ct: %s", tc.TcID, err)
-			}
-
-			a, err := subtle.NewAESSIV(key)
+			a, err := subtle.NewAESSIV(tc.Key)
 			if err != nil {
 				t.Errorf("NewAESSIV(key) = _, %v, want _, nil", err)
 				continue
 			}
 
 			// EncryptDeterministically should always succeed since msg and aad are valid inputs.
-			gotCt, err := a.EncryptDeterministically(msg, aad)
+			gotCt, err := a.EncryptDeterministically(tc.Msg, tc.Aad)
 			if err != nil {
-				t.Errorf("#%d, unexpected encryption error: %v", tc.TcID, err)
+				t.Errorf("#%d, unexpected encryption error: %v", tc.CaseID, err)
 			} else {
-				if tc.Result == "valid" && !bytes.Equal(gotCt, ct) {
-					t.Errorf("#%d, incorrect encryption: got %v, want %v", tc.TcID, gotCt, ct)
+				if tc.Result == "valid" && !bytes.Equal(gotCt, tc.Ct) {
+					t.Errorf("#%d, incorrect encryption: got %v, want %v", tc.CaseID, gotCt, tc.Ct)
 				}
-				if tc.Result == "invalid" && bytes.Equal(gotCt, ct) {
-					t.Errorf("#%d, invalid encryption: got %v, want %v", tc.TcID, gotCt, ct)
+				if tc.Result == "invalid" && bytes.Equal(gotCt, tc.Ct) {
+					t.Errorf("#%d, invalid encryption: got %v, want %v", tc.CaseID, gotCt, tc.Ct)
 				}
 			}
 
-			pt, err := a.DecryptDeterministically(ct, aad)
+			pt, err := a.DecryptDeterministically(tc.Ct, tc.Aad)
 			if tc.Result == "valid" {
 				if err != nil {
-					t.Errorf("#%d, unexpected decryption error: %v", tc.TcID, err)
-				} else if !bytes.Equal(pt, msg) {
-					t.Errorf("#%d, incorrect decryption: got %v, want %v", tc.TcID, pt, msg)
+					t.Errorf("#%d, unexpected decryption error: %v", tc.CaseID, err)
+				} else if !bytes.Equal(pt, tc.Msg) {
+					t.Errorf("#%d, incorrect decryption: got %v, want %v", tc.CaseID, pt, tc.Msg)
 				}
 			} else {
 				if err == nil {
-					t.Errorf("#%d, decryption error expected: got nil", tc.TcID)
+					t.Errorf("#%d, decryption error expected: got nil", tc.CaseID)
 				}
 			}
 		}
