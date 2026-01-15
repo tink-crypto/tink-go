@@ -24,6 +24,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac/aescmac"
 	"github.com/tink-crypto/tink-go/v2/mac"
@@ -270,71 +271,62 @@ func TestDecryptFailsWithInvalidInputs(t *testing.T) {
 }
 
 type AESCMACSuite struct {
-	Algorithm     string
-	NumberOfTests uint32
-	TestGroups    []*testgroup
+	wycheproof.SuiteV1
+	TestGroups []*testgroup `json:"testGroups"`
 }
 
 type testgroup struct {
-	KeySize uint32
-	TagSize uint32
-	Type    string
-	Tests   []*testcase
+	testutil.WycheproofGroup
+	KeySize uint32      `json:"keySize"`
+	TagSize uint32      `json:"tagSize"`
+	Tests   []*testcase `json:"tests"`
 }
 
 type testcase struct {
-	Comment string
-	Key     string
-	Msg     string
-	Result  string
-	Tag     string
-	TcID    uint32
+	testutil.WycheproofCase
+	Key     testutil.HexBytes `json:"key"`
+	Message testutil.HexBytes `json:"msg"`
+	Tag     testutil.HexBytes `json:"tag"`
 }
 
 func TestVectorsWycheproof(t *testing.T) {
 	suite := new(AESCMACSuite)
-	if err := testutil.PopulateSuite(suite, "aes_cmac_test.json"); err != nil {
-		t.Fatalf("testutil.PopulateSuite: %v", err)
-	}
+	wycheproof.PopulateSuiteV1(t, suite, "aes_cmac_test.json")
 
 	for _, g := range suite.TestGroups {
 		for _, tc := range g.Tests {
 			if g.KeySize != 256 {
-				t.Logf("Key size for test case %d (%s) is not 256, but %d", tc.TcID, tc.Comment, g.KeySize)
+				t.Logf("Key size for test case %d (%s) is not 256, but %d", tc.CaseID, tc.Comment, g.KeySize)
 				continue
 			}
 			if g.TagSize%8 != 0 {
-				t.Errorf("Requested tag size for test case %d (%s) is not a multiple of 8, but %d", tc.TcID, tc.Comment, g.TagSize)
+				t.Errorf("Requested tag size for test case %d (%s) is not a multiple of 8, but %d", tc.CaseID, tc.Comment, g.TagSize)
 				continue
 			}
-			keyBytes := mustHexDecode(t, tc.Key)
-			msg := mustHexDecode(t, tc.Msg)
-			tag := mustHexDecode(t, tc.Tag)
-
-			t.Run(fmt.Sprintf("test_case_%d", tc.TcID), func(t *testing.T) {
+			t.Run(fmt.Sprintf("test_case_%d", tc.CaseID), func(t *testing.T) {
 				params := mustCreateParameters(t, aescmac.ParametersOpts{
-					KeySizeInBytes: len(keyBytes),
+					KeySizeInBytes: len(tc.Key),
 					TagSizeInBytes: int(g.TagSize / 8),
 					Variant:        aescmac.VariantNoPrefix,
 				})
-				key := mustCreateKey(t, secretdata.NewBytesFromData(keyBytes, insecuresecretdataaccess.Token{}), params, 0)
+				key := mustCreateKey(t, secretdata.NewBytesFromData(tc.Key, insecuresecretdataaccess.Token{}), params, 0)
 				valid := tc.Result == "valid"
 				mac, err := aescmac.NewMAC(key, internalapi.Token{})
 				if valid && err != nil {
 					t.Fatalf("aescmac.NewMAC(%v, %v) err = %v, want nil", key, internalapi.Token{}, err)
 				}
 				if err == nil {
-					res, err := mac.ComputeMAC(msg)
+					res, err := mac.ComputeMAC(tc.Message)
 					if valid && err != nil {
 						t.Errorf("mac.ComputeMAC(msg) err = %v, want nil", err)
 					}
-					if valid && !bytes.Equal(res, tag) {
-						t.Errorf("mac.ComputeMAC(msg) = %v, want %v", res, tag)
+					if valid && !bytes.Equal(res, tc.Tag) {
+						t.Errorf("mac.ComputeMAC(msg) = %v, want %v", res, tc.Tag)
 					}
-					if !valid && bytes.Equal(res, tag) && err == nil {
-						t.Errorf("Compute AES-CMAC and invalid expected (%s) match:\nComputed: %q\nExpected: %q", tc.Comment, res, tag)
+					if !valid && bytes.Equal(res, tc.Tag) && err == nil {
+						t.Errorf("Compute AES-CMAC and invalid expected (%s) match:\nComputed: %q\nExpected: %q", tc.Comment, res, tc.Tag)
 					}
-					err = mac.VerifyMAC(tag, msg)
+					err = mac.VerifyMAC(tc.Tag, tc.Message)
 					if valid && err != nil {
 						t.Errorf("mac.VerifyMAC(tag, msg) err = %v, want nil", err)
 					}

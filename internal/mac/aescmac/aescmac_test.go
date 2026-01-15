@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/internal/mac/aescmac"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
@@ -145,7 +146,7 @@ func TestVectorsRFC4493(t *testing.T) {
 }
 
 type macSuite struct {
-	testutil.WycheproofSuite
+	wycheproof.SuiteV1
 	TestGroups []*macGroup `json:"testGroups"`
 }
 
@@ -166,9 +167,7 @@ type macCase struct {
 
 func TestAESCMACPRFWycheproofCases(t *testing.T) {
 	suite := new(macSuite)
-	if err := testutil.PopulateSuite(suite, "aes_cmac_test.json"); err != nil {
-		t.Fatalf("Failed populating suite: %s", err)
-	}
+	wycheproof.PopulateSuiteV1(t, suite, "aes_cmac_test.json")
 	for _, group := range suite.TestGroups {
 		groupName := fmt.Sprintf("%s-%s-%d", suite.Algorithm, group.Type, group.KeySize)
 		if group.TagSize%8 != 0 {

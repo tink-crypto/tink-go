@@ -15,9 +15,11 @@
 package subtle_test
 
 import (
+	"bytes"
 	"encoding/hex"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/mac/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
@@ -36,80 +38,64 @@ var (
 )
 
 type AESCMACSuite struct {
-	Algorithm     string
-	NumberOfTests uint32
-	TestGroups    []*testgroup
+	wycheproof.SuiteV1
+	TestGroups []*testgroup `json:"testGroups"`
 }
 
 type testgroup struct {
-	KeySize uint32
-	TagSize uint32
-	Type    string
-	Tests   []*testcase
+	testutil.WycheproofGroup
+	KeySize uint32      `json:"keySize"`
+	TagSize uint32      `json:"tagSize"`
+	Tests   []*testcase `json:"tests"`
 }
 
 type testcase struct {
-	Comment string
-	Key     string
-	Msg     string
-	Result  string
-	Tag     string
-	TcID    uint32
+	testutil.WycheproofCase
+	Key     testutil.HexBytes `json:"key"`
+	Message testutil.HexBytes `json:"msg"`
+	Tag     testutil.HexBytes `json:"tag"`
 }
 
 func TestVectorsWycheproof(t *testing.T) {
 	suite := new(AESCMACSuite)
-	if err := testutil.PopulateSuite(suite, "aes_cmac_test.json"); err != nil {
-		t.Fatalf("testutil.PopulateSuite: %v", err)
-	}
+	wycheproof.PopulateSuiteV1(t, suite, "aes_cmac_test.json")
 
 	for _, g := range suite.TestGroups {
 		for _, tc := range g.Tests {
-			key, err := hex.DecodeString(tc.Key)
-			if err != nil || uint32(len(key))*8 != g.KeySize {
-				t.Errorf("Could not decode key for test case %d (%s): %v", tc.TcID, tc.Comment, err)
-				continue
-			}
-			msg, err := hex.DecodeString(tc.Msg)
-			if err != nil {
-				t.Errorf("Could not decode message for test case %d (%s): %v", tc.TcID, tc.Comment, err)
-				continue
-			}
-			tag, err := hex.DecodeString(tc.Tag)
-			if err != nil {
-				t.Errorf("Could not decode expected tag for test case %d (%s): %v", tc.TcID, tc.Comment, err)
+			if uint32(len(tc.Key))*8 != g.KeySize {
+				t.Errorf("Unexpected key size for test case %d (%s): got %d, want %d", tc.CaseID, tc.Comment, uint32(len(tc.Key))*8, g.KeySize)
 				continue
 			}
 			if g.TagSize%8 != 0 {
-				t.Errorf("Requested tag size for test case %d (%s) is not a multiple of 8, but %d", tc.TcID, tc.Comment, g.TagSize)
+				t.Errorf("Requested tag size for test case %d (%s) is not a multiple of 8, but %d", tc.CaseID, tc.Comment, g.TagSize)
 				continue
 			}
-			aes, err := subtle.NewAESCMAC(key, g.TagSize/8)
+			aes, err := subtle.NewAESCMAC(tc.Key, g.TagSize/8)
 			valid := tc.Result == "valid"
 			if valid && err != nil {
-				t.Errorf("Could not create subtle.CMAC for test case %d (%s): %v", tc.TcID, tc.Comment, err)
+				t.Errorf("Could not create subtle.CMAC for test case %d (%s): %v", tc.CaseID, tc.Comment, err)
 				continue
 			}
 			if !valid && err != nil {
 				continue
 			}
-			res, err := aes.ComputeMAC(msg)
+			res, err := aes.ComputeMAC(tc.Message)
 			if valid && err != nil {
-				t.Errorf("Could not compute AES-CMAC for test case %d (%s): %v", tc.TcID, tc.Comment, err)
+				t.Errorf("Could not compute AES-CMAC for test case %d (%s): %v", tc.CaseID, tc.Comment, err)
 				continue
 			}
-			if valid && hex.EncodeToString(res) != tc.Tag {
-				t.Errorf("Compute AES-CMAC and expected for test case %d (%s) do not match:\nComputed: %q\nExpected: %q", tc.TcID, tc.Comment, hex.EncodeToString(res), tc.Tag)
+			if valid && !bytes.Equal(res, tc.Tag) {
+				t.Errorf("Compute AES-CMAC and expected for test case %d (%s) do not match:\nComputed: %q\nExpected: %q", tc.CaseID, tc.Comment, hex.EncodeToString(res), tc.Tag)
 			}
-			if !valid && hex.EncodeToString(res) == tc.Tag && err == nil {
-				t.Errorf("Compute AES-CMAC and invalid expected for test case %d (%s) match:\nComputed: %q\nExpected: %q", tc.TcID, tc.Comment, hex.EncodeToString(res), tc.Tag)
+			if !valid && bytes.Equal(res, tc.Tag) && err == nil {
+				t.Errorf("Compute AES-CMAC and invalid expected for test case %d (%s) match:\nComputed: %q\nExpected: %q", tc.CaseID, tc.Comment, hex.EncodeToString(res), tc.Tag)
 			}
-			err = aes.VerifyMAC(tag, msg)
+			err = aes.VerifyMAC(tc.Tag, tc.Message)
 			if valid && err != nil {
-				t.Errorf("Could not verify MAC for test case %d (%s): %v", tc.TcID, tc.Comment, err)
+				t.Errorf("Could not verify MAC for test case %d (%s): %v", tc.CaseID, tc.Comment, err)
 			}
 			if !valid && err == nil {
-				t.Errorf("Verified invalid MAC for test case %d (%s)", tc.TcID, tc.Comment)
+				t.Errorf("Verified invalid MAC for test case %d (%s)", tc.CaseID, tc.Comment)
 			}
 		}
 	}
