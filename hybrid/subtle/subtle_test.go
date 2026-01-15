@@ -14,10 +14,13 @@
 
 package subtle_test
 
-import "github.com/tink-crypto/tink-go/v2/testutil"
+import (
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+)
 
 type ecdhSuite struct {
-	testutil.WycheproofSuite
+	wycheproof.SuiteV1
 	Schema     string       `json:"schema"`
 	TestGroups []*ecdhGroup `json:"testGroups"`
 }

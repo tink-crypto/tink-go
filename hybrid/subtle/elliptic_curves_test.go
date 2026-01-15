@@ -27,7 +27,7 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/hybrid/subtle"
-	"github.com/tink-crypto/tink-go/v2/testutil"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 )
 
 // The tests are from
@@ -539,7 +539,10 @@ func convertPointPublicKey(t *testing.T, pk []byte, curve elliptic.Curve, flags 
 
 func TestECWycheproofCases(t *testing.T) {
 	vectors := []string{
-		"ecdh_test.json",
+		"ecdh_secp224r1_test.json",
+		"ecdh_secp256r1_test.json",
+		"ecdh_secp384r1_test.json",
+		"ecdh_secp521r1_test.json",
 		"ecdh_secp224r1_ecpoint_test.json",
 		"ecdh_secp256r1_ecpoint_test.json",
 		"ecdh_secp384r1_ecpoint_test.json",
@@ -547,9 +550,7 @@ func TestECWycheproofCases(t *testing.T) {
 	}
 	for _, v := range vectors {
 		suite := new(ecdhSuite)
-		if err := testutil.PopulateSuite(suite, v); err != nil {
-			t.Fatalf("failed populating suite: %s", err)
-		}
+		wycheproof.PopulateSuiteV1(t, suite, v)
 		for _, group := range suite.TestGroups {
 			curve, err := subtle.GetCurve(group.Curve)
 			if err != nil {
