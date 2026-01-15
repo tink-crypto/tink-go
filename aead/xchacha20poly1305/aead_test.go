@@ -27,9 +27,9 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	testingaead "github.com/tink-crypto/tink-go/v2/internal/testing/aead"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -284,10 +284,8 @@ func TestDecryptCorrectness(t *testing.T) {
 }
 
 func TestWycheproofCases(t *testing.T) {
-	suite := new(testingaead.WycheproofSuite)
-	if err := testutil.PopulateSuite(suite, "xchacha20_poly1305_test.json"); err != nil {
-		t.Fatalf("testutil.PopulateSuite(suite, \"xchacha20_poly1305_test.json\") err = %v, want nil", err)
-	}
+	suite := new(testingaead.WycheproofSuiteV1)
+	wycheproof.PopulateSuiteV1(t, suite, "xchacha20_poly1305_test.json")
 	for _, group := range suite.TestGroups {
 		if group.KeySize/8 != chacha20poly1305.KeySize {
 			continue

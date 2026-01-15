@@ -18,11 +18,12 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/internal/aead"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 type AEADSuite struct {
-	testutil.WycheproofSuite
+	wycheproof.SuiteV1
 	TestGroups []*AEADGroup `json:"testGroups"`
 }
 
@@ -31,7 +32,6 @@ type AEADGroup struct {
 	IVSize  uint32      `json:"ivSize"`
 	KeySize uint32      `json:"keySize"`
 	TagSize uint32      `json:"tagSize"`
-	Type    string      `json:"type"`
 	Tests   []*AEADCase `json:"tests"`
 }
 
