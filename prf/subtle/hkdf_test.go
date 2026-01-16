@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/prf/subtle"
-	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 type rfc5869test struct {
@@ -125,9 +125,7 @@ func TestHKDFPRFWycheproofCases(t *testing.T) {
 	for _, hash := range []string{"SHA1", "SHA256", "SHA512"} {
 		filename := fmt.Sprintf("hkdf_%s_test.json", strings.ToLower(hash))
 		suite := new(hkdfSuite)
-		if err := testutil.PopulateSuite(suite, filename); err != nil {
-			t.Fatalf("Failed populating suite: %s", err)
-		}
+		wycheproof.PopulateSuiteV1(t, suite, filename)
 		for _, group := range suite.TestGroups {
 			for _, test := range group.Tests {
 				caseName := fmt.Sprintf("%s-%s-%s(%d):Case-%d", suite.Algorithm, group.Type, hash, group.KeySize, test.CaseID)

@@ -14,10 +14,13 @@
 
 package subtle_test
 
-import "github.com/tink-crypto/tink-go/v2/testutil"
+import (
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+)
 
 type macSuite struct {
-	testutil.WycheproofSuite
+	wycheproof.SuiteV1
 	TestGroups []*macGroup `json:"testGroups"`
 }
 
@@ -37,7 +40,7 @@ type macCase struct {
 }
 
 type hkdfSuite struct {
-	testutil.WycheproofSuite
+	wycheproof.SuiteV1
 	TestGroups []*hkdfGroup `json:"testGroups"`
 }
 

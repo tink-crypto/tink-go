@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/prf/subtle"
-	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 type rfc4868test struct {
@@ -112,9 +112,7 @@ func TestHMACPRFWycheproofCases(t *testing.T) {
 	for _, hash := range []string{"SHA1", "SHA256", "SHA512"} {
 		filename := fmt.Sprintf("hmac_%s_test.json", strings.ToLower(hash))
 		suite := new(macSuite)
-		if err := testutil.PopulateSuite(suite, filename); err != nil {
-			t.Fatalf("Failed populating suite: %s", err)
-		}
+		wycheproof.PopulateSuiteV1(t, suite, filename)
 		for _, group := range suite.TestGroups {
 			groupName := fmt.Sprintf("%s-%s-%s(%d)", suite.Algorithm, group.Type, hash, group.KeySize)
 			if group.TagSize%8 != 0 {
