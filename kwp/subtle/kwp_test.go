@@ -16,10 +16,11 @@ package subtle_test
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
+	"slices"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/kwp/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
@@ -89,9 +90,9 @@ func TestInvalidWrappingSizes(t *testing.T) {
 
 type KwpCase struct {
 	testutil.WycheproofCase
-	Key        string `json:"key"`
-	Message    string `json:"msg"`
-	Ciphertext string `json:"ct"`
+	Key        testutil.HexBytes `json:"key"`
+	Message    testutil.HexBytes `json:"msg"`
+	Ciphertext testutil.HexBytes `json:"ct"`
 }
 
 type KwpGroup struct {
@@ -101,15 +102,13 @@ type KwpGroup struct {
 }
 
 type KwpSuite struct {
-	testutil.WycheproofSuite
+	wycheproof.SuiteV1
 	Groups []*KwpGroup `json:"testGroups"`
 }
 
 func TestWycheproofCases(t *testing.T) {
 	suite := new(KwpSuite)
-	if err := testutil.PopulateSuite(suite, "kwp_test.json"); err != nil {
-		t.Fatalf("testutil.PopulateSuite: %v", err)
-	}
+	wycheproof.PopulateSuiteV1(t, suite, "aes_kwp_test.json")
 
 	for _, group := range suite.Groups {
 		if group.KeySize == 192 {
@@ -125,64 +124,50 @@ func TestWycheproofCases(t *testing.T) {
 }
 
 func runWycheproofCase(t *testing.T, testCase *KwpCase) {
-	kek, err := hex.DecodeString(testCase.Key)
-	if err != nil {
-		t.Fatalf("hex.DecodeString(testCase.Key) => %v", err)
-	}
-
-	msg, err := hex.DecodeString(testCase.Message)
-	if err != nil {
-		t.Fatalf("hex.DecodeString(testCase.Message) => %v", err)
-	}
-
-	ct, err := hex.DecodeString(testCase.Ciphertext)
-	if err != nil {
-		t.Fatalf("hex.DecodeString(testCase.Ciphertext) => %v", err)
-	}
-
-	cipher, err := subtle.NewKWP(kek)
+	cipher, err := subtle.NewKWP(testCase.Key)
 	if err != nil {
 		switch testCase.Result {
 		case "valid":
 			t.Fatalf("cannot create kwp, error: %v", err)
-		case "invalid", "acceptable":
+		case "invalid":
 			return
 		}
 	}
 
-	wrapped, err := cipher.Wrap(msg)
+	// Test cases with msg values less than 32 bytes are flagged as small, but
+	// still are marked as valid.
+	//
+	// The minimum accepted key size by this implementation is 16 bytes.
+	expectSmallKeyErr := slices.Contains(testCase.Flags, "SmallKey") && len(testCase.Message) <= 16
+
+	wrapped, err := cipher.Wrap(testCase.Message)
 	switch testCase.Result {
 	case "valid":
 		if err != nil {
+			if expectSmallKeyErr {
+				return
+			}
 			t.Errorf("cannot wrap, error: %v", err)
-		} else if !bytes.Equal(ct, wrapped) {
+		} else if !bytes.Equal(testCase.Ciphertext, wrapped) {
 			t.Error("wrapped key mismatches test vector")
 		}
 	case "invalid":
-		if err == nil && bytes.Equal(ct, wrapped) {
+		if err == nil && bytes.Equal(testCase.Ciphertext, wrapped) {
 			t.Error("no error and wrapped key matches test vector for invalid case")
-		}
-	case "acceptable":
-		if err == nil && !bytes.Equal(ct, wrapped) {
-			t.Error("no error and wrapped key mismatches test vector for acceptable case")
 		}
 	}
 
-	unwrapped, err := cipher.Unwrap(ct)
+	unwrapped, err := cipher.Unwrap(testCase.Ciphertext)
 	switch testCase.Result {
 	case "valid":
 		if err != nil {
 			t.Errorf("cannot unwrap, error: %v", err)
-		} else if !bytes.Equal(msg, unwrapped) {
+		} else if !bytes.Equal(testCase.Message, unwrapped) {
 			t.Error("unwrapped key mismatches test vector")
 		}
 	case "invalid":
 		if err == nil {
 			t.Error("no error unwrapping invalid case")
-		}
-	case "acceptable":
-		if err == nil && !bytes.Equal(msg, unwrapped) {
-			t.Error("no error and unwrapped key mismatches plaintext")
 		}
 	}
 }
