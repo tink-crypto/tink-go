@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"golang.org/x/crypto/curve25519"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/subtle"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
@@ -60,7 +61,7 @@ func TestComputeSharedSecretX25519WithRFCTestVectors(t *testing.T) {
 }
 
 type x25519Suite struct {
-	testutil.WycheproofSuite
+	wycheproof.SuiteV1
 	TestGroups []*x25519Group `json:"testGroups"`
 }
 
@@ -81,9 +82,7 @@ type x25519Case struct {
 
 func TestComputeSharedSecretX25519WithWycheproofVectors(t *testing.T) {
 	suite := new(x25519Suite)
-	if err := testutil.PopulateSuite(suite, "x25519_test.json"); err != nil {
-		t.Fatalf("testutil.PopulateSuite: %v", err)
-	}
+	wycheproof.PopulateSuiteV1(t, suite, "x25519_test.json")
 
 	for _, group := range suite.TestGroups {
 		if group.Curve != "curve25519" {
