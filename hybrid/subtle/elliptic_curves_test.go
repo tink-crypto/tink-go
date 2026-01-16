@@ -565,12 +565,12 @@ func TestECWycheproofCases(t *testing.T) {
 					var pubKey *subtle.ECPublicKey
 					var errPub error
 					switch suite.Schema {
-					case "ecdh_test_schema.json":
+					case "ecdh_test_schema_v1.json":
 						pubKey, errPub = convertX509PublicKey(t, test.Public)
-					case "ecdh_ecpoint_test_schema.json":
+					case "ecdh_ecpoint_test_schema_v1.json":
 						pubKey, errPub = convertPointPublicKey(t, test.Public, curve, test.Flags)
 					default:
-						t.Logf("Unsupported schema: %q", suite.Schema)
+						t.Errorf("Unsupported schema: %q", suite.Schema)
 						return
 					}
 
