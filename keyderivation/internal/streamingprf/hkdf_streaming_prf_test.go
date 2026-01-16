@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
@@ -153,11 +154,10 @@ func TestHKDFStreamingPRFWithWycheproof(t *testing.T) {
 	type hkdfGroup struct {
 		testutil.WycheproofGroup
 		KeySize uint32      `json:"keySize"`
-		Type    string      `json:"type"`
 		Tests   []*hkdfCase `json:"tests"`
 	}
 	type hkdfSuite struct {
-		testutil.WycheproofSuite
+		wycheproof.SuiteV1
 		TestGroups []*hkdfGroup `json:"testGroups"`
 	}
 
@@ -165,9 +165,8 @@ func TestHKDFStreamingPRFWithWycheproof(t *testing.T) {
 	for _, hash := range []string{"SHA256", "SHA512"} {
 		filename := fmt.Sprintf("hkdf_%s_test.json", strings.ToLower(hash))
 		suite := new(hkdfSuite)
-		if err := testutil.PopulateSuite(suite, filename); err != nil {
-			t.Fatalf("testutil.PopulateSuite(%v, %s): %v", suite, filename, err)
-		}
+		wycheproof.PopulateSuiteV1(t, suite, filename)
+
 		for _, group := range suite.TestGroups {
 			for _, test := range group.Tests {
 				caseName := fmt.Sprintf("%s(%d):Case-%d", hash, group.KeySize, test.CaseID)
@@ -221,7 +220,7 @@ func TestHKDFStreamingPRFWithWycheproof(t *testing.T) {
 			}
 		}
 	}
-	if count < 200 {
-		t.Errorf("number of test cases = %d, want > 200", count)
+	if count < 169 {
+		t.Errorf("number of test cases = %d, want >= 169", count)
 	}
 }
