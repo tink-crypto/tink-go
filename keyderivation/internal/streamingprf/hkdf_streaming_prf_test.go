@@ -144,7 +144,7 @@ func TestHKDFStreamingPRFWithRFCVector(t *testing.T) {
 
 func TestHKDFStreamingPRFWithWycheproof(t *testing.T) {
 	type hkdfCase struct {
-		testutil.WycheproofCase
+		wycheproof.Case
 		IKM  testutil.HexBytes `json:"ikm"`
 		Salt testutil.HexBytes `json:"salt"`
 		Info testutil.HexBytes `json:"info"`
@@ -152,12 +152,12 @@ func TestHKDFStreamingPRFWithWycheproof(t *testing.T) {
 		OKM  testutil.HexBytes `json:"okm"`
 	}
 	type hkdfGroup struct {
-		testutil.WycheproofGroup
+		wycheproof.Group
 		KeySize uint32      `json:"keySize"`
 		Tests   []*hkdfCase `json:"tests"`
 	}
 	type hkdfSuite struct {
-		wycheproof.SuiteV1
+		wycheproof.Suite
 		TestGroups []*hkdfGroup `json:"testGroups"`
 	}
 

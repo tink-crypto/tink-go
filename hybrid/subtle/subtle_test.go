@@ -20,13 +20,13 @@ import (
 )
 
 type ecdhSuite struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	Schema     string       `json:"schema"`
 	TestGroups []*ecdhGroup `json:"testGroups"`
 }
 
 type ecdhGroup struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	Curve    string      `json:"curve"`
 	Encoding string      `json:"encoding"`
 	Type     string      `json:"type"`
@@ -34,7 +34,7 @@ type ecdhGroup struct {
 }
 
 type ecdhCase struct {
-	testutil.WycheproofCase
+	wycheproof.Case
 	Public  testutil.HexBytes `json:"public"`
 	Private testutil.HexBytes `json:"private"`
 	Shared  testutil.HexBytes `json:"shared"`

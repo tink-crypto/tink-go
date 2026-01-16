@@ -61,23 +61,23 @@ func TestComputeSharedSecretX25519WithRFCTestVectors(t *testing.T) {
 }
 
 type x25519Suite struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	TestGroups []*x25519Group `json:"testGroups"`
 }
 
 type x25519Group struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	Curve string        `json:"curve"`
 	Tests []*x25519Case `json:"tests"`
 }
 
 type x25519Case struct {
-	testutil.WycheproofCase
-	Public  string   `json:"public"`
-	Private string   `json:"private"`
-	Shared  string   `json:"shared"`
-	Result  string   `json:"result"`
-	Flags   []string `json:"flags"`
+	wycheproof.Case
+	Public  testutil.HexBytes `json:"public"`
+	Private testutil.HexBytes `json:"private"`
+	Shared  string            `json:"shared"`
+	Result  string            `json:"result"`
+	Flags   []string          `json:"flags"`
 }
 
 func TestComputeSharedSecretX25519WithWycheproofVectors(t *testing.T) {
@@ -91,16 +91,7 @@ func TestComputeSharedSecretX25519WithWycheproofVectors(t *testing.T) {
 
 		for _, test := range group.Tests {
 			t.Run(fmt.Sprintf("%d", test.CaseID), func(t *testing.T) {
-				pub, err := hex.DecodeString(test.Public)
-				if err != nil {
-					t.Fatalf("DecodeString(pub): got err %q, want nil", err)
-				}
-				priv, err := hex.DecodeString(test.Private)
-				if err != nil {
-					t.Fatalf("DecodeString(priv): got err %q, want nil", err)
-				}
-
-				gotShared, err := subtle.ComputeSharedSecretX25519(priv, pub)
+				gotShared, err := subtle.ComputeSharedSecretX25519(test.Private, test.Public)
 				// ComputeSharedSecretX25519 fails on low order public values.
 				wantErr := false
 				for _, flag := range test.Flags {

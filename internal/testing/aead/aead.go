@@ -20,22 +20,16 @@ import (
 	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
-// WycheproofSuite is a Wycheproof test suite for AEAD primitives.
-type WycheproofSuite struct {
-	testutil.WycheproofSuite
-	TestGroups []*WycheproofGroup `json:"testGroups"`
-}
-
 // WycheproofSuiteV1 is a Wycheproof test suite for AEAD primitives using the
 // v1 test vector format.
 type WycheproofSuiteV1 struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	TestGroups []*WycheproofGroup `json:"testGroups"`
 }
 
 // WycheproofGroup is a Wycheproof test group for AEAD primitives.
 type WycheproofGroup struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	IvSize  uint32            `json:"ivSize"`
 	KeySize uint32            `json:"keySize"`
 	TagSize uint32            `json:"tagSize"`
@@ -45,7 +39,7 @@ type WycheproofGroup struct {
 
 // WycheproofCase is a Wycheproof test case for AEAD primitives.
 type WycheproofCase struct {
-	testutil.WycheproofCase
+	wycheproof.Case
 	Aad testutil.HexBytes `json:"aad"`
 	Ct  testutil.HexBytes `json:"ct"`
 	Iv  testutil.HexBytes `json:"iv"`

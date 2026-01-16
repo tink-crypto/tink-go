@@ -260,19 +260,19 @@ func TestNewRSASSAPKCS1SignerVerifierInvalidInput(t *testing.T) {
 }
 
 type rsaSSAPKCS1Suite struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	TestGroups []*rsaSSAPKCS1Group `json:"testGroups"`
 }
 
 type rsaSSAPKCS1Group struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	SHA       string                `json:"sha"`
 	PublicKey *rsaSSAPKCS1PublicKey `json:"publicKey"`
 	Tests     []*rsaSSAPKCS1Case    `json:"tests"`
 }
 
 type rsaSSAPKCS1Case struct {
-	testutil.WycheproofCase
+	wycheproof.Case
 	Message   testutil.HexBytes `json:"msg"`
 	Signature testutil.HexBytes `json:"sig"`
 }

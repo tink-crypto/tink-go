@@ -89,20 +89,20 @@ func TestInvalidWrappingSizes(t *testing.T) {
 }
 
 type KwpCase struct {
-	testutil.WycheproofCase
+	wycheproof.Case
 	Key        testutil.HexBytes `json:"key"`
 	Message    testutil.HexBytes `json:"msg"`
 	Ciphertext testutil.HexBytes `json:"ct"`
 }
 
 type KwpGroup struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	KeySize int        `json:"keySize"`
 	Tests   []*KwpCase `json:"tests"`
 }
 
 type KwpSuite struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	Groups []*KwpGroup `json:"testGroups"`
 }
 

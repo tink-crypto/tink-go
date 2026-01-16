@@ -146,12 +146,12 @@ func TestVectorsRFC4493(t *testing.T) {
 }
 
 type macSuite struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	TestGroups []*macGroup `json:"testGroups"`
 }
 
 type macGroup struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	KeySize uint32     `json:"keySize"`
 	TagSize uint32     `json:"tagSize"`
 	Type    string     `json:"type"`
@@ -159,7 +159,7 @@ type macGroup struct {
 }
 
 type macCase struct {
-	testutil.WycheproofCase
+	wycheproof.Case
 	Key     testutil.HexBytes `json:"key"`
 	Message testutil.HexBytes `json:"msg"`
 	Tag     testutil.HexBytes `json:"tag"`

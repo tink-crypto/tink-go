@@ -383,12 +383,12 @@ func TestNewRSASSAPSSSignerVerifierFailWithInvalidInputs(t *testing.T) {
 }
 
 type rsaSSAPSSSuite struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	TestGroups []*rsaSSAPSSGroup `json:"testGroups"`
 }
 
 type rsaSSAPSSGroup struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	SHA        string              `json:"sha"`
 	MGFSHA     string              `json:"mgfSha"`
 	SaltLength int                 `json:"sLen"`
@@ -397,7 +397,7 @@ type rsaSSAPSSGroup struct {
 }
 
 type rsaSSAPSSCase struct {
-	testutil.WycheproofCase
+	wycheproof.Case
 	Message   testutil.HexBytes `json:"msg"`
 	Signature testutil.HexBytes `json:"sig"`
 }

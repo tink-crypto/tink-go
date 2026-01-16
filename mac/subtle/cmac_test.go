@@ -38,19 +38,19 @@ var (
 )
 
 type AESCMACSuite struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	TestGroups []*testgroup `json:"testGroups"`
 }
 
 type testgroup struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	KeySize uint32      `json:"keySize"`
 	TagSize uint32      `json:"tagSize"`
 	Tests   []*testcase `json:"tests"`
 }
 
 type testcase struct {
-	testutil.WycheproofCase
+	wycheproof.Case
 	Key     testutil.HexBytes `json:"key"`
 	Message testutil.HexBytes `json:"msg"`
 	Tag     testutil.HexBytes `json:"tag"`

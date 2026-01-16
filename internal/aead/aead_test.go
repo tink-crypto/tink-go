@@ -23,12 +23,12 @@ import (
 )
 
 type AEADSuite struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	TestGroups []*AEADGroup `json:"testGroups"`
 }
 
 type AEADGroup struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	IVSize  uint32      `json:"ivSize"`
 	KeySize uint32      `json:"keySize"`
 	TagSize uint32      `json:"tagSize"`
@@ -36,7 +36,7 @@ type AEADGroup struct {
 }
 
 type AEADCase struct {
-	testutil.WycheproofCase
+	wycheproof.Case
 	AD      testutil.HexBytes `json:"aad"`
 	CT      testutil.HexBytes `json:"ct"`
 	IV      testutil.HexBytes `json:"iv"`

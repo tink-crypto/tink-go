@@ -24,7 +24,7 @@ import (
 )
 
 type AeadTest struct {
-	testutil.WycheproofCase
+	wycheproof.Case
 	Key        testutil.HexBytes `json:"key"`
 	IV         testutil.HexBytes `json:"iv"`
 	AAD        testutil.HexBytes `json:"aad"`
@@ -34,12 +34,12 @@ type AeadTest struct {
 }
 
 type AeadGroup struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	Tests []*AeadTest `json:"tests"`
 }
 
 type AeadSuite struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	TestGroups []*AeadGroup `json:"testGroups"`
 }
 
@@ -55,15 +55,17 @@ func mustHexDecode(t *testing.T, s string) []byte {
 func TestPopulateSuiteV1(t *testing.T) {
 	suite := new(AeadSuite)
 	wycheproof.PopulateSuiteV1(t, suite, "aes_gcm_test.json")
+
 	if suite.Algorithm != "AES-GCM" {
 		t.Errorf("suite.Algorithm = %q, want %q", suite.Algorithm, "AES-GCM")
 	}
-	wantZeroLengthIVNotes := wycheproof.NotesV1{
+
+	wantZeroLengthIVNotes := wycheproof.Notes{
 		BugType:     "AUTH_BYPASS",
 		Description: "GCM does not allow an IV of length 0. Encrypting with an IV of length 0 leaks the authentication key. Hence using an IV of length 0 is insecure even if the key itself is only used for a single encryption.",
 		CVEs:        []string{"CVE-2017-7822"},
 	}
-	got := suite.SuiteV1.Notes["ZeroLengthIv"]
+	got := suite.Notes["ZeroLengthIv"]
 	if diff := cmp.Diff(wantZeroLengthIVNotes, got); diff != "" {
 		t.Errorf("wycheproof.PopulateSuiteV1 returned unexpected diff (-want +got):\n%s", diff)
 	}
@@ -78,7 +80,7 @@ func TestPopulateSuiteV1(t *testing.T) {
 	gotTestVector := suite.TestGroups[0].Tests[0]
 
 	wantTestVector := &AeadTest{
-		WycheproofCase: testutil.WycheproofCase{
+		Case: wycheproof.Case{
 			CaseID:  1,
 			Comment: "",
 			Result:  "valid",

@@ -21,9 +21,9 @@ import (
 	"testing"
 )
 
-// NotesV1 represents the notes field of the top level
+// Notes represents the notes field of the top level
 // object in a Wycheproof JSON file.
-type NotesV1 struct {
+type Notes struct {
 	BugType     string   `json:"bugType"`
 	Description string   `json:"description"`
 	Effect      string   `json:"effect"`
@@ -31,14 +31,37 @@ type NotesV1 struct {
 	Links       []string `json:"links"`
 }
 
-// SuiteV1 represents the common elements of the top level
+// Suite represents the common elements of the top level
 // object in a Wycheproof JSON file. Implementations should embed
 // SuiteV1 in a struct that strongly types the testGroups
-// field. See wycheproofutil_test.go for an example.
-type SuiteV1 struct {
-	Algorithm     string             `json:"algorithm"`
-	NumberOfTests int                `json:"numberOfTests"`
-	Notes         map[string]NotesV1 `json:"notes"`
+// field.
+//
+// See v1_test.go for an example.
+type Suite struct {
+	Algorithm     string           `json:"algorithm"`
+	NumberOfTests int              `json:"numberOfTests"`
+	Notes         map[string]Notes `json:"notes"`
+}
+
+// Group represents the common elements of a testGroups
+// object in a Wycheproof suite. Implementations should embed
+// WycheproofGroup in a struct that strongly types its list of cases.
+//
+// See v1_test.go for an example.
+type Group struct {
+	Type string `json:"type"`
+}
+
+// Case represents the common elements of a tests object
+// in a Wycheproof group. Implementation should embed WycheproofCase
+// in a struct that contains fields specific to the test type.
+//
+// See v1_test.go for an example.
+type Case struct {
+	CaseID  int      `json:"tcId"`
+	Comment string   `json:"comment"`
+	Result  string   `json:"result"`
+	Flags   []string `json:"flags"`
 }
 
 // PopulateSuiteV1 opens filename from the Wycheproof testvectors_v1 test

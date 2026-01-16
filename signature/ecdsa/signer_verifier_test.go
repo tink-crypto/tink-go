@@ -344,12 +344,12 @@ func TestVerifyFails(t *testing.T) {
 }
 
 type wycheproofSuite struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	TestGroups []*wycheproofGroup `json:"testGroups"`
 }
 
 type wycheproofGroup struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	JWK          *wycheproofJWK    `json:"jwk,omitempty"`
 	PublicKeyDER string            `json:"publicKeyDer"`
 	PublicKeyPEM string            `json:"publicKeyPem"`
@@ -360,7 +360,7 @@ type wycheproofGroup struct {
 }
 
 type wycheproofCase struct {
-	testutil.WycheproofCase
+	wycheproof.Case
 	Message   testutil.HexBytes `json:"msg"`
 	Signature testutil.HexBytes `json:"sig"`
 }

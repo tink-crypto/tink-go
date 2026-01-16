@@ -267,12 +267,12 @@ func TestSignVerify(t *testing.T) {
 }
 
 type ed25519Suite struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	TestGroups []*ed25519Group `json:"testGroups"`
 }
 
 type ed25519Group struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	PublicKeyDER string          `json:"publicKeyDer"`
 	PublicKeyPEM string          `json:"publicKeyPem"`
 	SHA          string          `json:"sha"`
@@ -281,7 +281,7 @@ type ed25519Group struct {
 }
 
 type ed25519Case struct {
-	testutil.WycheproofCase
+	wycheproof.Case
 	Message   testutil.HexBytes `json:"msg"`
 	Signature testutil.HexBytes `json:"sig"`
 }

@@ -247,18 +247,18 @@ func TestAESSIV_CiphertextModifications(t *testing.T) {
 }
 
 type AESSIVSuite struct {
-	wycheproof.SuiteV1
+	wycheproof.Suite
 	TestGroups []*testGroup `json:"testGroups"`
 }
 
 type testGroup struct {
-	testutil.WycheproofGroup
+	wycheproof.Group
 	KeySize uint32      `json:"keySize"`
 	Tests   []*testCase `json:"tests"`
 }
 
 type testCase struct {
-	testutil.WycheproofCase
+	wycheproof.Case
 	Key testutil.HexBytes `json:"key"`
 	Aad testutil.HexBytes `json:"aad"`
 	Msg testutil.HexBytes `json:"msg"`
