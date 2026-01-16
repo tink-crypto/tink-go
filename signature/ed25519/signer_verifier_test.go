@@ -15,7 +15,6 @@
 package ed25519_test
 
 import (
-	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
@@ -27,6 +26,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	tinked25519 "github.com/tink-crypto/tink-go/v2/signature/ed25519"
@@ -267,18 +267,17 @@ func TestSignVerify(t *testing.T) {
 }
 
 type ed25519Suite struct {
-	testutil.WycheproofSuite
+	wycheproof.SuiteV1
 	TestGroups []*ed25519Group `json:"testGroups"`
 }
 
 type ed25519Group struct {
 	testutil.WycheproofGroup
-	KeyDER string          `json:"keyDer"`
-	KeyPEM string          `json:"keyPem"`
-	SHA    string          `json:"sha"`
-	Type   string          `json:"type"`
-	Key    *ed25519TestKey `json:"key"`
-	Tests  []*ed25519Case  `json:"tests"`
+	PublicKeyDER string          `json:"publicKeyDer"`
+	PublicKeyPEM string          `json:"publicKeyPem"`
+	SHA          string          `json:"sha"`
+	PublicKey    *ed25519TestKey `json:"publicKey"`
+	Tests        []*ed25519Case  `json:"tests"`
 }
 
 type ed25519Case struct {
@@ -288,53 +287,32 @@ type ed25519Case struct {
 }
 
 type ed25519TestKey struct {
-	SK testutil.HexBytes `json:"sk"`
 	PK testutil.HexBytes `json:"pk"`
 }
 
 func TestWycheproof(t *testing.T) {
 	suite := new(ed25519Suite)
-	if err := testutil.PopulateSuite(suite, "eddsa_test.json"); err != nil {
-		t.Fatalf("failed populating suite: %s", err)
-	}
-	for _, group := range suite.TestGroups {
-		private := ed25519.PrivateKey(group.Key.SK)
-		public := ed25519.PrivateKey(group.Key.PK)
+	wycheproof.PopulateSuiteV1(t, suite, "ed25519_test.json")
 
-		publicKey, privateKey := keyPair(t, public, private, tinked25519.VariantNoPrefix)
-		signer, err := tinked25519.NewSigner(privateKey, internalapi.Token{})
+	for _, group := range suite.TestGroups {
+		public := ed25519.PublicKey(group.PublicKey.PK)
+		variant := tinked25519.VariantNoPrefix
+		idRequirement := uint32(0)
+		params, err := tinked25519.NewParameters(variant)
 		if err != nil {
-			continue
+			t.Fatalf("tinked25519.NewParameters(%v) err = %v, want nil", variant, err)
 		}
+		publicKey, err := tinked25519.NewPublicKey(public, idRequirement, params)
+		if err != nil {
+			t.Fatalf("tinked25519.NewPublicKey(%v, %v, %v) err = %v, want nil", public, idRequirement, params, err)
+		}
+
 		verifier, err := tinked25519.NewVerifier(publicKey, internalapi.Token{})
 		if err != nil {
 			continue
 		}
 		for _, test := range group.Tests {
-			caseName := fmt.Sprintf("Sign-%s-%s:Case-%d", suite.Algorithm, group.Type, test.CaseID)
-			t.Run(caseName, func(t *testing.T) {
-				got, err := signer.Sign(test.Message)
-				switch test.Result {
-				case "valid":
-					if err != nil {
-						t.Fatalf("ED25519Signer.Sign() failed in a valid test case: %s", err)
-					}
-					if !bytes.Equal(got, test.Signature) {
-						// Ed25519 is deterministic.
-						// Getting an alternative signature may leak the private key.
-						// This is especially the case if an attacker can also learn the valid signature.
-						t.Fatalf("ED25519Signer.Sign() = 0x%x, want = 0x%x", got, test.Signature)
-					}
-				case "invalid":
-					if err == nil && bytes.Equal(got, test.Signature) {
-						t.Fatalf("ED25519Signer.Sign() produced a matching signature in an invalid test case.")
-					}
-				default:
-					t.Fatalf("unrecognized result: %q", test.Result)
-				}
-			})
-
-			caseName = fmt.Sprintf("Verify-%s-%s:Case-%d", suite.Algorithm, group.Type, test.CaseID)
+			caseName := fmt.Sprintf("Verify-%s-%s:Case-%d", suite.Algorithm, group.Type, test.CaseID)
 			t.Run(caseName, func(t *testing.T) {
 				err := verifier.Verify(test.Signature, test.Message)
 				switch test.Result {

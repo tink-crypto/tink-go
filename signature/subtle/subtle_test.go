@@ -14,22 +14,24 @@
 
 package subtle_test
 
-import "github.com/tink-crypto/tink-go/v2/testutil"
+import (
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+)
 
 type ecdsaSuite struct {
-	testutil.WycheproofSuite
+	wycheproof.SuiteV1
 	TestGroups []*ecdsaGroup `json:"testGroups"`
 }
 
 type ecdsaGroup struct {
 	testutil.WycheproofGroup
-	JWK    *ecdsaJWK     `json:"jwk,omitempty"`
-	KeyDER string        `json:"keyDer"`
-	KeyPEM string        `json:"keyPem"`
-	SHA    string        `json:"sha"`
-	Type   string        `json:"type"`
-	Key    *ecdsaTestKey `json:"key"`
-	Tests  []*ecdsaCase  `json:"tests"`
+	JWK          *ecdsaJWK     `json:"jwk,omitempty"`
+	PublicKeyDER string        `json:"PublicKeyDer"`
+	PublicKeyPEM string        `json:"PublicKeyPem"`
+	SHA          string        `json:"sha"`
+	PublicKey    *ecdsaTestKey `json:"PublicKey"`
+	Tests        []*ecdsaCase  `json:"tests"`
 }
 
 type ecdsaCase struct {
@@ -55,18 +57,17 @@ type ecdsaJWK struct {
 }
 
 type ed25519Suite struct {
-	testutil.WycheproofSuite
+	wycheproof.SuiteV1
 	TestGroups []*ed25519Group `json:"testGroups"`
 }
 
 type ed25519Group struct {
 	testutil.WycheproofGroup
-	KeyDER string          `json:"keyDer"`
-	KeyPEM string          `json:"keyPem"`
-	SHA    string          `json:"sha"`
-	Type   string          `json:"type"`
-	Key    *ed25519TestKey `json:"key"`
-	Tests  []*ed25519Case  `json:"tests"`
+	PublicKeyDER string          `json:"publicKeyDer"`
+	PublicKeyPEM string          `json:"publicKeyPem"`
+	SHA          string          `json:"sha"`
+	PublicKey    *ed25519TestKey `json:"publicKey"`
+	Tests        []*ed25519Case  `json:"tests"`
 }
 
 type ed25519Case struct {
@@ -76,6 +77,5 @@ type ed25519Case struct {
 }
 
 type ed25519TestKey struct {
-	SK testutil.HexBytes `json:"sk"`
 	PK testutil.HexBytes `json:"pk"`
 }

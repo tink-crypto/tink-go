@@ -15,7 +15,6 @@
 package subtle_test
 
 import (
-	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
@@ -24,9 +23,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	subtleSignature "github.com/tink-crypto/tink-go/v2/signature/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
-	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -212,45 +211,16 @@ func NewED25519SignerInvalidKeyLength(t *testing.T) {
 
 func TestED25519WycheproofCases(t *testing.T) {
 	suite := new(ed25519Suite)
-	if err := testutil.PopulateSuite(suite, "eddsa_test.json"); err != nil {
-		t.Fatalf("failed populating suite: %s", err)
-	}
+	wycheproof.PopulateSuiteV1(t, suite, "ed25519_test.json")
+
 	for _, group := range suite.TestGroups {
-		private := ed25519.PrivateKey(group.Key.SK)
-		public := ed25519.PrivateKey(group.Key.PK)
-		signer, err := subtleSignature.NewED25519Signer(private)
-		if err != nil {
-			continue
-		}
+		public := ed25519.PublicKey(group.PublicKey.PK)
 		verifier, err := subtleSignature.NewED25519Verifier(public)
 		if err != nil {
 			continue
 		}
 		for _, test := range group.Tests {
-			caseName := fmt.Sprintf("Sign-%s-%s:Case-%d", suite.Algorithm, group.Type, test.CaseID)
-			t.Run(caseName, func(t *testing.T) {
-				got, err := signer.Sign(test.Message)
-				switch test.Result {
-				case "valid":
-					if err != nil {
-						t.Fatalf("ED25519Signer.Sign() failed in a valid test case: %s", err)
-					}
-					if !bytes.Equal(got, test.Signature) {
-						// Ed25519 is deterministic.
-						// Getting an alternative signature may leak the private key.
-						// This is especially the case if an attacker can also learn the valid signature.
-						t.Fatalf("ED25519Signer.Sign() = %s, want = %s", hex.EncodeToString(got), hex.EncodeToString(test.Signature))
-					}
-				case "invalid":
-					if err == nil && bytes.Equal(got, test.Signature) {
-						t.Fatalf("ED25519Signer.Sign() produced a matching signature in an invalid test case.")
-					}
-				default:
-					t.Fatalf("unrecognized result: %q", test.Result)
-				}
-			})
-
-			caseName = fmt.Sprintf("Verify-%s-%s:Case-%d", suite.Algorithm, group.Type, test.CaseID)
+			caseName := fmt.Sprintf("Verify-%s-%s:Case-%d", suite.Algorithm, group.Type, test.CaseID)
 			t.Run(caseName, func(t *testing.T) {
 				err := verifier.Verify(test.Signature, test.Message)
 				switch test.Result {

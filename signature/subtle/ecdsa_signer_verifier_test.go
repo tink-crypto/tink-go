@@ -18,12 +18,13 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"slices"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	subtleSignature "github.com/tink-crypto/tink-go/v2/signature/subtle"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/subtle"
-	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 func TestSignVerify(t *testing.T) {
@@ -93,38 +94,46 @@ func TestECDSAWycheproofCases(t *testing.T) {
 		Filename string
 		Encoding string
 	}{
-		{"ecdsa_test.json", "DER"},
-		{"ecdsa_secp256r1_sha256_p1363_test.json", "IEEE_P1363"},
-		{"ecdsa_secp384r1_sha512_p1363_test.json", "IEEE_P1363"},
-		{"ecdsa_secp521r1_sha512_p1363_test.json", "IEEE_P1363"},
+		{Filename: "ecdsa_secp256r1_sha256_test.json", Encoding: "DER"},
+		{Filename: "ecdsa_secp384r1_sha512_test.json", Encoding: "DER"},
+		{Filename: "ecdsa_secp521r1_sha512_test.json", Encoding: "DER"},
+		{Filename: "ecdsa_secp256r1_sha256_p1363_test.json", Encoding: "IEEE_P1363"},
+		{Filename: "ecdsa_secp384r1_sha512_p1363_test.json", Encoding: "IEEE_P1363"},
+		{Filename: "ecdsa_secp521r1_sha512_p1363_test.json", Encoding: "IEEE_P1363"},
 	}
 
 	for _, v := range vectors {
 		suite := new(ecdsaSuite)
-		if err := testutil.PopulateSuite(suite, v.Filename); err != nil {
-			t.Fatalf("failed populating suite: %s", err)
-		}
+		wycheproof.PopulateSuiteV1(t, suite, v.Filename)
+
 		for _, group := range suite.TestGroups {
 			hash := subtle.ConvertHashName(group.SHA)
-			curve := subtle.ConvertCurveName(group.Key.Curve)
+			curve := subtle.ConvertCurveName(group.PublicKey.Curve)
 			if hash == "" || curve == "" {
 				continue
 			}
-			x, err := subtle.NewBigIntFromHex(group.Key.Wx)
+			x, err := subtle.NewBigIntFromHex(group.PublicKey.Wx)
 			if err != nil {
 				t.Errorf("cannot decode wx: %s", err)
 				continue
 			}
-			y, err := subtle.NewBigIntFromHex(group.Key.Wy)
+			y, err := subtle.NewBigIntFromHex(group.PublicKey.Wy)
 			if err != nil {
 				t.Errorf("cannot decode wy: %s", err)
 				continue
 			}
+
 			verifier, err := subtleSignature.NewECDSAVerifier(hash, curve, v.Encoding, x.Bytes(), y.Bytes())
 			if err != nil {
 				continue
 			}
 			for _, test := range group.Tests {
+				// There is no requirement that libraries check the length of P1363 encoded signatures.
+				//
+				// See https://github.com/C2SP/wycheproof/blob/fca0d3ba9f1286c3af57801ace39c633e29a88f1/testvectors_v1/ecdsa_secp256r1_sha256_p1363_test.json#L66-L69
+				//
+				expectedSignatureSizeNilErr := slices.Contains(test.Flags, "SignatureSize") && v.Encoding == "IEEE_P1363"
+
 				caseName := fmt.Sprintf("%s-%s:Case-%d", group.Type, group.SHA, test.CaseID)
 				t.Run(caseName, func(t *testing.T) {
 					err := verifier.Verify(test.Signature, test.Message)
@@ -135,6 +144,9 @@ func TestECDSAWycheproofCases(t *testing.T) {
 						}
 					case "invalid":
 						if err == nil {
+							if expectedSignatureSizeNilErr {
+								return
+							}
 							t.Fatalf("ECDSAVerifier.Verify() succeeded in an invalid test case")
 						}
 					case "acceptable":
