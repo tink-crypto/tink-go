@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/internal/signature"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/subtle"
 	"github.com/tink-crypto/tink-go/v2/testutil"
@@ -382,18 +383,17 @@ func TestNewRSASSAPSSSignerVerifierFailWithInvalidInputs(t *testing.T) {
 }
 
 type rsaSSAPSSSuite struct {
-	testutil.WycheproofSuite
+	wycheproof.SuiteV1
 	TestGroups []*rsaSSAPSSGroup `json:"testGroups"`
 }
 
 type rsaSSAPSSGroup struct {
 	testutil.WycheproofGroup
-	SHA        string            `json:"sha"`
-	MGFSHA     string            `json:"mgfSha"`
-	SaltLength int               `json:"sLen"`
-	E          testutil.HexBytes `json:"e"`
-	N          testutil.HexBytes `json:"N"`
-	Tests      []*rsaSSAPSSCase  `json:"tests"`
+	SHA        string              `json:"sha"`
+	MGFSHA     string              `json:"mgfSha"`
+	SaltLength int                 `json:"sLen"`
+	PublicKey  *rsaSSAPSSPublicKey `json:"publicKey"`
+	Tests      []*rsaSSAPSSCase    `json:"tests"`
 }
 
 type rsaSSAPSSCase struct {
@@ -402,10 +402,23 @@ type rsaSSAPSSCase struct {
 	Signature testutil.HexBytes `json:"sig"`
 }
 
+type rsaSSAPSSPublicKey struct {
+	PublicExponent testutil.HexBytes `json:"publicExponent"`
+	Modulus        testutil.HexBytes `json:"modulus"`
+}
+
 func TestRSASSAPSSWycheproofCases(t *testing.T) {
 	ranTestCount := 0
+
+	casesToIgnore := map[string][]int{
+		// crypto/rsa will ignore zero length salt and parse the salt length from the
+		// signature. Since theses test cases use a zero salt length as a parameter,
+		// Golang will ignore it and parse the salt directly from the signature.
+		"rsa_pss_2048_sha256_mgf1_0_test.json": []int{67, 68, 69, 70},
+	}
+
 	vectorsFiles := []string{
-		"rsa_pss_2048_sha512_256_mgf1_28_test.json",
+		"rsa_pss_2048_sha512_224_mgf1_28_test.json",
 		"rsa_pss_2048_sha512_256_mgf1_32_test.json",
 		"rsa_pss_2048_sha256_mgf1_0_test.json",
 		"rsa_pss_2048_sha256_mgf1_32_test.json",
@@ -415,27 +428,23 @@ func TestRSASSAPSSWycheproofCases(t *testing.T) {
 	}
 	for _, v := range vectorsFiles {
 		suite := &rsaSSAPSSSuite{}
-		if err := testutil.PopulateSuite(suite, v); err != nil {
-			t.Fatalf("failed populating suite: %s", err)
-		}
+		wycheproof.PopulateSuiteV1(t, suite, v)
+
 		for _, group := range suite.TestGroups {
 			sigHash := subtle.ConvertHashName(group.SHA)
 			if sigHash == "" {
 				continue
 			}
 			pubKey := &rsa.PublicKey{
-				E: int(new(big.Int).SetBytes(group.E).Uint64()),
-				N: new(big.Int).SetBytes(group.N),
+				E: int(new(big.Int).SetBytes(group.PublicKey.PublicExponent).Uint64()),
+				N: new(big.Int).SetBytes(group.PublicKey.Modulus),
 			}
 			verifier, err := signature.New_RSA_SSA_PSS_Verifier(sigHash, group.SaltLength, pubKey)
 			if err != nil {
 				t.Fatalf("New_RSA_SSA_PSS_Verifier() err = %v, want nil", err)
 			}
 			for _, test := range group.Tests {
-				if (test.CaseID == 67 || test.CaseID == 68) && v == "rsa_pss_2048_sha256_mgf1_0_test.json" {
-					// crypto/rsa will interpret zero length salt and parse the salt length from signature.
-					// Since this test cases use a zero salt length as a parameter, even if a different parameter
-					// is provided, Golang will interpret it and parse the salt directly from the signature.
+				if cases, ok := casesToIgnore[v]; ok && slices.Contains(cases, test.CaseID) {
 					continue
 				}
 				ranTestCount++
@@ -460,7 +469,7 @@ func TestRSASSAPSSWycheproofCases(t *testing.T) {
 			}
 		}
 	}
-	if ranTestCount < 578 {
-		t.Errorf("ranTestCount > %d, want > %d", ranTestCount, 578)
+	if ranTestCount < 501 {
+		t.Errorf("ranTestCount > %d, want > %d", ranTestCount, 501)
 	}
 }

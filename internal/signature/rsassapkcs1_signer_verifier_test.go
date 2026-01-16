@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	internal "github.com/tink-crypto/tink-go/v2/internal/signature"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/subtle"
 	"github.com/tink-crypto/tink-go/v2/testutil"
@@ -259,23 +260,26 @@ func TestNewRSASSAPKCS1SignerVerifierInvalidInput(t *testing.T) {
 }
 
 type rsaSSAPKCS1Suite struct {
-	testutil.WycheproofSuite
+	wycheproof.SuiteV1
 	TestGroups []*rsaSSAPKCS1Group `json:"testGroups"`
 }
 
 type rsaSSAPKCS1Group struct {
 	testutil.WycheproofGroup
-	SHA   string             `json:"sha"`
-	E     testutil.HexBytes  `json:"e"`
-	N     testutil.HexBytes  `json:"n"`
-	Type  string             `json:"type"`
-	Tests []*rsaSSAPKCS1Case `json:"tests"`
+	SHA       string                `json:"sha"`
+	PublicKey *rsaSSAPKCS1PublicKey `json:"publicKey"`
+	Tests     []*rsaSSAPKCS1Case    `json:"tests"`
 }
 
 type rsaSSAPKCS1Case struct {
 	testutil.WycheproofCase
 	Message   testutil.HexBytes `json:"msg"`
 	Signature testutil.HexBytes `json:"sig"`
+}
+
+type rsaSSAPKCS1PublicKey struct {
+	PublicExponent testutil.HexBytes `json:"publicExponent"`
+	Modulus        testutil.HexBytes `json:"modulus"`
 }
 
 func TestRSASSAPKCS1WycheproofCases(t *testing.T) {
@@ -286,17 +290,16 @@ func TestRSASSAPKCS1WycheproofCases(t *testing.T) {
 		"rsa_signature_4096_sha512_test.json",
 	} {
 		suite := &rsaSSAPKCS1Suite{}
-		if err := testutil.PopulateSuite(suite, v); err != nil {
-			t.Fatalf("testutil.PopulateSuite() err = %v, want nil", err)
-		}
+		wycheproof.PopulateSuiteV1(t, suite, v)
+
 		for _, group := range suite.TestGroups {
 			hash := subtle.ConvertHashName(group.SHA)
 			if hash == "" {
 				t.Fatalf("invalid hash name")
 			}
 			publicKey := &rsa.PublicKey{
-				E: int(new(big.Int).SetBytes(group.E).Uint64()),
-				N: new(big.Int).SetBytes(group.N),
+				E: int(new(big.Int).SetBytes(group.PublicKey.PublicExponent).Uint64()),
+				N: new(big.Int).SetBytes(group.PublicKey.Modulus),
 			}
 			if publicKey.E != 65537 {
 				// golang "crypto/rsa" only supports 65537 as an exponent.
@@ -332,7 +335,7 @@ func TestRSASSAPKCS1WycheproofCases(t *testing.T) {
 			}
 		}
 	}
-	if testsRan != 716 {
-		t.Errorf("testsRan = %d, want = %d", testsRan, 716)
+	if testsRan != 775 {
+		t.Errorf("testsRan = %d, want = %d", testsRan, 775)
 	}
 }
