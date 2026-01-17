@@ -16,9 +16,9 @@ package wycheproof
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
+
+	c2spwycheproof "github.com/c2sp/wycheproof"
 )
 
 // Notes represents the notes field of the top level
@@ -68,7 +68,7 @@ type Case struct {
 // vectors directory and populates suite with the decoded JSON data.
 func PopulateSuiteV1(t *testing.T, suite any, filename string) {
 	t.Helper()
-	f, err := os.Open(filepath.Join(BaseDir, "testvectors_v1", filename))
+	f, err := c2spwycheproof.TestVectors.Open(filename)
 	if err != nil {
 		t.Fatalf("failed to open file %s: %s", filename, err)
 	}
