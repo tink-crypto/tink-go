@@ -200,7 +200,7 @@ func setEntryMonitoringIfNeeded(h *Handle) error {
 	}
 	for _, entry := range h.entries {
 		l, err := h.monitoringClient.NewLogger(&monitoring.Context{
-			Primitive:   "keyset",
+			Primitive:   "keyset_handle",
 			APIFunction: "get_key",
 			KeysetInfo:  monitoringKeysetInfo,
 		})

@@ -1407,7 +1407,7 @@ func TestKeyExportMonitoring(t *testing.T) {
 		&fakemonitoring.LogKeyExport{
 			KeyID: keyID1,
 			Context: &monitoring.Context{
-				Primitive:   "keyset",
+				Primitive:   "keyset_handle",
 				APIFunction: "get_key",
 				KeysetInfo:  info,
 			},
@@ -1415,7 +1415,7 @@ func TestKeyExportMonitoring(t *testing.T) {
 		&fakemonitoring.LogKeyExport{
 			KeyID: keyID2,
 			Context: &monitoring.Context{
-				Primitive:   "keyset",
+				Primitive:   "keyset_handle",
 				APIFunction: "get_key",
 				KeysetInfo:  info,
 			},
@@ -1476,7 +1476,7 @@ func TestKeyExportMonitoring_keysetMaterial(t *testing.T) {
 		&fakemonitoring.LogKeyExport{
 			KeyID: keyID1,
 			Context: &monitoring.Context{
-				Primitive:   "keyset",
+				Primitive:   "keyset_handle",
 				APIFunction: "get_key",
 				KeysetInfo:  info,
 			},
@@ -1484,7 +1484,7 @@ func TestKeyExportMonitoring_keysetMaterial(t *testing.T) {
 		&fakemonitoring.LogKeyExport{
 			KeyID: keyID2,
 			Context: &monitoring.Context{
-				Primitive:   "keyset",
+				Primitive:   "keyset_handle",
 				APIFunction: "get_key",
 				KeysetInfo:  info,
 			},
