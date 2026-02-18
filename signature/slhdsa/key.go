@@ -84,11 +84,6 @@ type parameterSet struct {
 }
 
 // Parameters represents the parameters of a SLH-DSA key.
-//
-// Currently, only the following parameters are supported:
-//
-//	SLH-DSA-SHA2-128s: {hashType: SHA2, keySize: 64, sigType: SmallSignature},
-//	SLH-DSA-SHAKE-256f: {hashType: SHAKE, keySize: 128, sigType: FastSigning}.
 type Parameters struct {
 	paramSet parameterSet
 	variant  Variant
@@ -102,6 +97,86 @@ func slhDSASHA2128s() parameterSet {
 	}
 }
 
+func slhDSASHAKE128s() parameterSet {
+	return parameterSet{
+		hashType: SHAKE,
+		keySize:  64,
+		sigType:  SmallSignature,
+	}
+}
+
+func slhDSASHA2128f() parameterSet {
+	return parameterSet{
+		hashType: SHA2,
+		keySize:  64,
+		sigType:  FastSigning,
+	}
+}
+
+func slhDSASHAKE128f() parameterSet {
+	return parameterSet{
+		hashType: SHAKE,
+		keySize:  64,
+		sigType:  FastSigning,
+	}
+}
+
+func slhDSASHA2192s() parameterSet {
+	return parameterSet{
+		hashType: SHA2,
+		keySize:  96,
+		sigType:  SmallSignature,
+	}
+}
+
+func slhDSASHAKE192s() parameterSet {
+	return parameterSet{
+		hashType: SHAKE,
+		keySize:  96,
+		sigType:  SmallSignature,
+	}
+}
+
+func slhDSASHA2192f() parameterSet {
+	return parameterSet{
+		hashType: SHA2,
+		keySize:  96,
+		sigType:  FastSigning,
+	}
+}
+
+func slhDSASHAKE192f() parameterSet {
+	return parameterSet{
+		hashType: SHAKE,
+		keySize:  96,
+		sigType:  FastSigning,
+	}
+}
+
+func slhDSASHA2256s() parameterSet {
+	return parameterSet{
+		hashType: SHA2,
+		keySize:  128,
+		sigType:  SmallSignature,
+	}
+}
+
+func slhDSASHAKE256s() parameterSet {
+	return parameterSet{
+		hashType: SHAKE,
+		keySize:  128,
+		sigType:  SmallSignature,
+	}
+}
+
+func slhDSASHA2256f() parameterSet {
+	return parameterSet{
+		hashType: SHA2,
+		keySize:  128,
+		sigType:  FastSigning,
+	}
+}
+
 func slhDSASHAKE256f() parameterSet {
 	return parameterSet{
 		hashType: SHAKE,
@@ -112,7 +187,7 @@ func slhDSASHAKE256f() parameterSet {
 
 func checkSupportedParameters(paramSet parameterSet) error {
 	switch paramSet {
-	case slhDSASHA2128s(), slhDSASHAKE256f():
+	case slhDSASHA2128s(), slhDSASHAKE128s(), slhDSASHA2128f(), slhDSASHAKE128f(), slhDSASHA2192s(), slhDSASHAKE192s(), slhDSASHA2192f(), slhDSASHAKE192f(), slhDSASHA2256s(), slhDSASHAKE256s(), slhDSASHA2256f(), slhDSASHAKE256f():
 		return nil
 	default:
 		return fmt.Errorf("unsupported parameters: %v", paramSet)
@@ -182,6 +257,26 @@ func publicKeyLengthForParams(paramSet parameterSet) (int, error) {
 	switch paramSet {
 	case slhDSASHA2128s():
 		return slhdsa.SLH_DSA_SHA2_128s.PublicKeyLength(), nil
+	case slhDSASHAKE128s():
+		return slhdsa.SLH_DSA_SHAKE_128s.PublicKeyLength(), nil
+	case slhDSASHA2128f():
+		return slhdsa.SLH_DSA_SHA2_128f.PublicKeyLength(), nil
+	case slhDSASHAKE128f():
+		return slhdsa.SLH_DSA_SHAKE_128f.PublicKeyLength(), nil
+	case slhDSASHA2192s():
+		return slhdsa.SLH_DSA_SHA2_192s.PublicKeyLength(), nil
+	case slhDSASHAKE192s():
+		return slhdsa.SLH_DSA_SHAKE_192s.PublicKeyLength(), nil
+	case slhDSASHA2192f():
+		return slhdsa.SLH_DSA_SHA2_192f.PublicKeyLength(), nil
+	case slhDSASHAKE192f():
+		return slhdsa.SLH_DSA_SHAKE_192f.PublicKeyLength(), nil
+	case slhDSASHA2256s():
+		return slhdsa.SLH_DSA_SHA2_256s.PublicKeyLength(), nil
+	case slhDSASHAKE256s():
+		return slhdsa.SLH_DSA_SHAKE_256s.PublicKeyLength(), nil
+	case slhDSASHA2256f():
+		return slhdsa.SLH_DSA_SHA2_256f.PublicKeyLength(), nil
 	case slhDSASHAKE256f():
 		return slhdsa.SLH_DSA_SHAKE_256f.PublicKeyLength(), nil
 	default:
@@ -193,6 +288,26 @@ func privateKeyLengthForParams(paramSet parameterSet) (int, error) {
 	switch paramSet {
 	case slhDSASHA2128s():
 		return slhdsa.SLH_DSA_SHA2_128s.SecretKeyLength(), nil
+	case slhDSASHAKE128s():
+		return slhdsa.SLH_DSA_SHAKE_128s.SecretKeyLength(), nil
+	case slhDSASHA2128f():
+		return slhdsa.SLH_DSA_SHA2_128f.SecretKeyLength(), nil
+	case slhDSASHAKE128f():
+		return slhdsa.SLH_DSA_SHAKE_128f.SecretKeyLength(), nil
+	case slhDSASHA2192s():
+		return slhdsa.SLH_DSA_SHA2_192s.SecretKeyLength(), nil
+	case slhDSASHAKE192s():
+		return slhdsa.SLH_DSA_SHAKE_192s.SecretKeyLength(), nil
+	case slhDSASHA2192f():
+		return slhdsa.SLH_DSA_SHA2_192f.SecretKeyLength(), nil
+	case slhDSASHAKE192f():
+		return slhdsa.SLH_DSA_SHAKE_192f.SecretKeyLength(), nil
+	case slhDSASHA2256s():
+		return slhdsa.SLH_DSA_SHA2_256s.SecretKeyLength(), nil
+	case slhDSASHAKE256s():
+		return slhdsa.SLH_DSA_SHAKE_256s.SecretKeyLength(), nil
+	case slhDSASHA2256f():
+		return slhdsa.SLH_DSA_SHA2_256f.SecretKeyLength(), nil
 	case slhDSASHAKE256f():
 		return slhdsa.SLH_DSA_SHAKE_256f.SecretKeyLength(), nil
 	default:
@@ -293,6 +408,26 @@ func publicKeyForParameters(privateKeyBytes secretdata.Bytes, params *Parameters
 	switch params.paramSet {
 	case slhDSASHA2128s():
 		sk, err = slhdsa.SLH_DSA_SHA2_128s.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHAKE128s():
+		sk, err = slhdsa.SLH_DSA_SHAKE_128s.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHA2128f():
+		sk, err = slhdsa.SLH_DSA_SHA2_128f.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHAKE128f():
+		sk, err = slhdsa.SLH_DSA_SHAKE_128f.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHA2192s():
+		sk, err = slhdsa.SLH_DSA_SHA2_192s.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHAKE192s():
+		sk, err = slhdsa.SLH_DSA_SHAKE_192s.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHA2192f():
+		sk, err = slhdsa.SLH_DSA_SHA2_192f.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHAKE192f():
+		sk, err = slhdsa.SLH_DSA_SHAKE_192f.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHA2256s():
+		sk, err = slhdsa.SLH_DSA_SHA2_256s.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHAKE256s():
+		sk, err = slhdsa.SLH_DSA_SHAKE_256s.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHA2256f():
+		sk, err = slhdsa.SLH_DSA_SHA2_256f.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
 	case slhDSASHAKE256f():
 		sk, err = slhdsa.SLH_DSA_SHAKE_256f.DecodeSecretKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
 	default:
@@ -392,6 +527,26 @@ func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
 	switch slhDSAParams.paramSet {
 	case slhDSASHA2128s():
 		sk, _ = slhdsa.SLH_DSA_SHA2_128s.KeyGen()
+	case slhDSASHAKE128s():
+		sk, _ = slhdsa.SLH_DSA_SHAKE_128s.KeyGen()
+	case slhDSASHA2128f():
+		sk, _ = slhdsa.SLH_DSA_SHA2_128f.KeyGen()
+	case slhDSASHAKE128f():
+		sk, _ = slhdsa.SLH_DSA_SHAKE_128f.KeyGen()
+	case slhDSASHA2192s():
+		sk, _ = slhdsa.SLH_DSA_SHA2_192s.KeyGen()
+	case slhDSASHAKE192s():
+		sk, _ = slhdsa.SLH_DSA_SHAKE_192s.KeyGen()
+	case slhDSASHA2192f():
+		sk, _ = slhdsa.SLH_DSA_SHA2_192f.KeyGen()
+	case slhDSASHAKE192f():
+		sk, _ = slhdsa.SLH_DSA_SHAKE_192f.KeyGen()
+	case slhDSASHA2256s():
+		sk, _ = slhdsa.SLH_DSA_SHA2_256s.KeyGen()
+	case slhDSASHAKE256s():
+		sk, _ = slhdsa.SLH_DSA_SHAKE_256s.KeyGen()
+	case slhDSASHA2256f():
+		sk, _ = slhdsa.SLH_DSA_SHA2_256f.KeyGen()
 	case slhDSASHAKE256f():
 		sk, _ = slhdsa.SLH_DSA_SHAKE_256f.KeyGen()
 	default:

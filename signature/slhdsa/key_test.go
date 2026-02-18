@@ -104,7 +104,7 @@ func TestNewParametersFails(t *testing.T) {
 		},
 		{
 			name:     "invalid hash type",
-			hashType: slhdsa.SHAKE,
+			hashType: slhdsa.UnknownHashType,
 			keySize:  64,
 			sigType:  slhdsa.SmallSignature,
 			variant:  slhdsa.VariantTink,
@@ -112,7 +112,7 @@ func TestNewParametersFails(t *testing.T) {
 		{
 			name:     "invalid key size",
 			hashType: slhdsa.SHA2,
-			keySize:  128,
+			keySize:  256,
 			sigType:  slhdsa.SmallSignature,
 			variant:  slhdsa.VariantTink,
 		},
@@ -120,7 +120,7 @@ func TestNewParametersFails(t *testing.T) {
 			name:     "invalid signature type",
 			hashType: slhdsa.SHA2,
 			keySize:  64,
-			sigType:  slhdsa.FastSigning,
+			sigType:  slhdsa.UnknownSignatureType,
 			variant:  slhdsa.VariantTink,
 		},
 	} {

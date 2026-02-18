@@ -35,13 +35,34 @@ var _ tink.Verifier = (*verifier)(nil)
 
 // These checks are gated by NewParameters filtering out invalid parameters.
 func slhdsaPublicKeyFromPublicKey(publicKey *PublicKey) (*slhdsa.PublicKey, error) {
-	if publicKey.params.paramSet == slhDSASHA2128s() {
+	switch publicKey.params.paramSet {
+	case slhDSASHA2128s():
 		return slhdsa.SLH_DSA_SHA2_128s.DecodePublicKey(publicKey.KeyBytes())
-	}
-	if publicKey.params.paramSet == slhDSASHAKE256f() {
+	case slhDSASHAKE128s():
+		return slhdsa.SLH_DSA_SHAKE_128s.DecodePublicKey(publicKey.KeyBytes())
+	case slhDSASHA2128f():
+		return slhdsa.SLH_DSA_SHA2_128f.DecodePublicKey(publicKey.KeyBytes())
+	case slhDSASHAKE128f():
+		return slhdsa.SLH_DSA_SHAKE_128f.DecodePublicKey(publicKey.KeyBytes())
+	case slhDSASHA2192s():
+		return slhdsa.SLH_DSA_SHA2_192s.DecodePublicKey(publicKey.KeyBytes())
+	case slhDSASHAKE192s():
+		return slhdsa.SLH_DSA_SHAKE_192s.DecodePublicKey(publicKey.KeyBytes())
+	case slhDSASHA2192f():
+		return slhdsa.SLH_DSA_SHA2_192f.DecodePublicKey(publicKey.KeyBytes())
+	case slhDSASHAKE192f():
+		return slhdsa.SLH_DSA_SHAKE_192f.DecodePublicKey(publicKey.KeyBytes())
+	case slhDSASHA2256s():
+		return slhdsa.SLH_DSA_SHA2_256s.DecodePublicKey(publicKey.KeyBytes())
+	case slhDSASHAKE256s():
+		return slhdsa.SLH_DSA_SHAKE_256s.DecodePublicKey(publicKey.KeyBytes())
+	case slhDSASHA2256f():
+		return slhdsa.SLH_DSA_SHA2_256f.DecodePublicKey(publicKey.KeyBytes())
+	case slhDSASHAKE256f():
 		return slhdsa.SLH_DSA_SHAKE_256f.DecodePublicKey(publicKey.KeyBytes())
+	default:
+		return nil, fmt.Errorf("invalid parameters: %v", publicKey.params)
 	}
-	return nil, fmt.Errorf("invalid parameters: %v", publicKey.params)
 }
 
 // NewVerifier creates a new [tink.Verifier] for SLH-DSA.

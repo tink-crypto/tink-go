@@ -846,7 +846,7 @@ func TestParseParametersFails(t *testing.T) {
 					Version: 0,
 					Params: &slhdsapb.SlhDsaParams{
 						KeySize:  64,
-						HashType: slhdsapb.SlhDsaHashType_SHAKE,
+						HashType: slhdsapb.SlhDsaHashType_SLH_DSA_HASH_TYPE_UNSPECIFIED,
 						SigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
 					},
 				}),
@@ -860,7 +860,7 @@ func TestParseParametersFails(t *testing.T) {
 				Value: mustMarshal(t, &slhdsapb.SlhDsaKeyFormat{
 					Version: 0,
 					Params: &slhdsapb.SlhDsaParams{
-						KeySize:  128,
+						KeySize:  256,
 						HashType: slhdsapb.SlhDsaHashType_SHA2,
 						SigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
 					},
@@ -877,7 +877,7 @@ func TestParseParametersFails(t *testing.T) {
 					Params: &slhdsapb.SlhDsaParams{
 						KeySize:  64,
 						HashType: slhdsapb.SlhDsaHashType_SHA2,
-						SigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+						SigType:  slhdsapb.SlhDsaSignatureType_SLH_DSA_SIGNATURE_TYPE_UNSPECIFIED,
 					},
 				}),
 			},

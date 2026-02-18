@@ -36,13 +36,34 @@ var _ tink.Signer = (*signer)(nil)
 
 // These checks are gated by NewParameters filtering out invalid parameters.
 func slhdsaSecretKeyFromPrivateKey(privateKey *PrivateKey) (*slhdsa.SecretKey, error) {
-	if privateKey.publicKey.params.paramSet == slhDSASHA2128s() {
+	switch privateKey.publicKey.params.paramSet {
+	case slhDSASHA2128s():
 		return slhdsa.SLH_DSA_SHA2_128s.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
-	}
-	if privateKey.publicKey.params.paramSet == slhDSASHAKE256f() {
+	case slhDSASHAKE128s():
+		return slhdsa.SLH_DSA_SHAKE_128s.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHA2128f():
+		return slhdsa.SLH_DSA_SHA2_128f.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHAKE128f():
+		return slhdsa.SLH_DSA_SHAKE_128f.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHA2192s():
+		return slhdsa.SLH_DSA_SHA2_192s.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHAKE192s():
+		return slhdsa.SLH_DSA_SHAKE_192s.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHA2192f():
+		return slhdsa.SLH_DSA_SHA2_192f.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHAKE192f():
+		return slhdsa.SLH_DSA_SHAKE_192f.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHA2256s():
+		return slhdsa.SLH_DSA_SHA2_256s.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHAKE256s():
+		return slhdsa.SLH_DSA_SHAKE_256s.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHA2256f():
+		return slhdsa.SLH_DSA_SHA2_256f.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
+	case slhDSASHAKE256f():
 		return slhdsa.SLH_DSA_SHAKE_256f.DecodeSecretKey(privateKey.keyBytes.Data(insecuresecretdataaccess.Token{}))
+	default:
+		return nil, fmt.Errorf("invalid parameters: %v", privateKey.publicKey.params)
 	}
-	return nil, fmt.Errorf("invalid parameters: %v", privateKey.publicKey.params)
 }
 
 // NewSigner creates a new [tink.Signer] for SLH-DSA.
