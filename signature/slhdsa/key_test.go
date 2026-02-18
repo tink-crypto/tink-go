@@ -552,14 +552,14 @@ func TestPublicKeyEqualFalse(t *testing.T) {
 				t.Fatalf("hex.DecodeString(tc.firstKey.keyHex) err = %v, want nil", err)
 			}
 			if tc.firstKey.changeKeyBytes {
-				firstKeyBytes[0] = 0x99
+				firstKeyBytes[0] ^= 1
 			}
 			secondKeyBytes, err := hex.DecodeString(tc.secondKey.keyHex)
 			if err != nil {
 				t.Fatalf("hex.DecodeString(tc.secondKey.keyHex) err = %v, want nil", err)
 			}
 			if tc.secondKey.changeKeyBytes {
-				secondKeyBytes[0] = 0x99
+				secondKeyBytes[0] ^= 1
 			}
 			firstParams, err := slhdsa.NewParameters(tc.firstKey.hashType, tc.firstKey.keySize, tc.firstKey.sigType, tc.firstKey.variant)
 			if err != nil {
@@ -625,12 +625,12 @@ func TestPublicKeyKeyBytes(t *testing.T) {
 				t.Errorf("bytes.Equal(gotPubKeyBytes, keyBytes) = false, want true")
 			}
 			// Make sure a copy is made when creating the public key.
-			keyBytes[0] = 0x99
+			keyBytes[0] ^= 1
 			if bytes.Equal(pubKey.KeyBytes(), keyBytes) {
 				t.Errorf("bytes.Equal(pubKey.KeyBytes(), keyBytes) = true, want false")
 			}
 			// Make sure no changes are made to the internal state of the public key.
-			gotPubKeyBytes[1] = 0x99
+			gotPubKeyBytes[1] ^= 1
 			if bytes.Equal(pubKey.KeyBytes(), gotPubKeyBytes) {
 				t.Errorf("bytes.Equal((pubKey.KeyBytes(), gotPubKeyBytes) = true, want false")
 			}
