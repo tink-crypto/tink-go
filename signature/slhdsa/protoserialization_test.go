@@ -17,6 +17,7 @@ package slhdsa
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -723,63 +724,159 @@ func TestSerializeParameters(t *testing.T) {
 }
 
 func TestParseParameters(t *testing.T) {
-	format := &slhdsapb.SlhDsaKeyFormat{
-		Version: 0,
-		Params: &slhdsapb.SlhDsaParams{
-			KeySize:  64,
-			HashType: slhdsapb.SlhDsaHashType_SHA2,
-			SigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
-		},
-	}
-	serializedFormat, err := proto.Marshal(format)
-	if err != nil {
-		t.Fatalf("proto.Marshal(format) err = %v, want nil", err)
-	}
-	for _, tc := range []struct {
-		name     string
-		want     key.Parameters
-		template *tinkpb.KeyTemplate
+	for _, p := range []struct {
+		hashType  HashType
+		keySize   int
+		sigType   SignatureType
+		pHashType slhdsapb.SlhDsaHashType
+		pSigType  slhdsapb.SlhDsaSignatureType
 	}{
 		{
-			name: "parameters with TINK variant",
-			want: &Parameters{
-				paramSet: parameterSet{
-					hashType: SHA2,
-					keySize:  64,
-					sigType:  SmallSignature,
-				},
-				variant: VariantTink,
-			},
-			template: &tinkpb.KeyTemplate{
-				TypeUrl:          "type.googleapis.com/google.crypto.tink.SlhDsaPrivateKey",
-				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				Value:            serializedFormat,
-			},
+			hashType:  SHA2,
+			keySize:   64,
+			sigType:   SmallSignature,
+			pHashType: slhdsapb.SlhDsaHashType_SHA2,
+			pSigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
 		},
 		{
-			name: "parameters with NO_PREFIX variant",
-			want: &Parameters{
-				paramSet: parameterSet{
-					hashType: SHA2,
-					keySize:  64,
-					sigType:  SmallSignature,
-				},
-				variant: VariantNoPrefix,
-			},
-			template: &tinkpb.KeyTemplate{
-				TypeUrl:          "type.googleapis.com/google.crypto.tink.SlhDsaPrivateKey",
-				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
-				Value:            serializedFormat,
-			},
+			hashType:  SHAKE,
+			keySize:   64,
+			sigType:   SmallSignature,
+			pHashType: slhdsapb.SlhDsaHashType_SHAKE,
+			pSigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+		},
+		{
+			hashType:  SHA2,
+			keySize:   64,
+			sigType:   FastSigning,
+			pHashType: slhdsapb.SlhDsaHashType_SHA2,
+			pSigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+		},
+		{
+			hashType:  SHAKE,
+			keySize:   64,
+			sigType:   FastSigning,
+			pHashType: slhdsapb.SlhDsaHashType_SHAKE,
+			pSigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+		},
+		{
+			hashType:  SHA2,
+			keySize:   96,
+			sigType:   SmallSignature,
+			pHashType: slhdsapb.SlhDsaHashType_SHA2,
+			pSigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+		},
+		{
+			hashType:  SHAKE,
+			keySize:   96,
+			sigType:   SmallSignature,
+			pHashType: slhdsapb.SlhDsaHashType_SHAKE,
+			pSigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+		},
+		{
+			hashType:  SHA2,
+			keySize:   96,
+			sigType:   FastSigning,
+			pHashType: slhdsapb.SlhDsaHashType_SHA2,
+			pSigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+		},
+		{
+			hashType:  SHAKE,
+			keySize:   96,
+			sigType:   FastSigning,
+			pHashType: slhdsapb.SlhDsaHashType_SHAKE,
+			pSigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+		},
+		{
+			hashType:  SHA2,
+			keySize:   128,
+			sigType:   SmallSignature,
+			pHashType: slhdsapb.SlhDsaHashType_SHA2,
+			pSigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+		},
+		{
+			hashType:  SHAKE,
+			keySize:   128,
+			sigType:   SmallSignature,
+			pHashType: slhdsapb.SlhDsaHashType_SHAKE,
+			pSigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+		},
+		{
+			hashType:  SHA2,
+			keySize:   128,
+			sigType:   FastSigning,
+			pHashType: slhdsapb.SlhDsaHashType_SHA2,
+			pSigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+		},
+		{
+			hashType:  SHAKE,
+			keySize:   128,
+			sigType:   FastSigning,
+			pHashType: slhdsapb.SlhDsaHashType_SHAKE,
+			pSigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := protoserialization.ParseParameters(tc.template)
-			if err != nil {
-				t.Fatalf("protoserialization.ParseParameters(%v) err = %v, want nil", tc.template, err)
+		name := fmt.Sprintf("%v_%d_%v", p.hashType, p.keySize, p.sigType)
+		t.Run(name, func(t *testing.T) {
+			format := &slhdsapb.SlhDsaKeyFormat{
+				Version: 0,
+				Params: &slhdsapb.SlhDsaParams{
+					KeySize:  int32(p.keySize),
+					HashType: p.pHashType,
+					SigType:  p.pSigType,
+				},
 			}
-			if diff := cmp.Diff(tc.want, got); diff != "" {
-				t.Errorf("protoserialization.ParseParameters(%v) returned unexpected diff (-want +got):\n%s", tc.template, diff)
+			serializedFormat, err := proto.Marshal(format)
+			if err != nil {
+				t.Fatalf("proto.Marshal(format) err = %v, want nil", err)
+			}
+			for _, tc := range []struct {
+				name     string
+				want     key.Parameters
+				template *tinkpb.KeyTemplate
+			}{
+				{
+					name: "parameters with TINK variant",
+					want: &Parameters{
+						paramSet: parameterSet{
+							hashType: p.hashType,
+							keySize:  p.keySize,
+							sigType:  p.sigType,
+						},
+						variant: VariantTink,
+					},
+					template: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.SlhDsaPrivateKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						Value:            serializedFormat,
+					},
+				},
+				{
+					name: "parameters with NO_PREFIX variant",
+					want: &Parameters{
+						paramSet: parameterSet{
+							hashType: p.hashType,
+							keySize:  p.keySize,
+							sigType:  p.sigType,
+						},
+						variant: VariantNoPrefix,
+					},
+					template: &tinkpb.KeyTemplate{
+						TypeUrl:          "type.googleapis.com/google.crypto.tink.SlhDsaPrivateKey",
+						OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+						Value:            serializedFormat,
+					},
+				},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					got, err := protoserialization.ParseParameters(tc.template)
+					if err != nil {
+						t.Fatalf("protoserialization.ParseParameters(%v) err = %v, want nil", tc.template, err)
+					}
+					if diff := cmp.Diff(tc.want, got); diff != "" {
+						t.Errorf("protoserialization.ParseParameters(%v) returned unexpected diff (-want +got):\n%s", tc.template, diff)
+					}
+				})
 			}
 		})
 	}

@@ -65,6 +65,146 @@ func TestNewParameters(t *testing.T) {
 			sigType:  slhdsa.FastSigning,
 			variant:  slhdsa.VariantNoPrefix,
 		},
+		{
+			name:     "tink SHAKE-128s",
+			hashType: slhdsa.SHAKE,
+			keySize:  64,
+			sigType:  slhdsa.SmallSignature,
+			variant:  slhdsa.VariantTink,
+		},
+		{
+			name:     "no prefix SHAKE-128s",
+			hashType: slhdsa.SHAKE,
+			keySize:  64,
+			sigType:  slhdsa.SmallSignature,
+			variant:  slhdsa.VariantNoPrefix,
+		},
+		{
+			name:     "tink SHA2-128f",
+			hashType: slhdsa.SHA2,
+			keySize:  64,
+			sigType:  slhdsa.FastSigning,
+			variant:  slhdsa.VariantTink,
+		},
+		{
+			name:     "no prefix SHA2-128f",
+			hashType: slhdsa.SHA2,
+			keySize:  64,
+			sigType:  slhdsa.FastSigning,
+			variant:  slhdsa.VariantNoPrefix,
+		},
+		{
+			name:     "tink SHAKE-128f",
+			hashType: slhdsa.SHAKE,
+			keySize:  64,
+			sigType:  slhdsa.FastSigning,
+			variant:  slhdsa.VariantTink,
+		},
+		{
+			name:     "no prefix SHAKE-128f",
+			hashType: slhdsa.SHAKE,
+			keySize:  64,
+			sigType:  slhdsa.FastSigning,
+			variant:  slhdsa.VariantNoPrefix,
+		},
+		{
+			name:     "tink SHA2-192s",
+			hashType: slhdsa.SHA2,
+			keySize:  96,
+			sigType:  slhdsa.SmallSignature,
+			variant:  slhdsa.VariantTink,
+		},
+		{
+			name:     "no prefix SHA2-192s",
+			hashType: slhdsa.SHA2,
+			keySize:  96,
+			sigType:  slhdsa.SmallSignature,
+			variant:  slhdsa.VariantNoPrefix,
+		},
+		{
+			name:     "tink SHAKE-192s",
+			hashType: slhdsa.SHAKE,
+			keySize:  96,
+			sigType:  slhdsa.SmallSignature,
+			variant:  slhdsa.VariantTink,
+		},
+		{
+			name:     "no prefix SHAKE-192s",
+			hashType: slhdsa.SHAKE,
+			keySize:  96,
+			sigType:  slhdsa.SmallSignature,
+			variant:  slhdsa.VariantNoPrefix,
+		},
+		{
+			name:     "tink SHA2-192f",
+			hashType: slhdsa.SHA2,
+			keySize:  96,
+			sigType:  slhdsa.FastSigning,
+			variant:  slhdsa.VariantTink,
+		},
+		{
+			name:     "no prefix SHA2-192f",
+			hashType: slhdsa.SHA2,
+			keySize:  96,
+			sigType:  slhdsa.FastSigning,
+			variant:  slhdsa.VariantNoPrefix,
+		},
+		{
+			name:     "tink SHAKE-192f",
+			hashType: slhdsa.SHAKE,
+			keySize:  96,
+			sigType:  slhdsa.FastSigning,
+			variant:  slhdsa.VariantTink,
+		},
+		{
+			name:     "no prefix SHAKE-192f",
+			hashType: slhdsa.SHAKE,
+			keySize:  96,
+			sigType:  slhdsa.FastSigning,
+			variant:  slhdsa.VariantNoPrefix,
+		},
+		{
+			name:     "tink SHA2-256s",
+			hashType: slhdsa.SHA2,
+			keySize:  128,
+			sigType:  slhdsa.SmallSignature,
+			variant:  slhdsa.VariantTink,
+		},
+		{
+			name:     "no prefix SHA2-256s",
+			hashType: slhdsa.SHA2,
+			keySize:  128,
+			sigType:  slhdsa.SmallSignature,
+			variant:  slhdsa.VariantNoPrefix,
+		},
+		{
+			name:     "tink SHAKE-256s",
+			hashType: slhdsa.SHAKE,
+			keySize:  128,
+			sigType:  slhdsa.SmallSignature,
+			variant:  slhdsa.VariantTink,
+		},
+		{
+			name:     "no prefix SHAKE-256s",
+			hashType: slhdsa.SHAKE,
+			keySize:  128,
+			sigType:  slhdsa.SmallSignature,
+			variant:  slhdsa.VariantNoPrefix,
+		},
+		{
+			name:     "tink SHA2-256f",
+			hashType: slhdsa.SHA2,
+			keySize:  128,
+			sigType:  slhdsa.FastSigning,
+			variant:  slhdsa.VariantTink,
+		},
+		{
+			name:     "no prefix SHA2-256f",
+			hashType: slhdsa.SHA2,
+			keySize:  128,
+			sigType:  slhdsa.FastSigning,
+			variant:  slhdsa.VariantNoPrefix,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			params, err := slhdsa.NewParameters(tc.hashType, tc.keySize, tc.sigType, tc.variant)
@@ -291,59 +431,9 @@ func TestNewPublicKeyFails(t *testing.T) {
 }
 
 func TestPublicKey(t *testing.T) {
-	for _, tc := range []struct {
-		name             string
-		hashType         slhdsa.HashType
-		keySize          int
-		sigType          slhdsa.SignatureType
-		variant          slhdsa.Variant
-		pubKeyHex        string
-		idRequirement    uint32
-		wantOutputPrefix []byte
-	}{
-		{
-			name:             "tink SHA2-128s",
-			hashType:         slhdsa.SHA2,
-			keySize:          64,
-			sigType:          slhdsa.SmallSignature,
-			variant:          slhdsa.VariantTink,
-			pubKeyHex:        pubKeySHA2128sHex,
-			idRequirement:    uint32(0x01020304),
-			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
-		},
-		{
-			name:             "no prefix SHA2-128s",
-			hashType:         slhdsa.SHA2,
-			keySize:          64,
-			sigType:          slhdsa.SmallSignature,
-			variant:          slhdsa.VariantNoPrefix,
-			pubKeyHex:        pubKeySHA2128sHex,
-			idRequirement:    0,
-			wantOutputPrefix: nil,
-		},
-		{
-			name:             "tink SHAKE-256f",
-			hashType:         slhdsa.SHAKE,
-			keySize:          128,
-			sigType:          slhdsa.FastSigning,
-			variant:          slhdsa.VariantTink,
-			pubKeyHex:        pubKeySHAKE256fHex,
-			idRequirement:    uint32(0x01020304),
-			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
-		},
-		{
-			name:             "no prefix SHAKE-256f",
-			hashType:         slhdsa.SHAKE,
-			keySize:          128,
-			sigType:          slhdsa.FastSigning,
-			variant:          slhdsa.VariantNoPrefix,
-			pubKeyHex:        pubKeySHAKE256fHex,
-			idRequirement:    0,
-			wantOutputPrefix: nil,
-		},
-	} {
+	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			keyBytes, err := hex.DecodeString(tc.pubKeyHex)
+			keyBytes, err := hex.DecodeString(tc.pubKeyBytesHex)
 			if err != nil {
 				t.Fatalf("hex.DecodeString(pubKeyHex) err = %v, want nil", err)
 			}
@@ -585,40 +675,19 @@ func TestPublicKeyEqualFalse(t *testing.T) {
 }
 
 func TestPublicKeyKeyBytes(t *testing.T) {
-	for _, tc := range []struct {
-		name     string
-		hashType slhdsa.HashType
-		keySize  int
-		sigType  slhdsa.SignatureType
-		keyHex   string
-	}{
-		{
-			name:     "SLH-DSA-SHA2-128s",
-			hashType: slhdsa.SHA2,
-			keySize:  64,
-			sigType:  slhdsa.SmallSignature,
-			keyHex:   pubKeySHA2128sHex,
-		},
-		{
-			name:     "SLH-DSA-SHAKE-256f",
-			hashType: slhdsa.SHAKE,
-			keySize:  128,
-			sigType:  slhdsa.FastSigning,
-			keyHex:   pubKeySHAKE256fHex,
-		},
-	} {
+	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			params, err := slhdsa.NewParameters(tc.hashType, tc.keySize, tc.sigType, slhdsa.VariantTink)
+			params, err := slhdsa.NewParameters(tc.hashType, tc.keySize, tc.sigType, tc.variant)
 			if err != nil {
-				t.Fatalf("slhdsa.NewParameters(%v) err = %v, want nil", slhdsa.VariantTink, err)
+				t.Fatalf("slhdsa.NewParameters(%v) err = %v, want nil", tc.variant, err)
 			}
-			keyBytes, err := hex.DecodeString(tc.keyHex)
+			keyBytes, err := hex.DecodeString(tc.pubKeyBytesHex)
 			if err != nil {
-				t.Fatalf("hex.DecodeString(tc.keyHex) err = %v, want nil", err)
+				t.Fatalf("hex.DecodeString(tc.pubKeyBytesHex) err = %v, want nil", err)
 			}
-			pubKey, err := slhdsa.NewPublicKey(keyBytes, 123, params)
+			pubKey, err := slhdsa.NewPublicKey(keyBytes, tc.idRequirement, params)
 			if err != nil {
-				t.Fatalf("slhdsa.NewPublicKey(%v, %v, %v) err = %v, want nil", keyBytes, 123, params, err)
+				t.Fatalf("slhdsa.NewPublicKey(%v, %v, %v) err = %v, want nil", keyBytes, tc.idRequirement, params, err)
 			}
 			gotPubKeyBytes := pubKey.KeyBytes()
 			if !bytes.Equal(gotPubKeyBytes, keyBytes) {
@@ -649,6 +718,7 @@ var testCases = []struct {
 	idRequirement    uint32
 	wantOutputPrefix []byte
 }{
+	// SHA2-128s
 	{
 		name:             "tink SHA2-128s",
 		hashType:         slhdsa.SHA2,
@@ -671,6 +741,237 @@ var testCases = []struct {
 		idRequirement:    0,
 		wantOutputPrefix: nil,
 	},
+	// SHAKE-128s
+	{
+		name:             "tink SHAKE-128s",
+		hashType:         slhdsa.SHAKE,
+		keySize:          64,
+		sigType:          slhdsa.SmallSignature,
+		variant:          slhdsa.VariantTink,
+		privKeyBytesHex:  privKeySHAKE128sHex,
+		pubKeyBytesHex:   pubKeySHAKE128sHex,
+		idRequirement:    uint32(0x01020304),
+		wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+	},
+	{
+		name:             "no prefix SHAKE-128s",
+		hashType:         slhdsa.SHAKE,
+		keySize:          64,
+		sigType:          slhdsa.SmallSignature,
+		variant:          slhdsa.VariantNoPrefix,
+		privKeyBytesHex:  privKeySHAKE128sHex,
+		pubKeyBytesHex:   pubKeySHAKE128sHex,
+		idRequirement:    0,
+		wantOutputPrefix: nil,
+	},
+	// SHA2-128f
+	{
+		name:             "tink SHA2-128f",
+		hashType:         slhdsa.SHA2,
+		keySize:          64,
+		sigType:          slhdsa.FastSigning,
+		variant:          slhdsa.VariantTink,
+		privKeyBytesHex:  privKeySHA2128fHex,
+		pubKeyBytesHex:   pubKeySHA2128fHex,
+		idRequirement:    uint32(0x01020304),
+		wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+	},
+	{
+		name:             "no prefix SHA2-128f",
+		hashType:         slhdsa.SHA2,
+		keySize:          64,
+		sigType:          slhdsa.FastSigning,
+		variant:          slhdsa.VariantNoPrefix,
+		privKeyBytesHex:  privKeySHA2128fHex,
+		pubKeyBytesHex:   pubKeySHA2128fHex,
+		idRequirement:    0,
+		wantOutputPrefix: nil,
+	},
+	// SHAKE-128f
+	{
+		name:             "tink SHAKE-128f",
+		hashType:         slhdsa.SHAKE,
+		keySize:          64,
+		sigType:          slhdsa.FastSigning,
+		variant:          slhdsa.VariantTink,
+		privKeyBytesHex:  privKeySHAKE128fHex,
+		pubKeyBytesHex:   pubKeySHAKE128fHex,
+		idRequirement:    uint32(0x01020304),
+		wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+	},
+	{
+		name:             "no prefix SHAKE-128f",
+		hashType:         slhdsa.SHAKE,
+		keySize:          64,
+		sigType:          slhdsa.FastSigning,
+		variant:          slhdsa.VariantNoPrefix,
+		privKeyBytesHex:  privKeySHAKE128fHex,
+		pubKeyBytesHex:   pubKeySHAKE128fHex,
+		idRequirement:    0,
+		wantOutputPrefix: nil,
+	},
+	// SHA2-192s
+	{
+		name:             "tink SHA2-192s",
+		hashType:         slhdsa.SHA2,
+		keySize:          96,
+		sigType:          slhdsa.SmallSignature,
+		variant:          slhdsa.VariantTink,
+		privKeyBytesHex:  privKeySHA2192sHex,
+		pubKeyBytesHex:   pubKeySHA2192sHex,
+		idRequirement:    uint32(0x01020304),
+		wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+	},
+	{
+		name:             "no prefix SHA2-192s",
+		hashType:         slhdsa.SHA2,
+		keySize:          96,
+		sigType:          slhdsa.SmallSignature,
+		variant:          slhdsa.VariantNoPrefix,
+		privKeyBytesHex:  privKeySHA2192sHex,
+		pubKeyBytesHex:   pubKeySHA2192sHex,
+		idRequirement:    0,
+		wantOutputPrefix: nil,
+	},
+	// SHAKE-192s
+	{
+		name:             "tink SHAKE-192s",
+		hashType:         slhdsa.SHAKE,
+		keySize:          96,
+		sigType:          slhdsa.SmallSignature,
+		variant:          slhdsa.VariantTink,
+		privKeyBytesHex:  privKeySHAKE192sHex,
+		pubKeyBytesHex:   pubKeySHAKE192sHex,
+		idRequirement:    uint32(0x01020304),
+		wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+	},
+	{
+		name:             "no prefix SHAKE-192s",
+		hashType:         slhdsa.SHAKE,
+		keySize:          96,
+		sigType:          slhdsa.SmallSignature,
+		variant:          slhdsa.VariantNoPrefix,
+		privKeyBytesHex:  privKeySHAKE192sHex,
+		pubKeyBytesHex:   pubKeySHAKE192sHex,
+		idRequirement:    0,
+		wantOutputPrefix: nil,
+	},
+	// SHA2-192f
+	{
+		name:             "tink SHA2-192f",
+		hashType:         slhdsa.SHA2,
+		keySize:          96,
+		sigType:          slhdsa.FastSigning,
+		variant:          slhdsa.VariantTink,
+		privKeyBytesHex:  privKeySHA2192fHex,
+		pubKeyBytesHex:   pubKeySHA2192fHex,
+		idRequirement:    uint32(0x01020304),
+		wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+	},
+	{
+		name:             "no prefix SHA2-192f",
+		hashType:         slhdsa.SHA2,
+		keySize:          96,
+		sigType:          slhdsa.FastSigning,
+		variant:          slhdsa.VariantNoPrefix,
+		privKeyBytesHex:  privKeySHA2192fHex,
+		pubKeyBytesHex:   pubKeySHA2192fHex,
+		idRequirement:    0,
+		wantOutputPrefix: nil,
+	},
+	// SHAKE-192f
+	{
+		name:             "tink SHAKE-192f",
+		hashType:         slhdsa.SHAKE,
+		keySize:          96,
+		sigType:          slhdsa.FastSigning,
+		variant:          slhdsa.VariantTink,
+		privKeyBytesHex:  privKeySHAKE192fHex,
+		pubKeyBytesHex:   pubKeySHAKE192fHex,
+		idRequirement:    uint32(0x01020304),
+		wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+	},
+	{
+		name:             "no prefix SHAKE-192f",
+		hashType:         slhdsa.SHAKE,
+		keySize:          96,
+		sigType:          slhdsa.FastSigning,
+		variant:          slhdsa.VariantNoPrefix,
+		privKeyBytesHex:  privKeySHAKE192fHex,
+		pubKeyBytesHex:   pubKeySHAKE192fHex,
+		idRequirement:    0,
+		wantOutputPrefix: nil,
+	},
+	// SHA2-256s
+	{
+		name:             "tink SHA2-256s",
+		hashType:         slhdsa.SHA2,
+		keySize:          128,
+		sigType:          slhdsa.SmallSignature,
+		variant:          slhdsa.VariantTink,
+		privKeyBytesHex:  privKeySHA2256sHex,
+		pubKeyBytesHex:   pubKeySHA2256sHex,
+		idRequirement:    uint32(0x01020304),
+		wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+	},
+	{
+		name:             "no prefix SHA2-256s",
+		hashType:         slhdsa.SHA2,
+		keySize:          128,
+		sigType:          slhdsa.SmallSignature,
+		variant:          slhdsa.VariantNoPrefix,
+		privKeyBytesHex:  privKeySHA2256sHex,
+		pubKeyBytesHex:   pubKeySHA2256sHex,
+		idRequirement:    0,
+		wantOutputPrefix: nil,
+	},
+	// SHAKE-256s
+	{
+		name:             "tink SHAKE-256s",
+		hashType:         slhdsa.SHAKE,
+		keySize:          128,
+		sigType:          slhdsa.SmallSignature,
+		variant:          slhdsa.VariantTink,
+		privKeyBytesHex:  privKeySHAKE256sHex,
+		pubKeyBytesHex:   pubKeySHAKE256sHex,
+		idRequirement:    uint32(0x01020304),
+		wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+	},
+	{
+		name:             "no prefix SHAKE-256s",
+		hashType:         slhdsa.SHAKE,
+		keySize:          128,
+		sigType:          slhdsa.SmallSignature,
+		variant:          slhdsa.VariantNoPrefix,
+		privKeyBytesHex:  privKeySHAKE256sHex,
+		pubKeyBytesHex:   pubKeySHAKE256sHex,
+		idRequirement:    0,
+		wantOutputPrefix: nil,
+	},
+	// SHA2-256f
+	{
+		name:             "tink SHA2-256f",
+		hashType:         slhdsa.SHA2,
+		keySize:          128,
+		sigType:          slhdsa.FastSigning,
+		variant:          slhdsa.VariantTink,
+		privKeyBytesHex:  privKeySHA2256fHex,
+		pubKeyBytesHex:   pubKeySHA2256fHex,
+		idRequirement:    uint32(0x01020304),
+		wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+	},
+	{
+		name:             "no prefix SHA2-256f",
+		hashType:         slhdsa.SHA2,
+		keySize:          128,
+		sigType:          slhdsa.FastSigning,
+		variant:          slhdsa.VariantNoPrefix,
+		privKeyBytesHex:  privKeySHA2256fHex,
+		pubKeyBytesHex:   pubKeySHA2256fHex,
+		idRequirement:    0,
+		wantOutputPrefix: nil,
+	},
+	// SHAKE-256f
 	{
 		name:             "tink SHAKE-256f",
 		hashType:         slhdsa.SHAKE,
@@ -1125,35 +1426,16 @@ func TestPrivateKeyEqualFalse(t *testing.T) {
 }
 
 func TestPrivateKeyKeyBytes(t *testing.T) {
-	for _, tc := range []struct {
-		name      string
-		hashType  slhdsa.HashType
-		keySize   int
-		sigType   slhdsa.SignatureType
-		pubKeyHex string
-	}{
-		{
-			name:     "SLH-DSA-SHA2-128s",
-			hashType: slhdsa.SHA2,
-			keySize:  64,
-			sigType:  slhdsa.SmallSignature,
-		},
-		{
-			name:     "SLH-DSA-SHAKE-256f",
-			hashType: slhdsa.SHAKE,
-			keySize:  128,
-			sigType:  slhdsa.FastSigning,
-		},
-	} {
+	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			keyPair := generateTestKeyPair(t, tc.hashType, tc.keySize, tc.sigType)
-			params, err := slhdsa.NewParameters(tc.hashType, tc.keySize, tc.sigType, slhdsa.VariantTink)
+			params, err := slhdsa.NewParameters(tc.hashType, tc.keySize, tc.sigType, tc.variant)
 			if err != nil {
-				t.Fatalf("slhdsa.NewParameters(%v) err = %v, want nil", slhdsa.VariantTink, err)
+				t.Fatalf("slhdsa.NewParameters(%v) err = %v, want nil", tc.variant, err)
 			}
-			pubKey, err := slhdsa.NewPublicKey(keyPair.pubKey, 123, params)
+			pubKey, err := slhdsa.NewPublicKey(keyPair.pubKey, tc.idRequirement, params)
 			if err != nil {
-				t.Fatalf("slhdsa.NewPublicKey(%v, %v, %v) err = %v, want nil", keyPair.pubKey, 123, params, err)
+				t.Fatalf("slhdsa.NewPublicKey(%v, %v, %v) err = %v, want nil", keyPair.pubKey, tc.idRequirement, params, err)
 			}
 			secretKey := secretdata.NewBytesFromData(keyPair.privKey, insecuresecretdataaccess.Token{})
 			privKey, err := slhdsa.NewPrivateKeyWithPublicKey(secretKey, pubKey)

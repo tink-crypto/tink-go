@@ -125,6 +125,66 @@ func TestSignerKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {
 			sigType:  tinkslhdsa.SmallSignature,
 		},
 		{
+			name:     "SLH-DSA-SHAKE-128s",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  64,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHA2-128f",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  64,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-128f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  64,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
+			name:     "SLH-DSA-SHA2-192s",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  96,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-192s",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  96,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHA2-192f",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  96,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-192f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  96,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
+			name:     "SLH-DSA-SHA2-256s",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  128,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-256s",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  128,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHA2-256f",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  128,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
 			name:     "SLH-DSA-SHAKE-256f",
 			hashType: tinkslhdsa.SHAKE,
 			keySize:  128,
@@ -165,6 +225,66 @@ func TestSignerKeyManagerNewKeyDataBasic(t *testing.T) {
 			hashType: slhdsapb.SlhDsaHashType_SHA2,
 			keySize:  64,
 			sigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-128s",
+			hashType: slhdsapb.SlhDsaHashType_SHAKE,
+			keySize:  64,
+			sigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+		},
+		{
+			name:     "SLH-DSA-SHA2-128f",
+			hashType: slhdsapb.SlhDsaHashType_SHA2,
+			keySize:  64,
+			sigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-128f",
+			hashType: slhdsapb.SlhDsaHashType_SHAKE,
+			keySize:  64,
+			sigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+		},
+		{
+			name:     "SLH-DSA-SHA2-192s",
+			hashType: slhdsapb.SlhDsaHashType_SHA2,
+			keySize:  96,
+			sigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-192s",
+			hashType: slhdsapb.SlhDsaHashType_SHAKE,
+			keySize:  96,
+			sigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+		},
+		{
+			name:     "SLH-DSA-SHA2-192f",
+			hashType: slhdsapb.SlhDsaHashType_SHA2,
+			keySize:  96,
+			sigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-192f",
+			hashType: slhdsapb.SlhDsaHashType_SHAKE,
+			keySize:  96,
+			sigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+		},
+		{
+			name:     "SLH-DSA-SHA2-256s",
+			hashType: slhdsapb.SlhDsaHashType_SHA2,
+			keySize:  128,
+			sigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-256s",
+			hashType: slhdsapb.SlhDsaHashType_SHAKE,
+			keySize:  128,
+			sigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+		},
+		{
+			name:     "SLH-DSA-SHA2-256f",
+			hashType: slhdsapb.SlhDsaHashType_SHA2,
+			keySize:  128,
+			sigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
 		},
 		{
 			name:     "SLH-DSA-SHAKE-256f",
@@ -217,6 +337,66 @@ func TestSignerKeyManagerPublicKeyDataBasic(t *testing.T) {
 			hashType: tinkslhdsa.SHA2,
 			keySize:  64,
 			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-128s",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  64,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHA2-128f",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  64,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-128f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  64,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
+			name:     "SLH-DSA-SHA2-192s",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  96,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-192s",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  96,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHA2-192f",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  96,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-192f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  96,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
+			name:     "SLH-DSA-SHA2-256s",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  128,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-256s",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  128,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHA2-256f",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  128,
+			sigType:  tinkslhdsa.FastSigning,
 		},
 		{
 			name:     "SLH-DSA-SHAKE-256f",
@@ -273,6 +453,66 @@ func TestSignerKeyManagerPublicKeyDataWithInvalidInput(t *testing.T) {
 			sigType:  tinkslhdsa.SmallSignature,
 		},
 		{
+			name:     "SLH-DSA-SHAKE-128s",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  64,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHA2-128f",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  64,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-128f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  64,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
+			name:     "SLH-DSA-SHA2-192s",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  96,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-192s",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  96,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHA2-192f",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  96,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-192f",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  96,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
+			name:     "SLH-DSA-SHA2-256s",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  128,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHAKE-256s",
+			hashType: tinkslhdsa.SHAKE,
+			keySize:  128,
+			sigType:  tinkslhdsa.SmallSignature,
+		},
+		{
+			name:     "SLH-DSA-SHA2-256f",
+			hashType: tinkslhdsa.SHA2,
+			keySize:  128,
+			sigType:  tinkslhdsa.FastSigning,
+		},
+		{
 			name:     "SLH-DSA-SHAKE-256f",
 			hashType: tinkslhdsa.SHAKE,
 			keySize:  128,
@@ -324,6 +564,176 @@ func newSLHDSAPrivateKey(hashType tinkslhdsa.HashType, keySize int, sigType tink
 			KeyValue:  private.Encode(),
 		}
 	}
+	if hashType == tinkslhdsa.SHAKE && keySize == 64 && sigType == tinkslhdsa.SmallSignature {
+		private, public := slhdsa.SLH_DSA_SHAKE_128s.KeyGen()
+		publicProto := &slhdsapb.SlhDsaPublicKey{
+			Params: &slhdsapb.SlhDsaParams{
+				KeySize:  64,
+				HashType: slhdsapb.SlhDsaHashType_SHAKE,
+				SigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+			},
+			Version:  0,
+			KeyValue: public.Encode(),
+		}
+		return &slhdsapb.SlhDsaPrivateKey{
+			Version:   0,
+			PublicKey: publicProto,
+			KeyValue:  private.Encode(),
+		}
+	}
+	if hashType == tinkslhdsa.SHA2 && keySize == 64 && sigType == tinkslhdsa.FastSigning {
+		private, public := slhdsa.SLH_DSA_SHA2_128f.KeyGen()
+		publicProto := &slhdsapb.SlhDsaPublicKey{
+			Params: &slhdsapb.SlhDsaParams{
+				KeySize:  64,
+				HashType: slhdsapb.SlhDsaHashType_SHA2,
+				SigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+			},
+			Version:  0,
+			KeyValue: public.Encode(),
+		}
+		return &slhdsapb.SlhDsaPrivateKey{
+			Version:   0,
+			PublicKey: publicProto,
+			KeyValue:  private.Encode(),
+		}
+	}
+	if hashType == tinkslhdsa.SHAKE && keySize == 64 && sigType == tinkslhdsa.FastSigning {
+		private, public := slhdsa.SLH_DSA_SHAKE_128f.KeyGen()
+		publicProto := &slhdsapb.SlhDsaPublicKey{
+			Params: &slhdsapb.SlhDsaParams{
+				KeySize:  64,
+				HashType: slhdsapb.SlhDsaHashType_SHAKE,
+				SigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+			},
+			Version:  0,
+			KeyValue: public.Encode(),
+		}
+		return &slhdsapb.SlhDsaPrivateKey{
+			Version:   0,
+			PublicKey: publicProto,
+			KeyValue:  private.Encode(),
+		}
+	}
+	if hashType == tinkslhdsa.SHA2 && keySize == 96 && sigType == tinkslhdsa.SmallSignature {
+		private, public := slhdsa.SLH_DSA_SHA2_192s.KeyGen()
+		publicProto := &slhdsapb.SlhDsaPublicKey{
+			Params: &slhdsapb.SlhDsaParams{
+				KeySize:  96,
+				HashType: slhdsapb.SlhDsaHashType_SHA2,
+				SigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+			},
+			Version:  0,
+			KeyValue: public.Encode(),
+		}
+		return &slhdsapb.SlhDsaPrivateKey{
+			Version:   0,
+			PublicKey: publicProto,
+			KeyValue:  private.Encode(),
+		}
+	}
+	if hashType == tinkslhdsa.SHAKE && keySize == 96 && sigType == tinkslhdsa.SmallSignature {
+		private, public := slhdsa.SLH_DSA_SHAKE_192s.KeyGen()
+		publicProto := &slhdsapb.SlhDsaPublicKey{
+			Params: &slhdsapb.SlhDsaParams{
+				KeySize:  96,
+				HashType: slhdsapb.SlhDsaHashType_SHAKE,
+				SigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+			},
+			Version:  0,
+			KeyValue: public.Encode(),
+		}
+		return &slhdsapb.SlhDsaPrivateKey{
+			Version:   0,
+			PublicKey: publicProto,
+			KeyValue:  private.Encode(),
+		}
+	}
+	if hashType == tinkslhdsa.SHA2 && keySize == 96 && sigType == tinkslhdsa.FastSigning {
+		private, public := slhdsa.SLH_DSA_SHA2_192f.KeyGen()
+		publicProto := &slhdsapb.SlhDsaPublicKey{
+			Params: &slhdsapb.SlhDsaParams{
+				KeySize:  96,
+				HashType: slhdsapb.SlhDsaHashType_SHA2,
+				SigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+			},
+			Version:  0,
+			KeyValue: public.Encode(),
+		}
+		return &slhdsapb.SlhDsaPrivateKey{
+			Version:   0,
+			PublicKey: publicProto,
+			KeyValue:  private.Encode(),
+		}
+	}
+	if hashType == tinkslhdsa.SHAKE && keySize == 96 && sigType == tinkslhdsa.FastSigning {
+		private, public := slhdsa.SLH_DSA_SHAKE_192f.KeyGen()
+		publicProto := &slhdsapb.SlhDsaPublicKey{
+			Params: &slhdsapb.SlhDsaParams{
+				KeySize:  96,
+				HashType: slhdsapb.SlhDsaHashType_SHAKE,
+				SigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+			},
+			Version:  0,
+			KeyValue: public.Encode(),
+		}
+		return &slhdsapb.SlhDsaPrivateKey{
+			Version:   0,
+			PublicKey: publicProto,
+			KeyValue:  private.Encode(),
+		}
+	}
+	if hashType == tinkslhdsa.SHA2 && keySize == 128 && sigType == tinkslhdsa.SmallSignature {
+		private, public := slhdsa.SLH_DSA_SHA2_256s.KeyGen()
+		publicProto := &slhdsapb.SlhDsaPublicKey{
+			Params: &slhdsapb.SlhDsaParams{
+				KeySize:  128,
+				HashType: slhdsapb.SlhDsaHashType_SHA2,
+				SigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+			},
+			Version:  0,
+			KeyValue: public.Encode(),
+		}
+		return &slhdsapb.SlhDsaPrivateKey{
+			Version:   0,
+			PublicKey: publicProto,
+			KeyValue:  private.Encode(),
+		}
+	}
+	if hashType == tinkslhdsa.SHAKE && keySize == 128 && sigType == tinkslhdsa.SmallSignature {
+		private, public := slhdsa.SLH_DSA_SHAKE_256s.KeyGen()
+		publicProto := &slhdsapb.SlhDsaPublicKey{
+			Params: &slhdsapb.SlhDsaParams{
+				KeySize:  128,
+				HashType: slhdsapb.SlhDsaHashType_SHAKE,
+				SigType:  slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE,
+			},
+			Version:  0,
+			KeyValue: public.Encode(),
+		}
+		return &slhdsapb.SlhDsaPrivateKey{
+			Version:   0,
+			PublicKey: publicProto,
+			KeyValue:  private.Encode(),
+		}
+	}
+	if hashType == tinkslhdsa.SHA2 && keySize == 128 && sigType == tinkslhdsa.FastSigning {
+		private, public := slhdsa.SLH_DSA_SHA2_256f.KeyGen()
+		publicProto := &slhdsapb.SlhDsaPublicKey{
+			Params: &slhdsapb.SlhDsaParams{
+				KeySize:  128,
+				HashType: slhdsapb.SlhDsaHashType_SHA2,
+				SigType:  slhdsapb.SlhDsaSignatureType_FAST_SIGNING,
+			},
+			Version:  0,
+			KeyValue: public.Encode(),
+		}
+		return &slhdsapb.SlhDsaPrivateKey{
+			Version:   0,
+			PublicKey: publicProto,
+			KeyValue:  private.Encode(),
+		}
+	}
 	if hashType == tinkslhdsa.SHAKE && keySize == 128 && sigType == tinkslhdsa.FastSigning {
 		private, public := slhdsa.SLH_DSA_SHAKE_256f.KeyGen()
 		publicProto := &slhdsapb.SlhDsaPublicKey{
@@ -358,6 +768,66 @@ func validateSLHDSAPrivateKey(hashType slhdsapb.SlhDsaHashType, keySize int32, s
 	var secretKey *slhdsa.SecretKey
 	if hashType == slhdsapb.SlhDsaHashType_SHA2 && keySize == 64 && sigType == slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE {
 		sk, err := slhdsa.SLH_DSA_SHA2_128s.DecodeSecretKey(key.KeyValue)
+		if err != nil {
+			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
+		}
+		secretKey = sk
+	} else if hashType == slhdsapb.SlhDsaHashType_SHAKE && keySize == 64 && sigType == slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE {
+		sk, err := slhdsa.SLH_DSA_SHAKE_128s.DecodeSecretKey(key.KeyValue)
+		if err != nil {
+			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
+		}
+		secretKey = sk
+	} else if hashType == slhdsapb.SlhDsaHashType_SHA2 && keySize == 64 && sigType == slhdsapb.SlhDsaSignatureType_FAST_SIGNING {
+		sk, err := slhdsa.SLH_DSA_SHA2_128f.DecodeSecretKey(key.KeyValue)
+		if err != nil {
+			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
+		}
+		secretKey = sk
+	} else if hashType == slhdsapb.SlhDsaHashType_SHAKE && keySize == 64 && sigType == slhdsapb.SlhDsaSignatureType_FAST_SIGNING {
+		sk, err := slhdsa.SLH_DSA_SHAKE_128f.DecodeSecretKey(key.KeyValue)
+		if err != nil {
+			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
+		}
+		secretKey = sk
+	} else if hashType == slhdsapb.SlhDsaHashType_SHA2 && keySize == 96 && sigType == slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE {
+		sk, err := slhdsa.SLH_DSA_SHA2_192s.DecodeSecretKey(key.KeyValue)
+		if err != nil {
+			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
+		}
+		secretKey = sk
+	} else if hashType == slhdsapb.SlhDsaHashType_SHAKE && keySize == 96 && sigType == slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE {
+		sk, err := slhdsa.SLH_DSA_SHAKE_192s.DecodeSecretKey(key.KeyValue)
+		if err != nil {
+			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
+		}
+		secretKey = sk
+	} else if hashType == slhdsapb.SlhDsaHashType_SHA2 && keySize == 96 && sigType == slhdsapb.SlhDsaSignatureType_FAST_SIGNING {
+		sk, err := slhdsa.SLH_DSA_SHA2_192f.DecodeSecretKey(key.KeyValue)
+		if err != nil {
+			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
+		}
+		secretKey = sk
+	} else if hashType == slhdsapb.SlhDsaHashType_SHAKE && keySize == 96 && sigType == slhdsapb.SlhDsaSignatureType_FAST_SIGNING {
+		sk, err := slhdsa.SLH_DSA_SHAKE_192f.DecodeSecretKey(key.KeyValue)
+		if err != nil {
+			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
+		}
+		secretKey = sk
+	} else if hashType == slhdsapb.SlhDsaHashType_SHA2 && keySize == 128 && sigType == slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE {
+		sk, err := slhdsa.SLH_DSA_SHA2_256s.DecodeSecretKey(key.KeyValue)
+		if err != nil {
+			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
+		}
+		secretKey = sk
+	} else if hashType == slhdsapb.SlhDsaHashType_SHAKE && keySize == 128 && sigType == slhdsapb.SlhDsaSignatureType_SMALL_SIGNATURE {
+		sk, err := slhdsa.SLH_DSA_SHAKE_256s.DecodeSecretKey(key.KeyValue)
+		if err != nil {
+			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
+		}
+		secretKey = sk
+	} else if hashType == slhdsapb.SlhDsaHashType_SHA2 && keySize == 128 && sigType == slhdsapb.SlhDsaSignatureType_FAST_SIGNING {
+		sk, err := slhdsa.SLH_DSA_SHA2_256f.DecodeSecretKey(key.KeyValue)
 		if err != nil {
 			return fmt.Errorf("DecodeSecretKey() failed: %w", err)
 		}
