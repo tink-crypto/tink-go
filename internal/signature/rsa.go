@@ -106,3 +106,39 @@ func rsaHashFunc(hashAlg string) (func() hash.Hash, crypto.Hash, error) {
 	}
 	return hashFunc, hashID, nil
 }
+
+// Pad pads a byte slice to a given length. Returns an error if the byte slice is longer than the
+// given length.
+func Pad(toPad []byte, encodingLength int) ([]byte, error) {
+	if len(toPad) > encodingLength {
+		return nil, fmt.Errorf("invalid length: got %d, want <= %d", len(toPad), encodingLength)
+	}
+	if len(toPad) == encodingLength {
+		return toPad, nil
+	}
+	padded := make([]byte, encodingLength)
+	copy(padded[encodingLength-len(toPad):], toPad)
+	return padded, nil
+}
+
+// AdjustEncodingLengths adjusts the encoding lengths of RSA private key parameters.
+func AdjustEncodingLengths(n, p, q, d, dp, dq, crt []byte) ([]byte, []byte, []byte, []byte, error) {
+	var err error
+	dp, err = Pad(dp, len(p))
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("dp: %v", err)
+	}
+	dq, err = Pad(dq, len(q))
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("dq: %v", err)
+	}
+	crt, err = Pad(crt, len(p))
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("crt: %v", err)
+	}
+	d, err = Pad(d, len(n))
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("d: %v", err)
+	}
+	return d, dp, dq, crt, nil
+}
