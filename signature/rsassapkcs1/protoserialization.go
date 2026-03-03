@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/signature"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
@@ -283,13 +284,26 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 	}
 
 	token := insecuresecretdataaccess.Token{}
+	n := rsaSsaPrivKey.publicKey.Modulus()
+	p := rsaSsaPrivKey.P().Data(token)
+	q := rsaSsaPrivKey.Q().Data(token)
+	d := rsaSsaPrivKey.D().Data(token)
+	dp := rsaSsaPrivKey.DP().Data(token)
+	dq := rsaSsaPrivKey.DQ().Data(token)
+	crt := rsaSsaPrivKey.QInv().Data(token)
+
+	d, dp, dq, crt, err = signature.AdjustEncodingLengths(n, p, q, d, dp, dq, crt)
+	if err != nil {
+		return nil, err
+	}
+
 	protoKey := &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
-		P:   rsaSsaPrivKey.P().Data(token),
-		Q:   rsaSsaPrivKey.Q().Data(token),
-		D:   rsaSsaPrivKey.D().Data(token),
-		Dp:  rsaSsaPrivKey.DP().Data(token),
-		Dq:  rsaSsaPrivKey.DQ().Data(token),
-		Crt: rsaSsaPrivKey.QInv().Data(token),
+		P:   p,
+		Q:   q,
+		D:   d,
+		Dp:  dp,
+		Dq:  dq,
+		Crt: crt,
 		PublicKey: &rsassapkcs1pb.RsaSsaPkcs1PublicKey{
 			Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
 				HashType: hashType,

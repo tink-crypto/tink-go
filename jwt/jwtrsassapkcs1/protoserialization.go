@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/signature"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 
@@ -260,15 +261,30 @@ func (s *privateKeySerializer) SerializeKey(k key.Key) (*protoserialization.KeyS
 	if err != nil {
 		return nil, err
 	}
+
+	token := insecuresecretdataaccess.Token{}
+	n := jwtRSAPrivateKey.publicKey.Modulus()
+	p := jwtRSAPrivateKey.P().Data(token)
+	q := jwtRSAPrivateKey.Q().Data(token)
+	d := jwtRSAPrivateKey.D().Data(token)
+	dp := jwtRSAPrivateKey.DP().Data(token)
+	dq := jwtRSAPrivateKey.DQ().Data(token)
+	crt := jwtRSAPrivateKey.QInv().Data(token)
+
+	d, dp, dq, crt, err = signature.AdjustEncodingLengths(n, p, q, d, dp, dq, crt)
+	if err != nil {
+		return nil, err
+	}
+
 	protoPrivateKey := &jwtrsapb.JwtRsaSsaPkcs1PrivateKey{
 		Version:   0,
 		PublicKey: publicKeyProto,
-		D:         jwtRSAPrivateKey.D().Data(insecuresecretdataaccess.Token{}),
-		P:         jwtRSAPrivateKey.P().Data(insecuresecretdataaccess.Token{}),
-		Q:         jwtRSAPrivateKey.Q().Data(insecuresecretdataaccess.Token{}),
-		Dp:        jwtRSAPrivateKey.DP().Data(insecuresecretdataaccess.Token{}),
-		Dq:        jwtRSAPrivateKey.DQ().Data(insecuresecretdataaccess.Token{}),
-		Crt:       jwtRSAPrivateKey.QInv().Data(insecuresecretdataaccess.Token{}),
+		D:         d,
+		P:         p,
+		Q:         q,
+		Dp:        dp,
+		Dq:        dq,
+		Crt:       crt,
 	}
 	serializedPrivateKey, err := proto.Marshal(protoPrivateKey)
 	if err != nil {
