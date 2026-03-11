@@ -61,5 +61,7 @@ func ClearMonitoringClient() {
 
 // GetMonitoringClient returns the registered monitoring client.
 func GetMonitoringClient() monitoring.Client {
+	monitoringClientMu.RLock()
+	defer monitoringClientMu.RUnlock()
 	return monitoringClient
 }
