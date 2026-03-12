@@ -20,18 +20,23 @@ import (
 	"encoding/binary"
 )
 
-// GetRandomBytes randomly generates n bytes.
-func GetRandomBytes(n uint32) []byte {
-	buf := make([]byte, n)
-	_, err := rand.Read(buf)
+func mustRand(b []byte) {
+	_, err := rand.Read(b)
 	if err != nil {
 		panic(err) // out of randomness, should never happen
 	}
+}
+
+// GetRandomBytes randomly generates n bytes.
+func GetRandomBytes(n uint32) []byte {
+	buf := make([]byte, n)
+	mustRand(buf)
 	return buf
 }
 
 // GetRandomUint32 randomly generates an unsigned 32-bit integer.
 func GetRandomUint32() uint32 {
-	b := GetRandomBytes(4)
-	return binary.BigEndian.Uint32(b)
+	var b [4]byte
+	mustRand(b[:])
+	return binary.BigEndian.Uint32(b[:])
 }
