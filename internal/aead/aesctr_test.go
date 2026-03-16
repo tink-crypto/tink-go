@@ -17,6 +17,7 @@ package aead_test
 import (
 	"bytes"
 	"crypto/aes"
+	"crypto/cipher"
 	"encoding/hex"
 	"strings"
 	"testing"
@@ -48,20 +49,82 @@ func TestNewAESCTR(t *testing.T) {
 			}
 		}
 	}
+}
 
-	// Test different IV sizes with a fixed key.
-	for i := 0; i < 64; i++ {
-		k := key[:16]
-		_, err := aead.NewAESCTR(k, i)
-		if i >= subtle.AESCTRMinIVSize && i <= aes.BlockSize {
-			if err != nil {
-				t.Errorf("want: valid cipher (IV size=%d), got: error %v", i, err)
-			}
-			continue
+func TestNewAESCTRWithValidIVSizes(t *testing.T) {
+	key := make([]byte, 16)
+	for ivSize := subtle.AESCTRMinIVSize; ivSize <= aes.BlockSize; ivSize++ {
+		_, err := aead.NewAESCTR(key, ivSize)
+		if err != nil {
+			t.Errorf("aead.NewAESCTR(%v, %d) failed, want nil, got: %v", key, ivSize, err)
 		}
-		if !strings.Contains(err.Error(), "aes_ctr: invalid IV size:") {
+	}
+}
+
+func TestNewAESCTRWithInvalidIVSize(t *testing.T) {
+	key := make([]byte, 16)
+	invalidIVSizes := []int{0, 1, 11, 17}
+	for _, ivSize := range invalidIVSizes {
+		_, err := aead.NewAESCTR(key, ivSize)
+		if err == nil {
+			t.Fatalf("aead.NewAESCTR(%v, %d) succeeded, want error", key, ivSize)
+		}
+		if err != nil && !strings.Contains(err.Error(), "aes_ctr: invalid IV size:") {
 			t.Errorf("want: error invalid IV size, got: %v", err)
 		}
+	}
+}
+
+func TestAESCTRIVIsRandom(t *testing.T) {
+	key := random.GetRandomBytes(16)
+	plaintext := []byte("Some data to encrypt.")
+	stream, err := aead.NewAESCTR(key, 12)
+	if err != nil {
+		t.Fatalf("failed to create AESCTR instance, error: %v", err)
+	}
+	ct1, err := stream.Encrypt(nil, plaintext)
+	if err != nil {
+		t.Fatalf("encryption failed, error: %v", err)
+	}
+	ct2, err := stream.Encrypt(nil, plaintext)
+	if err != nil {
+		t.Fatalf("encryption failed, error: %v", err)
+	}
+	iv1 := ct1[:12]
+	iv2 := ct2[:12]
+	if bytes.Equal(iv1, iv2) {
+		t.Errorf("IVs are equal: %x", iv1)
+	}
+}
+
+func TestAESCTRIVIsPadded(t *testing.T) {
+	key := random.GetRandomBytes(16)
+	plaintext := []byte("Some data to encrypt.")
+
+	stream, err := aead.NewAESCTR(key, 12)
+	if err != nil {
+		t.Fatalf("failed to create AESCTR instance, error: %v", err)
+	}
+
+	ct, err := stream.Encrypt(nil, plaintext)
+	if err != nil {
+		t.Fatalf("encryption failed, error: %v", err)
+	}
+
+	iv := ct[:12]
+
+	// Make sure the IV is padded to BlockSize. We pad and decrypt.
+	paddedIV := make([]byte, aes.BlockSize)
+	copy(paddedIV, iv)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatalf("failed to create block cipher, error: %v", err)
+	}
+	decryptingStream := cipher.NewCTR(block, paddedIV)
+	dst := make([]byte, len(plaintext))
+	decryptingStream.XORKeyStream(dst, ct[12:])
+	if !bytes.Equal(dst, plaintext) {
+		t.Errorf("decryption failed, got: %v, want: %v", dst, plaintext)
 	}
 }
 

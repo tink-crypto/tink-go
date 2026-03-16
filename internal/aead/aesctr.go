@@ -19,7 +19,7 @@ import (
 	"crypto/cipher"
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/internal/random"
 )
 
 const (
@@ -28,7 +28,7 @@ const (
 
 // AESCTR is an implementation of IndCpa Interface.
 type AESCTR struct {
-	key    []byte
+	block  cipher.Block
 	ivSize int
 }
 
@@ -41,7 +41,11 @@ func NewAESCTR(key []byte, ivSize int) (*AESCTR, error) {
 	if ivSize < aesCTRMinIVSize || ivSize > aes.BlockSize {
 		return nil, fmt.Errorf("aes_ctr: invalid IV size: %d", ivSize)
 	}
-	return &AESCTR{key: key, ivSize: ivSize}, nil
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("aes_ctr: failed to create block cipher, error: %v", err)
+	}
+	return &AESCTR{block: block, ivSize: ivSize}, nil
 }
 
 // Encrypt encrypts plaintext using AES in CTR mode.
@@ -57,13 +61,11 @@ func (a *AESCTR) Encrypt(dst, plaintext []byte) ([]byte, error) {
 		return nil, fmt.Errorf("aes_ctr: destination buffer too small (%d vs %d)", len(dst), ctSize)
 	}
 
-	iv := random.GetRandomBytes(uint32(a.ivSize))
-	stream, err := newCipher(a.key, iv)
+	iv := dst[:a.ivSize]
+	random.MustRand(iv)
+	stream, err := a.newCipher(iv)
 	if err != nil {
 		return nil, err
-	}
-	if n := copy(dst, iv); n != a.ivSize {
-		return nil, fmt.Errorf("aes_ctr: failed to copy IV (copied %d/%d bytes)", n, a.ivSize)
 	}
 	stream.XORKeyStream(dst[a.ivSize:], plaintext)
 	return dst, nil
@@ -81,7 +83,7 @@ func (a *AESCTR) Decrypt(dst, ciphertext []byte) ([]byte, error) {
 	if len(dst) < ptSize {
 		return nil, fmt.Errorf("aes_ctr: destination buffer too small (%d vs %d)", len(dst), ptSize)
 	}
-	stream, err := newCipher(a.key, ciphertext[:a.ivSize])
+	stream, err := a.newCipher(ciphertext[:a.ivSize])
 	if err != nil {
 		return nil, err
 	}
@@ -89,20 +91,15 @@ func (a *AESCTR) Decrypt(dst, ciphertext []byte) ([]byte, error) {
 	return dst, nil
 }
 
-func newCipher(key, iv []byte) (cipher.Stream, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, fmt.Errorf("aes_ctr: failed to create block cipher, error: %v", err)
-	}
-
+func (a *AESCTR) newCipher(iv []byte) (cipher.Stream, error) {
 	// If the IV is less than BlockSize bytes we need to pad it with zeros
 	// otherwise NewCTR will panic.
 	if len(iv) < aes.BlockSize {
 		paddedIV := make([]byte, aes.BlockSize)
-		if n := copy(paddedIV, iv); n != len(iv) {
+		if n := copy(paddedIV, iv); n != a.ivSize {
 			return nil, fmt.Errorf("aes_ctr: failed to pad IV")
 		}
 		iv = paddedIV
 	}
-	return cipher.NewCTR(block, iv), nil
+	return cipher.NewCTR(a.block, iv), nil
 }
