@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"golang.org/x/crypto/chacha20poly1305"
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/internal/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -55,10 +55,10 @@ func (x *XChaCha20Poly1305) Encrypt(plaintext []byte, associatedData []byte) ([]
 		return nil, fmt.Errorf("xchacha20poly1305: plaintext too long")
 	}
 
-	nonce := random.GetRandomBytes(chacha20poly1305.NonceSizeX)
 	// Make the capacity of dst large enough so that both the nonce and the ciphertext fit inside.
-	dst := make([]byte, 0, chacha20poly1305.NonceSizeX+len(plaintext)+x.cipher.Overhead())
-	dst = append(dst, nonce...)
+	dst := make([]byte, chacha20poly1305.NonceSizeX, chacha20poly1305.NonceSizeX+len(plaintext)+x.cipher.Overhead())
+	nonce := dst[:chacha20poly1305.NonceSizeX]
+	random.MustRand(nonce)
 	// Seal appends the ciphertext to dst. So the final output is: nonce || ciphertext.
 	return x.cipher.Seal(dst, nonce, plaintext, associatedData), nil
 }

@@ -21,8 +21,8 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/random"
 	"github.com/tink-crypto/tink-go/v2/key"
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -61,11 +61,11 @@ func (a *aead) Encrypt(plaintext []byte, associatedData []byte) ([]byte, error) 
 	if len(plaintext) > maxPlaintextSize {
 		return nil, fmt.Errorf("xchacha20_poly1305: plaintext too long: got %d, want <= %d", len(plaintext), maxPlaintextSize)
 	}
-	nonce := random.GetRandomBytes(chacha20poly1305.NonceSizeX)
-	ciphertextSize := len(a.prefix) + len(nonce) + len(plaintext) + chacha20poly1305.Overhead
-	dst := make([]byte, 0, ciphertextSize)
-	dst = append(dst, a.prefix...)
-	dst = append(dst, nonce...)
+	ciphertextSize := len(a.prefix) + chacha20poly1305.NonceSizeX + len(plaintext) + chacha20poly1305.Overhead
+	dst := make([]byte, len(a.prefix)+chacha20poly1305.NonceSizeX, ciphertextSize)
+	copy(dst, a.prefix)
+	nonce := dst[len(a.prefix):]
+	random.MustRand(nonce)
 	return a.aead.Seal(dst, nonce, plaintext, associatedData), nil
 }
 
