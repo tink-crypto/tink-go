@@ -17,9 +17,8 @@ package subtle
 import (
 	"fmt"
 
-	"golang.org/x/crypto/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/internal/aead"
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/internal/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -47,9 +46,9 @@ func NewChaCha20Poly1305(key []byte) (*ChaCha20Poly1305, error) {
 //
 // The resulting ciphertext is of the form: | nonce | ciphertext | tag |.
 func (ca *ChaCha20Poly1305) Encrypt(plaintext []byte, associatedData []byte) ([]byte, error) {
-	nonce := random.GetRandomBytes(chacha20poly1305.NonceSize)
-	ciphertext := make([]byte, 0, len(nonce)+len(plaintext)+aead.ChaCha20Poly1305InsecureTagSize)
-	ciphertext = append(ciphertext, nonce...)
+	ciphertext := make([]byte, aead.ChaCha20Poly1305InsecureNonceSize, aead.ChaCha20Poly1305InsecureNonceSize+len(plaintext)+aead.ChaCha20Poly1305InsecureTagSize)
+	nonce := ciphertext[:aead.ChaCha20Poly1305InsecureNonceSize]
+	random.MustRand(nonce)
 	ciphertext, err := ca.rawAEAD.Encrypt(ciphertext, nonce, plaintext, associatedData)
 	if err != nil {
 		return nil, fmt.Errorf("chacha20_poly1305: %w", err)

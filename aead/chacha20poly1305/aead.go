@@ -20,8 +20,8 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/aead"
+	"github.com/tink-crypto/tink-go/v2/internal/random"
 	"github.com/tink-crypto/tink-go/v2/key"
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -47,10 +47,10 @@ func newAEAD(key *Key) (tink.AEAD, error) {
 
 // Encrypt encrypts plaintext with associatedData.
 func (ca *fullAEAD) Encrypt(plaintext []byte, associatedData []byte) ([]byte, error) {
-	nonce := random.GetRandomBytes(aead.ChaCha20Poly1305InsecureNonceSize)
-	ciphertext := make([]byte, 0, len(ca.prefix)+len(nonce)+len(plaintext)+aead.ChaCha20Poly1305InsecureTagSize)
-	ciphertext = append(ciphertext, ca.prefix...)
-	ciphertext = append(ciphertext, nonce...)
+	ciphertext := make([]byte, len(ca.prefix)+aead.ChaCha20Poly1305InsecureNonceSize, len(ca.prefix)+aead.ChaCha20Poly1305InsecureNonceSize+len(plaintext)+aead.ChaCha20Poly1305InsecureTagSize)
+	copy(ciphertext, ca.prefix)
+	nonce := ciphertext[len(ca.prefix):]
+	random.MustRand(nonce)
 	ciphertext, err := ca.rawAEAD.Encrypt(ciphertext, nonce, plaintext, associatedData)
 	if err != nil {
 		return nil, fmt.Errorf("chacha20_poly1305: encryption failed: %w", err)
