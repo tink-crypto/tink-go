@@ -67,7 +67,7 @@ func (a *aesGCMAEAD) seal(key, nonce, plaintext, associatedData []byte) ([]byte,
 	if len(nonce) != a.nonceLength() {
 		return nil, fmt.Errorf("unexpected nonce length: got %d, want %d", len(nonce), a.nonceLength())
 	}
-	if err := internalaead.CheckPlaintextSize(uint64(len(plaintext))); err != nil {
+	if err := internalaead.CheckAESGCMPlaintextSize(uint64(len(plaintext))); err != nil {
 		return nil, err
 	}
 	c, err := newAESGCMCipher(key)

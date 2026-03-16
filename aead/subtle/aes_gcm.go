@@ -28,8 +28,6 @@ const (
 	AESGCMIVSize = 12
 	// AESGCMTagSize is the acceptable tag size defined by RFC 5116.
 	AESGCMTagSize = 16
-
-	maxIntPlaintextSize = maxInt - AESGCMIVSize - AESGCMTagSize
 )
 
 // AESGCM is an implementation of the [tink.AEAD] interface.

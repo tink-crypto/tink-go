@@ -17,12 +17,6 @@ package aead
 
 import "fmt"
 
-const (
-	// AESGCMIVSize is the acceptable IV size defined by RFC 5116.
-	AESGCMIVSize = 12
-	// AESGCMTagSize is the acceptable tag size defined by RFC 5116.
-	AESGCMTagSize = 16
-)
 
 // ValidateAESKeySize checks if the given key size is a valid AES key size.
 func ValidateAESKeySize(sizeInBytes uint32) error {

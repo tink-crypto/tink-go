@@ -19,6 +19,11 @@ import (
 )
 
 const (
+	// AESGCMIVSize is the acceptable IV size defined by RFC 5116.
+	AESGCMIVSize = 12
+	// AESGCMTagSize is the acceptable tag size defined by RFC 5116.
+	AESGCMTagSize = 16
+
 	// aesGCMMaxPlaintextSize is the maximum plaintext size defined by RFC 5116.
 	aesGCMMaxPlaintextSize = (1 << 36) - 31
 
@@ -27,8 +32,8 @@ const (
 	maxIntPlaintextSize = maxInt - AESGCMIVSize - AESGCMTagSize
 )
 
-// CheckPlaintextSize checks if the given plaintext size is valid for AES-GCM.
-func CheckPlaintextSize(size uint64) error {
+// CheckAESGCMPlaintextSize checks if the given plaintext size is valid for AES-GCM.
+func CheckAESGCMPlaintextSize(size uint64) error {
 	var maxPlaintextSize uint64 = maxIntPlaintextSize
 	if maxIntPlaintextSize > aesGCMMaxPlaintextSize {
 		maxPlaintextSize = aesGCMMaxPlaintextSize

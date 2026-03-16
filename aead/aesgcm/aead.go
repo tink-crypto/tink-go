@@ -54,7 +54,7 @@ var _ tink.AEAD = (*fullAEAD)(nil)
 // where prefix is the key's output prefix, iv is a random 12-byte IV,
 // ciphertext is the encrypted plaintext, and tag is a 16-byte tag.
 func (a *fullAEAD) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
-	if err := aead.CheckPlaintextSize(uint64(len(plaintext))); err != nil {
+	if err := aead.CheckAESGCMPlaintextSize(uint64(len(plaintext))); err != nil {
 		return nil, err
 	}
 	iv := random.GetRandomBytes(ivSize)
@@ -90,8 +90,8 @@ func (a *fullAEAD) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
 
 // NewAEAD creates a [tink.AEAD] from a [Key].
 func NewAEAD(k *Key) (tink.AEAD, error) {
-	if k.parameters.KeySizeInBytes() != 16 && k.parameters.KeySizeInBytes() != 32 {
-		return nil, fmt.Errorf("aesgcm.NewAEAD: unsupported key size: got %v, want 16 or 32", k.parameters.KeySizeInBytes())
+	if err := aead.ValidateAESKeySize(uint32(k.parameters.KeySizeInBytes())); err != nil {
+		return nil, fmt.Errorf("aesgcm.NewAEAD: %v", err)
 	}
 	if k.parameters.IVSizeInBytes() != ivSize {
 		return nil, fmt.Errorf("aesgcm.NewAEAD: unsupported IV size: got %v, want %v", k.parameters.IVSizeInBytes(), ivSize)

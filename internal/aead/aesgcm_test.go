@@ -20,14 +20,14 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/aead"
 )
 
-func TestCheckPlaintextSize(t *testing.T) {
+func TestCheckAESGCMPlaintextSize(t *testing.T) {
 	for _, plaintextSize := range []uint64{16, 1 << 24} {
-		if err := aead.CheckPlaintextSize(plaintextSize); err != nil {
-			t.Errorf("aead.CheckPlaintextSize(%v) err = %v, want nil", plaintextSize, err)
+		if err := aead.CheckAESGCMPlaintextSize(plaintextSize); err != nil {
+			t.Errorf("aead.CheckAESGCMPlaintextSize(%v) err = %v, want nil", plaintextSize, err)
 		}
 	}
 	var largePlaintextSize uint64 = 1 << 60
-	if err := aead.CheckPlaintextSize(largePlaintextSize); err == nil {
-		t.Errorf("aead.CheckPlaintextSize(%v) err = nil, want error", largePlaintextSize)
+	if err := aead.CheckAESGCMPlaintextSize(largePlaintextSize); err == nil {
+		t.Errorf("aead.CheckAESGCMPlaintextSize(%v) err = nil, want error", largePlaintextSize)
 	}
 }
