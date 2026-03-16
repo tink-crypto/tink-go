@@ -24,7 +24,7 @@ import (
 
 	// Placeholder for internal crypto/cipher allowlist, please ignore.
 	// Placeholder for internal crypto/subtle allowlist, please ignore. // to allow import of "crypto/subte"
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/internal/random"
 )
 
 const (
@@ -43,6 +43,8 @@ const (
 	// aesgcmsivPolyvalSize is the byte-length of result produced by the
 	// POLYVAL function.
 	aesgcmsivPolyvalSize = aesgcmsivBlockSize
+
+	maxAESGCMSIVKeySize = 32
 )
 
 // AESGCMSIV is an implementation of AEAD interface.
@@ -80,9 +82,16 @@ func (a *AESGCMSIV) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
 		return nil, fmt.Errorf("aes_gcm_siv: associatedData too long")
 	}
 
-	nonce := random.GetRandomBytes(uint32(AESGCMSIVNonceSize))
-	authKey, encKey, err := a.deriveKeys(nonce)
-	if err != nil {
+	ret := make([]byte, AESGCMSIVNonceSize+aesgcmsivTagSize+len(plaintext))
+
+	nonce := ret[:AESGCMSIVNonceSize]
+	random.MustRand(nonce)
+
+	var authKeyData [aesgcmsivBlockSize]byte
+	var encKeyData [maxAESGCMSIVKeySize]byte
+	authKey := authKeyData[:]
+	encKey := encKeyData[:a.keySize]
+	if err := a.deriveKeys(nonce, authKey, encKey); err != nil {
 		return nil, err
 	}
 
@@ -90,20 +99,16 @@ func (a *AESGCMSIV) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	tag, err := a.computeTag(polyval, nonce, encKey)
-	if err != nil {
+
+	tag := ret[len(ret)-aesgcmsivTagSize:]
+	if err := a.computeTag(polyval, nonce, encKey, tag); err != nil {
 		return nil, err
 	}
 
-	ct, err := a.aesCTR(encKey, tag, plaintext)
-	if err != nil {
+	ct := ret[AESGCMSIVNonceSize : len(ret)-aesgcmsivTagSize]
+	if err := aesCTR(encKey, tag, plaintext, ct); err != nil {
 		return nil, err
 	}
-
-	ret := make([]byte, 0, AESGCMSIVNonceSize+aesgcmsivTagSize+len(plaintext))
-	ret = append(ret, nonce...)
-	ret = append(ret, ct...)
-	ret = append(ret, tag...)
 
 	return ret, nil
 }
@@ -124,13 +129,16 @@ func (a *AESGCMSIV) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
 	tag := ciphertext[len(ciphertext)-aesgcmsivTagSize:]
 	ciphertext = ciphertext[AESGCMSIVNonceSize : len(ciphertext)-aesgcmsivTagSize]
 
-	authKey, encKey, err := a.deriveKeys(nonce)
-	if err != nil {
+	var authKeyData [aesgcmsivBlockSize]byte
+	var encKeyData [maxAESGCMSIVKeySize]byte
+	authKey := authKeyData[:]
+	encKey := encKeyData[:a.keySize]
+	if err := a.deriveKeys(nonce, authKey, encKey); err != nil {
 		return nil, err
 	}
 
-	pt, err := a.aesCTR(encKey, tag, ciphertext)
-	if err != nil {
+	pt := make([]byte, len(ciphertext))
+	if err := aesCTR(encKey, tag, ciphertext, pt); err != nil {
 		return nil, err
 	}
 
@@ -139,52 +147,58 @@ func (a *AESGCMSIV) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	expectedTag, err := a.computeTag(polyval, nonce, encKey)
-	if err != nil {
+	var tagOut [aesgcmsivTagSize]byte
+	if err := a.computeTag(polyval, nonce, encKey, tagOut[:]); err != nil {
 		return nil, err
 	}
 
-	if subtle.ConstantTimeCompare(expectedTag, tag) != 1 {
+	if subtle.ConstantTimeCompare(tagOut[:], tag) != 1 {
 		return nil, fmt.Errorf("aes_gcm_siv: message authentication failure")
 	}
 
 	return pt, nil
 }
 
-// The KDF as described by the RFC #8452. This uses the AES-GCM-SIV key and
-// nonce to generate the authentication key and the encryption key.
-func (a *AESGCMSIV) deriveKeys(nonce []byte) ([]byte, []byte, error) {
+// deriveKeys implements the `derive_keys` function described by RFC 8452.
+//
+// It uses the key and nonce to derive authentication key and encryption key,
+// which are written to authKey and encKey respectively. authKey and encKey must
+// be of length aesgcmsivBlockSize and maxAESGCMSIVKeySize respectively.
+func (a *AESGCMSIV) deriveKeys(nonce, authKey, encKey []byte) error {
 	if len(nonce) != AESGCMSIVNonceSize {
-		return nil, nil, fmt.Errorf("aes_gcm_siv: invalid nonce size")
+		return fmt.Errorf("aes_gcm_siv: invalid nonce size")
 	}
-	nonceBlock := make([]byte, aesgcmsivBlockSize)
+	if len(authKey) != aesgcmsivBlockSize {
+		return fmt.Errorf("aes_gcm_siv: invalid authKey size")
+	}
+	if len(encKey) != a.keySize {
+		return fmt.Errorf("aes_gcm_siv: invalid encKey size")
+	}
+	var nonceBlock [aesgcmsivBlockSize]byte
 	copy(nonceBlock[aesgcmsivBlockSize-AESGCMSIVNonceSize:], nonce)
 
-	encBlock := make([]byte, a.block.BlockSize())
+	const counterSize = 4 // aesgcmsivBlockSize - AESGCMSIVNonceSize
+
+	var encBlock [aesgcmsivBlockSize]byte
 	kdfAes := func(counter uint32, dst []byte) {
-		binary.LittleEndian.PutUint32(nonceBlock[:4], counter)
-		a.block.Encrypt(encBlock, nonceBlock)
+		binary.LittleEndian.PutUint32(nonceBlock[:counterSize], counter)
+		a.block.Encrypt(encBlock[:], nonceBlock[:])
 		copy(dst, encBlock[0:8])
 	}
 
-	authKey := make([]byte, aesgcmsivBlockSize)
 	kdfAes(0, authKey[0:8])
 	kdfAes(1, authKey[8:16])
-
-	encKey := make([]byte, a.keySize)
 	kdfAes(2, encKey[0:8])
 	kdfAes(3, encKey[8:16])
-
 	if a.keySize == 32 {
 		kdfAes(4, encKey[16:24])
 		kdfAes(5, encKey[24:32])
 	}
-
-	return authKey, encKey, nil
+	return nil
 }
 
 func (a *AESGCMSIV) computePolyval(authKey, pt, ad []byte) ([]byte, error) {
-	lengthBlock := make([]byte, aesgcmsivBlockSize)
+	var lengthBlock [aesgcmsivBlockSize]byte
 	binary.LittleEndian.PutUint64(lengthBlock[:8], uint64(len(ad))*8)
 	binary.LittleEndian.PutUint64(lengthBlock[8:], uint64(len(pt))*8)
 
@@ -195,15 +209,18 @@ func (a *AESGCMSIV) computePolyval(authKey, pt, ad []byte) ([]byte, error) {
 
 	p.Update(ad)
 	p.Update(pt)
-	p.Update(lengthBlock)
+	p.Update(lengthBlock[:])
 	polyval := p.Finish()
 
 	return polyval[:], nil
 }
 
-func (a *AESGCMSIV) computeTag(polyval, nonce, encKey []byte) ([]byte, error) {
+func (a *AESGCMSIV) computeTag(polyval, nonce, encKey, out []byte) error {
 	if len(polyval) != aesgcmsivPolyvalSize {
-		return nil, fmt.Errorf("aes_gcm_siv: polyval returned invalid sized response")
+		return fmt.Errorf("aes_gcm_siv: polyval returned invalid sized response")
+	}
+	if len(out) != aesgcmsivTagSize {
+		return fmt.Errorf("aes_gcm_siv: tag buffer should have the same length as tag size")
 	}
 
 	for i, val := range nonce {
@@ -213,43 +230,46 @@ func (a *AESGCMSIV) computeTag(polyval, nonce, encKey []byte) ([]byte, error) {
 
 	block, err := aes.NewCipher(encKey)
 	if err != nil {
-		return nil, fmt.Errorf("aes_gcm_siv: failed to create block cipher, error: %v", err)
+		return fmt.Errorf("aes_gcm_siv: failed to create block cipher, error: %v", err)
 	}
 
-	tag := make([]byte, aesgcmsivTagSize)
-	block.Encrypt(tag, polyval)
-	return tag, nil
+	block.Encrypt(out, polyval)
+	return nil
 }
 
-// aesCTR implements the AES-CTR operation in AES-GCM-SIV.
-// Note that RFC 8452 defines AES-CTR differently compared to standard AES
-// in CTR mode: the way they increment the counter block is completely different.
-func (a *AESGCMSIV) aesCTR(key, tag, in []byte) ([]byte, error) {
+// aesCTR implements the AES-CTR operation in AES-GCM-SIV, writing the result to
+// out.
+//
+// NOTE: This is from RFC 8452. The counter incrementation is different from
+// standard AES-CTR. Arguments in and out must have the same length.
+func aesCTR(key, tag, in, out []byte) error {
+	if len(out) != len(in) {
+		return fmt.Errorf("aes_gcm_siv: output buffer should have the same length as input buffer; got %d, want %d", len(out), len(in))
+	}
 	if len(tag) != aesgcmsivTagSize {
-		return nil, fmt.Errorf("aes_gcm_siv: incorrect IV size for stream cipher")
+		return fmt.Errorf("aes_gcm_siv: incorrect IV size for stream cipher")
 	}
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"aes_gcm_siv: failed to create block cipher, error: %v", err)
 	}
 
-	counter := make([]byte, aesgcmsivBlockSize)
-	copy(counter, tag)
+	var counter [aesgcmsivBlockSize]byte
+	copy(counter[:], tag)
 	counter[aesgcmsivBlockSize-1] |= 0x80
 	counterInc := binary.LittleEndian.Uint32(counter[0:4])
 
-	output := make([]byte, len(in))
 	outputIdx := 0
-	keystreamBlock := make([]byte, block.BlockSize())
+	var keystreamBlock [aesgcmsivBlockSize]byte
 	for len(in) > 0 {
-		block.Encrypt(keystreamBlock, counter)
+		block.Encrypt(keystreamBlock[:], counter[:])
 		counterInc++
 		binary.LittleEndian.PutUint32(counter[0:4], counterInc)
-		n := subtle.XORBytes(output[outputIdx:], in, keystreamBlock)
+		n := subtle.XORBytes(out[outputIdx:], in, keystreamBlock[:])
 		outputIdx += n
 		in = in[n:]
 	}
-	return output, nil
+	return nil
 }
