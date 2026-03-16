@@ -18,10 +18,13 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
+	"slices"
 	"testing"
-)
 
-// TODO: b/401208985 - Add Wycheproof style tests.
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
+	"github.com/tink-crypto/tink-go/v2/testutil"
+)
 
 // Number of times to run sign-verify roundtrip tests.
 const numSignVerifyTests = 100
@@ -395,5 +398,240 @@ func TestSignDeterministicContextTooLong(t *testing.T) {
 	_, err := sk.SignDeterministic(m[:], ctx[:])
 	if err == nil {
 		t.Errorf("Sign did not fail with context too long")
+	}
+}
+
+type wycheproofCase struct {
+	wycheproof.Case
+	Message   testutil.HexBytes `json:"msg"`
+	Signature testutil.HexBytes `json:"sig"`
+	Context   testutil.HexBytes `json:"ctx"`
+}
+
+func TestWycheproofVerify(t *testing.T) {
+	vectors := []struct {
+		filename string
+		params   *params
+	}{
+		{
+			filename: "mldsa_44_verify_test.json",
+			params:   MLDSA44,
+		},
+		{
+			filename: "mldsa_65_verify_test.json",
+			params:   MLDSA65,
+		},
+		{
+			filename: "mldsa_87_verify_test.json",
+			params:   MLDSA87,
+		},
+	}
+
+	type wycheproofGroup struct {
+		wycheproof.Group
+		PublicKey testutil.HexBytes `json:"publicKey"`
+		Tests     []*wycheproofCase `json:"tests"`
+	}
+
+	type wycheproofSuite struct {
+		wycheproof.Suite
+		TestGroups []*wycheproofGroup `json:"testGroups"`
+	}
+
+	for _, v := range vectors {
+		suite := new(wycheproofSuite)
+		wycheproof.PopulateSuiteV1(t, suite, v.filename)
+
+		for _, group := range suite.TestGroups {
+			for _, test := range group.Tests {
+				expectedPublicKeyParsingErr := slices.Contains(test.Flags, "IncorrectPublicKeyLength")
+
+				caseName := fmt.Sprintf("%s:Case-%d", v.filename, test.CaseID)
+				t.Run(caseName, func(t *testing.T) {
+					publicKey, err := v.params.DecodePublicKey(group.PublicKey)
+					if expectedPublicKeyParsingErr {
+						if err == nil {
+							t.Fatalf("params.DecodePublicKey(%x) err = nil, want err", group.PublicKey)
+						}
+						// End subtest successfully.
+						return
+					}
+					if err != nil {
+						t.Fatalf("params.DecodePublicKey(%x) err = %v, want nil", group.PublicKey, err)
+					}
+
+					err = publicKey.Verify(test.Message, test.Signature, test.Context)
+					switch test.Result {
+					case "valid":
+						if err != nil {
+							t.Errorf("publicKey.Verify() failed in a valid test case: %s", err)
+						}
+					case "invalid":
+						if err == nil {
+							t.Errorf("publicKey.Verify() succeeded in an invalid test case")
+						}
+					default:
+						t.Errorf("unsupported test result: %q", test.Result)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestWycheproofSign(t *testing.T) {
+	vectors := []struct {
+		filename string
+		params   *params
+	}{
+		{
+			filename: "mldsa_44_sign_seed_test.json",
+			params:   MLDSA44,
+		},
+		{
+			filename: "mldsa_65_sign_seed_test.json",
+			params:   MLDSA65,
+		},
+		{
+			filename: "mldsa_87_sign_seed_test.json",
+			params:   MLDSA87,
+		},
+	}
+
+	type wycheproofGroup struct {
+		wycheproof.Group
+		PrivateSeed testutil.HexBytes `json:"privateSeed"`
+		Tests       []*wycheproofCase `json:"tests"`
+	}
+
+	type wycheproofSuite struct {
+		wycheproof.Suite
+		TestGroups []*wycheproofGroup `json:"testGroups"`
+	}
+
+	for _, v := range vectors {
+		suite := new(wycheproofSuite)
+		wycheproof.PopulateSuiteV1(t, suite, v.filename)
+
+		for _, group := range suite.TestGroups {
+			for _, test := range group.Tests {
+				expectedSignErr := slices.Contains(test.Flags, "InvalidContext")
+
+				caseName := fmt.Sprintf("%s:Case-%d", v.filename, test.CaseID)
+				t.Run(caseName, func(t *testing.T) {
+					_, secretKey := v.params.KeyGenFromSeed([32]byte(group.PrivateSeed))
+
+					got, err := secretKey.SignDeterministic(test.Message, test.Context)
+					if expectedSignErr {
+						if err == nil {
+							t.Fatalf("secretKey.SignDeterministic(%x, %x) err = nil, want err", test.Message, test.Context)
+						}
+						// End subtest successfully.
+						return
+					}
+					if err != nil {
+						t.Fatalf("secretKey.SignDeterministic(%x, %x) err = %v, want nil", test.Message, test.Context, err)
+					}
+					want := test.Signature
+
+					switch test.Result {
+					case "valid":
+						if !bytes.Equal(got, want) {
+							t.Errorf("secretKey.SignDeterministic() failed in a valid test case: %s", err)
+						}
+					case "invalid":
+						if bytes.Equal(got, want) {
+							t.Errorf("SecretKey.SignDeterministic() succeeded in an invalid test case")
+						}
+					default:
+						t.Errorf("unsupported test result: %q", test.Result)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestWycheproofSignNoSeed(t *testing.T) {
+	vectors := []struct {
+		filename string
+		params   *params
+	}{
+		{
+			filename: "mldsa_44_sign_noseed_test.json",
+			params:   MLDSA44,
+		},
+		{
+			filename: "mldsa_65_sign_noseed_test.json",
+			params:   MLDSA65,
+		},
+		{
+			filename: "mldsa_87_sign_noseed_test.json",
+			params:   MLDSA87,
+		},
+	}
+
+	type wycheproofGroup struct {
+		wycheproof.Group
+		PrivateKey testutil.HexBytes `json:"privateKey"`
+		Tests      []*wycheproofCase `json:"tests"`
+	}
+
+	type wycheproofSuite struct {
+		wycheproof.Suite
+		TestGroups []*wycheproofGroup `json:"testGroups"`
+	}
+
+	for _, v := range vectors {
+		suite := new(wycheproofSuite)
+		wycheproof.PopulateSuiteV1(t, suite, v.filename)
+
+		for _, group := range suite.TestGroups {
+			for _, test := range group.Tests {
+				expectedDecodeSecretKeyErr := slices.Contains(test.Flags, "IncorrectPrivateKeyLength")
+				expectedSignErr := slices.Contains(test.Flags, "InvalidContext")
+
+				caseName := fmt.Sprintf("%s:Case-%d", v.filename, test.CaseID)
+				t.Run(caseName, func(t *testing.T) {
+					secretKey, err := v.params.DecodeSecretKey(group.PrivateKey)
+					if expectedDecodeSecretKeyErr {
+						if err == nil {
+							t.Fatalf("params.DecodeSecretKey(%x) err = nil, want err", group.PrivateKey)
+						}
+						// End subtest successfully.
+						return
+					}
+					if err != nil {
+						t.Fatalf("params.DecodeSecretKey(%x) err = %v, want nil", group.PrivateKey, err)
+					}
+
+					got, err := secretKey.SignDeterministic(test.Message, test.Context)
+					if expectedSignErr {
+						if err == nil {
+							t.Fatalf("secretKey.SignDeterministic(%x, %x) err = nil, want err", test.Message, test.Context)
+						}
+						// End subtest successfully.
+						return
+					}
+					if err != nil {
+						t.Fatalf("secretKey.SignDeterministic(%x, %x) err = %v, want nil", test.Message, test.Context, err)
+					}
+					want := test.Signature
+
+					switch test.Result {
+					case "valid":
+						if !bytes.Equal(got, want) {
+							t.Errorf("secretKey.SignDeterministic() failed in a valid test case: %s", err)
+						}
+					case "invalid":
+						if bytes.Equal(got, want) {
+							t.Errorf("SecretKey.SignDeterministic() succeeded in an invalid test case")
+						}
+					default:
+						t.Errorf("unsupported test result: %q", test.Result)
+					}
+				})
+			}
+		}
 	}
 }
