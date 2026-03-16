@@ -49,7 +49,9 @@ func RegisterKeyCreator[P key.Parameters](creator func(p key.Parameters, idRequi
 
 // CreateKey creates a key from the given [key.Parameters] using the registry.
 func CreateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	keyCreatorsMutex.RLock()
 	creator, found := keyCreators[reflect.TypeOf(p)]
+	keyCreatorsMutex.RUnlock()
 	if !found {
 		return nil, fmt.Errorf("no creator found for parameters %T", p)
 	}

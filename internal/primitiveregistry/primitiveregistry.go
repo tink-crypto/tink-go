@@ -58,7 +58,9 @@ func Primitive(key key.Key) (any, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key is nil")
 	}
+	primitiveConstructorsMu.RLock()
 	constructor, found := primitiveConstructors[reflect.TypeOf(key)]
+	primitiveConstructorsMu.RUnlock()
 	if !found {
 		return nil, fmt.Errorf("no constructor found for key %T", key)
 	}

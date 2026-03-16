@@ -297,7 +297,9 @@ func RegisterParametersParser(keyTypeURL string, parameterParser ParametersParse
 // SerializeKey serializes the given key into a proto keyset key.
 func SerializeKey(key key.Key) (*KeySerialization, error) {
 	keyType := reflect.TypeOf(key)
+	keySerializersMu.RLock()
 	serializer, ok := keySerializers[keyType]
+	keySerializersMu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("protoserialization.SerializeKey: no serializer for type %v", keyType)
 	}
@@ -310,7 +312,9 @@ func SerializeParameters(parameters key.Parameters) (*tinkpb.KeyTemplate, error)
 		return nil, fmt.Errorf("protoserialization.SerializeParameters: parameters is nil")
 	}
 	parametersType := reflect.TypeOf(parameters)
+	parametersSerializersMu.RLock()
 	serializer, ok := parameterSerializers[parametersType]
+	parametersSerializersMu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("protoserialization.SerializeParameters: no serializer for type %v", parametersType)
 	}
@@ -334,7 +338,9 @@ func RegisterKeyParser(keyTypeURL string, keyParser KeyParser) error {
 //
 // If no parser is registered for the given type URL, a fallback key is returned.
 func ParseKey(keySerialization *KeySerialization) (key.Key, error) {
+	keyParsersMu.RLock()
 	parser, found := keyParsers[keySerialization.KeyData().GetTypeUrl()]
+	keyParsersMu.RUnlock()
 	if !found {
 		if keySerialization.KeyData().GetKeyMaterialType() == tinkpb.KeyData_ASYMMETRIC_PRIVATE {
 			return NewFallbackProtoPrivateKey(keySerialization)
@@ -348,7 +354,9 @@ func ParseKey(keySerialization *KeySerialization) (key.Key, error) {
 //
 // If no parser is registered for the given type URL, returns an error.
 func ParseParameters(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	parametersParsersMu.RLock()
 	parser, found := parameterParsers[keyTemplate.GetTypeUrl()]
+	parametersParsersMu.RUnlock()
 	if !found {
 		return nil, fmt.Errorf("protoserialization.ParseParameters: no parser for type %s", keyTemplate.GetTypeUrl())
 	}
