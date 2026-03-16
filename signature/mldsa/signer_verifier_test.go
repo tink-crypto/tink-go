@@ -15,16 +15,19 @@
 package mldsa_test
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/testing/wycheproof"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	tinkmldsa "github.com/tink-crypto/tink-go/v2/signature/mldsa"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/testutil"
 )
 
 func TestSignVerifyManager(t *testing.T) {
@@ -287,5 +290,94 @@ func TestSignVerifyCorrectness(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestWycheproof(t *testing.T) {
+	vectors := []struct {
+		filename string
+		instance tinkmldsa.Instance
+	}{
+		{
+			filename: "mldsa_65_verify_test.json",
+			instance: tinkmldsa.MLDSA65,
+		},
+		{
+			filename: "mldsa_87_verify_test.json",
+			instance: tinkmldsa.MLDSA87,
+		},
+	}
+
+	type wycheproofCase struct {
+		wycheproof.Case
+		Message   testutil.HexBytes `json:"msg"`
+		Signature testutil.HexBytes `json:"sig"`
+		Context   testutil.HexBytes `json:"ctx"`
+	}
+
+	type wycheproofGroup struct {
+		wycheproof.Group
+		PublicKey testutil.HexBytes `json:"publicKey"`
+		Tests     []*wycheproofCase `json:"tests"`
+	}
+
+	type wycheproofSuite struct {
+		wycheproof.Suite
+		TestGroups []*wycheproofGroup `json:"testGroups"`
+	}
+
+	for _, v := range vectors {
+		suite := new(wycheproofSuite)
+		wycheproof.PopulateSuiteV1(t, suite, v.filename)
+
+		for _, group := range suite.TestGroups {
+			for _, test := range group.Tests {
+				// The tink.Verifier interface does not support passing context.
+				if len(test.Context) != 0 {
+					continue
+				}
+
+				expectedPublicKeyParsingErr := slices.Contains(test.Flags, "IncorrectPublicKeyLength")
+
+				caseName := fmt.Sprintf("%s:Case-%d", v.filename, test.CaseID)
+				t.Run(caseName, func(t *testing.T) {
+					params, err := tinkmldsa.NewParameters(v.instance, tinkmldsa.VariantNoPrefix)
+					if err != nil {
+						t.Fatalf("tinkmldsa.NewParameters(%v, tinkmldsa.VariantNoPrefix) err = %v, want nil", v.instance, err)
+					}
+
+					publicKey, err := tinkmldsa.NewPublicKey(group.PublicKey, 0, params)
+					if expectedPublicKeyParsingErr {
+						if err == nil {
+							t.Fatalf("tinkmldsa.NewPublicKey(%x, 0, %+v) err = nil, want err", group.PublicKey, params)
+						}
+						// End subtest successfully.
+						return
+					}
+					if err != nil {
+						t.Fatalf("tinkmldsa.NewPublicKey(%x, 0, %+v) err = %v, want nil", group.PublicKey, params, err)
+					}
+
+					verifier, err := tinkmldsa.NewVerifier(publicKey, internalapi.Token{})
+					if err != nil {
+						t.Fatalf("tinkmldsa.NewVerifier(%v, internalapi.Token{}) err = %v, want nil", publicKey, err)
+					}
+
+					err = verifier.Verify(test.Signature, test.Message)
+					switch test.Result {
+					case "valid":
+						if err != nil {
+							t.Errorf("verifier.Verify() failed in a valid test case: %s", err)
+						}
+					case "invalid":
+						if err == nil {
+							t.Errorf("verifier.Verify() succeeded in an invalid test case")
+						}
+					default:
+						t.Errorf("unsupported test result: %q", test.Result)
+					}
+				})
+			}
+		}
 	}
 }
