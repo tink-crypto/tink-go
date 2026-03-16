@@ -223,9 +223,7 @@ func (a *AESGCMSIV) computeTag(polyval, nonce, encKey, out []byte) error {
 		return fmt.Errorf("aes_gcm_siv: tag buffer should have the same length as tag size")
 	}
 
-	for i, val := range nonce {
-		polyval[i] ^= val
-	}
+	subtle.XORBytes(polyval, polyval, nonce)
 	polyval[aesgcmsivPolyvalSize-1] &= 0x7f
 
 	block, err := aes.NewCipher(encKey)
