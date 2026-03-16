@@ -22,8 +22,8 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/aead"
+	"github.com/tink-crypto/tink-go/v2/internal/random"
 	"github.com/tink-crypto/tink-go/v2/key"
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -57,10 +57,10 @@ func (a *fullAEAD) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
 	if err := aead.CheckAESGCMPlaintextSize(uint64(len(plaintext))); err != nil {
 		return nil, err
 	}
-	iv := random.GetRandomBytes(ivSize)
-	dst := make([]byte, 0, len(a.prefix)+len(iv)+len(plaintext)+a.cipher.Overhead())
-	dst = append(dst, a.prefix...)
-	dst = append(dst, iv...)
+	dst := make([]byte, len(a.prefix)+ivSize, len(a.prefix)+ivSize+len(plaintext)+tagSize)
+	copy(dst, a.prefix)
+	iv := dst[len(a.prefix):]
+	random.MustRand(iv)
 	return a.cipher.Seal(dst, iv, plaintext, associatedData), nil
 }
 
