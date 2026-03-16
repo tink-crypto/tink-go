@@ -15,7 +15,7 @@
 package aead
 
 import (
-	"errors"
+	"crypto/cipher"
 	"fmt"
 
 	"golang.org/x/crypto/chacha20poly1305"
@@ -33,16 +33,17 @@ const (
 // ChaCha20Poly1305InsecureNonce is an insecure implementation of the AEAD
 // interface that permits the user to set the nonce.
 type ChaCha20Poly1305InsecureNonce struct {
-	Key []byte
+	cipher cipher.AEAD
 }
 
 // NewChaCha20Poly1305InsecureNonce returns a ChaCha20Poly1305InsecureNonce instance.
 // The key argument should be a 32-bytes key.
 func NewChaCha20Poly1305InsecureNonce(key []byte) (*ChaCha20Poly1305InsecureNonce, error) {
-	if len(key) != chacha20poly1305.KeySize {
-		return nil, errors.New("bad key length")
+	c, err := chacha20poly1305.New(key)
+	if err != nil {
+		return nil, err
 	}
-	return &ChaCha20Poly1305InsecureNonce{Key: key}, nil
+	return &ChaCha20Poly1305InsecureNonce{cipher: c}, nil
 }
 
 // Encrypt encrypts plaintext with nonce and associatedData.
@@ -50,11 +51,7 @@ func (ca *ChaCha20Poly1305InsecureNonce) Encrypt(dst, nonce, plaintext, associat
 	if len(plaintext) > maxPlaintextSize {
 		return nil, fmt.Errorf("plaintext too long")
 	}
-	c, err := chacha20poly1305.New(ca.Key)
-	if err != nil {
-		return nil, err
-	}
-	return c.Seal(dst, nonce, plaintext, associatedData), nil
+	return ca.cipher.Seal(dst, nonce, plaintext, associatedData), nil
 }
 
 // Decrypt decrypts ciphertext with nonce and associatedData.
@@ -65,9 +62,5 @@ func (ca *ChaCha20Poly1305InsecureNonce) Decrypt(nonce, ciphertext, associatedDa
 	if len(ciphertext) < ChaCha20Poly1305InsecureTagSize {
 		return nil, fmt.Errorf("ciphertext too short")
 	}
-	c, err := chacha20poly1305.New(ca.Key)
-	if err != nil {
-		return nil, err
-	}
-	return c.Open(nil, nonce, ciphertext, associatedData)
+	return ca.cipher.Open(nil, nonce, ciphertext, associatedData)
 }
