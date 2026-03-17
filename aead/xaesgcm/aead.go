@@ -23,9 +23,9 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/random"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/subtle"
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
@@ -69,13 +69,13 @@ var (
 )
 
 func (a *aead) derivePerMessageKey(salt []byte) ([]byte, error) {
-	paddedSalt := make([]byte, 12)
-	copy(paddedSalt, salt)
-	key1, err := a.prf.ComputePRF(slices.Concat(derivationBlock1Prefix, paddedSalt), 16)
+	var paddedSalt [12]byte
+	copy(paddedSalt[:], salt)
+	key1, err := a.prf.ComputePRF(slices.Concat(derivationBlock1Prefix, paddedSalt[:]), 16)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute PRF: %v", err)
 	}
-	key2, err := a.prf.ComputePRF(slices.Concat(derivationBlock2Prefix, paddedSalt), 16)
+	key2, err := a.prf.ComputePRF(slices.Concat(derivationBlock2Prefix, paddedSalt[:]), 16)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute PRF: %v", err)
 	}
@@ -100,7 +100,12 @@ func (a *aead) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
 		return nil, fmt.Errorf("xaesgcm: plaintext with size %d is too large", len(plaintext))
 	}
 
-	saltAndIV := random.GetRandomBytes(uint32(a.saltSizeInBytes) + ivSize)
+	dst := make([]byte, len(a.prefix)+a.saltSizeInBytes+ivSize, len(a.prefix)+a.saltSizeInBytes+ivSize+len(plaintext)+tagSize)
+	// Set the prefix.
+	copy(dst, a.prefix)
+	// Randomly generate salt and IV.
+	saltAndIV := dst[len(a.prefix):]
+	random.MustRand(saltAndIV)
 	salt := saltAndIV[:a.saltSizeInBytes]
 	iv := saltAndIV[a.saltSizeInBytes:]
 	perMessageKeyBytes, err := a.derivePerMessageKey(salt)
@@ -111,9 +116,6 @@ func (a *aead) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("xaesgcm: failed to create cipher.AEAD")
 	}
-	dst := make([]byte, 0, len(a.prefix)+a.saltSizeInBytes+ivSize+len(plaintext)+tagSize)
-	dst = append(dst, a.prefix...)
-	dst = append(dst, saltAndIV...)
 	return aesGCM.Seal(dst, iv, plaintext, associatedData), nil
 }
 
