@@ -55,7 +55,7 @@ var _ tink.AEAD = (*fullAEAD)(nil)
 // ciphertext is the encrypted plaintext, and tag is a 16-byte tag.
 func (a *fullAEAD) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
 	if err := aead.CheckAESGCMPlaintextSize(uint64(len(plaintext))); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("aesgcm.Encrypt: %v", err)
 	}
 	dst := make([]byte, len(a.prefix)+ivSize, len(a.prefix)+ivSize+len(plaintext)+tagSize)
 	copy(dst, a.prefix)
@@ -75,17 +75,21 @@ func (a *fullAEAD) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
 // prefix must match the key's output prefix. The prefix may be empty.
 func (a *fullAEAD) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
 	if len(ciphertext) < len(a.prefix)+ivSize+tagSize {
-		return nil, fmt.Errorf("ciphertext with size %d is too short", len(ciphertext))
+		return nil, fmt.Errorf("aesgcm.Decrypt: ciphertext with size %d is too short", len(ciphertext))
 	}
 	prefix := ciphertext[:len(a.prefix)]
 	if !bytes.Equal(prefix, a.prefix) {
-		return nil, fmt.Errorf("ciphertext prefix does not match")
+		return nil, fmt.Errorf("aesgcm.Decrypt: ciphertext prefix does not match")
 	}
 	iv := ciphertext[len(a.prefix) : len(a.prefix)+ivSize]
 	ciphertextWithTag := ciphertext[len(a.prefix)+ivSize:]
 	plaintextLen := len(ciphertextWithTag) - tagSize
 	output := make([]byte, 0, plaintextLen)
-	return a.cipher.Open(output, iv, ciphertextWithTag, associatedData)
+	pt, err := a.cipher.Open(output, iv, ciphertextWithTag, associatedData)
+	if err != nil {
+		return nil, fmt.Errorf("aesgcm.Decrypt: %v", err)
+	}
+	return pt, nil
 }
 
 // NewAEAD creates a [tink.AEAD] from a [Key].
