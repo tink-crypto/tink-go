@@ -28,25 +28,26 @@ type chaCha20Poly1305AEAD struct{}
 var _ aead = (*chaCha20Poly1305AEAD)(nil)
 
 func (c *chaCha20Poly1305AEAD) seal(key, nonce, plaintext, associatedData []byte) ([]byte, error) {
-	if len(key) != chacha20poly1305.KeySize {
-		return nil, fmt.Errorf("unexpected key length: got %d, want %d", len(key), chacha20poly1305.KeySize)
-	}
-	cc, err := internalaead.NewChaCha20Poly1305InsecureNonce(key)
+	a, err := chacha20poly1305.New(key)
 	if err != nil {
-		return nil, fmt.Errorf("NewChaCha20Poly1305InsecureNonce: %v", err)
+		return nil, fmt.Errorf("chacha20_poly1305: failed to create AEAD, error: %v", err)
 	}
-	return cc.Encrypt(nil, nonce, plaintext, associatedData)
+	if err := internalaead.CheckChaCha20Poly1305PlaintextSize(len(plaintext)); err != nil {
+		return nil, err
+	}
+	return a.Seal(nil, nonce, plaintext, associatedData), nil
 }
 
 func (c *chaCha20Poly1305AEAD) open(key, nonce, ciphertext, associatedData []byte) ([]byte, error) {
-	if len(key) != chacha20poly1305.KeySize {
-		return nil, fmt.Errorf("unexpected key length: got %d, want %d", len(key), chacha20poly1305.KeySize)
-	}
-	cc, err := internalaead.NewChaCha20Poly1305InsecureNonce(key)
+	a, err := chacha20poly1305.New(key)
 	if err != nil {
-		return nil, fmt.Errorf("NewChaCha20Poly1305InsecureNonce: %v", err)
+		return nil, fmt.Errorf("chacha20_poly1305: failed to create AEAD, error: %v", err)
 	}
-	return cc.Decrypt(nonce, ciphertext, associatedData)
+	pt, err := a.Open(nil, nonce, ciphertext, associatedData)
+	if err != nil {
+		return nil, fmt.Errorf("chacha20_poly1305: %w", err)
+	}
+	return pt, nil
 }
 
 func (c *chaCha20Poly1305AEAD) id() AEADID { return ChaCha20Poly1305 }
