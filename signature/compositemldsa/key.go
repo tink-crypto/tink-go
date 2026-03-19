@@ -90,15 +90,30 @@ type Parameters struct {
 
 // NewParameters creates a new Parameters.
 func NewParameters(classicalAlgorithm ClassicalAlgorithm, mldsaInstance MLDSAInstance, variant Variant) (*Parameters, error) {
-	if mldsaInstance == UnknownInstance {
-		return nil, errors.New("mldsaInstance cannot be UnknownInstance")
-	}
-	if classicalAlgorithm == UnknownAlgorithm {
-		return nil, errors.New("classicalAlgorithm cannot be UnknownAlgorithm")
-	}
 	if variant == VariantUnknown {
 		return nil, errors.New("variant cannot be VariantUnknown")
 	}
+
+	switch mldsaInstance {
+	// Supported combinations are defined at https://datatracker.ietf.org/doc/html/draft-ietf-lamps-pq-composite-sigs-15#name-algorithm-identifiers-and-p.
+	case MLDSA65:
+		switch classicalAlgorithm {
+		// Supported combination
+		case Ed25519, ECDSAP256, ECDSAP384, RSA3072PSS, RSA4096PSS, RSA3072PKCS1, RSA4096PKCS1:
+		default:
+			return nil, fmt.Errorf("unsupported classical algorithm for ML-DSA-65: %v", classicalAlgorithm)
+		}
+	case MLDSA87:
+		switch classicalAlgorithm {
+		// Supported combination
+		case ECDSAP384, ECDSAP521, RSA3072PSS, RSA4096PSS:
+		default:
+			return nil, fmt.Errorf("unsupported classical algorithm for ML-DSA-87: %v", classicalAlgorithm)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported ML-DSA instance: %v", mldsaInstance)
+	}
+
 	return &Parameters{classicalAlgorithm: classicalAlgorithm, mldsaInstance: mldsaInstance, variant: variant}, nil
 }
 

@@ -20,81 +20,118 @@ import (
 	"github.com/tink-crypto/tink-go/v2/signature/compositemldsa"
 )
 
-func TestNewParameters(t *testing.T) {
-	for _, ca := range []compositemldsa.ClassicalAlgorithm{
-		compositemldsa.Ed25519,
-		compositemldsa.ECDSAP256,
-		compositemldsa.ECDSAP384,
-		compositemldsa.ECDSAP521,
-		compositemldsa.RSA3072PSS,
-		compositemldsa.RSA4096PSS,
-		compositemldsa.RSA3072PKCS1,
-		compositemldsa.RSA4096PKCS1,
-		compositemldsa.UnknownAlgorithm,
-	} {
-		for _, inst := range []compositemldsa.MLDSAInstance{
-			compositemldsa.MLDSA65,
-			compositemldsa.MLDSA87,
-			compositemldsa.UnknownInstance,
-		} {
-			for _, variant := range []compositemldsa.Variant{
-				compositemldsa.VariantTink,
-				compositemldsa.VariantNoPrefix,
-				compositemldsa.VariantUnknown,
-			} {
-				params, err := compositemldsa.NewParameters(ca, inst, variant)
-				if ca == compositemldsa.UnknownAlgorithm {
-					if err == nil {
-						t.Errorf("compositemldsa.NewParameters(%v, %v, %v) err = nil, want error", ca, inst, variant)
-					}
-					continue
-				}
-				if variant == compositemldsa.VariantUnknown {
-					if err == nil {
-						t.Errorf("compositemldsa.NewParameters(%v, %v, %v) err = nil, want error", ca, inst, variant)
-					}
-					continue
-				}
-				if inst == compositemldsa.UnknownInstance {
-					if err == nil {
-						t.Errorf("compositemldsa.NewParameters(%v, %v, %v) err = nil, want error", ca, inst, variant)
-					}
-					continue
-				}
-				if err != nil {
-					t.Errorf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", ca, inst, variant, err)
-				}
-				if got := params.ClassicalAlgorithm(); got != ca {
-					t.Errorf("params.ClassicalAlgorithm() = %v, want %v", got, ca)
-				}
-				if got := params.MLDSAInstance(); got != inst {
-					t.Errorf("params.MlDsaInstance() = %v, want %v", got, inst)
-				}
-				if got := params.Variant(); got != variant {
-					t.Errorf("params.Variant() = %v, want %v", got, variant)
-				}
-			}
+func isSupported(classicalAlgorithm compositemldsa.ClassicalAlgorithm, instance compositemldsa.MLDSAInstance) bool {
+	switch instance {
+	case compositemldsa.MLDSA65:
+		switch classicalAlgorithm {
+		case compositemldsa.Ed25519, compositemldsa.ECDSAP256, compositemldsa.ECDSAP384, compositemldsa.RSA3072PSS, compositemldsa.RSA4096PSS, compositemldsa.RSA3072PKCS1, compositemldsa.RSA4096PKCS1:
+			return true
+		default:
+			return false
+		}
+	case compositemldsa.MLDSA87:
+		switch classicalAlgorithm {
+		case compositemldsa.ECDSAP384, compositemldsa.ECDSAP521, compositemldsa.RSA3072PSS, compositemldsa.RSA4096PSS:
+			return true
+		default:
+			return false
+		}
+	default:
+		return false
+	}
+}
+
+func TestNewParametersSupported(t *testing.T) {
+	tests := []struct {
+		classicalAlgorithm compositemldsa.ClassicalAlgorithm
+		instance           compositemldsa.MLDSAInstance
+		variant            compositemldsa.Variant
+	}{
+		// MLDSA65
+		{compositemldsa.Ed25519, compositemldsa.MLDSA65, compositemldsa.VariantTink},
+		{compositemldsa.Ed25519, compositemldsa.MLDSA65, compositemldsa.VariantNoPrefix},
+		{compositemldsa.ECDSAP256, compositemldsa.MLDSA65, compositemldsa.VariantTink},
+		{compositemldsa.ECDSAP256, compositemldsa.MLDSA65, compositemldsa.VariantNoPrefix},
+		{compositemldsa.ECDSAP384, compositemldsa.MLDSA65, compositemldsa.VariantTink},
+		{compositemldsa.ECDSAP384, compositemldsa.MLDSA65, compositemldsa.VariantNoPrefix},
+		{compositemldsa.RSA3072PSS, compositemldsa.MLDSA65, compositemldsa.VariantTink},
+		{compositemldsa.RSA3072PSS, compositemldsa.MLDSA65, compositemldsa.VariantNoPrefix},
+		{compositemldsa.RSA4096PSS, compositemldsa.MLDSA65, compositemldsa.VariantTink},
+		{compositemldsa.RSA4096PSS, compositemldsa.MLDSA65, compositemldsa.VariantNoPrefix},
+		{compositemldsa.RSA3072PKCS1, compositemldsa.MLDSA65, compositemldsa.VariantTink},
+		{compositemldsa.RSA3072PKCS1, compositemldsa.MLDSA65, compositemldsa.VariantNoPrefix},
+		{compositemldsa.RSA4096PKCS1, compositemldsa.MLDSA65, compositemldsa.VariantTink},
+		{compositemldsa.RSA4096PKCS1, compositemldsa.MLDSA65, compositemldsa.VariantNoPrefix},
+		// MLDSA87
+		{compositemldsa.ECDSAP384, compositemldsa.MLDSA87, compositemldsa.VariantTink},
+		{compositemldsa.ECDSAP384, compositemldsa.MLDSA87, compositemldsa.VariantNoPrefix},
+		{compositemldsa.ECDSAP521, compositemldsa.MLDSA87, compositemldsa.VariantTink},
+		{compositemldsa.ECDSAP521, compositemldsa.MLDSA87, compositemldsa.VariantNoPrefix},
+		{compositemldsa.RSA3072PSS, compositemldsa.MLDSA87, compositemldsa.VariantTink},
+		{compositemldsa.RSA3072PSS, compositemldsa.MLDSA87, compositemldsa.VariantNoPrefix},
+		{compositemldsa.RSA4096PSS, compositemldsa.MLDSA87, compositemldsa.VariantTink},
+		{compositemldsa.RSA4096PSS, compositemldsa.MLDSA87, compositemldsa.VariantNoPrefix},
+	}
+	for _, tc := range tests {
+		params, err := compositemldsa.NewParameters(tc.classicalAlgorithm, tc.instance, tc.variant)
+		if err != nil {
+			t.Errorf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
+		}
+		if got := params.ClassicalAlgorithm(); got != tc.classicalAlgorithm {
+			t.Errorf("params.ClassicalAlgorithm() = %v, want %v", got, tc.classicalAlgorithm)
+		}
+		if got := params.MLDSAInstance(); got != tc.instance {
+			t.Errorf("params.MlDsaInstance() = %v, want %v", got, tc.instance)
+		}
+		if got := params.Variant(); got != tc.variant {
+			t.Errorf("params.Variant() = %v, want %v", got, tc.variant)
+		}
+	}
+}
+
+func TestNewParametersUnsupported(t *testing.T) {
+	tests := []struct {
+		classicalAlgorithm compositemldsa.ClassicalAlgorithm
+		instance           compositemldsa.MLDSAInstance
+		variant            compositemldsa.Variant
+	}{
+		// Unknown
+		{compositemldsa.UnknownAlgorithm, compositemldsa.MLDSA65, compositemldsa.VariantTink},
+		{compositemldsa.Ed25519, compositemldsa.UnknownInstance, compositemldsa.VariantTink},
+		{compositemldsa.Ed25519, compositemldsa.MLDSA65, compositemldsa.VariantUnknown},
+		// MLDSA65 unsupported
+		{compositemldsa.ECDSAP521, compositemldsa.MLDSA65, compositemldsa.VariantTink},
+		// MLDSA87 unsupported
+		{compositemldsa.Ed25519, compositemldsa.MLDSA87, compositemldsa.VariantTink},
+		{compositemldsa.ECDSAP256, compositemldsa.MLDSA87, compositemldsa.VariantTink},
+		{compositemldsa.RSA3072PKCS1, compositemldsa.MLDSA87, compositemldsa.VariantTink},
+		{compositemldsa.RSA4096PKCS1, compositemldsa.MLDSA87, compositemldsa.VariantTink},
+	}
+	for _, tc := range tests {
+		_, err := compositemldsa.NewParameters(tc.classicalAlgorithm, tc.instance, tc.variant)
+		if err == nil {
+			t.Errorf("compositemldsa.NewParameters(%v, %v, %v) err = nil, want error", tc.classicalAlgorithm, tc.instance, tc.variant)
 		}
 	}
 }
 
 func TestParametersEqual(t *testing.T) {
-	for _, ca := range []compositemldsa.ClassicalAlgorithm{
-		compositemldsa.Ed25519,
-		compositemldsa.ECDSAP256,
+	for _, classicalAlgorithm := range []compositemldsa.ClassicalAlgorithm{
+		compositemldsa.RSA3072PSS,
+		compositemldsa.ECDSAP384,
 	} {
-		for _, inst := range []compositemldsa.MLDSAInstance{
+		for _, instance := range []compositemldsa.MLDSAInstance{
 			compositemldsa.MLDSA65,
 			compositemldsa.MLDSA87,
 		} {
-			t.Run(fmt.Sprintf("%v/%v", ca, inst), func(t *testing.T) {
-				tinkParams, err := compositemldsa.NewParameters(ca, inst, compositemldsa.VariantTink)
+			t.Run(fmt.Sprintf("%v/%v", classicalAlgorithm, instance), func(t *testing.T) {
+				tinkParams, err := compositemldsa.NewParameters(classicalAlgorithm, instance, compositemldsa.VariantTink)
 				if err != nil {
-					t.Fatalf("NewParameters(ca, inst, compositemldsa.VariantTink) err = %v", err)
+					t.Fatalf("NewParameters(classicalAlgorithm, instance, compositemldsa.VariantTink) err = %v", err)
 				}
-				noPrefixParams, err := compositemldsa.NewParameters(ca, inst, compositemldsa.VariantNoPrefix)
+				noPrefixParams, err := compositemldsa.NewParameters(classicalAlgorithm, instance, compositemldsa.VariantNoPrefix)
 				if err != nil {
-					t.Fatalf("NewParameters(ca, inst, compositemldsa.VariantNoPrefix) err = %v", err)
+					t.Fatalf("NewParameters(classicalAlgorithm, instance, compositemldsa.VariantNoPrefix) err = %v", err)
 				}
 				if !tinkParams.Equal(tinkParams) {
 					t.Errorf("tinkParams.Equal(tinkParams) = false, want true")
@@ -113,18 +150,18 @@ func TestParametersEqual(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	p2, err := compositemldsa.NewParameters(compositemldsa.ECDSAP256, compositemldsa.MLDSA65, compositemldsa.VariantTink)
+	p2, err := compositemldsa.NewParameters(compositemldsa.ECDSAP384, compositemldsa.MLDSA65, compositemldsa.VariantTink)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	if p1.Equal(p2) {
 		t.Errorf("p1.Equal(p2) = true, want false")
 	}
-	p3, err := compositemldsa.NewParameters(compositemldsa.Ed25519, compositemldsa.MLDSA87, compositemldsa.VariantTink)
+	p3, err := compositemldsa.NewParameters(compositemldsa.ECDSAP384, compositemldsa.MLDSA87, compositemldsa.VariantTink)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if p1.Equal(p3) {
+	if p2.Equal(p3) {
 		t.Errorf("p1.Equal(p3) = true, want false")
 	}
 }
