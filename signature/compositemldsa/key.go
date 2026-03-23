@@ -15,7 +15,6 @@
 package compositemldsa
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/key"
@@ -88,32 +87,38 @@ type Parameters struct {
 	variant            Variant
 }
 
+type mlDSAAndClassicalInstance struct {
+	classicalAlgorithm ClassicalAlgorithm
+	mldsaInstance      MLDSAInstance
+}
+
+// supportedParameterSets is a set of supported parameter set combinations.
+// Supported combinations are defined at https://datatracker.ietf.org/doc/html/draft-ietf-lamps-pq-composite-sigs-15#name-algorithm-identifiers-and-p.
+var supportedParameterSets = map[mlDSAAndClassicalInstance]struct{}{
+	// MLDSA65
+	{Ed25519, MLDSA65}:      struct{}{},
+	{ECDSAP256, MLDSA65}:    struct{}{},
+	{ECDSAP384, MLDSA65}:    struct{}{},
+	{RSA3072PSS, MLDSA65}:   struct{}{},
+	{RSA4096PSS, MLDSA65}:   struct{}{},
+	{RSA3072PKCS1, MLDSA65}: struct{}{},
+	{RSA4096PKCS1, MLDSA65}: struct{}{},
+	// MLDSA87
+	{ECDSAP384, MLDSA87}:  struct{}{},
+	{ECDSAP521, MLDSA87}:  struct{}{},
+	{RSA3072PSS, MLDSA87}: struct{}{},
+	{RSA4096PSS, MLDSA87}: struct{}{},
+}
+
 // NewParameters creates a new Parameters.
 func NewParameters(classicalAlgorithm ClassicalAlgorithm, mldsaInstance MLDSAInstance, variant Variant) (*Parameters, error) {
 	if variant == VariantUnknown {
-		return nil, errors.New("variant cannot be VariantUnknown")
+		return nil, fmt.Errorf("variant must be specified")
 	}
-
-	switch mldsaInstance {
-	// Supported combinations are defined at https://datatracker.ietf.org/doc/html/draft-ietf-lamps-pq-composite-sigs-15#name-algorithm-identifiers-and-p.
-	case MLDSA65:
-		switch classicalAlgorithm {
-		// Supported combination
-		case Ed25519, ECDSAP256, ECDSAP384, RSA3072PSS, RSA4096PSS, RSA3072PKCS1, RSA4096PKCS1:
-		default:
-			return nil, fmt.Errorf("unsupported classical algorithm for ML-DSA-65: %v", classicalAlgorithm)
-		}
-	case MLDSA87:
-		switch classicalAlgorithm {
-		// Supported combination
-		case ECDSAP384, ECDSAP521, RSA3072PSS, RSA4096PSS:
-		default:
-			return nil, fmt.Errorf("unsupported classical algorithm for ML-DSA-87: %v", classicalAlgorithm)
-		}
-	default:
-		return nil, fmt.Errorf("unsupported ML-DSA instance: %v", mldsaInstance)
+	key := mlDSAAndClassicalInstance{classicalAlgorithm, mldsaInstance}
+	if _, supported := supportedParameterSets[key]; !supported {
+		return nil, fmt.Errorf("unsupported parameter combination: {ClassicalAlgorithm: %v, MLDSAInstance: %v}", classicalAlgorithm, mldsaInstance)
 	}
-
 	return &Parameters{classicalAlgorithm: classicalAlgorithm, mldsaInstance: mldsaInstance, variant: variant}, nil
 }
 

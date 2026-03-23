@@ -20,33 +20,14 @@ import (
 	"github.com/tink-crypto/tink-go/v2/signature/compositemldsa"
 )
 
-func isSupported(classicalAlgorithm compositemldsa.ClassicalAlgorithm, instance compositemldsa.MLDSAInstance) bool {
-	switch instance {
-	case compositemldsa.MLDSA65:
-		switch classicalAlgorithm {
-		case compositemldsa.Ed25519, compositemldsa.ECDSAP256, compositemldsa.ECDSAP384, compositemldsa.RSA3072PSS, compositemldsa.RSA4096PSS, compositemldsa.RSA3072PKCS1, compositemldsa.RSA4096PKCS1:
-			return true
-		default:
-			return false
-		}
-	case compositemldsa.MLDSA87:
-		switch classicalAlgorithm {
-		case compositemldsa.ECDSAP384, compositemldsa.ECDSAP521, compositemldsa.RSA3072PSS, compositemldsa.RSA4096PSS:
-			return true
-		default:
-			return false
-		}
-	default:
-		return false
-	}
+type testParameters struct {
+	classicalAlgorithm compositemldsa.ClassicalAlgorithm
+	instance           compositemldsa.MLDSAInstance
+	variant            compositemldsa.Variant
 }
 
-func TestNewParametersSupported(t *testing.T) {
-	tests := []struct {
-		classicalAlgorithm compositemldsa.ClassicalAlgorithm
-		instance           compositemldsa.MLDSAInstance
-		variant            compositemldsa.Variant
-	}{
+func testCasesSupportedParameters() []testParameters {
+	return []testParameters{
 		// MLDSA65
 		{compositemldsa.Ed25519, compositemldsa.MLDSA65, compositemldsa.VariantTink},
 		{compositemldsa.Ed25519, compositemldsa.MLDSA65, compositemldsa.VariantNoPrefix},
@@ -72,7 +53,10 @@ func TestNewParametersSupported(t *testing.T) {
 		{compositemldsa.RSA4096PSS, compositemldsa.MLDSA87, compositemldsa.VariantTink},
 		{compositemldsa.RSA4096PSS, compositemldsa.MLDSA87, compositemldsa.VariantNoPrefix},
 	}
-	for _, tc := range tests {
+}
+
+func TestNewParametersSupported(t *testing.T) {
+	for _, tc := range testCasesSupportedParameters() {
 		params, err := compositemldsa.NewParameters(tc.classicalAlgorithm, tc.instance, tc.variant)
 		if err != nil {
 			t.Errorf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
