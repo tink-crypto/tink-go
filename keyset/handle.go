@@ -534,13 +534,9 @@ func Primitives[T any](h *Handle, config Config, _ internalapi.Token) (*primitiv
 func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry *Entry, config Config) error {
 	// Don't monitor this as key export.
 	entry = entry.toUnmonitored()
-	protoKey, err := entryToProtoKey(entry)
-	if err != nil {
-		return err
-	}
 	var primitive any
 	isFullPrimitive := true
-	primitive, err = config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
+	primitive, err := config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
 	if err != nil {
 		return err
 	}
@@ -554,7 +550,7 @@ func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry 
 		return fmt.Errorf("primitive is of type %T, want %T", primitive, (*T)(nil))
 	}
 	psEntry := &primitiveset.Entry[T]{
-		KeyID:     protoKey.GetKeyId(),
+		KeyID:     entry.KeyID(),
 		Key:       entry.Key(),
 		IsPrimary: entry.isPrimary,
 	}
