@@ -17,6 +17,7 @@ package keyset_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"reflect"
@@ -41,6 +42,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
+	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/testing/fakekms"
 	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
@@ -811,6 +813,68 @@ func TestKeysetInfo(t *testing.T) {
 	info := kh.KeysetInfo()
 	if info.PrimaryKeyId != info.KeyInfo[0].KeyId {
 		t.Errorf("Expected primary key id: %d, but got: %d", info.KeyInfo[0].KeyId, info.PrimaryKeyId)
+	}
+}
+
+// RSA-SSA-PSS keys with salt length is 0 are different in tink-go than in other Tink
+// implementations. For backwards compatibility, we continue to allow these keys in
+// tink-go, but we don't want to allow them to be serialized anymore. This test makes sure
+// that KeysetInfo() works with these special keys.
+func TestKeysetInfo_withRSAPSSAndSaltLengthZero_works(t *testing.T) {
+	n2048Base64 := "s1EKK81M5kTFtZSuUFnhKy8FS2WNXaWVmi_fGHG4CLw98-Yo0nkuUarVwSS0O9pFPcpc3kvPKOe9Tv-6DLS3Qru21aATy2PRqjqJ4CYn71OYtSwM_ZfSCKvrjXybzgu-sBmobdtYm-sppbdL-GEHXGd8gdQw8DDCZSR6-dPJFAzLZTCdB-Ctwe_RXPF-ewVdfaOGjkZIzDoYDw7n-OHnsYCYozkbTOcWHpjVevipR-IBpGPi1rvKgFnlcG6d_tj0hWRl_6cS7RqhjoiNEtxqoJzpXs_Kg8xbCxXbCchkf11STA8udiCjQWuWI8rcDwl69XMmHJjIQAqhKvOOQ8rYTQ"
+	n2048, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(n2048Base64)
+	if err != nil {
+		t.Fatalf("base64 decoding failed: %v", err)
+	}
+	paramsValues := rsassapss.ParametersValues{
+		ModulusSizeBits: 2048,
+		SigHashType:     rsassapss.SHA256,
+		MGF1HashType:    rsassapss.SHA256,
+		PublicExponent:  65537,
+		SaltLengthBytes: 0,
+	}
+	params, err := rsassapss.NewParameters(paramsValues, rsassapss.VariantTink)
+	if err != nil {
+		t.Fatalf("NewParameters(%v, %v) = %v, want nil", paramsValues, rsassapss.VariantTink, err)
+	}
+	publicKey, err := rsassapss.NewPublicKey(n2048, 1234, params)
+	if err != nil {
+		t.Fatalf("rsassapss.NewPublicKey() err = %v, want nil", err)
+	}
+	km := keyset.NewManager()
+	id, err := km.AddKey(publicKey)
+	if err != nil {
+		t.Fatalf("km.AddKey(publicKey) err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(id); err != nil {
+		t.Fatalf("km.SetPrimary(id) err = %v, want nil", err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	info := handle.KeysetInfo()
+
+	if len(info.KeyInfo) != 1 {
+		t.Fatalf("len(info.KeyInfo) = %d, want 1", len(info.KeyInfo))
+	}
+	if info.PrimaryKeyId != 1234 {
+		t.Errorf("info.PrimaryKeyId = %d, want: %d", info.PrimaryKeyId, 1234)
+	}
+	keyInfo := info.KeyInfo[0]
+	wantTypeURL := "type.googleapis.com/google.crypto.tink.RsaSsaPssPublicKey"
+	if keyInfo.TypeUrl != wantTypeURL {
+		t.Errorf("keyInfo.TypeUrl = %s, want: %s", keyInfo.TypeUrl, wantTypeURL)
+	}
+	if keyInfo.Status != tinkpb.KeyStatusType_ENABLED {
+		t.Errorf("keyInfo.Status = %v, want %v", keyInfo.Status, tinkpb.KeyStatusType_ENABLED)
+	}
+	if keyInfo.OutputPrefixType != tinkpb.OutputPrefixType_TINK {
+		t.Errorf("keyInfo.OutputPrefixType = %v, want %v", keyInfo.OutputPrefixType, tinkpb.OutputPrefixType_TINK)
+	}
+	if keyInfo.KeyId != 1234 {
+		t.Errorf("keyInfo.KeyId = %d, want %d", keyInfo.KeyId, 1234)
 	}
 }
 
