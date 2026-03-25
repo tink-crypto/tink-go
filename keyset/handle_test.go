@@ -29,6 +29,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -39,9 +40,11 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/mac/aescmac"
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/testing/fakekms"
@@ -805,14 +808,83 @@ func TestWriteAndReadWithNoSecretsFailsWithUnknownKeyMaterial(t *testing.T) {
 }
 
 func TestKeysetInfo(t *testing.T) {
-	kt := mac.HMACSHA256Tag128KeyTemplate()
-	kh, err := keyset.NewHandle(kt)
+	params, err := hmac.NewParameters(hmac.ParametersOpts{
+		KeySizeInBytes: 16,
+		TagSizeInBytes: 16,
+		HashType:       hmac.SHA256,
+		Variant:        hmac.VariantTink,
+	})
+	if err != nil {
+		t.Fatalf("NewParameters() err = %v, want nil", err)
+	}
+	hmacKey, err := hmac.NewKey(
+		secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}),
+		params,
+		1234)
+	if err != nil {
+		t.Errorf("hmac.NewKey() err = %v, want nil", err)
+	}
+	aescmacParams, err := aescmac.NewParameters(aescmac.ParametersOpts{
+		KeySizeInBytes: 16,
+		TagSizeInBytes: 16,
+		Variant:        aescmac.VariantCrunchy,
+	})
+	if err != nil {
+		t.Fatalf("aescmac.NewParameters() err = %v, want nil", err)
+	}
+	aescmacKey, err := aescmac.NewKey(
+		secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}),
+		aescmacParams,
+		4567)
+	if err != nil {
+		t.Errorf("aescmac.NewKey() err = nil, want error")
+	}
+
+	manager := keyset.NewManager()
+	if err != nil {
+		t.Fatalf("keyset.NewManager() err = %v, want nil", err)
+	}
+	id0, err := manager.AddKey(hmacKey)
+	if err != nil {
+		t.Fatalf("manager.Add(kt) err = %v, want nil", err)
+	}
+	err = manager.Disable(id0)
+	if err != nil {
+		t.Fatalf("manager.Disable(id0) err = %v, want nil", err)
+	}
+	id, err := manager.AddKey(aescmacKey)
+	if err != nil {
+		t.Fatalf("manager.Add(kt) err = %v, want nil", err)
+	}
+	if err := manager.SetPrimary(id); err != nil {
+		t.Fatalf("manager.SetPrimary(id) err = %v, want nil", err)
+	}
+	handle, err := manager.Handle()
+
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}
-	info := kh.KeysetInfo()
-	if info.PrimaryKeyId != info.KeyInfo[0].KeyId {
-		t.Errorf("Expected primary key id: %d, but got: %d", info.KeyInfo[0].KeyId, info.PrimaryKeyId)
+	gotInfo := handle.KeysetInfo()
+
+	wantInfo := &tinkpb.KeysetInfo{
+		PrimaryKeyId: 4567,
+		KeyInfo: []*tinkpb.KeysetInfo_KeyInfo{
+			&tinkpb.KeysetInfo_KeyInfo{
+				KeyId:            1234,
+				Status:           tinkpb.KeyStatusType_DISABLED,
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.HmacKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+			&tinkpb.KeysetInfo_KeyInfo{
+				KeyId:            4567,
+				Status:           tinkpb.KeyStatusType_ENABLED,
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCmacKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
+			},
+		},
+	}
+	if diff := cmp.Diff(wantInfo, gotInfo, protocmp.Transform()); diff != "" {
+		t.Errorf("handle.KeysetInfo() returned unexpected diff (-want +got):\n%s", diff)
 	}
 }
 
@@ -854,27 +926,21 @@ func TestKeysetInfo_withRSAPSSAndSaltLengthZero_works(t *testing.T) {
 		t.Fatalf("km.Handle() err = %v, want nil", err)
 	}
 
-	info := handle.KeysetInfo()
+	gotInfo := handle.KeysetInfo()
 
-	if len(info.KeyInfo) != 1 {
-		t.Fatalf("len(info.KeyInfo) = %d, want 1", len(info.KeyInfo))
+	wantInfo := &tinkpb.KeysetInfo{
+		PrimaryKeyId: 1234,
+		KeyInfo: []*tinkpb.KeysetInfo_KeyInfo{
+			&tinkpb.KeysetInfo_KeyInfo{
+				KeyId:            1234,
+				Status:           tinkpb.KeyStatusType_ENABLED,
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.RsaSsaPssPublicKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+			},
+		},
 	}
-	if info.PrimaryKeyId != 1234 {
-		t.Errorf("info.PrimaryKeyId = %d, want: %d", info.PrimaryKeyId, 1234)
-	}
-	keyInfo := info.KeyInfo[0]
-	wantTypeURL := "type.googleapis.com/google.crypto.tink.RsaSsaPssPublicKey"
-	if keyInfo.TypeUrl != wantTypeURL {
-		t.Errorf("keyInfo.TypeUrl = %s, want: %s", keyInfo.TypeUrl, wantTypeURL)
-	}
-	if keyInfo.Status != tinkpb.KeyStatusType_ENABLED {
-		t.Errorf("keyInfo.Status = %v, want %v", keyInfo.Status, tinkpb.KeyStatusType_ENABLED)
-	}
-	if keyInfo.OutputPrefixType != tinkpb.OutputPrefixType_TINK {
-		t.Errorf("keyInfo.OutputPrefixType = %v, want %v", keyInfo.OutputPrefixType, tinkpb.OutputPrefixType_TINK)
-	}
-	if keyInfo.KeyId != 1234 {
-		t.Errorf("keyInfo.KeyId = %d, want %d", keyInfo.KeyId, 1234)
+	if diff := cmp.Diff(wantInfo, gotInfo, protocmp.Transform()); diff != "" {
+		t.Errorf("handle.KeysetInfo() returned unexpected diff (-want +got):\n%s", diff)
 	}
 }
 
