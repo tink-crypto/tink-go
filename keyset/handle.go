@@ -417,17 +417,50 @@ func (h *Handle) Len() int {
 	return len(h.entries)
 }
 
+func entriesToKeysetInfo(entries []*Entry) (*tinkpb.KeysetInfo, error) {
+	if len(entries) == 0 {
+		return nil, fmt.Errorf("entries is empty")
+	}
+	keyInfos := make([]*tinkpb.KeysetInfo_KeyInfo, len(entries))
+	var primaryKeyID uint32
+
+	for i, entry := range entries {
+		entry = entry.toUnmonitored()
+		if entry.IsPrimary() {
+			primaryKeyID = entry.KeyID()
+		}
+		protoKeyStatus, err := keyStatusToProto(entry.KeyStatus())
+		if err != nil {
+			return nil, err
+		}
+		protoKeySerialization, err := protoserialization.SerializeKey(entry.Key())
+		if err != nil {
+			return nil, err
+		}
+		keyInfos[i] = &tinkpb.KeysetInfo_KeyInfo{
+			TypeUrl:          protoKeySerialization.KeyData().GetTypeUrl(),
+			Status:           protoKeyStatus,
+			KeyId:            entry.KeyID(),
+			OutputPrefixType: protoKeySerialization.OutputPrefixType(),
+		}
+	}
+	return &tinkpb.KeysetInfo{
+		PrimaryKeyId: primaryKeyID,
+		KeyInfo:      keyInfos,
+	}, nil
+}
+
 // KeysetInfo returns [*tinkpb.KeysetInfo] representation of the managed
 // keyset.
 //
 // The result does not contain any sensitive key material.
 func (h *Handle) KeysetInfo() *tinkpb.KeysetInfo {
-	protoKeyset, err := entriesToProtoKeyset(h.entries, false)
+	keysetInfo, err := entriesToKeysetInfo(h.entries)
 	if err != nil {
 		// This should never happen.
 		panic(err)
 	}
-	return getKeysetInfo(protoKeyset)
+	return keysetInfo
 }
 
 // Write encrypts and writes the enclosing keyset.
