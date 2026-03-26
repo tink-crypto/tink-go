@@ -15,10 +15,21 @@
 package compositemldsa
 
 import (
+	"bytes"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
+	"github.com/tink-crypto/tink-go/v2/signature/ed25519"
 	"github.com/tink-crypto/tink-go/v2/signature/mldsa"
+	"github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1"
+	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
+)
+
+const (
+	// f4 is the public exponent 65537.
+	f4 = 65537
 )
 
 // Variant is the prefix variant of a ML-DSA key.
@@ -83,13 +94,13 @@ const (
 // Parameters represents the parameters of a composite ML-DSA key.
 type Parameters struct {
 	classicalAlgorithm ClassicalAlgorithm
-	mldsaInstance      MLDSAInstance
+	mlDSAInstance      MLDSAInstance
 	variant            Variant
 }
 
 type mlDSAAndClassicalInstance struct {
 	classicalAlgorithm ClassicalAlgorithm
-	mldsaInstance      MLDSAInstance
+	mlDSAInstance      MLDSAInstance
 }
 
 // supportedParameterSets is a set of supported parameter set combinations.
@@ -111,15 +122,15 @@ var supportedParameterSets = map[mlDSAAndClassicalInstance]struct{}{
 }
 
 // NewParameters creates a new Parameters.
-func NewParameters(classicalAlgorithm ClassicalAlgorithm, mldsaInstance MLDSAInstance, variant Variant) (*Parameters, error) {
+func NewParameters(classicalAlgorithm ClassicalAlgorithm, mlDSAInstance MLDSAInstance, variant Variant) (*Parameters, error) {
 	if variant == VariantUnknown {
 		return nil, fmt.Errorf("variant must be specified")
 	}
-	key := mlDSAAndClassicalInstance{classicalAlgorithm, mldsaInstance}
+	key := mlDSAAndClassicalInstance{classicalAlgorithm, mlDSAInstance}
 	if _, supported := supportedParameterSets[key]; !supported {
-		return nil, fmt.Errorf("unsupported parameter combination: {ClassicalAlgorithm: %v, MLDSAInstance: %v}", classicalAlgorithm, mldsaInstance)
+		return nil, fmt.Errorf("unsupported parameter combination: {ClassicalAlgorithm: %v, MLDSAInstance: %v}", classicalAlgorithm, mlDSAInstance)
 	}
-	return &Parameters{classicalAlgorithm: classicalAlgorithm, mldsaInstance: mldsaInstance, variant: variant}, nil
+	return &Parameters{classicalAlgorithm: classicalAlgorithm, mlDSAInstance: mlDSAInstance, variant: variant}, nil
 }
 
 var _ key.Parameters = (*Parameters)(nil)
@@ -137,31 +148,186 @@ func (p *Parameters) Variant() Variant { return p.variant }
 func (p *Parameters) Equal(other key.Parameters) bool {
 	then, ok := other.(*Parameters)
 	return ok && p.classicalAlgorithm == then.classicalAlgorithm &&
-		p.mldsaInstance == then.mldsaInstance &&
+		p.mlDSAInstance == then.mlDSAInstance &&
 		p.variant == then.variant
 }
 
 // MLDSAInstance returns the ML-DSA instance of the parameters.
-func (p *Parameters) MLDSAInstance() MLDSAInstance { return p.mldsaInstance }
+func (p *Parameters) MLDSAInstance() MLDSAInstance { return p.mlDSAInstance }
 
-func instanceFromMlDsaInstance(mldsaInstance mldsa.Instance) (MLDSAInstance, error) {
-	switch mldsaInstance {
+// PublicKey represents a composite ML-DSA public key.
+// The classical public key must be of one of the following concrete types:
+//
+//   - ed25519.PublicKey
+//   - ecdsa.PublicKey
+//   - rsassapss.PublicKey: in this case, modulus should be 3072 or 4096 bits.
+//   - rsassapkcs1.PublicKey: in this case, modulus should be 3072 or 4096 bits.
+type PublicKey struct {
+	mlDSAPublicKey     *mldsa.PublicKey
+	classicalPublicKey key.Key
+	params             *Parameters
+	idRequirement      uint32
+	outputPrefix       []byte
+}
+
+var _ key.Key = (*PublicKey)(nil)
+
+// Parameters returns the parameters of the key.
+func (k *PublicKey) Parameters() key.Parameters { return k.params }
+
+// IDRequirement returns the ID requirement of the key, and whether it is
+// required.
+func (k *PublicKey) IDRequirement() (uint32, bool) {
+	return k.idRequirement, k.params.HasIDRequirement()
+}
+
+// OutputPrefix returns the output prefix of the key.
+func (k *PublicKey) OutputPrefix() []byte {
+	return k.outputPrefix
+}
+
+// ClassicalPublicKey returns the classical public key.
+func (k *PublicKey) ClassicalPublicKey() key.Key {
+	return k.classicalPublicKey
+}
+
+// MLDSAPublicKey returns the ML-DSA public key.
+func (k *PublicKey) MLDSAPublicKey() *mldsa.PublicKey {
+	return k.mlDSAPublicKey
+}
+
+// Equal returns true if this key is equal to other.
+func (k *PublicKey) Equal(other key.Key) bool {
+	if k == other {
+		return true
+	}
+	that, ok := other.(*PublicKey)
+	return ok && k.params.Equal(that.Parameters()) &&
+		bytes.Equal(k.mlDSAPublicKey.KeyBytes(), that.mlDSAPublicKey.KeyBytes()) &&
+		k.classicalPublicKey.Equal(that.classicalPublicKey) &&
+		k.idRequirement == that.idRequirement
+}
+
+func calculateOutputPrefix(variant Variant, keyID uint32) ([]byte, error) {
+	switch variant {
+	case VariantTink:
+		return outputprefix.Tink(keyID), nil
+	case VariantNoPrefix:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("invalid output prefix variant: %v", variant)
+	}
+}
+
+func instanceFromMlDsaInstance(mlDSAInstance mldsa.Instance) (MLDSAInstance, error) {
+	switch mlDSAInstance {
 	case mldsa.MLDSA65:
 		return MLDSA65, nil
 	case mldsa.MLDSA87:
 		return MLDSA87, nil
 	default:
-		return UnknownInstance, fmt.Errorf("unsupported ML-DSA instance: %v", mldsaInstance)
+		return UnknownInstance, fmt.Errorf("unsupported ML-DSA instance: %v", mlDSAInstance)
 	}
 }
 
-func variantFromMlDsaVariant(mldsaVariant mldsa.Variant) (Variant, error) {
-	switch mldsaVariant {
+func variantFromMlDsaVariant(mlDSAVariant mldsa.Variant) (Variant, error) {
+	switch mlDSAVariant {
 	case mldsa.VariantTink:
 		return VariantTink, nil
 	case mldsa.VariantNoPrefix:
 		return VariantNoPrefix, nil
 	default:
-		return VariantUnknown, fmt.Errorf("unsupported ML-DSA variant: %v", mldsaVariant)
+		return VariantUnknown, fmt.Errorf("unsupported ML-DSA variant: %v", mlDSAVariant)
 	}
+}
+
+// parametersForClassicalAlgorithm returns the parameters for the given classical algorithm.
+func parametersForClassicalAlgorithm(classicalAlgorithm ClassicalAlgorithm) (key.Parameters, error) {
+	switch classicalAlgorithm {
+	case Ed25519:
+		params, err := ed25519.NewParameters(ed25519.VariantNoPrefix)
+		if err != nil {
+			return nil, err
+		}
+		return &params, nil
+	case ECDSAP256:
+		return ecdsa.NewParameters(ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantNoPrefix)
+	case ECDSAP384:
+		return ecdsa.NewParameters(ecdsa.NistP384, ecdsa.SHA384, ecdsa.DER, ecdsa.VariantNoPrefix)
+	case ECDSAP521:
+		return ecdsa.NewParameters(ecdsa.NistP521, ecdsa.SHA512, ecdsa.DER, ecdsa.VariantNoPrefix)
+	case RSA3072PSS:
+		return rsassapss.NewParameters(rsassapss.ParametersValues{
+			ModulusSizeBits: 3072,
+			SigHashType:     rsassapss.SHA256,
+			MGF1HashType:    rsassapss.SHA256,
+			PublicExponent:  f4,
+			SaltLengthBytes: 32,
+		}, rsassapss.VariantNoPrefix)
+	case RSA4096PSS:
+		return rsassapss.NewParameters(rsassapss.ParametersValues{
+			ModulusSizeBits: 4096,
+			SigHashType:     rsassapss.SHA384,
+			MGF1HashType:    rsassapss.SHA384,
+			PublicExponent:  f4,
+			SaltLengthBytes: 48,
+		}, rsassapss.VariantNoPrefix)
+	case RSA3072PKCS1:
+		return rsassapkcs1.NewParameters(3072, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantNoPrefix)
+	case RSA4096PKCS1:
+		return rsassapkcs1.NewParameters(4096, rsassapkcs1.SHA384, f4, rsassapkcs1.VariantNoPrefix)
+	default:
+		return nil, fmt.Errorf("unsupported classical algorithm: %v", classicalAlgorithm)
+	}
+}
+
+// parametersForMLDSA returns the parameters for the given ML-DSA instance.
+func parametersForMLDSA(mlDSAInstance MLDSAInstance) (*mldsa.Parameters, error) {
+	switch mlDSAInstance {
+	case MLDSA65:
+		return mldsa.NewParameters(mldsa.MLDSA65, mldsa.VariantNoPrefix)
+	case MLDSA87:
+		return mldsa.NewParameters(mldsa.MLDSA87, mldsa.VariantNoPrefix)
+	default:
+		return nil, fmt.Errorf("unsupported ML-DSA instance: %v", mlDSAInstance)
+	}
+}
+
+// NewPublicKey creates a new composite ML-DSA public key.
+// The provided classical public key needs to be of one of the following concrete types:
+//
+// - ed25519.PublicKey
+// - ecdsa.PublicKey
+// - rsassapss.PublicKey: in this case, modulus should be 3072 or 4096 bits and the public exponent must be 65537.
+// - rsassapkcs1.PublicKey: in this case, modulus should be 3072 or 4096 bits and the public exponent must be 65537.
+func NewPublicKey(mlDsaPublicKey *mldsa.PublicKey, classicalPublicKey key.Key, idRequirement uint32, parameters *Parameters) (*PublicKey, error) {
+	expectedClassicalParams, err := parametersForClassicalAlgorithm(parameters.ClassicalAlgorithm())
+	if err != nil {
+		return nil, err
+	}
+
+	if !classicalPublicKey.Parameters().Equal(expectedClassicalParams) {
+		return nil, fmt.Errorf("classical public key parameters do not match expected parameters")
+	}
+
+	expectedMlDsaparameters, err := parametersForMLDSA(parameters.MLDSAInstance())
+	if err != nil {
+		return nil, err
+	}
+	if !mlDsaPublicKey.Parameters().Equal(expectedMlDsaparameters) {
+		return nil, fmt.Errorf("ML-DSA public key parameters do not match expected parameters")
+	}
+
+	outputPrefix, err := calculateOutputPrefix(parameters.Variant(), idRequirement)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PublicKey{
+		mlDSAPublicKey:     mlDsaPublicKey,
+		classicalPublicKey: classicalPublicKey,
+		params:             parameters,
+		idRequirement:      idRequirement,
+		outputPrefix:       outputPrefix,
+	}, nil
 }
