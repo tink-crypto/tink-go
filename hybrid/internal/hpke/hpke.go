@@ -31,7 +31,8 @@ const (
 type KEMID uint16
 
 // All identifier values are specified in
-// https://www.rfc-editor.org/rfc/rfc9180.html.
+// https://www.rfc-editor.org/rfc/rfc9180.html and
+// https://www.iana.org/assignments/hpke/hpke.xhtml.
 
 // KEM algorithm identifiers.
 const (
@@ -45,6 +46,10 @@ const (
 	P521HKDFSHA512 = 0x0012
 	// X25519HKDFSHA256 is the KEM identifier for Curve25519 with HKDF-SHA-256.
 	X25519HKDFSHA256 = 0x0020
+	// MLKEM768 is the KEM identifier for ML-KEM-768.
+	MLKEM768 = 0x0041
+	// MLKEM1024 is the KEM identifier for ML-KEM-1024.
+	MLKEM1024 = 0x0042
 )
 
 // KDFID is the key derivation function identifier.
@@ -124,6 +129,7 @@ const hpkeV1 = "HPKE-v1"
 
 var (
 	// KEM lengths from https://www.rfc-editor.org/rfc/rfc9180.html#section-7.1
+	// and https://www.iana.org/assignments/hpke/hpke.xhtml.
 	kemLengths = map[KEMID]struct {
 		nSecret, nEnc, nPK, nSK int
 	}{
@@ -131,6 +137,8 @@ var (
 		P384HKDFSHA384:   {nSecret: 48, nEnc: 97, nPK: 97, nSK: 48},
 		P521HKDFSHA512:   {nSecret: 64, nEnc: 133, nPK: 133, nSK: 66},
 		X25519HKDFSHA256: {nSecret: 32, nEnc: 32, nPK: 32, nSK: 32},
+		MLKEM768:         {nSecret: 32, nEnc: 1088, nPK: 1184, nSK: 64},
+		MLKEM1024:        {nSecret: 32, nEnc: 1568, nPK: 1568, nSK: 64},
 	}
 
 	errInvalidHPKEParams           = errors.New("invalid HPKE parameters")

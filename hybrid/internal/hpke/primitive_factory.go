@@ -47,6 +47,10 @@ func newKEM(kemID KEMID) (kem, error) {
 		return newNISTCurvesKEM(P521HKDFSHA512)
 	case X25519HKDFSHA256:
 		return newX25519KEM(SHA256)
+	case MLKEM768:
+		return newMLKEM(MLKEM768)
+	case MLKEM1024:
+		return newMLKEM(MLKEM1024)
 	default:
 		return nil, fmt.Errorf("KEM ID %d is not supported", kemID)
 	}
