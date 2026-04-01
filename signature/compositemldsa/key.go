@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
@@ -330,4 +331,110 @@ func NewPublicKey(mlDsaPublicKey *mldsa.PublicKey, classicalPublicKey key.Key, i
 		idRequirement:      idRequirement,
 		outputPrefix:       outputPrefix,
 	}, nil
+}
+
+// PrivateKey represents a composite ML-DSA private key.
+type PrivateKey struct {
+	publicKey           *PublicKey
+	mlDsaPrivateKey     *mldsa.PrivateKey
+	classicalPrivateKey key.Key
+}
+
+var _ key.Key = (*PrivateKey)(nil)
+
+// MLDSAPrivateKey returns the ML-DSA private key.
+func (k *PrivateKey) MLDSAPrivateKey() *mldsa.PrivateKey {
+	return k.mlDsaPrivateKey
+}
+
+// ClassicalPrivateKey returns the classical private key.
+func (k *PrivateKey) ClassicalPrivateKey() key.Key {
+	return k.classicalPrivateKey
+}
+
+// PublicKey returns the public key of the key.
+//
+// This implements the privateKey interface defined in handle.go.
+func (k *PrivateKey) PublicKey() (key.Key, error) { return k.publicKey, nil }
+
+// Parameters returns the parameters of the key.
+func (k *PrivateKey) Parameters() key.Parameters { return k.publicKey.params }
+
+// IDRequirement returns the ID requirement of the key, and whether it is
+// required.
+func (k *PrivateKey) IDRequirement() (uint32, bool) { return k.publicKey.IDRequirement() }
+
+// OutputPrefix returns the output prefix of this key.
+func (k *PrivateKey) OutputPrefix() []byte { return bytes.Clone(k.publicKey.outputPrefix) }
+
+// Equal returns true if this key is equal to other.
+func (k *PrivateKey) Equal(other key.Key) bool {
+	if k == other {
+		return true
+	}
+	that, ok := other.(*PrivateKey)
+	return ok && k.publicKey.Equal(that.publicKey) &&
+		k.mlDsaPrivateKey.Equal(that.mlDsaPrivateKey) &&
+		k.classicalPrivateKey.Equal(that.classicalPrivateKey)
+}
+
+// NewPrivateKey creates a new composite ML-DSA private key.
+// The provided classical private key needs to be of one of the following concrete types:
+//
+// - ed25519.PrivateKey
+// - ecdsa.PrivateKey
+// - rsassapss.PrivateKey: in this case, modulus should be 3072 or 4096 bits.
+// - rsassapkcs1.PrivateKey: in this case, modulus should be 4096 bits.
+func NewPrivateKey(mlDsaPrivateKey *mldsa.PrivateKey, classicalPrivateKey key.Key, idRequirement uint32, parameters *Parameters) (*PrivateKey, error) {
+	// The implementation of PublicKey() never fails in the case of ML-DSA, so we don't need to handle the error.
+	mldsaPublicKey, _ := mlDsaPrivateKey.PublicKey()
+
+	classicalPrivPubKeyExposed, ok := classicalPrivateKey.(interface {
+		PublicKey() (key.Key, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("classicalPrivateKey of type %T does not expose a public key", classicalPrivateKey)
+	}
+	classicalPubKey, err := classicalPrivPubKeyExposed.PublicKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get public key from classical private key: %v", err)
+	}
+
+	publicKey, err := NewPublicKey(mldsaPublicKey.(*mldsa.PublicKey), classicalPubKey, idRequirement, parameters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create composite public key: %v", err)
+	}
+
+	return &PrivateKey{
+		publicKey:           publicKey,
+		mlDsaPrivateKey:     mlDsaPrivateKey,
+		classicalPrivateKey: classicalPrivateKey,
+	}, nil
+}
+
+func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
+	params, ok := p.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: %T", p)
+	}
+
+	mldsaParams, err := parametersForMLDSA(params.MLDSAInstance())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ML-DSA parameters: %v", err)
+	}
+	mldsaPrivKey, err := keygenregistry.CreateKey(mldsaParams, 0) // ML-DSA part has no ID requirement
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ML-DSA private key: %v", err)
+	}
+
+	classicalParams, err := parametersForClassicalAlgorithm(params.ClassicalAlgorithm())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get classical parameters: %v", err)
+	}
+	classicalPrivKey, err := keygenregistry.CreateKey(classicalParams, 0) // Classical part has no ID requirement
+	if err != nil {
+		return nil, fmt.Errorf("failed to create classical private key: %v", err)
+	}
+
+	return NewPrivateKey(mldsaPrivKey.(*mldsa.PrivateKey), classicalPrivKey, idRequirement, params)
 }

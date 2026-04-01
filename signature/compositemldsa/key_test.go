@@ -530,3 +530,157 @@ func TestNewPublicKeyRSAPSSInvalidPublicExponent(t *testing.T) {
 		t.Errorf("compositemldsa.NewPublicKey(%v, %v, %v, %v) err = nil, want error", mldsaPubKey, newClassicalPubKey, keyID, params)
 	}
 }
+
+func TestNewPrivateKeySuccess(t *testing.T) {
+	for _, tc := range testCasesSupportedParameters(t) {
+		testName := fmt.Sprintf("%v-%v-%v", tc.classicalAlgorithm, tc.instance, tc.variant)
+		t.Run(testName, func(t *testing.T) {
+			params, err := compositemldsa.NewParameters(tc.classicalAlgorithm, tc.instance, tc.variant)
+			if err != nil {
+				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
+			}
+			mldsaPrivKey, _ := generateMLDSAKeyPair(t, tc.instance)
+			classicalPrivKey, _ := generateClassicalKeyPair(t, tc.classicalAlgorithm, tc.classicalParams)
+			keyID := uint32(0x12345678)
+			privKey, err := compositemldsa.NewPrivateKey(mldsaPrivKey, classicalPrivKey, keyID, params)
+			if err != nil {
+				t.Fatalf("compositemldsa.NewPrivateKey(%v, %v, %v, %v) err = %v, want nil", mldsaPrivKey, classicalPrivKey, keyID, params, err)
+			}
+			if !privKey.Parameters().Equal(params) {
+				t.Errorf("%v, %v, %v: privKey.Parameters() = %v, want %v", tc.classicalAlgorithm, tc.instance, tc.variant, privKey.Parameters(), params)
+			}
+			if gotID, gotOK := privKey.IDRequirement(); gotOK != params.HasIDRequirement() || (gotOK && gotID != keyID) {
+				t.Errorf("privKey.IDRequirement() = %v, %v, want %v, %v", gotID, gotOK, keyID, params.HasIDRequirement())
+			}
+			var expectedOutputPrefix []byte
+			if params.Variant() == compositemldsa.VariantTink {
+				expectedOutputPrefix = outputprefix.Tink(keyID)
+			}
+			if !bytes.Equal(privKey.OutputPrefix(), expectedOutputPrefix) {
+				t.Errorf("privKey.OutputPrefix() = %v, want %v", privKey.OutputPrefix(), expectedOutputPrefix)
+			}
+			if !privKey.MLDSAPrivateKey().Equal(mldsaPrivKey) {
+				t.Errorf("privKey.MLDSAPrivateKey() = %v, want %v", privKey.MLDSAPrivateKey(), mldsaPrivKey)
+			}
+			if !privKey.ClassicalPrivateKey().Equal(classicalPrivKey) {
+				t.Errorf("privKey.ClassicalPrivateKey() = %v, want %v", privKey.ClassicalPrivateKey(), classicalPrivKey)
+			}
+		})
+	}
+}
+
+func TestPrivateKeyEqual(t *testing.T) {
+	for _, tc := range testCasesSupportedParameters(t) {
+		testName := fmt.Sprintf("%v-%v-%v", tc.classicalAlgorithm, tc.instance, tc.variant)
+		t.Run(testName, func(t *testing.T) {
+			params, err := compositemldsa.NewParameters(tc.classicalAlgorithm, tc.instance, tc.variant)
+			if err != nil {
+				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
+			}
+			mldsaPrivKey, _ := generateMLDSAKeyPair(t, tc.instance)
+			classicalPrivKey, _ := generateClassicalKeyPair(t, tc.classicalAlgorithm, tc.classicalParams)
+			keyID := uint32(0x12345678)
+			privKey, err := compositemldsa.NewPrivateKey(mldsaPrivKey, classicalPrivKey, keyID, params)
+			if err != nil {
+				t.Fatalf("compositemldsa.NewPrivateKey(%v, %v, %v, %v) err = %v, want nil", mldsaPrivKey, classicalPrivKey, keyID, params, err)
+			}
+			if !privKey.Equal(privKey) {
+				t.Errorf("privKey.Equal(privKey) = false, want true")
+			}
+
+			// Create a second key with the same parameters.
+			mldsaPrivKey2, _ := generateMLDSAKeyPair(t, tc.instance)
+			classicalPrivKey2, _ := generateClassicalKeyPair(t, tc.classicalAlgorithm, tc.classicalParams)
+			privKey2, err := compositemldsa.NewPrivateKey(mldsaPrivKey2, classicalPrivKey2, keyID, params)
+			if err != nil {
+				t.Fatalf("compositemldsa.NewPrivateKey(%v, %v, %v, %v) err = %v, want nil", mldsaPrivKey2, classicalPrivKey2, keyID, params, err)
+			}
+			if privKey.Equal(privKey2) {
+				t.Errorf("privKey.Equal(privKey2) = true, want false")
+			}
+		})
+	}
+}
+
+func TestNewPrivateKeyFailsOnMistypedClassicalKey(t *testing.T) {
+	for _, tc := range testCasesSupportedParameters(t) {
+		testName := fmt.Sprintf("%v-%v-%v", tc.classicalAlgorithm, tc.instance, tc.variant)
+		t.Run(testName, func(t *testing.T) {
+			params, err := compositemldsa.NewParameters(tc.classicalAlgorithm, tc.instance, tc.variant)
+			if err != nil {
+				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
+			}
+			mldsaPrivKey, _ := generateMLDSAKeyPair(t, tc.instance)
+			_, classicalPubKey := generateClassicalKeyPair(t, tc.classicalAlgorithm, tc.classicalParams)
+			const keyID = uint32(0x12345678)
+			if _, err = compositemldsa.NewPrivateKey(mldsaPrivKey, classicalPubKey, keyID, params); err == nil {
+				t.Errorf("compositemldsa.NewPrivateKey(%v, %v, %v, %v) err = nil, want error", mldsaPrivKey, classicalPubKey, keyID, params)
+			}
+		})
+	}
+}
+
+func TestPrivateKeyNotEqual(t *testing.T) {
+	params, err := compositemldsa.NewParameters(compositemldsa.Ed25519, compositemldsa.MLDSA65, compositemldsa.VariantTink)
+	if err != nil {
+		t.Fatalf("compositemldsa.NewParameters(Ed25519, MLDSA65, VariantTink) err = %v, want nil", err)
+	}
+	keyID := uint32(0x12345678)
+	classicalParams := mustNewED25519Parameters(t)
+
+	// Baseline key
+	mldsaPrivKey1, _ := generateMLDSAKeyPair(t, compositemldsa.MLDSA65)
+	classicalPrivKey1, _ := generateClassicalKeyPair(t, compositemldsa.Ed25519, classicalParams)
+	privKey1, err := compositemldsa.NewPrivateKey(mldsaPrivKey1, classicalPrivKey1, keyID, params)
+	if err != nil {
+		t.Fatalf("compositemldsa.NewPrivateKey() err = %v, want nil", err)
+	}
+
+	tests := []struct {
+		name    string
+		other   key.Key
+		wantErr bool
+	}{
+		{
+			name: "Different PublicKey (keyID)",
+			other: func() key.Key {
+				otherKeyID := uint32(0x87654321)
+				privKeyOtherID, err := compositemldsa.NewPrivateKey(mldsaPrivKey1, classicalPrivKey1, otherKeyID, params)
+				if err != nil {
+					t.Fatalf("compositemldsa.NewPrivateKey() err = %v, want nil", err)
+				}
+				return privKeyOtherID
+			}(),
+		},
+		{
+			name: "Different ML-DSA Private Key",
+			other: func() key.Key {
+				mldsaPrivKey2, _ := generateMLDSAKeyPair(t, compositemldsa.MLDSA65)
+				privKeyDiffMLDSA, err := compositemldsa.NewPrivateKey(mldsaPrivKey2, classicalPrivKey1, keyID, params)
+				if err != nil {
+					t.Fatalf("compositemldsa.NewPrivateKey() err = %v, want nil", err)
+				}
+				return privKeyDiffMLDSA
+			}(),
+		},
+		{
+			name: "Different Classical Private Key",
+			other: func() key.Key {
+				classicalPrivKey2, _ := generateClassicalKeyPair(t, compositemldsa.Ed25519, classicalParams)
+				privKeyDiffClassical, err := compositemldsa.NewPrivateKey(mldsaPrivKey1, classicalPrivKey2, keyID, params)
+				if err != nil {
+					t.Fatalf("compositemldsa.NewPrivateKey() err = %v, want nil", err)
+				}
+				return privKeyDiffClassical
+			}(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if privKey1.Equal(test.other) {
+				t.Errorf("privKey1.Equal(%s) = true, want false", test.name)
+			}
+		})
+	}
+}
