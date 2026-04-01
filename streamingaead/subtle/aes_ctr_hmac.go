@@ -26,8 +26,8 @@ import (
 	// Placeholder for internal crypto/cipher allowlist, please ignore.
 	subtleaead "github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle/noncebased"
-	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"github.com/tink-crypto/tink-go/v2/subtle"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
 )
 
 const (
@@ -224,7 +224,8 @@ func (a *AESCTRHMAC) NewEncryptingWriter(w io.Writer, aad []byte) (io.WriteClose
 
 type aesCTRHMACSegmentDecrypter struct {
 	blockCipher    cipher.Block
-	mac            hash.Hash
+	newHash        func() hash.Hash
+	hmacKey        []byte
 	tagSizeInBytes int
 }
 
@@ -249,10 +250,10 @@ func (d aesCTRHMACSegmentDecrypter) DecryptSegmentWithDst(dst, segment, nonce []
 	}
 	tag := segment[plaintextLen:]
 
-	d.mac.Reset()
-	d.mac.Write(nonce)
-	d.mac.Write(segment[:plaintextLen])
-	wantTag := d.mac.Sum(nil)[:d.tagSizeInBytes]
+	mac := hmac.New(d.newHash, d.hmacKey)
+	mac.Write(nonce)
+	mac.Write(segment[:plaintextLen])
+	wantTag := mac.Sum(nil)[:d.tagSizeInBytes]
 	if !hmac.Equal(tag, wantTag) {
 		return nil, errors.New("tag mismatch")
 	}
@@ -303,7 +304,8 @@ func (a *AESCTRHMAC) NewDecryptingReader(r io.Reader, aad []byte) (io.Reader, er
 		R: r,
 		SegmentDecrypter: aesCTRHMACSegmentDecrypter{
 			blockCipher:    blockCipher,
-			mac:            hmac.New(subtle.GetHashFunc(a.tagAlg), hmacKey),
+			newHash:        subtle.GetHashFunc(a.tagAlg),
+			hmacKey:        hmacKey,
 			tagSizeInBytes: a.tagSizeInBytes,
 		},
 		NonceSize:                    AESCTRHMACNonceSizeInBytes,
@@ -316,4 +318,55 @@ func (a *AESCTRHMAC) NewDecryptingReader(r io.Reader, aad []byte) (io.Reader, er
 	}
 
 	return &aesCTRHMACReader{Reader: nr}, nil
+}
+
+// NewDecryptingReaderAt returns an io.ReaderAt over the plaintext
+// corresponding to the ciphertext available via ct, using aad as associated
+// authenticated data.
+//
+// ct must provide the full ciphertext as written by NewEncryptingWriter (i.e.
+// offset 0 is the first byte of the stream header), and ctSize must be its
+// total length in bytes.
+//
+// The header is read and the per-stream keys derived eagerly. Segment
+// authentication is deferred until the corresponding plaintext bytes are read.
+func (a *AESCTRHMAC) NewDecryptingReaderAt(ct io.ReaderAt, ctSize int64, aad []byte) (*noncebased.ReaderAt, error) {
+	hlen := a.HeaderLength()
+	if ctSize < int64(hlen) {
+		return nil, errors.New("ciphertext too short")
+	}
+	header := make([]byte, hlen)
+	if _, err := io.ReadFull(io.NewSectionReader(ct, 0, int64(hlen)), header); err != nil {
+		return nil, fmt.Errorf("cannot read header: %v", err)
+	}
+	if header[0] != byte(hlen) {
+		return nil, errors.New("invalid header length")
+	}
+	salt := header[1 : 1+a.keySizeInBytes]
+	noncePrefix := header[1+a.keySizeInBytes:]
+
+	aesKey, hmacKey, err := a.deriveKeys(salt, aad)
+	if err != nil {
+		return nil, err
+	}
+	blockCipher, err := aes.NewCipher(aesKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return noncebased.NewReaderAt(noncebased.ReaderAtParams{
+		R:              io.NewSectionReader(ct, int64(hlen), ctSize-int64(hlen)),
+		CiphertextSize: ctSize - int64(hlen),
+		SegmentDecrypter: aesCTRHMACSegmentDecrypter{
+			blockCipher:    blockCipher,
+			newHash:        subtle.GetHashFunc(a.tagAlg),
+			hmacKey:        hmacKey,
+			tagSizeInBytes: a.tagSizeInBytes,
+		},
+		NonceSize:                    AESCTRHMACNonceSizeInBytes,
+		NoncePrefix:                  noncePrefix,
+		CiphertextSegmentSize:        a.ciphertextSegmentSize,
+		PlaintextSegmentSize:         a.plaintextSegmentSize,
+		FirstCiphertextSegmentOffset: a.firstCiphertextSegmentOffset,
+	})
 }
