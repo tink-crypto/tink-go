@@ -144,8 +144,7 @@ func TestUseHint(t *testing.T) {
 				} else {
 					exp = exp + 1
 				}
-			}
-			if r0 >= th {
+			} else {
 				// Unsigned dec-mod.
 				if exp == 0 {
 					exp = m - 1
