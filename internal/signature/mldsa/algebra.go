@@ -159,10 +159,11 @@ func (a rZq) lowBits(gamma2 uint32) rZq {
 func (a rZq) makeHint(gamma2 uint32, r rZq) rZq {
 	r1 := r.highBits(gamma2)
 	v1 := r.add(a).highBits(gamma2)
-	if r1 != v1 {
-		return rZq(1)
-	}
-	return rZq(0)
+	// Use constant-time selection. During signing, the inputs depend on
+	// the secret key vector t0, so a branch on r1 != v1 leaks timing
+	// information about the hint vector.
+	neq := 1 - subtle.ConstantTimeEq(int32(r1), int32(v1))
+	return rZq(neq)
 }
 
 // Algorithm 40 (UseHint)
@@ -487,7 +488,12 @@ func (v vector) infinityNorm() uint32 {
 	res := uint32(0)
 	for i := range v {
 		norm := v[i].infinityNorm()
-		res = max(res, norm)
+		// Use constant-time selection to avoid leaking which polynomial
+		// has the largest norm via timing side-channels. The polynomial-
+		// level infinityNorm already uses centeredMax (constant-time),
+		// so this maintains the invariant at the vector level.
+		c := subtle.ConstantTimeLessOrEq(int(norm), int(res))
+		res = uint32(subtle.ConstantTimeSelect(c, int(res), int(norm)))
 	}
 	return res
 }
