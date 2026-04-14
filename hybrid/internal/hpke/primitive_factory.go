@@ -51,6 +51,8 @@ func newKEM(kemID KEMID) (kem, error) {
 		return newMLKEM(MLKEM768)
 	case MLKEM1024:
 		return newMLKEM(MLKEM1024)
+	case XWing:
+		return newXWingKEM()
 	default:
 		return nil, fmt.Errorf("KEM ID %d is not supported", kemID)
 	}

@@ -50,6 +50,8 @@ const (
 	MLKEM768 = 0x0041
 	// MLKEM1024 is the KEM identifier for ML-KEM-1024.
 	MLKEM1024 = 0x0042
+	// XWing is the KEM identifier for X-Wing.
+	XWing = 0x647a
 )
 
 // KDFID is the key derivation function identifier.
@@ -139,6 +141,7 @@ var (
 		X25519HKDFSHA256: {nSecret: 32, nEnc: 32, nPK: 32, nSK: 32},
 		MLKEM768:         {nSecret: 32, nEnc: 1088, nPK: 1184, nSK: 64},
 		MLKEM1024:        {nSecret: 32, nEnc: 1568, nPK: 1568, nSK: 64},
+		XWing:            {nSecret: 32, nEnc: 1120, nPK: 1216, nSK: 32},
 	}
 
 	errInvalidHPKEParams           = errors.New("invalid HPKE parameters")
