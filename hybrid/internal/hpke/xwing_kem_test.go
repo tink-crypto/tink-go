@@ -17,6 +17,9 @@ package hpke
 import (
 	"bytes"
 	"testing"
+
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
 type xWingTestVector struct {
@@ -230,5 +233,80 @@ func TestXWingEncapsulatedKeyLength(t *testing.T) {
 
 	if kem.encapsulatedKeyLength() != kemLengths[XWing].nEnc {
 		t.Errorf("encapsulatedKeyLength() = %d, want %d", kem.encapsulatedKeyLength(), kemLengths[XWing].nEnc)
+	}
+}
+
+type xWingHPKETestVector struct {
+	name        string
+	kdfID       KDFID
+	aeadID      AEADID
+	privateKey  []byte
+	contextInfo []byte
+	ciphertext  []byte
+	key         []byte
+	baseNonce   []byte
+	ptEnc       []byte
+	aadEnc      []byte
+	ctEnc       []byte
+}
+
+func xWingHPKEVectors(t *testing.T) []xWingHPKETestVector {
+	t.Helper()
+	const (
+		// Test vector from BoringSSL.
+		privateKey1Hex  = "7f9c2ba4e88f827d616045507605853ed73b8093f6efbc88eb1a6eacfa66ef26"
+		contextInfo1Hex = "4f6465206f6e2061204772656369616e2055726e"
+		ciphertext1Hex  = "3829125bd65c4e3612e520ff3cd77938d11c7fa6445fe440a77ee7354b178b71018427144fb2ebcb0aab44f4456251d3885181e0bae0509793f7c160116630ecd898af82d557e5b8aa313672c785e40a8c4b401ecc3d13300591933fe46f7061eaac318f4ab9277174c6282b2f1cc7b7c6dfe57e34f0a325732d58cce71a33fef826419f9c033e31001d8db456a4818563b0754530a855cde822c38643a73c19bb0a9552df2f36c9b00020b3a32d4130dd073ed9eddcea046364bd25ca1ba99865e3aed169c338042fbd31dab9387ed9f5c6d6117bd320b6e3f7092fbab7e2ddceceb81907fcbea6986444836f86004e946ed1c0236dbc760fa06c1ec191d9c92b07e90d243715975af3422980287fc7a57e120b604c8a598e8f1aac5d430e2b2801ff3b36da7640fdbc1fe41fc49fd04320ec86e9dc104aa88f7e346a950c0f2dc1c423fbde5adbd360b66079523795a9e351d17e5b2e943c6381b07c16612960aa682ddc7093e510a7f2b0f24761ab0564c926049dc330f3ed6c4ec23a6cf0f51fd99edae518fdb7615060931c3c0b58f34a7a8aa647368a8bed78ee7b5213bb730170320ccb218e42d7c06b4a5d9088acf3ea9d7f7633203e3a66372c2a75de396f329b6c0d35e2505dcb0ff2ec07eb5ca7f4f44a2d38df047aaeb5761e36fc65537a560ed302992aa03d0b0e20e96501e70545eafbc0bcb93e3d71761f814555c94076540632509a23f2b19d632da32e86203a5232103e13707686e1c2662e50a5f3e08a730e90d4002aff2a85eda0b39c360e1618999100bc56d2c06e7c4cdd728f65a0e044ae2c0c94704b760b0d2a993483cc0636dcb7f5e1ff2453aee6804297b66b314d6158360a4f7f8dfaf70e83459a01b2a9b8e8e6b9dc69793b22940acae5ac404951358e7e31901b47ee6d12ee483e4d449bc8d59af6d56b982b4a6134e29648c54aa47e85d5eb63a98a94f53d91773bf63902057f0969719b28778881aa01504e3f8631b4091a19392bd1afe2554be79b6c61f125d78e16dec8dff31e778076ef81b4a30217b321fb714511e9d9fe87f6616572ec1b2d7dab2ed1eaab1bc8bd7f033c2a95c6426b336a24a972a3efcdaf3614d3a570ec9bea43d2a1bcc9ca10590cd473acbdb0ba86d7b6a5d24a2a4b0b8b192846d2da9f6b7f6b43c7b6953ca071a47b7025dca6d452d1964106b8e640d6af37c87462e7bbd113cedbd336da61e283483624dd7551a4e62c8f4686e4e001930ad8820962bedf2afbdd2f7cd5c79cd392e031671c349a92b4ee40271ce08cb0b83a76275a70dc56eca92a335f7584f7fa132171416b4eed2a8888edca372285fefbcfaf36646a7a45f95113f3015d190ebd7961f74960672fca13f96f8f076927baecfebc742443ff916b9331aa886718dd2a3a68703df5fb477b6d0942a55b6379e8920fede28bebdc36e7cbf56cb3d3143d1be5ddf7deac990fe41db417dc62f297f7956e20d6fa9d2a9735b5675c256fb3c94fff37bafa16fa15e299ba47a311263f9581298172eafc6e007b6cb01a54e73f5c4bc692d5e002e9b423301a39155577991d"
+		key1Hex         = "11fb746c11b05e5c55009341c5756fe7"
+		baseNonce1Hex   = "79aa8112af02ab20a4587a85"
+		ptEnc1Hex       = "4265617574792069732074727574682c20747275746820626561757479"
+		aadEnc1Hex      = "436f756e742d30"
+		ctEnc1Hex       = "a96ea59259a2893265d79052bfa8e976f6a9aaf9fb0cce901449f23c18a9e9b238e29161c2d94b5b6fefa046af"
+	)
+	return []xWingHPKETestVector{
+		{
+			name:        "Vector1",
+			kdfID:       HKDFSHA256,
+			aeadID:      AES128GCM,
+			privateKey:  mustHexDecodeString(t, privateKey1Hex),
+			contextInfo: mustHexDecodeString(t, contextInfo1Hex),
+			ciphertext:  mustHexDecodeString(t, ciphertext1Hex),
+			key:         mustHexDecodeString(t, key1Hex),
+			baseNonce:   mustHexDecodeString(t, baseNonce1Hex),
+			ptEnc:       mustHexDecodeString(t, ptEnc1Hex),
+			aadEnc:      mustHexDecodeString(t, aadEnc1Hex),
+			ctEnc:       mustHexDecodeString(t, ctEnc1Hex),
+		},
+	}
+}
+
+func TestXWingHPKEVectors(t *testing.T) {
+	for _, vec := range xWingHPKEVectors(t) {
+		t.Run(vec.name, func(t *testing.T) {
+			kem, kdf, aead, err := newPrimitives(XWing, vec.kdfID, vec.aeadID)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			privateKeySecret := secretdata.NewBytesFromData(vec.privateKey, insecuresecretdataaccess.Token{})
+			ctx, err := newRecipientContext(vec.ciphertext, privateKeySecret, kem, kdf, aead, vec.contextInfo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(vec.key, ctx.key) {
+				t.Errorf("newRecipientContext(): got key %x, want %x", ctx.key, vec.key)
+			}
+			if !bytes.Equal(vec.baseNonce, ctx.baseNonce) {
+				t.Errorf("newRecipientContext(): got baseNonce %x, want %x", ctx.baseNonce, vec.baseNonce)
+			}
+
+			otherPtEnc, err := ctx.open(vec.ctEnc, vec.aadEnc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(vec.ptEnc, otherPtEnc) {
+				t.Errorf("open(): got plaintext %x, want %x", otherPtEnc, vec.ptEnc)
+			}
+		})
 	}
 }

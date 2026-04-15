@@ -18,6 +18,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"testing"
+
+	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
 
 func mustHexDecodeString(t *testing.T, s string) []byte {
@@ -253,5 +256,105 @@ func TestMLKEMEncapsulatedKeyLength(t *testing.T) {
 func TestNewMLKEM_InvalidIDs(t *testing.T) {
 	if _, err := newMLKEM(UnknownKEMID); err == nil {
 		t.Errorf("newPrimitives() err = nil, want error")
+	}
+}
+
+type mlKEMHPKETestVector struct {
+	name        string
+	kemID       KEMID
+	kdfID       KDFID
+	aeadID      AEADID
+	privateKey  []byte
+	contextInfo []byte
+	ciphertext  []byte
+	key         []byte
+	baseNonce   []byte
+	ptEnc       []byte
+	aadEnc      []byte
+	ctEnc       []byte
+}
+
+func mlKEMHPKEVectors(t *testing.T) []mlKEMHPKETestVector {
+	t.Helper()
+	const (
+		// Test vector from https://www.ietf.org/archive/id/draft-ietf-hpke-pq-04.html.
+		privateKeyMLKEM768Hex  = "e3408aae322a3628a4d641c2690d4eb212fd66f369782f2dd22fa293476c69957716be20e83920cd26a7710110a34ac3d5da7d90efdc9759812f5cf1a47e85bf"
+		contextInfoMLKEM768Hex = "34663634363532303666366532303631323034373732363536333639363136653230353537323665"
+		ciphertextMLKEM768Hex  = "f4c758bd517040c97d327a0d30de9770055583ac2fb90a91a6ec7cca4b464abbd78722db29b985607aea1bb4a79fc76fb784c4d10828e9bfd21495c3e94596c4b626051f30c7028a29c716a2568997392b30179cfbe136fb06b741504dd8901a7291446a692c804859171245d12aa53e0f58b6643a3ba8490180161340f24dfbeb0ab865445ceaa235236ee0db44c119bfe942c7f83d381d7d65172008de0d684de2e87f21394a66bfcf88918832f299469f32fca0e7d5efac51d34b6a788c54922b3b4b7e8325f6306cf545380169773ebdc03fa06ce25aa1c71d307c08bef2016affdd6c293f3cbb0cdb92021692a8ebaef6b74cd6a2bb468da79cc9d08a0494bb88bb2ba0c88d4a3ee2af38762cd6c297c6b36ee18816546b375718876efa557ec600e7c4c6e44aaa3a1372c677dc638dc9742d90319ffc27ee99149c5c8a8185ecf600fdd8be897efea52bfbdc4ef53fff7301ee49a7a352b4890e31c2f44b459b9f7df4623b0be87f1cb9212de1beb19687f3fca6d13ca7f924c0471cf3d9b284e13db8e25e2fd88095ae020100cd9ad5aa5355b8aa90d31657355f80160b3e1e12820908b3a85d321be6d68bebfc7335738b7122de60f4acbb924d3a610749577e8c09574ac0160a3a2f37f9f8af0082082673347db7f2ec20f9d05e96e483411b4c2b18cc49a01ec65ae3a077ba18a7074e5bd14ce97b773687a2cc89b18d9f442d30eebd4925d1591aeba4a04c1a69a7cc6cf34e2581300a27b2bbe9c2fec61ed1b63e50f8704c2737de13f4a9e53e021c5a314d13951293c0a74cc4f098a458885fee8dcf879ee8fe91ebd2a2ca1ffaa9efd84a042b32e195165ae187d66b27e3cde4334bff1eced50910c3ea026ae049df54ab30791f129caa89180c1b6939f8017ef980de3900bbb32e9bc2e1bc53595c438137c62afa349961772d12694fea979f0f4e70c8176b750eb9002483815984b6747d8d4f301eb0b76987d407b2261adecf580160d3185f49aecace7e82701a2eb70d20c43de1be39c1a26e4b5433e213abb748ed5e6fa088c5843c725336c650fbd73f2ee3f8800e9c07948bedec99f75673545425ab826dfe8a0636f422035bb56ef90b5dfab3592232a0b9a84b1bdd78b610a9c3a89ab3dddeaceae9bc5b5d89c930ca20039b65acceb1dba527b58fd6517a21ba90cfb38a2cec950c3f3b490fa4458fe5ccdf79fbd88ae0a84b02cf980aacd4107c29bff7ac8c2fb9e8c131144d968a8b9f4c5bc75420f6cba590682170f2931c99b41895d68ea474f74829fda255f80c7d4ae7b2b0dbd002684f01aa5a2bb17003817d29f27697778404bb9d07fc46eedea487f50490e9beaaa2be101b0d03ae9612e7574022c49166e1e0ce14187df4c75a134f12f60f74d41645584017404b3da7c7e2dec2eca554fb90eb5c958db7e6f5f19cacd27de4651c52358bb7be407261ae4f16559c9617cbcdea92133114b35c376e174165d56082b0e6e2ea347f4e26b904375da1248a863766d95b2c5a2de36b47"
+		keyMLKEM768Hex         = "00fc412edb7a5adc4a2994869d1016ef"
+		baseNonceMLKEM768Hex   = "2a2bd95954150f73d200005e"
+		ptEncMLKEM768Hex       = "34323635363137353734373932303639373332303734373237353734363832633230373437323735373436383230363236353631373537343739"
+		aadEncMLKEM768Hex      = "436f756e742d30"
+		ctEncMLKEM768Hex       = "4793c6f4dc5824a0039d8faf2d84d359fd6cf423eaeee578bbb7830068ba34b576a6e3f4ba03c5c2c62f2b869224a1c5acf96083cd13bdc3623a47bde544171a72aa684b12a562196785"
+		// Test vector from https://www.ietf.org/archive/id/draft-ietf-hpke-pq-04.html.
+		privateKeyMLKEM1024Hex  = "c58f733ea1245a7a54723c30dbf0837acdd7e93c188692523b53b132b993a25af933368a76bbcbf1212e1d34d7128e32c387dc9b04a7ceb0e2b40e1e5769c57d"
+		contextInfoMLKEM1024Hex = "34663634363532303666366532303631323034373732363536333639363136653230353537323665"
+		ciphertextMLKEM1024Hex  = "f4a53a8db87e065bc2929f5d4e827ef6f6aed7c8f457e19dd8d0c1930e3e1bd2ae6183590d45a037d13f5fa7ff1d1d7ec9873d625fec2727c0a940a66fe5bd6501946f3bfb8f027da703e82ea1d86ac8089d7f6e359e9ac6ec95661be7958489d48e930e9eb9e77e842adc9774525dafbbb6675727cea9501aeb53a33fe08bdaa43418486d3391add4a6cb72bd6865f616e3b9ae4339871e6662f03500e05c0ed883fc3ab9ed8940a7a48037f37b8701dc2daa42469b88086732bca4b7ecfe412b5217defa3b0db1df8b7b003938535cfaf72e55ae08fb76687a5268dfc1e3b2d827bb66f2d09a689b69b5d06cc51aeffd76479fce38e952af5fc0ed1e0195929ba7d1172d509d26b133ec3f415273de4c8acc302435ea4afbfa0cb3e1b669d0e968f3326da174b10de6e29adcb4970036dd17567b376ad97e0a94d3fe7cbff0daaa3ea698ce12ba7fdede4c51f88502dddcc5a62a146253464c8f60ecffbf4c1469435c18c3380cb226931804497b9e73f8a0ced189770b626239531b709f9fc9b299b1f3dd403cdebda088104adac23ede52b4d225b5140f34e3f7da50b8a671807be7c0c408b1b7e665609bb2bf0680d942d33f99fa24d8f9c9d41ac6d056a5d59de974c0e16dd89e2c9794dc4f2a23f12d4d1dcdcd799ea56a185c0453348016a4bf05c5daeb71aa8a911eab43d787a81656a4f9a36fac5304ef8949077636b96536dfced3e005d8c30d053f06bc30bdf97251d842e1a4a1713521bdc43ae1d0af798c33d383e36e1049f7040ca35dcc25537b93411959103e0be8a3c16b68c499e8f7ed2f18372e6a7d605e5efdaa79d06a78e9e8c1fb47afe30eaf6f1fafad31cf88b39e502b3ac5b183ad3e5fdf90306a8840bc45d44f3ef933482a2a3cb2ac5e5adba06585fe04b5f8260bc0139b7d9892acb3326748aef0d7337122830e39cee915149ce3e2da5281cd7917930274e74ca46a5078019411dcf662ea4c6fc1647b62653eecbe6114b2b8c7c6dc4b6f210ec380d093c2674da248029895e2ce8481094ae40a56eb0107e5213556b5af4d1f45fc1d1417d58844d7a116c308c1c794e3f76efafffc372719aca595f34a6a87eae2211e0d4ba6d6217528bbbd09675105c2358d48d71711bfd64f42f66179ba845266709e0dbeb2f8f71febc684bf1217e0176406b2eac9ec257c5ab4e1711ba866420da0874895eec278bbed2aa7546a798d13510bb49929455dcc27791a381d086ef37872d1ec7b3a621bf989667c6804be0dcf1f1d7806cb1e32db6bd6701089b119b745b7d15b8b4d0d421e1cfbd1adaee71586a2d2a6e289cec185b3ce1e139cb9272bfd145918a0e7768ece9169197106a3487cab68ebc99f49919d6906953dacfb7ab020045c36db21315004ae7b9632ef1310b657b35e6f6312329274eea7858c9aca3a3f93eea9e065e9d248b1b5476da95708ee65f1e8b3a7a03d95188f87c504626793b8a4b87e49bc1da085dac71342b351496e63e00650b1f9751cec64a60f6b7920b9f9eaec00b5788bc77e9a2861501c528be11c5d98f6c4e1d8dd3f809456a8963e7511da4438bd0eb8621c210d522a60deb8e0d9c00b7d354e16d7af2969d64174493f0205444cee5bfcf21ef34e09c93c7941506e77329723e203c4473c9ed861fdf4a20d96235f5615cdd9f5b6013bef71fd37b464677f1a802919115f5231602798710ef33495bbb16a0de68d3c0dfd2e1c4833789912ecd7cf41af474f76eb22ef670176ae9e5418eda91be4853de9c212a14636fc7f804612707981a4097f746d137ff7af79aaf73b9d79b5c1243ec5ca02fbfc00c12b02bd59d28217c1181f7388332a1362272182d23aa6059a7493586581a5df3452bd414bcc84599bf740de19a745f40953f87f156b568ba4039e4ecc15e11b9f21f6acc6cffb1da164c0a40323043fc126dec090ecb9054ca3ac1a245291925b531f6b08d8ea60becb8edbdd2d4ac4b3a6fd5282335737b5c7fea581e2842f7b3b56a694e0b2e909507690f2c452d6ec020fb309d12ec0f75117c8cfb10c8a3c3614321beafcf0459d523ee0ceb7e730e3b5d2b1b509e7e5310c07f9dd4eb5250e550ae084613791b87c107c4c875c6ae44a30eece84d4ba8d45754c7b5c63ba3193bc0c013c1619c2b82710fd958a92f99c549a3be20fdb7ce3c2f07dba9b917e81190589c8a0fe95a3"
+		keyMLKEM1024Hex         = "57928282570ac8e002ebc79908293d65faabdb3ef58149edb33083cc2f38a55b"
+		baseNonceMLKEM1024Hex   = "107259b6ac73abb151fb98a8"
+		ptEncMLKEM1024Hex       = "34323635363137353734373932303639373332303734373237353734363832633230373437323735373436383230363236353631373537343739"
+		aadEncMLKEM1024Hex      = "436f756e742d30"
+		ctEncMLKEM1024Hex       = "433d24cb45dba60451bfcdd3fcc9033a55cbcf128f6068a09cc617dee516d02bd1b15d8bb9f8acc788b29086566124414183c07dfe160d135213dc21b34e7320a19e54d979b2ba3f2d66"
+	)
+	return []mlKEMHPKETestVector{
+		{
+			name:        "ML-KEM-768",
+			kemID:       MLKEM768,
+			kdfID:       HKDFSHA256,
+			aeadID:      AES128GCM,
+			privateKey:  mustHexDecodeString(t, privateKeyMLKEM768Hex),
+			contextInfo: mustHexDecodeString(t, contextInfoMLKEM768Hex),
+			ciphertext:  mustHexDecodeString(t, ciphertextMLKEM768Hex),
+			key:         mustHexDecodeString(t, keyMLKEM768Hex),
+			baseNonce:   mustHexDecodeString(t, baseNonceMLKEM768Hex),
+			ptEnc:       mustHexDecodeString(t, ptEncMLKEM768Hex),
+			aadEnc:      mustHexDecodeString(t, aadEncMLKEM768Hex),
+			ctEnc:       mustHexDecodeString(t, ctEncMLKEM768Hex),
+		},
+		{
+			name:        "ML-KEM-1024",
+			kemID:       MLKEM1024,
+			kdfID:       HKDFSHA384,
+			aeadID:      AES256GCM,
+			privateKey:  mustHexDecodeString(t, privateKeyMLKEM1024Hex),
+			contextInfo: mustHexDecodeString(t, contextInfoMLKEM1024Hex),
+			ciphertext:  mustHexDecodeString(t, ciphertextMLKEM1024Hex),
+			key:         mustHexDecodeString(t, keyMLKEM1024Hex),
+			baseNonce:   mustHexDecodeString(t, baseNonceMLKEM1024Hex),
+			ptEnc:       mustHexDecodeString(t, ptEncMLKEM1024Hex),
+			aadEnc:      mustHexDecodeString(t, aadEncMLKEM1024Hex),
+			ctEnc:       mustHexDecodeString(t, ctEncMLKEM1024Hex),
+		},
+	}
+}
+
+func TestMLKEMHPKEVectors(t *testing.T) {
+	for _, vec := range mlKEMHPKEVectors(t) {
+		t.Run(vec.name, func(t *testing.T) {
+			kem, kdf, aead, err := newPrimitives(vec.kemID, vec.kdfID, vec.aeadID)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			privateKeySecret := secretdata.NewBytesFromData(vec.privateKey, insecuresecretdataaccess.Token{})
+			ctx, err := newRecipientContext(vec.ciphertext, privateKeySecret, kem, kdf, aead, vec.contextInfo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(vec.key, ctx.key) {
+				t.Errorf("newRecipientContext(): got key %x, want %x", ctx.key, vec.key)
+			}
+			if !bytes.Equal(vec.baseNonce, ctx.baseNonce) {
+				t.Errorf("newRecipientContext(): got baseNonce %x, want %x", ctx.baseNonce, vec.baseNonce)
+			}
+
+			otherPtEnc, err := ctx.open(vec.ctEnc, vec.aadEnc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(vec.ptEnc, otherPtEnc) {
+				t.Errorf("open(): got plaintext %x, want %x", otherPtEnc, vec.ptEnc)
+			}
+		})
 	}
 }
