@@ -175,14 +175,14 @@ func (a rZq) useHint(gamma2 uint32, h rZq) rZq {
 		// Hence, when applying the hint, we need to perform an additional comparison "r0 < t"
 		// to find out in which half of the range [0, t=gamma2) \cup [gamma2, 2*gamma2) r0 lies.
 		// In the ML-DSA spec, which assumes a signed representation, this corresponds to the
-		// cases r0 > 0 and r0 <= 0, respectively.
+		// cases r0 > 0 and r0 <= 0, respectively. Note that the r0 == 0 case maps to the
+		// spec's r0 <= 0 branch (decrement), not the r0 > 0 branch (increment).
 		if r0 > rZq(0) && r0 < t {
 			if r1 == rZq(m-1) {
 				return rZq(0)
 			}
 			return r1.add(1)
-		}
-		if r0 >= t {
+		} else {
 			if r1 == rZq(0) {
 				return rZq(m - 1)
 			}
