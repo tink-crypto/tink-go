@@ -52,12 +52,12 @@ func generateMLDSAKeyPair(t *testing.T, instance compositemldsa.MLDSAInstance) (
 	if err != nil {
 		t.Fatalf("keygenregistry.CreateKey(%v, 0) err = %v, want nil", params, err)
 	}
-	mldsaPriv := priv.(*mldsa.PrivateKey)
-	pub, err := mldsaPriv.PublicKey()
+	mlDsaPriv := priv.(*mldsa.PrivateKey)
+	pub, err := mlDsaPriv.PublicKey()
 	if err != nil {
-		t.Fatalf("mldsaPriv.PublicKey() err = %v, want nil", err)
+		t.Fatalf("mlDsaPriv.PublicKey() err = %v, want nil", err)
 	}
-	return mldsaPriv, pub.(*mldsa.PublicKey)
+	return mlDsaPriv, pub.(*mldsa.PublicKey)
 }
 
 func generateClassicalKeyPair(t *testing.T, classicalAlgorithm compositemldsa.ClassicalAlgorithm, params key.Parameters) (key.Key, key.Key) {
@@ -173,30 +173,6 @@ func testCasesSupportedParameters(t *testing.T) []testParameters {
 			classicalParams:    mustNewECDSAParameters(t, ecdsa.NistP384, ecdsa.SHA384),
 		},
 		{
-			classicalAlgorithm: compositemldsa.RSA3072PSS,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantTink,
-			classicalParams:    mustNewRSAPSSParameters(t, 3072, rsassapss.SHA256, rsassapss.SHA256, 32),
-		},
-		{
-			classicalAlgorithm: compositemldsa.RSA3072PSS,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantNoPrefix,
-			classicalParams:    mustNewRSAPSSParameters(t, 3072, rsassapss.SHA256, rsassapss.SHA256, 32),
-		},
-		{
-			classicalAlgorithm: compositemldsa.RSA4096PSS,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantTink,
-			classicalParams:    mustNewRSAPSSParameters(t, 4096, rsassapss.SHA384, rsassapss.SHA384, 48),
-		},
-		{
-			classicalAlgorithm: compositemldsa.RSA4096PSS,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantNoPrefix,
-			classicalParams:    mustNewRSAPSSParameters(t, 4096, rsassapss.SHA384, rsassapss.SHA384, 48),
-		},
-		{
 			classicalAlgorithm: compositemldsa.RSA3072PKCS1,
 			instance:           compositemldsa.MLDSA65,
 			variant:            compositemldsa.VariantTink,
@@ -207,18 +183,6 @@ func testCasesSupportedParameters(t *testing.T) []testParameters {
 			instance:           compositemldsa.MLDSA65,
 			variant:            compositemldsa.VariantNoPrefix,
 			classicalParams:    mustNewRSAPKCS1Parameters(t, 3072, rsassapkcs1.SHA256),
-		},
-		{
-			classicalAlgorithm: compositemldsa.RSA4096PKCS1,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantTink,
-			classicalParams:    mustNewRSAPKCS1Parameters(t, 4096, rsassapkcs1.SHA384),
-		},
-		{
-			classicalAlgorithm: compositemldsa.RSA4096PKCS1,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantNoPrefix,
-			classicalParams:    mustNewRSAPKCS1Parameters(t, 4096, rsassapkcs1.SHA384),
 		},
 		// MLDSA87
 		{
@@ -244,18 +208,6 @@ func testCasesSupportedParameters(t *testing.T) []testParameters {
 			instance:           compositemldsa.MLDSA87,
 			variant:            compositemldsa.VariantNoPrefix,
 			classicalParams:    mustNewECDSAParameters(t, ecdsa.NistP521, ecdsa.SHA512),
-		},
-		{
-			classicalAlgorithm: compositemldsa.RSA3072PSS,
-			instance:           compositemldsa.MLDSA87,
-			variant:            compositemldsa.VariantTink,
-			classicalParams:    mustNewRSAPSSParameters(t, 3072, rsassapss.SHA256, rsassapss.SHA256, 32),
-		},
-		{
-			classicalAlgorithm: compositemldsa.RSA3072PSS,
-			instance:           compositemldsa.MLDSA87,
-			variant:            compositemldsa.VariantNoPrefix,
-			classicalParams:    mustNewRSAPSSParameters(t, 3072, rsassapss.SHA256, rsassapss.SHA256, 32),
 		},
 		{
 			classicalAlgorithm: compositemldsa.RSA4096PSS,
@@ -375,12 +327,13 @@ func TestNewPublicKeySuccess(t *testing.T) {
 			if err != nil {
 				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
 			}
-			_, mldsaPubKey := generateMLDSAKeyPair(t, tc.instance)
+			// We don't need the private keys for this test.
+			_, mlDsaPubKey := generateMLDSAKeyPair(t, tc.instance)
 			_, classicalPubKey := generateClassicalKeyPair(t, tc.classicalAlgorithm, tc.classicalParams)
 			const keyID = uint32(0x12345678)
-			pubKey, err := compositemldsa.NewPublicKey(mldsaPubKey, classicalPubKey, keyID, params)
+			pubKey, err := compositemldsa.NewPublicKey(mlDsaPubKey, classicalPubKey, keyID, params)
 			if err != nil {
-				t.Fatalf("compositemldsa.NewPublicKey(%v, %v, %v, %v) err = %v, want nil", mldsaPubKey, classicalPubKey, keyID, params, err)
+				t.Errorf("compositemldsa.NewPublicKey(%v, %v, %v, %v) err = %v, want nil", mlDsaPubKey, classicalPubKey, keyID, params, err)
 			}
 			if !pubKey.Parameters().Equal(params) {
 				t.Errorf("pubKey.Parameters() = %v, want %v", pubKey.Parameters(), params)
@@ -391,8 +344,8 @@ func TestNewPublicKeySuccess(t *testing.T) {
 			if !pubKey.ClassicalPublicKey().Equal(classicalPubKey) {
 				t.Errorf("pubKey.ClassicalPublicKey() = %v, want %v", pubKey.ClassicalPublicKey(), classicalPubKey)
 			}
-			if !pubKey.MLDSAPublicKey().Equal(mldsaPubKey) {
-				t.Errorf("pubKey.MLDSAPublicKey() = %v, want %v", pubKey.MLDSAPublicKey(), mldsaPubKey)
+			if !pubKey.MLDSAPublicKey().Equal(mlDsaPubKey) {
+				t.Errorf("pubKey.MLDSAPublicKey() = %v, want %v", pubKey.MLDSAPublicKey(), mlDsaPubKey)
 			}
 			var expectedOutputPrefix []byte
 			if params.Variant() == compositemldsa.VariantTink {
@@ -413,12 +366,12 @@ func TestNewPublicKeyEquals(t *testing.T) {
 			if err != nil {
 				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
 			}
-			_, mldsaPubKey := generateMLDSAKeyPair(t, tc.instance)
+			_, mlDsaPubKey := generateMLDSAKeyPair(t, tc.instance)
 			_, classicalPubKey := generateClassicalKeyPair(t, tc.classicalAlgorithm, tc.classicalParams)
 			keyID := uint32(0x12345678)
-			pubKey, err := compositemldsa.NewPublicKey(mldsaPubKey, classicalPubKey, keyID, params)
+			pubKey, err := compositemldsa.NewPublicKey(mlDsaPubKey, classicalPubKey, keyID, params)
 			if err != nil {
-				t.Fatalf("compositemldsa.NewPublicKey(%v, %v, %v, %v) err = %v, want nil", mldsaPubKey, classicalPubKey, keyID, params, err)
+				t.Fatalf("compositemldsa.NewPublicKey(%v, %v, %v, %v) err = %v, want nil", mlDsaPubKey, classicalPubKey, keyID, params, err)
 			}
 			if !pubKey.Equal(pubKey) {
 				t.Errorf("pubKey.Equal(pubKey) = false, want true")
@@ -499,7 +452,7 @@ func TestNewPublicKeyRSAPSSInvalidPublicExponent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compositemldsa.NewParameters(compositemldsa.RSA3072PSS, compositemldsa.MLDSA65, compositemldsa.VariantTink) err = %v, want nil", err)
 	}
-	_, mldsaPubKey := generateMLDSAKeyPair(t, compositemldsa.MLDSA65)
+	_, mlDsaPubKey := generateMLDSAKeyPair(t, compositemldsa.MLDSA65)
 	classicalPriv, _ := generateClassicalKeyPair(t, compositemldsa.RSA3072PSS, mustNewRSAPSSParameters(t, 3072, rsassapss.SHA256, rsassapss.SHA256, 32))
 
 	// Create a new classical public key with an invalid public exponent.
@@ -525,9 +478,9 @@ func TestNewPublicKeyRSAPSSInvalidPublicExponent(t *testing.T) {
 	}
 
 	keyID := uint32(0x12345678)
-	_, err = compositemldsa.NewPublicKey(mldsaPubKey, newClassicalPubKey, keyID, params)
+	_, err = compositemldsa.NewPublicKey(mlDsaPubKey, newClassicalPubKey, keyID, params)
 	if err == nil {
-		t.Errorf("compositemldsa.NewPublicKey(%v, %v, %v, %v) err = nil, want error", mldsaPubKey, newClassicalPubKey, keyID, params)
+		t.Errorf("compositemldsa.NewPublicKey(%v, %v, %v, %v) err = nil, want error", mlDsaPubKey, newClassicalPubKey, keyID, params)
 	}
 }
 

@@ -387,7 +387,7 @@ func (k *PrivateKey) Equal(other key.Key) bool {
 // - rsassapkcs1.PrivateKey: in this case, modulus should be 4096 bits.
 func NewPrivateKey(mlDsaPrivateKey *mldsa.PrivateKey, classicalPrivateKey key.Key, idRequirement uint32, parameters *Parameters) (*PrivateKey, error) {
 	// The implementation of PublicKey() never fails in the case of ML-DSA, so we don't need to handle the error.
-	mldsaPublicKey, _ := mlDsaPrivateKey.PublicKey()
+	mlDsaPublicKey, _ := mlDsaPrivateKey.PublicKey()
 
 	classicalPrivPubKeyExposed, ok := classicalPrivateKey.(interface {
 		PublicKey() (key.Key, error)
@@ -400,7 +400,7 @@ func NewPrivateKey(mlDsaPrivateKey *mldsa.PrivateKey, classicalPrivateKey key.Ke
 		return nil, fmt.Errorf("failed to get public key from classical private key: %v", err)
 	}
 
-	publicKey, err := NewPublicKey(mldsaPublicKey.(*mldsa.PublicKey), classicalPubKey, idRequirement, parameters)
+	publicKey, err := NewPublicKey(mlDsaPublicKey.(*mldsa.PublicKey), classicalPubKey, idRequirement, parameters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create composite public key: %v", err)
 	}
@@ -418,11 +418,11 @@ func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
 		return nil, fmt.Errorf("invalid parameters type: %T", p)
 	}
 
-	mldsaParams, err := parametersForMLDSA(params.MLDSAInstance())
+	mlDsaParams, err := parametersForMLDSA(params.MLDSAInstance())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ML-DSA parameters: %v", err)
 	}
-	mldsaPrivKey, err := keygenregistry.CreateKey(mldsaParams, 0) // ML-DSA part has no ID requirement
+	mlDsaPrivKey, err := keygenregistry.CreateKey(mlDsaParams, 0) // ML-DSA part has no ID requirement
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ML-DSA private key: %v", err)
 	}
@@ -436,5 +436,5 @@ func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
 		return nil, fmt.Errorf("failed to create classical private key: %v", err)
 	}
 
-	return NewPrivateKey(mldsaPrivKey.(*mldsa.PrivateKey), classicalPrivKey, idRequirement, params)
+	return NewPrivateKey(mlDsaPrivKey.(*mldsa.PrivateKey), classicalPrivKey, idRequirement, params)
 }
