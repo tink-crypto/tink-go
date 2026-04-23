@@ -79,7 +79,7 @@ type testCase struct {
 
 func testCases(t *testing.T) []testCase {
 	testCases := []testCase{}
-	for _, kemID := range []hpke.KEMID{hpke.DHKEM_P256_HKDF_SHA256, hpke.DHKEM_P384_HKDF_SHA384, hpke.DHKEM_P521_HKDF_SHA512, hpke.DHKEM_X25519_HKDF_SHA256, hpke.X_WING} {
+	for _, kemID := range []hpke.KEMID{hpke.DHKEM_P256_HKDF_SHA256, hpke.DHKEM_P384_HKDF_SHA384, hpke.DHKEM_P521_HKDF_SHA512, hpke.DHKEM_X25519_HKDF_SHA256, hpke.X_WING, hpke.ML_KEM768, hpke.ML_KEM1024} {
 		for _, kdfID := range []hpke.KDFID{hpke.HKDFSHA256, hpke.HKDFSHA384, hpke.HKDFSHA512} {
 			for _, aeadID := range []hpke.AEADID{hpke.AES256GCM, hpke.AES128GCM, hpke.ChaCha20Poly1305} {
 				for _, variant := range []hpke.Variant{hpke.VariantTink, hpke.VariantCrunchy, hpke.VariantNoPrefix} {
@@ -247,6 +247,16 @@ func TestKEMIDString(t *testing.T) {
 			name:  "X-Wing",
 			kemID: hpke.X_WING,
 			want:  "X-Wing",
+		},
+		{
+			name:  "ML-KEM-768",
+			kemID: hpke.ML_KEM768,
+			want:  "ML-KEM-768",
+		},
+		{
+			name:  "ML-KEM-1024",
+			kemID: hpke.ML_KEM1024,
+			want:  "ML-KEM-1024",
 		},
 		{
 			name:  "UnknownKEMID",

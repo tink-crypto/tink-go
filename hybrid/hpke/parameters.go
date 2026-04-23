@@ -70,6 +70,10 @@ const (
 	DHKEM_X25519_HKDF_SHA256
 	// X_WING implements the X-Wing KEM.
 	X_WING
+	// ML_KEM768 implements ML-KEM-768.
+	ML_KEM768
+	// ML_KEM1024 implements ML-KEM-1024.
+	ML_KEM1024
 )
 
 func (kemID KEMID) String() string {
@@ -84,6 +88,10 @@ func (kemID KEMID) String() string {
 		return "DHKEM-X25519-HKDF-SHA256"
 	case X_WING:
 		return "X-Wing"
+	case ML_KEM768:
+		return "ML-KEM-768"
+	case ML_KEM1024:
+		return "ML-KEM-1024"
 	default:
 		return "UNKNOWN"
 	}

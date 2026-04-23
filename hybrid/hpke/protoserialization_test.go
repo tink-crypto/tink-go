@@ -121,6 +121,10 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 	x25519PrivateKeyBytes := mustHexDecode(t, x25519PrivateKeyBytesHex)
 	xWingPublicKeyBytes := mustHexDecode(t, xWingPublicKeyBytesHex)
 	xWingPrivateKeyBytes := mustHexDecode(t, xWingPrivateKeyBytesHex)
+	mlKEM768PublicKeyBytes := mustHexDecode(t, mlKEM768PublicKeyBytesHex)
+	mlKEM768PrivateKeyBytes := mustHexDecode(t, mlKEM768PrivateKeyBytesHex)
+	mlKEM1024PublicKeyBytes := mustHexDecode(t, mlKEM1024PublicKeyBytesHex)
+	mlKEM1024PrivateKeyBytes := mustHexDecode(t, mlKEM1024PrivateKeyBytesHex)
 
 	testCases := []protoSerializationTestCase{}
 	for _, aeadID := range []struct {
@@ -162,6 +166,8 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 					{hpke.DHKEM_P521_HKDF_SHA512, hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512, p521PublicKeyBytes, p521PrivateKeyBytes},
 					{hpke.DHKEM_X25519_HKDF_SHA256, hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256, x25519PublicKeyBytes, x25519PrivateKeyBytes},
 					{hpke.X_WING, hpkepb.HpkeKem_X_WING, xWingPublicKeyBytes, xWingPrivateKeyBytes},
+					{hpke.ML_KEM768, hpkepb.HpkeKem_ML_KEM768, mlKEM768PublicKeyBytes, mlKEM768PrivateKeyBytes},
+					{hpke.ML_KEM1024, hpkepb.HpkeKem_ML_KEM1024, mlKEM1024PublicKeyBytes, mlKEM1024PrivateKeyBytes},
 				} {
 					publicKey := mustCreatePublicKey(t, kemIDAndKeyBytes.publicKeyBytes, idRequirement, mustCreateParameters(t, hpke.ParametersOpts{
 						KEMID:   kemIDAndKeyBytes.enumKEMID,
@@ -572,6 +578,8 @@ func mustCreateParametersTestParameters(t *testing.T) []parametersSerializationT
 					{hpke.DHKEM_P521_HKDF_SHA512, hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512},
 					{hpke.DHKEM_X25519_HKDF_SHA256, hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256},
 					{hpke.X_WING, hpkepb.HpkeKem_X_WING},
+					{hpke.ML_KEM768, hpkepb.HpkeKem_ML_KEM768},
+					{hpke.ML_KEM1024, hpkepb.HpkeKem_ML_KEM1024},
 				} {
 					tcs = append(tcs, parametersSerializationTestCase{
 						name: fmt.Sprintf("%s-%s-%s-%s", kemIDAndKeyBytes.enumKEMID, kdfID.enumKDFID, aeadID.enumAEADID, variant.enumVariant),

@@ -43,6 +43,10 @@ func serializeKEMID(kemID KEMID) (hpkepb.HpkeKem, error) {
 		return hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512, nil
 	case X_WING:
 		return hpkepb.HpkeKem_X_WING, nil
+	case ML_KEM768:
+		return hpkepb.HpkeKem_ML_KEM768, nil
+	case ML_KEM1024:
+		return hpkepb.HpkeKem_ML_KEM1024, nil
 	default:
 		return hpkepb.HpkeKem_KEM_UNKNOWN, fmt.Errorf("invalid KEMID: %v", kemID)
 	}
@@ -169,6 +173,10 @@ func parseKEMID(protoKEMID hpkepb.HpkeKem) (KEMID, error) {
 		return DHKEM_P521_HKDF_SHA512, nil
 	case hpkepb.HpkeKem_X_WING:
 		return X_WING, nil
+	case hpkepb.HpkeKem_ML_KEM768:
+		return ML_KEM768, nil
+	case hpkepb.HpkeKem_ML_KEM1024:
+		return ML_KEM1024, nil
 	default:
 		return KEMID(0), fmt.Errorf("invalid KEMID: %v", protoKEMID)
 	}

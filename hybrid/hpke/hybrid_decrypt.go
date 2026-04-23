@@ -42,6 +42,10 @@ func kemIDFromParams(params *Parameters) (internalhpke.KEMID, error) {
 		return internalhpke.X25519HKDFSHA256, nil
 	case X_WING:
 		return internalhpke.XWing, nil
+	case ML_KEM768:
+		return internalhpke.MLKEM768, nil
+	case ML_KEM1024:
+		return internalhpke.MLKEM1024, nil
 	default:
 		return 0, fmt.Errorf("unsupported variant: %v", params.KEMID())
 	}

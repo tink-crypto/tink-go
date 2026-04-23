@@ -17,6 +17,7 @@ package hpke
 import (
 	"bytes"
 	"crypto/ecdh"
+	"crypto/mlkem"
 	"crypto/rand"
 	"fmt"
 
@@ -28,8 +29,12 @@ import (
 )
 
 const (
-	xWingPublicKeySize = 1216
-	xWingSecretKeySize = 32
+	xWingPublicKeySize     = 1216
+	xWingSecretKeySize     = 32
+	mlKEM768PublicKeySize  = 1184
+	mlKEM768SecretKeySize  = 64
+	mlKEM1024PublicKeySize = 1568
+	mlKEM1024SecretKeySize = 64
 )
 
 // PublicKey represents an HPKE public key.
@@ -92,6 +97,22 @@ func validateXWingPublicKey(publicKeyBytes []byte) error {
 	return nil
 }
 
+func validateMLKEMPublicKey(publicKeyBytes []byte, kemID KEMID) error {
+	switch kemID {
+	case ML_KEM768:
+		if len(publicKeyBytes) != mlKEM768PublicKeySize {
+			return fmt.Errorf("invalid ML-KEM-768 public key length: %d, want %d", len(publicKeyBytes), mlKEM768PublicKeySize)
+		}
+	case ML_KEM1024:
+		if len(publicKeyBytes) != mlKEM1024PublicKeySize {
+			return fmt.Errorf("invalid ML-KEM-1024 public key length: %d, want %d", len(publicKeyBytes), mlKEM1024PublicKeySize)
+		}
+	default:
+		return fmt.Errorf("invalid KEMID: %v", kemID)
+	}
+	return nil
+}
+
 func newECDHPublicKeyFromPrivateKey(privateKeyBytes secretdata.Bytes, kemID KEMID) ([]byte, error) {
 	curve, err := ecdhCurveFromKEMID(kemID)
 	if err != nil {
@@ -110,6 +131,25 @@ func newXWingPublicKeyFromPrivateKey(privateKeyBytes secretdata.Bytes) ([]byte, 
 		return nil, fmt.Errorf("xwing.PublicFromSecret failed: %w", err)
 	}
 	return publicKeyBytes, nil
+}
+
+func newMLKEMPublicKeyFromPrivateKey(privateKeyBytes secretdata.Bytes, kemID KEMID) ([]byte, error) {
+	switch kemID {
+	case ML_KEM768:
+		privateKey, err := mlkem.NewDecapsulationKey768(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+		if err != nil {
+			return nil, fmt.Errorf("mlkem.NewDecapsulationKey768 failed: %w", err)
+		}
+		return privateKey.EncapsulationKey().Bytes(), nil
+	case ML_KEM1024:
+		privateKey, err := mlkem.NewDecapsulationKey1024(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+		if err != nil {
+			return nil, fmt.Errorf("mlkem.NewDecapsulationKey1024 failed: %w", err)
+		}
+		return privateKey.EncapsulationKey().Bytes(), nil
+	default:
+		return nil, fmt.Errorf("unsupported KEMID: %v", kemID)
+	}
 }
 
 func validateECDHPrivateKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey) error {
@@ -143,9 +183,35 @@ func validateXWingPrivateKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey
 	return nil
 }
 
+func validateMLKEMPrivateKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey) error {
+	switch pubKey.Parameters().(*Parameters).KEMID() {
+	case ML_KEM768:
+		mlKemPrivateKey, err := mlkem.NewDecapsulationKey768(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+		if err != nil {
+			return fmt.Errorf("mlkem.NewDecapsulationKey768 failed: %w", err)
+		}
+		mlKemPublicKeyBytes := mlKemPrivateKey.EncapsulationKey().Bytes()
+		if !bytes.Equal(mlKemPublicKeyBytes, pubKey.publicKeyBytes) {
+			return fmt.Errorf("invalid private key value")
+		}
+	case ML_KEM1024:
+		mlKemPrivateKey, err := mlkem.NewDecapsulationKey1024(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+		if err != nil {
+			return fmt.Errorf("mlkem.NewDecapsulationKey1024 failed: %w", err)
+		}
+		mlKemPublicKeyBytes := mlKemPrivateKey.EncapsulationKey().Bytes()
+		if !bytes.Equal(mlKemPublicKeyBytes, pubKey.publicKeyBytes) {
+			return fmt.Errorf("invalid private key value")
+		}
+	default:
+		return fmt.Errorf("unsupported KEMID: %v", pubKey.Parameters().(*Parameters).KEMID())
+	}
+	return nil
+}
+
 // NewPublicKey creates a new HPKE PublicKey.
 //
-// publicKeyBytes belongs to either a NIST Curve, Curve25519, or X-Wing.
+// publicKeyBytes belongs to either a NIST Curve, Curve25519, X-Wing, ML-KEM-768 or ML-KEM-1024.
 func NewPublicKey(publicKeyBytes []byte, idRequirement uint32, parameters *Parameters) (*PublicKey, error) {
 	if parameters.Variant() == VariantNoPrefix && idRequirement != 0 {
 		return nil, fmt.Errorf("hpke.NewPublicKey: key ID must be zero for VariantNoPrefix")
@@ -162,6 +228,10 @@ func NewPublicKey(publicKeyBytes []byte, idRequirement uint32, parameters *Param
 	case X_WING:
 		if err := validateXWingPublicKey(publicKeyBytes); err != nil {
 			return nil, fmt.Errorf("hpke.NewPublicKey: validateXWingPublicKey failed: %w", err)
+		}
+	case ML_KEM768, ML_KEM1024:
+		if err := validateMLKEMPublicKey(publicKeyBytes, parameters.KEMID()); err != nil {
+			return nil, fmt.Errorf("hpke.NewPublicKey: validateMLKEMPublicKey failed: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("hpke.NewPublicKey: unsupported KEMID: %v", parameters.KEMID())
@@ -211,6 +281,8 @@ var _ key.Key = (*PrivateKey)(nil)
 // If NIST curve is used, the private key value must be octet encoded as per
 // [SEC 1 v2.0, Section 2.3.5].
 // If X-Wing is used, the private key value must be 32 bytes.
+// If ML-KEM-768 is used, the private key value must be 64 bytes.
+// If ML-KEM-1024 is used, the private key value must be 64 bytes.
 //
 // [SEC 1 v2.0, Section 2.3.5]: https://www.secg.org/sec1-v2.pdf#page=17.08
 func NewPrivateKey(privateKeyBytes secretdata.Bytes, idRequirement uint32, params *Parameters) (*PrivateKey, error) {
@@ -226,6 +298,11 @@ func NewPrivateKey(privateKeyBytes secretdata.Bytes, idRequirement uint32, param
 		publicKeyBytes, err = newXWingPublicKeyFromPrivateKey(privateKeyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("hpke.NewPrivateKey: newXWingPublicKeyFromPrivateKey failed: %w", err)
+		}
+	case ML_KEM768, ML_KEM1024:
+		publicKeyBytes, err = newMLKEMPublicKeyFromPrivateKey(privateKeyBytes, params.KEMID())
+		if err != nil {
+			return nil, fmt.Errorf("hpke.NewPrivateKey: newMLKEMPublicKeyFromPrivateKey failed: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("hpke.NewPrivateKey: unsupported KEMID: %v", params.KEMID())
@@ -247,6 +324,8 @@ func NewPrivateKey(privateKeyBytes secretdata.Bytes, idRequirement uint32, param
 // If NIST curve is used, the private key value must be octet encoded as per
 // [SEC 1 v2.0, Section 2.3.5].
 // If X-Wing is used, the private key value must be 32 bytes.
+// If ML-KEM-768 is used, the private key value must be 64 bytes.
+// If ML-KEM-1024 is used, the private key value must be 64 bytes.
 //
 // [SEC 1 v2.0, Section 2.3.5]: https://www.secg.org/sec1-v2.pdf#page=17.08
 func NewPrivateKeyFromPublicKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey) (*PrivateKey, error) {
@@ -258,6 +337,10 @@ func NewPrivateKeyFromPublicKey(privateKeyBytes secretdata.Bytes, pubKey *Public
 	case X_WING:
 		if err := validateXWingPrivateKey(privateKeyBytes, pubKey); err != nil {
 			return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: validateXWingPrivateKey failed: %w", err)
+		}
+	case ML_KEM768, ML_KEM1024:
+		if err := validateMLKEMPrivateKey(privateKeyBytes, pubKey); err != nil {
+			return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: validateMLKEMPrivateKey failed: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: unsupported KEMID: %v", pubKey.Parameters().(*Parameters).KEMID())
@@ -313,6 +396,16 @@ func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
 		privKeyBytes = secretdata.NewBytesFromData(privKey.Bytes(), insecuresecretdataaccess.Token{})
 	case X_WING:
 		privKeyBytes, err = secretdata.NewBytesFromRand(xWingSecretKeySize)
+		if err != nil {
+			return nil, err
+		}
+	case ML_KEM768:
+		privKeyBytes, err = secretdata.NewBytesFromRand(mlKEM768SecretKeySize)
+		if err != nil {
+			return nil, err
+		}
+	case ML_KEM1024:
+		privKeyBytes, err = secretdata.NewBytesFromRand(mlKEM1024SecretKeySize)
 		if err != nil {
 			return nil, err
 		}
