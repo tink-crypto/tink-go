@@ -17,12 +17,14 @@ package hpke_test
 import (
 	"bytes"
 	"crypto/ecdh"
+	"crypto/mlkem"
 	"crypto/rand"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/hybrid/internal/hpke"
+	"github.com/tink-crypto/tink-go/v2/hybrid/internal/xwing"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
@@ -55,6 +57,18 @@ var hpkeKEMs = []struct {
 	{
 		protoID: hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256,
 		hpkeID:  hpke.X25519HKDFSHA256,
+	},
+	{
+		protoID: hpkepb.HpkeKem_X_WING,
+		hpkeID:  hpke.XWing,
+	},
+	{
+		protoID: hpkepb.HpkeKem_ML_KEM768,
+		hpkeID:  hpke.MLKEM768,
+	},
+	{
+		protoID: hpkepb.HpkeKem_ML_KEM1024,
+		hpkeID:  hpke.MLKEM1024,
 	},
 }
 
@@ -313,6 +327,33 @@ func pubPrivKeys(t *testing.T, params *hpkepb.HpkeParams) (*hpkepb.HpkePublicKey
 		pubKeyBytes, err = subtle.PublicFromPrivateX25519(privKeyBytes)
 		if err != nil {
 			t.Fatalf("PublicFromPrivateX25519: err %q", err)
+		}
+	case hpkepb.HpkeKem_X_WING:
+		var err error
+		privKeyBytes = random.GetRandomBytes(32)
+		pubKeyBytes, err = xwing.PublicFromSecret(privKeyBytes)
+		if err != nil {
+			t.Fatalf("xwing.PublicFromSecret: err %q", err)
+		}
+	case hpkepb.HpkeKem_ML_KEM768:
+		privKeyBytes = random.GetRandomBytes(64)
+		privKey, err := mlkem.NewDecapsulationKey768(privKeyBytes)
+		if err != nil {
+			t.Fatalf("mlkem.NewDecapsulationKey768: err %q", err)
+		}
+		pubKeyBytes = privKey.EncapsulationKey().Bytes()
+		if err != nil {
+			t.Fatalf("mlkem.EncapsulationKey768: err %q", err)
+		}
+	case hpkepb.HpkeKem_ML_KEM1024:
+		privKeyBytes = random.GetRandomBytes(64)
+		privKey, err := mlkem.NewDecapsulationKey1024(privKeyBytes)
+		if err != nil {
+			t.Fatalf("mlkem.NewDecapsulationKey1024: err %q", err)
+		}
+		pubKeyBytes = privKey.EncapsulationKey().Bytes()
+		if err != nil {
+			t.Fatalf("mlkem.EncapsulationKey1024: err %q", err)
 		}
 	default:
 		// Create invalid keys for testing.
