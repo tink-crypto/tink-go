@@ -68,6 +68,8 @@ const (
 	DHKEM_P521_HKDF_SHA512
 	// DHKEM_X25519_HKDF_SHA256 implements DHKEM-X25519-HKDF-SHA256.
 	DHKEM_X25519_HKDF_SHA256
+	// X_WING implements the X-Wing KEM.
+	X_WING
 )
 
 func (kemID KEMID) String() string {
@@ -80,6 +82,8 @@ func (kemID KEMID) String() string {
 		return "DHKEM-P521-HKDF-SHA512"
 	case DHKEM_X25519_HKDF_SHA256:
 		return "DHKEM-X25519-HKDF-SHA256"
+	case X_WING:
+		return "X-Wing"
 	default:
 		return "UNKNOWN"
 	}

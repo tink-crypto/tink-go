@@ -20,10 +20,16 @@ import (
 	"crypto/rand"
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/hybrid/internal/xwing"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
+)
+
+const (
+	xWingPublicKeySize = 1216
+	xWingSecretKeySize = 32
 )
 
 // PublicKey represents an HPKE public key.
@@ -67,24 +73,98 @@ func ecdhCurveFromKEMID(kemID KEMID) (ecdh.Curve, error) {
 	}
 }
 
+func validateECDHPublicKey(publicKeyBytes []byte, kemID KEMID) error {
+	curve, err := ecdhCurveFromKEMID(kemID)
+	if err != nil {
+		return fmt.Errorf("ecdhCurveFromKEMID failed: %w", err)
+	}
+	// Validate the point.
+	if _, err := curve.NewPublicKey(publicKeyBytes); err != nil {
+		return fmt.Errorf("point validation failed: %w", err)
+	}
+	return nil
+}
+
+func validateXWingPublicKey(publicKeyBytes []byte) error {
+	if len(publicKeyBytes) != xWingPublicKeySize {
+		return fmt.Errorf("invalid X-Wing public key length: %d, want %d", len(publicKeyBytes), xWingPublicKeySize)
+	}
+	return nil
+}
+
+func newECDHPublicKeyFromPrivateKey(privateKeyBytes secretdata.Bytes, kemID KEMID) ([]byte, error) {
+	curve, err := ecdhCurveFromKEMID(kemID)
+	if err != nil {
+		return nil, err
+	}
+	ecdhPrivateKey, err := curve.NewPrivateKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	if err != nil {
+		return nil, fmt.Errorf("private key validation failed: %w", err)
+	}
+	return ecdhPrivateKey.PublicKey().Bytes(), nil
+}
+
+func newXWingPublicKeyFromPrivateKey(privateKeyBytes secretdata.Bytes) ([]byte, error) {
+	publicKeyBytes, err := xwing.PublicFromSecret(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	if err != nil {
+		return nil, fmt.Errorf("xwing.PublicFromSecret failed: %w", err)
+	}
+	return publicKeyBytes, nil
+}
+
+func validateECDHPrivateKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey) error {
+	curve, err := ecdhCurveFromKEMID(pubKey.Parameters().(*Parameters).KEMID())
+	if err != nil {
+		return fmt.Errorf("ecdhCurveFromKEMID failed: %w", err)
+	}
+	ecdhPrivateKey, err := curve.NewPrivateKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	if err != nil {
+		return fmt.Errorf("private key validation failed: %w", err)
+	}
+	ecdhPublicKeyFromPrivateKey, err := curve.NewPublicKey(pubKey.publicKeyBytes)
+	if err != nil {
+		// Should never happen.
+		return fmt.Errorf("invalid public key point: %w", err)
+	}
+	if !ecdhPrivateKey.PublicKey().Equal(ecdhPublicKeyFromPrivateKey) {
+		return fmt.Errorf("invalid private key value")
+	}
+	return nil
+}
+
+func validateXWingPrivateKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey) error {
+	xWingPublicKeyBytes, err := xwing.PublicFromSecret(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	if err != nil {
+		return fmt.Errorf("xwing.PublicFromSecret failed: %w", err)
+	}
+	if !bytes.Equal(xWingPublicKeyBytes, pubKey.publicKeyBytes) {
+		return fmt.Errorf("invalid private key value")
+	}
+	return nil
+}
+
 // NewPublicKey creates a new HPKE PublicKey.
 //
-// publicKeyBytes belongs to either a NIST Curve or Curve25519.
+// publicKeyBytes belongs to either a NIST Curve, Curve25519, or X-Wing.
 func NewPublicKey(publicKeyBytes []byte, idRequirement uint32, parameters *Parameters) (*PublicKey, error) {
 	if parameters.Variant() == VariantNoPrefix && idRequirement != 0 {
 		return nil, fmt.Errorf("hpke.NewPublicKey: key ID must be zero for VariantNoPrefix")
 	}
 	outputPrefix, err := calculateOutputPrefix(parameters.Variant(), idRequirement)
 	if err != nil {
-		return nil, fmt.Errorf("hpke.NewPublicKey: %v", err)
+		return nil, fmt.Errorf("hpke.NewPublicKey: %w", err)
 	}
-	curve, err := ecdhCurveFromKEMID(parameters.KEMID())
-	if err != nil {
-		return nil, fmt.Errorf("hpke.NewPublicKey: %v", err)
-	}
-	// Validate the point.
-	if _, err := curve.NewPublicKey(publicKeyBytes); err != nil {
-		return nil, fmt.Errorf("hpke.NewPublicKey: point validation failed: %v", err)
+	switch parameters.KEMID() {
+	case DHKEM_P256_HKDF_SHA256, DHKEM_P384_HKDF_SHA384, DHKEM_P521_HKDF_SHA512, DHKEM_X25519_HKDF_SHA256:
+		if err := validateECDHPublicKey(publicKeyBytes, parameters.KEMID()); err != nil {
+			return nil, fmt.Errorf("hpke.NewPublicKey: validateECDHPublicKey failed: %w", err)
+		}
+	case X_WING:
+		if err := validateXWingPublicKey(publicKeyBytes); err != nil {
+			return nil, fmt.Errorf("hpke.NewPublicKey: validateXWingPublicKey failed: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("hpke.NewPublicKey: unsupported KEMID: %v", parameters.KEMID())
 	}
 	return &PublicKey{
 		publicKeyBytes: bytes.Clone(publicKeyBytes),
@@ -130,20 +210,29 @@ var _ key.Key = (*PrivateKey)(nil)
 // If X25519 curve is used, the private key value must be 32 bytes.
 // If NIST curve is used, the private key value must be octet encoded as per
 // [SEC 1 v2.0, Section 2.3.5].
+// If X-Wing is used, the private key value must be 32 bytes.
 //
 // [SEC 1 v2.0, Section 2.3.5]: https://www.secg.org/sec1-v2.pdf#page=17.08
 func NewPrivateKey(privateKeyBytes secretdata.Bytes, idRequirement uint32, params *Parameters) (*PrivateKey, error) {
-	curve, err := ecdhCurveFromKEMID(params.KEMID())
-	if err != nil {
-		return nil, err
+	var publicKeyBytes []byte
+	var err error
+	switch params.KEMID() {
+	case DHKEM_P256_HKDF_SHA256, DHKEM_P384_HKDF_SHA384, DHKEM_P521_HKDF_SHA512, DHKEM_X25519_HKDF_SHA256:
+		publicKeyBytes, err = newECDHPublicKeyFromPrivateKey(privateKeyBytes, params.KEMID())
+		if err != nil {
+			return nil, fmt.Errorf("hpke.NewPrivateKey: newECDHPublicKeyFromPrivateKey failed: %w", err)
+		}
+	case X_WING:
+		publicKeyBytes, err = newXWingPublicKeyFromPrivateKey(privateKeyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("hpke.NewPrivateKey: newXWingPublicKeyFromPrivateKey failed: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("hpke.NewPrivateKey: unsupported KEMID: %v", params.KEMID())
 	}
-	ecdhPrivateKey, err := curve.NewPrivateKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
+	publicKey, err := NewPublicKey(publicKeyBytes, idRequirement, params)
 	if err != nil {
-		return nil, fmt.Errorf("hpke.NewPrivateKey: private key validation failed: %v", err)
-	}
-	publicKey, err := NewPublicKey(ecdhPrivateKey.PublicKey().Bytes(), idRequirement, params)
-	if err != nil {
-		return nil, fmt.Errorf("hpke.NewPrivateKey: %v", err)
+		return nil, fmt.Errorf("hpke.NewPrivateKey: NewPublicKey failed: %w", err)
 	}
 	return &PrivateKey{
 		publicKey:       publicKey,
@@ -157,24 +246,21 @@ func NewPrivateKey(privateKeyBytes secretdata.Bytes, idRequirement uint32, param
 // If X25519 curve is used, the private key value must be 32 bytes.
 // If NIST curve is used, the private key value must be octet encoded as per
 // [SEC 1 v2.0, Section 2.3.5].
+// If X-Wing is used, the private key value must be 32 bytes.
 //
 // [SEC 1 v2.0, Section 2.3.5]: https://www.secg.org/sec1-v2.pdf#page=17.08
 func NewPrivateKeyFromPublicKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey) (*PrivateKey, error) {
-	curve, err := ecdhCurveFromKEMID(pubKey.Parameters().(*Parameters).KEMID())
-	if err != nil {
-		return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: %v", err)
-	}
-	ecdhPrivateKey, err := curve.NewPrivateKey(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
-	if err != nil {
-		return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: private key validation failed: %v", err)
-	}
-	ecdhPublicKeyFromPublicKey, err := curve.NewPublicKey(pubKey.publicKeyBytes)
-	if err != nil {
-		// Should never happen.
-		return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: invalid public key point: %v", err)
-	}
-	if !ecdhPrivateKey.PublicKey().Equal(ecdhPublicKeyFromPublicKey) {
-		return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: 	invalid private key value")
+	switch pubKey.Parameters().(*Parameters).KEMID() {
+	case DHKEM_P256_HKDF_SHA256, DHKEM_P384_HKDF_SHA384, DHKEM_P521_HKDF_SHA512, DHKEM_X25519_HKDF_SHA256:
+		if err := validateECDHPrivateKey(privateKeyBytes, pubKey); err != nil {
+			return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: validateECDHPrivateKey failed: %w", err)
+		}
+	case X_WING:
+		if err := validateXWingPrivateKey(privateKeyBytes, pubKey); err != nil {
+			return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: validateXWingPrivateKey failed: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: unsupported KEMID: %v", pubKey.Parameters().(*Parameters).KEMID())
 	}
 	return &PrivateKey{
 		publicKey:       pubKey,
@@ -212,13 +298,26 @@ func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid parameters type: %T, want %T", p, (*Parameters)(nil))
 	}
-	curve, err := ecdhCurveFromKEMID(hpkeParams.KEMID())
-	if err != nil {
-		return nil, err
+	var privKeyBytes secretdata.Bytes
+	var err error
+	switch hpkeParams.KEMID() {
+	case DHKEM_P256_HKDF_SHA256, DHKEM_P384_HKDF_SHA384, DHKEM_P521_HKDF_SHA512, DHKEM_X25519_HKDF_SHA256:
+		curve, err := ecdhCurveFromKEMID(hpkeParams.KEMID())
+		if err != nil {
+			return nil, err
+		}
+		privKey, err := curve.GenerateKey(rand.Reader)
+		if err != nil {
+			return nil, err
+		}
+		privKeyBytes = secretdata.NewBytesFromData(privKey.Bytes(), insecuresecretdataaccess.Token{})
+	case X_WING:
+		privKeyBytes, err = secretdata.NewBytesFromRand(xWingSecretKeySize)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported KEMID: %v", hpkeParams.KEMID())
 	}
-	privKeyBytes, err := curve.GenerateKey(rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-	return NewPrivateKey(secretdata.NewBytesFromData(privKeyBytes.Bytes(), insecuresecretdataaccess.Token{}), idRequirement, hpkeParams)
+	return NewPrivateKey(privKeyBytes, idRequirement, hpkeParams)
 }

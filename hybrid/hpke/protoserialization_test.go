@@ -119,6 +119,8 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 	p521PrivateKeyBytes := mustHexDecode(t, p521SHA512PrivateKeyBytesHex)
 	x25519PublicKeyBytes := mustHexDecode(t, x25519PublicKeyBytesHex)
 	x25519PrivateKeyBytes := mustHexDecode(t, x25519PrivateKeyBytesHex)
+	xWingPublicKeyBytes := mustHexDecode(t, xWingPublicKeyBytesHex)
+	xWingPrivateKeyBytes := mustHexDecode(t, xWingPrivateKeyBytesHex)
 
 	testCases := []protoSerializationTestCase{}
 	for _, aeadID := range []struct {
@@ -159,6 +161,7 @@ func mustCreateTestCases(t *testing.T) []protoSerializationTestCase {
 					{hpke.DHKEM_P384_HKDF_SHA384, hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384, p384PublicKeyBytes, p384PrivateKeyBytes},
 					{hpke.DHKEM_P521_HKDF_SHA512, hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512, p521PublicKeyBytes, p521PrivateKeyBytes},
 					{hpke.DHKEM_X25519_HKDF_SHA256, hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256, x25519PublicKeyBytes, x25519PrivateKeyBytes},
+					{hpke.X_WING, hpkepb.HpkeKem_X_WING, xWingPublicKeyBytes, xWingPrivateKeyBytes},
 				} {
 					publicKey := mustCreatePublicKey(t, kemIDAndKeyBytes.publicKeyBytes, idRequirement, mustCreateParameters(t, hpke.ParametersOpts{
 						KEMID:   kemIDAndKeyBytes.enumKEMID,
@@ -568,6 +571,7 @@ func mustCreateParametersTestParameters(t *testing.T) []parametersSerializationT
 					{hpke.DHKEM_P384_HKDF_SHA384, hpkepb.HpkeKem_DHKEM_P384_HKDF_SHA384},
 					{hpke.DHKEM_P521_HKDF_SHA512, hpkepb.HpkeKem_DHKEM_P521_HKDF_SHA512},
 					{hpke.DHKEM_X25519_HKDF_SHA256, hpkepb.HpkeKem_DHKEM_X25519_HKDF_SHA256},
+					{hpke.X_WING, hpkepb.HpkeKem_X_WING},
 				} {
 					tcs = append(tcs, parametersSerializationTestCase{
 						name: fmt.Sprintf("%s-%s-%s-%s", kemIDAndKeyBytes.enumKEMID, kdfID.enumKDFID, aeadID.enumAEADID, variant.enumVariant),
