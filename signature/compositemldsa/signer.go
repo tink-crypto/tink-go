@@ -20,7 +20,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	internal "github.com/tink-crypto/tink-go/v2/internal/signature/compositemldsa"
+	internalcompmldsa "github.com/tink-crypto/tink-go/v2/internal/signature/compositemldsa"
 	internalmldsa "github.com/tink-crypto/tink-go/v2/internal/signature/mldsa"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
@@ -82,7 +82,7 @@ func newClassicalSigner(classicalPrivateKey key.Key) (tink.Signer, error) {
 //
 // This is an internal API.
 func NewSigner(privateKey *PrivateKey, _ internalapi.Token) (tink.Signer, error) {
-	mldsaSecretKey, err := mldsaSecretKeyFromPrivateKey(privateKey.mlDsaPrivateKey)
+	mldsaSecretKey, err := mldsaSecretKeyFromPrivateKey(privateKey.mlDSAPrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func NewSigner(privateKey *PrivateKey, _ internalapi.Token) (tink.Signer, error)
 	if err != nil {
 		return nil, err
 	}
-	label, err := internal.ComputeLabel(internalInstance, internalAlg)
+	label, err := internalcompmldsa.ComputeLabel(internalInstance, internalAlg)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func NewSigner(privateKey *PrivateKey, _ internalapi.Token) (tink.Signer, error)
 // If the key has a prefix, the signature will be prefixed with the output
 // prefix.
 func (e *signer) Sign(data []byte) ([]byte, error) {
-	messagePrime := internal.ComputeMessagePrime(string(e.label), data)
+	messagePrime := internalcompmldsa.ComputeMessagePrime(string(e.label), data)
 
 	mldsaSign, err := e.mldsaSecretKey.Sign(messagePrime, e.label)
 	if err != nil {
@@ -144,36 +144,36 @@ func signerConstructor(key key.Key) (any, error) {
 	return NewSigner(that, internalapi.Token{})
 }
 
-func toInternalMLDSAInstance(instance MLDSAInstance) (internal.MLDSAInstance, error) {
+func toInternalMLDSAInstance(instance MLDSAInstance) (internalcompmldsa.MLDSAInstance, error) {
 	switch instance {
 	case MLDSA65:
-		return internal.MLDSA65, nil
+		return internalcompmldsa.MLDSA65, nil
 	case MLDSA87:
-		return internal.MLDSA87, nil
+		return internalcompmldsa.MLDSA87, nil
 	default:
-		return internal.UnknownInstance, fmt.Errorf("unsupported ML-DSA instance: %v", instance)
+		return internalcompmldsa.UnknownInstance, fmt.Errorf("unsupported ML-DSA instance: %v", instance)
 	}
 }
 
-func toInternalClassicalAlgorithm(alg ClassicalAlgorithm) (internal.ClassicalAlgorithm, error) {
+func toInternalClassicalAlgorithm(alg ClassicalAlgorithm) (internalcompmldsa.ClassicalAlgorithm, error) {
 	switch alg {
 	case Ed25519:
-		return internal.Ed25519, nil
+		return internalcompmldsa.Ed25519, nil
 	case ECDSAP256:
-		return internal.ECDSAP256, nil
+		return internalcompmldsa.ECDSAP256, nil
 	case ECDSAP384:
-		return internal.ECDSAP384, nil
+		return internalcompmldsa.ECDSAP384, nil
 	case ECDSAP521:
-		return internal.ECDSAP521, nil
+		return internalcompmldsa.ECDSAP521, nil
 	case RSA3072PSS:
-		return internal.RSA3072PSS, nil
+		return internalcompmldsa.RSA3072PSS, nil
 	case RSA4096PSS:
-		return internal.RSA4096PSS, nil
+		return internalcompmldsa.RSA4096PSS, nil
 	case RSA3072PKCS1:
-		return internal.RSA3072PKCS1, nil
+		return internalcompmldsa.RSA3072PKCS1, nil
 	case RSA4096PKCS1:
-		return internal.RSA4096PKCS1, nil
+		return internalcompmldsa.RSA4096PKCS1, nil
 	default:
-		return internal.UnknownAlgorithm, fmt.Errorf("unsupported classical algorithm: %v", alg)
+		return internalcompmldsa.UnknownAlgorithm, fmt.Errorf("unsupported classical algorithm: %v", alg)
 	}
 }

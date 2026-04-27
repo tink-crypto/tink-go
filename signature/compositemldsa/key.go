@@ -20,12 +20,9 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
+	internalcompmldsa "github.com/tink-crypto/tink-go/v2/internal/signature/compositemldsa"
 	"github.com/tink-crypto/tink-go/v2/key"
-	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
-	"github.com/tink-crypto/tink-go/v2/signature/ed25519"
 	"github.com/tink-crypto/tink-go/v2/signature/mldsa"
-	"github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1"
-	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
 )
 
 const (
@@ -244,54 +241,12 @@ func variantFromMlDsaVariant(mlDSAVariant mldsa.Variant) (Variant, error) {
 
 // parametersForClassicalAlgorithm returns the parameters for the given classical algorithm.
 func parametersForClassicalAlgorithm(classicalAlgorithm ClassicalAlgorithm) (key.Parameters, error) {
-	switch classicalAlgorithm {
-	case Ed25519:
-		params, err := ed25519.NewParameters(ed25519.VariantNoPrefix)
-		if err != nil {
-			return nil, err
-		}
-		return &params, nil
-	case ECDSAP256:
-		return ecdsa.NewParameters(ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantNoPrefix)
-	case ECDSAP384:
-		return ecdsa.NewParameters(ecdsa.NistP384, ecdsa.SHA384, ecdsa.DER, ecdsa.VariantNoPrefix)
-	case ECDSAP521:
-		return ecdsa.NewParameters(ecdsa.NistP521, ecdsa.SHA512, ecdsa.DER, ecdsa.VariantNoPrefix)
-	case RSA3072PSS:
-		return rsassapss.NewParameters(rsassapss.ParametersValues{
-			ModulusSizeBits: 3072,
-			SigHashType:     rsassapss.SHA256,
-			MGF1HashType:    rsassapss.SHA256,
-			PublicExponent:  f4,
-			SaltLengthBytes: 32,
-		}, rsassapss.VariantNoPrefix)
-	case RSA4096PSS:
-		return rsassapss.NewParameters(rsassapss.ParametersValues{
-			ModulusSizeBits: 4096,
-			SigHashType:     rsassapss.SHA384,
-			MGF1HashType:    rsassapss.SHA384,
-			PublicExponent:  f4,
-			SaltLengthBytes: 48,
-		}, rsassapss.VariantNoPrefix)
-	case RSA3072PKCS1:
-		return rsassapkcs1.NewParameters(3072, rsassapkcs1.SHA256, f4, rsassapkcs1.VariantNoPrefix)
-	case RSA4096PKCS1:
-		return rsassapkcs1.NewParameters(4096, rsassapkcs1.SHA384, f4, rsassapkcs1.VariantNoPrefix)
-	default:
-		return nil, fmt.Errorf("unsupported classical algorithm: %v", classicalAlgorithm)
-	}
+	return internalcompmldsa.ParametersForClassicalAlgorithm(internalcompmldsa.ClassicalAlgorithm(classicalAlgorithm))
 }
 
 // parametersForMLDSA returns the parameters for the given ML-DSA instance.
 func parametersForMLDSA(mlDSAInstance MLDSAInstance) (*mldsa.Parameters, error) {
-	switch mlDSAInstance {
-	case MLDSA65:
-		return mldsa.NewParameters(mldsa.MLDSA65, mldsa.VariantNoPrefix)
-	case MLDSA87:
-		return mldsa.NewParameters(mldsa.MLDSA87, mldsa.VariantNoPrefix)
-	default:
-		return nil, fmt.Errorf("unsupported ML-DSA instance: %v", mlDSAInstance)
-	}
+	return internalcompmldsa.ParametersForMLDSA(internalcompmldsa.MLDSAInstance(mlDSAInstance))
 }
 
 // NewPublicKey creates a new composite ML-DSA public key.
@@ -301,7 +256,7 @@ func parametersForMLDSA(mlDSAInstance MLDSAInstance) (*mldsa.Parameters, error) 
 // - ecdsa.PublicKey
 // - rsassapss.PublicKey: in this case, modulus should be 3072 or 4096 bits and the public exponent must be 65537.
 // - rsassapkcs1.PublicKey: in this case, modulus should be 3072 or 4096 bits and the public exponent must be 65537.
-func NewPublicKey(mlDsaPublicKey *mldsa.PublicKey, classicalPublicKey key.Key, idRequirement uint32, parameters *Parameters) (*PublicKey, error) {
+func NewPublicKey(mlDSAPublicKey *mldsa.PublicKey, classicalPublicKey key.Key, idRequirement uint32, parameters *Parameters) (*PublicKey, error) {
 	expectedClassicalParams, err := parametersForClassicalAlgorithm(parameters.ClassicalAlgorithm())
 	if err != nil {
 		return nil, err
@@ -315,7 +270,7 @@ func NewPublicKey(mlDsaPublicKey *mldsa.PublicKey, classicalPublicKey key.Key, i
 	if err != nil {
 		return nil, err
 	}
-	if !mlDsaPublicKey.Parameters().Equal(expectedMlDsaparameters) {
+	if !mlDSAPublicKey.Parameters().Equal(expectedMlDsaparameters) {
 		return nil, fmt.Errorf("ML-DSA public key parameters do not match expected parameters")
 	}
 
@@ -325,7 +280,7 @@ func NewPublicKey(mlDsaPublicKey *mldsa.PublicKey, classicalPublicKey key.Key, i
 	}
 
 	return &PublicKey{
-		mlDSAPublicKey:     mlDsaPublicKey,
+		mlDSAPublicKey:     mlDSAPublicKey,
 		classicalPublicKey: classicalPublicKey,
 		params:             parameters,
 		idRequirement:      idRequirement,
@@ -336,7 +291,7 @@ func NewPublicKey(mlDsaPublicKey *mldsa.PublicKey, classicalPublicKey key.Key, i
 // PrivateKey represents a composite ML-DSA private key.
 type PrivateKey struct {
 	publicKey           *PublicKey
-	mlDsaPrivateKey     *mldsa.PrivateKey
+	mlDSAPrivateKey     *mldsa.PrivateKey
 	classicalPrivateKey key.Key
 }
 
@@ -344,7 +299,7 @@ var _ key.Key = (*PrivateKey)(nil)
 
 // MLDSAPrivateKey returns the ML-DSA private key.
 func (k *PrivateKey) MLDSAPrivateKey() *mldsa.PrivateKey {
-	return k.mlDsaPrivateKey
+	return k.mlDSAPrivateKey
 }
 
 // ClassicalPrivateKey returns the classical private key.
@@ -374,7 +329,7 @@ func (k *PrivateKey) Equal(other key.Key) bool {
 	}
 	that, ok := other.(*PrivateKey)
 	return ok && k.publicKey.Equal(that.publicKey) &&
-		k.mlDsaPrivateKey.Equal(that.mlDsaPrivateKey) &&
+		k.mlDSAPrivateKey.Equal(that.mlDSAPrivateKey) &&
 		k.classicalPrivateKey.Equal(that.classicalPrivateKey)
 }
 
@@ -385,9 +340,9 @@ func (k *PrivateKey) Equal(other key.Key) bool {
 // - ecdsa.PrivateKey
 // - rsassapss.PrivateKey: in this case, modulus should be 3072 or 4096 bits.
 // - rsassapkcs1.PrivateKey: in this case, modulus should be 4096 bits.
-func NewPrivateKey(mlDsaPrivateKey *mldsa.PrivateKey, classicalPrivateKey key.Key, idRequirement uint32, parameters *Parameters) (*PrivateKey, error) {
+func NewPrivateKey(mlDSAPrivateKey *mldsa.PrivateKey, classicalPrivateKey key.Key, idRequirement uint32, parameters *Parameters) (*PrivateKey, error) {
 	// The implementation of PublicKey() never fails in the case of ML-DSA, so we don't need to handle the error.
-	mlDsaPublicKey, _ := mlDsaPrivateKey.PublicKey()
+	mlDSAPublicKey, _ := mlDSAPrivateKey.PublicKey()
 
 	classicalPrivPubKeyExposed, ok := classicalPrivateKey.(interface {
 		PublicKey() (key.Key, error)
@@ -400,14 +355,14 @@ func NewPrivateKey(mlDsaPrivateKey *mldsa.PrivateKey, classicalPrivateKey key.Ke
 		return nil, fmt.Errorf("failed to get public key from classical private key: %v", err)
 	}
 
-	publicKey, err := NewPublicKey(mlDsaPublicKey.(*mldsa.PublicKey), classicalPubKey, idRequirement, parameters)
+	publicKey, err := NewPublicKey(mlDSAPublicKey.(*mldsa.PublicKey), classicalPubKey, idRequirement, parameters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create composite public key: %v", err)
 	}
 
 	return &PrivateKey{
 		publicKey:           publicKey,
-		mlDsaPrivateKey:     mlDsaPrivateKey,
+		mlDSAPrivateKey:     mlDSAPrivateKey,
 		classicalPrivateKey: classicalPrivateKey,
 	}, nil
 }
@@ -418,11 +373,11 @@ func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
 		return nil, fmt.Errorf("invalid parameters type: %T", p)
 	}
 
-	mlDsaParams, err := parametersForMLDSA(params.MLDSAInstance())
+	mlDSAParams, err := parametersForMLDSA(params.MLDSAInstance())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ML-DSA parameters: %v", err)
 	}
-	mlDsaPrivKey, err := keygenregistry.CreateKey(mlDsaParams, 0) // ML-DSA part has no ID requirement
+	mlDSAPrivKey, err := keygenregistry.CreateKey(mlDSAParams, 0) // ML-DSA part has no ID requirement
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ML-DSA private key: %v", err)
 	}
@@ -436,5 +391,5 @@ func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
 		return nil, fmt.Errorf("failed to create classical private key: %v", err)
 	}
 
-	return NewPrivateKey(mlDsaPrivKey.(*mldsa.PrivateKey), classicalPrivKey, idRequirement, params)
+	return NewPrivateKey(mlDSAPrivKey.(*mldsa.PrivateKey), classicalPrivKey, idRequirement, params)
 }

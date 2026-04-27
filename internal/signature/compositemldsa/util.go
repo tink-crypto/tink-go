@@ -19,6 +19,13 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"slices"
+
+	"github.com/tink-crypto/tink-go/v2/key"
+	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
+	"github.com/tink-crypto/tink-go/v2/signature/ed25519"
+	"github.com/tink-crypto/tink-go/v2/signature/mldsa"
+	"github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1"
+	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
 )
 
 // MLDSAInstance is the instance type of the ML-DSA key.
@@ -55,6 +62,18 @@ const (
 	RSA3072PKCS1
 	// RSA4096PKCS1 is the RSA-4096-PKCS1 algorithm.
 	RSA4096PKCS1
+)
+
+// Variant describes the output prefix mode.
+type Variant int
+
+const (
+	// UnknownVariant is the default value of Variant.
+	UnknownVariant Variant = iota
+	// VariantTink describes keys with 5 bytes output prefix.
+	VariantTink
+	// VariantNoPrefix describes keys with no output prefix.
+	VariantNoPrefix
 )
 
 // ComputeLabel returns the label for the given ML-DSA instance and classical algorithm.
@@ -101,4 +120,56 @@ func ComputeMessagePrime(label string, message []byte) []byte {
 	prefix := []byte("CompositeAlgorithmSignatures2025")
 	hash := sha512.Sum512(message)
 	return slices.Concat(prefix, []byte(label), []byte{byte(0)}, hash[:])
+}
+
+// ParametersForClassicalAlgorithm returns the parameters for the given classical algorithm.
+func ParametersForClassicalAlgorithm(classicalAlgorithm ClassicalAlgorithm) (key.Parameters, error) {
+	switch classicalAlgorithm {
+	case Ed25519:
+		params, err := ed25519.NewParameters(ed25519.VariantNoPrefix)
+		if err != nil {
+			return nil, err
+		}
+		return &params, nil
+	case ECDSAP256:
+		return ecdsa.NewParameters(ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantNoPrefix)
+	case ECDSAP384:
+		return ecdsa.NewParameters(ecdsa.NistP384, ecdsa.SHA384, ecdsa.DER, ecdsa.VariantNoPrefix)
+	case ECDSAP521:
+		return ecdsa.NewParameters(ecdsa.NistP521, ecdsa.SHA512, ecdsa.DER, ecdsa.VariantNoPrefix)
+	case RSA3072PSS:
+		return rsassapss.NewParameters(rsassapss.ParametersValues{
+			ModulusSizeBits: 3072,
+			SigHashType:     rsassapss.SHA256,
+			MGF1HashType:    rsassapss.SHA256,
+			PublicExponent:  65537,
+			SaltLengthBytes: 32,
+		}, rsassapss.VariantNoPrefix)
+	case RSA4096PSS:
+		return rsassapss.NewParameters(rsassapss.ParametersValues{
+			ModulusSizeBits: 4096,
+			SigHashType:     rsassapss.SHA384,
+			MGF1HashType:    rsassapss.SHA384,
+			PublicExponent:  65537,
+			SaltLengthBytes: 48,
+		}, rsassapss.VariantNoPrefix)
+	case RSA3072PKCS1:
+		return rsassapkcs1.NewParameters(3072, rsassapkcs1.SHA256, 65537, rsassapkcs1.VariantNoPrefix)
+	case RSA4096PKCS1:
+		return rsassapkcs1.NewParameters(4096, rsassapkcs1.SHA384, 65537, rsassapkcs1.VariantNoPrefix)
+	default:
+		return nil, fmt.Errorf("unsupported classical algorithm: %v", classicalAlgorithm)
+	}
+}
+
+// ParametersForMLDSA returns the parameters for the given ML-DSA instance.
+func ParametersForMLDSA(mlDSAInstance MLDSAInstance) (*mldsa.Parameters, error) {
+	switch mlDSAInstance {
+	case MLDSA65:
+		return mldsa.NewParameters(mldsa.MLDSA65, mldsa.VariantNoPrefix)
+	case MLDSA87:
+		return mldsa.NewParameters(mldsa.MLDSA87, mldsa.VariantNoPrefix)
+	default:
+		return nil, fmt.Errorf("unsupported ML-DSA instance: %v", mlDSAInstance)
+	}
 }

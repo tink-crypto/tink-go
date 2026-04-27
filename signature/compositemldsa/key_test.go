@@ -18,13 +18,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
+	internalcompmldsa "github.com/tink-crypto/tink-go/v2/internal/signature/compositemldsa"
+	compmldsatestvectors "github.com/tink-crypto/tink-go/v2/internal/signature/compositemldsa/testing"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/signature/compositemldsa"
 	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
 	"github.com/tink-crypto/tink-go/v2/signature/ed25519"
-	"github.com/tink-crypto/tink-go/v2/signature/mldsa"
 	"github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1"
 	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
 )
@@ -33,211 +33,23 @@ const (
 	f4 = 65537
 )
 
-func generateMLDSAKeyPair(t *testing.T, instance compositemldsa.MLDSAInstance) (*mldsa.PrivateKey, *mldsa.PublicKey) {
-	t.Helper()
-	var params *mldsa.Parameters
-	var err error
-	switch instance {
-	case compositemldsa.MLDSA65:
-		params, err = mldsa.NewParameters(mldsa.MLDSA65, mldsa.VariantNoPrefix)
-	case compositemldsa.MLDSA87:
-		params, err = mldsa.NewParameters(mldsa.MLDSA87, mldsa.VariantNoPrefix)
-	default:
-		t.Fatalf("unsupported ML-DSA instance: %v", instance)
-	}
-	if err != nil {
-		t.Fatalf("mldsa.NewParameters(%v, %v) err = %v, want nil", instance, mldsa.VariantNoPrefix, err)
-	}
-	priv, err := keygenregistry.CreateKey(params, 0)
-	if err != nil {
-		t.Fatalf("keygenregistry.CreateKey(%v, 0) err = %v, want nil", params, err)
-	}
-	mlDsaPriv := priv.(*mldsa.PrivateKey)
-	pub, err := mlDsaPriv.PublicKey()
-	if err != nil {
-		t.Fatalf("mlDsaPriv.PublicKey() err = %v, want nil", err)
-	}
-	return mlDsaPriv, pub.(*mldsa.PublicKey)
-}
-
-func generateClassicalKeyPair(t *testing.T, classicalAlgorithm compositemldsa.ClassicalAlgorithm, params key.Parameters) (key.Key, key.Key) {
-	t.Helper()
-	priv, err := keygenregistry.CreateKey(params, 0)
-	if err != nil {
-		t.Fatalf("keygenregistry.CreateKey for %v err = %v, want nil", classicalAlgorithm, err)
-	}
-
-	var pub key.Key
-	switch classicalAlgorithm {
-	case compositemldsa.Ed25519:
-		pub, err = priv.(*ed25519.PrivateKey).PublicKey()
-	case compositemldsa.ECDSAP256, compositemldsa.ECDSAP384, compositemldsa.ECDSAP521:
-		pub, err = priv.(*ecdsa.PrivateKey).PublicKey()
-	case compositemldsa.RSA3072PSS, compositemldsa.RSA4096PSS:
-		pub, err = priv.(*rsassapss.PrivateKey).PublicKey()
-	case compositemldsa.RSA3072PKCS1, compositemldsa.RSA4096PKCS1:
-		pub, err = priv.(*rsassapkcs1.PrivateKey).PublicKey()
-	}
-	if err != nil {
-		t.Fatalf("PublicKey for %v err = %v, want nil", classicalAlgorithm, err)
-	}
-	return priv, pub
-}
-
-type testParameters struct {
-	classicalAlgorithm compositemldsa.ClassicalAlgorithm
-	instance           compositemldsa.MLDSAInstance
-	variant            compositemldsa.Variant
-	classicalParams    key.Parameters
-}
-
-func mustNewED25519Parameters(t *testing.T) key.Parameters {
-	t.Helper()
-	params, err := ed25519.NewParameters(ed25519.VariantNoPrefix)
-	if err != nil {
-		t.Fatalf("ed25519.NewParameters(ed25519.VariantNoPrefix) err = %v, want nil", err)
-	}
-	return &params
-}
-
-func mustNewECDSAParameters(t *testing.T, curve ecdsa.CurveType, hashType ecdsa.HashType) key.Parameters {
-	t.Helper()
-	params, err := ecdsa.NewParameters(curve, hashType, ecdsa.DER, ecdsa.VariantNoPrefix)
-	if err != nil {
-		t.Fatalf("ecdsa.NewParameters(%v, %v, ecdsa.DER, ecdsa.VariantNoPrefix) err = %v, want nil", curve, hashType, err)
-	}
-	return params
-}
-
-func mustNewRSAPSSParameters(t *testing.T, modulusSizeBits int, sigHashType rsassapss.HashType, mgf1HashType rsassapss.HashType, saltLengthBytes int) key.Parameters {
-	t.Helper()
-	params, err := rsassapss.NewParameters(rsassapss.ParametersValues{
-		ModulusSizeBits: modulusSizeBits,
-		SigHashType:     sigHashType,
-		MGF1HashType:    mgf1HashType,
-		PublicExponent:  f4,
-		SaltLengthBytes: saltLengthBytes,
-	}, rsassapss.VariantNoPrefix)
-	if err != nil {
-		t.Fatalf("rsassapss.NewParameters err = %v, want nil", err)
-	}
-	return params
-}
-
-func mustNewRSAPKCS1Parameters(t *testing.T, modulusSizeBits int, hashType rsassapkcs1.HashType) key.Parameters {
-	t.Helper()
-	params, err := rsassapkcs1.NewParameters(modulusSizeBits, hashType, f4, rsassapkcs1.VariantNoPrefix)
-	if err != nil {
-		t.Fatalf("rsassapkcs1.NewParameters err = %v, want nil", err)
-	}
-	return params
-}
-
-func testCasesSupportedParameters(t *testing.T) []testParameters {
-	return []testParameters{
-		// MLDSA65
-		{
-			classicalAlgorithm: compositemldsa.Ed25519,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantTink,
-			classicalParams:    mustNewED25519Parameters(t),
-		},
-		{
-			classicalAlgorithm: compositemldsa.Ed25519,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantNoPrefix,
-			classicalParams:    mustNewED25519Parameters(t),
-		},
-		{
-			classicalAlgorithm: compositemldsa.ECDSAP256,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantTink,
-			classicalParams:    mustNewECDSAParameters(t, ecdsa.NistP256, ecdsa.SHA256),
-		},
-		{
-			classicalAlgorithm: compositemldsa.ECDSAP256,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantNoPrefix,
-			classicalParams:    mustNewECDSAParameters(t, ecdsa.NistP256, ecdsa.SHA256),
-		},
-		{
-			classicalAlgorithm: compositemldsa.ECDSAP384,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantTink,
-			classicalParams:    mustNewECDSAParameters(t, ecdsa.NistP384, ecdsa.SHA384),
-		},
-		{
-			classicalAlgorithm: compositemldsa.ECDSAP384,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantNoPrefix,
-			classicalParams:    mustNewECDSAParameters(t, ecdsa.NistP384, ecdsa.SHA384),
-		},
-		{
-			classicalAlgorithm: compositemldsa.RSA3072PKCS1,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantTink,
-			classicalParams:    mustNewRSAPKCS1Parameters(t, 3072, rsassapkcs1.SHA256),
-		},
-		{
-			classicalAlgorithm: compositemldsa.RSA3072PKCS1,
-			instance:           compositemldsa.MLDSA65,
-			variant:            compositemldsa.VariantNoPrefix,
-			classicalParams:    mustNewRSAPKCS1Parameters(t, 3072, rsassapkcs1.SHA256),
-		},
-		// MLDSA87
-		{
-			classicalAlgorithm: compositemldsa.ECDSAP384,
-			instance:           compositemldsa.MLDSA87,
-			variant:            compositemldsa.VariantTink,
-			classicalParams:    mustNewECDSAParameters(t, ecdsa.NistP384, ecdsa.SHA384),
-		},
-		{
-			classicalAlgorithm: compositemldsa.ECDSAP384,
-			instance:           compositemldsa.MLDSA87,
-			variant:            compositemldsa.VariantNoPrefix,
-			classicalParams:    mustNewECDSAParameters(t, ecdsa.NistP384, ecdsa.SHA384),
-		},
-		{
-			classicalAlgorithm: compositemldsa.ECDSAP521,
-			instance:           compositemldsa.MLDSA87,
-			variant:            compositemldsa.VariantTink,
-			classicalParams:    mustNewECDSAParameters(t, ecdsa.NistP521, ecdsa.SHA512),
-		},
-		{
-			classicalAlgorithm: compositemldsa.ECDSAP521,
-			instance:           compositemldsa.MLDSA87,
-			variant:            compositemldsa.VariantNoPrefix,
-			classicalParams:    mustNewECDSAParameters(t, ecdsa.NistP521, ecdsa.SHA512),
-		},
-		{
-			classicalAlgorithm: compositemldsa.RSA4096PSS,
-			instance:           compositemldsa.MLDSA87,
-			variant:            compositemldsa.VariantTink,
-			classicalParams:    mustNewRSAPSSParameters(t, 4096, rsassapss.SHA384, rsassapss.SHA384, 48),
-		},
-		{
-			classicalAlgorithm: compositemldsa.RSA4096PSS,
-			instance:           compositemldsa.MLDSA87,
-			variant:            compositemldsa.VariantNoPrefix,
-			classicalParams:    mustNewRSAPSSParameters(t, 4096, rsassapss.SHA384, rsassapss.SHA384, 48),
-		},
-	}
-}
-
 func TestNewParametersSupported(t *testing.T) {
-	for _, tc := range testCasesSupportedParameters(t) {
-		params, err := compositemldsa.NewParameters(tc.classicalAlgorithm, tc.instance, tc.variant)
+	for _, tc := range compmldsatestvectors.TestCasesSupportedParameters(t) {
+		classicalAlgorithm := compositemldsa.ClassicalAlgorithm(tc.ClassicalAlgorithm)
+		instance := compositemldsa.MLDSAInstance(tc.Instance)
+		variant := compositemldsa.Variant(tc.Variant)
+		params, err := compositemldsa.NewParameters(classicalAlgorithm, instance, variant)
 		if err != nil {
-			t.Errorf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
+			t.Errorf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", classicalAlgorithm, instance, variant, err)
 		}
-		if got := params.ClassicalAlgorithm(); got != tc.classicalAlgorithm {
-			t.Errorf("params.ClassicalAlgorithm() = %v, want %v", got, tc.classicalAlgorithm)
+		if got := params.ClassicalAlgorithm(); got != classicalAlgorithm {
+			t.Errorf("params.ClassicalAlgorithm() = %v, want %v", got, classicalAlgorithm)
 		}
-		if got := params.MLDSAInstance(); got != tc.instance {
-			t.Errorf("params.MlDsaInstance() = %v, want %v", got, tc.instance)
+		if got := params.MLDSAInstance(); got != instance {
+			t.Errorf("params.MlDsaInstance() = %v, want %v", got, instance)
 		}
-		if got := params.Variant(); got != tc.variant {
-			t.Errorf("params.Variant() = %v, want %v", got, tc.variant)
+		if got := params.Variant(); got != variant {
+			t.Errorf("params.Variant() = %v, want %v", got, variant)
 		}
 	}
 }
@@ -320,16 +132,19 @@ func TestParametersEqual(t *testing.T) {
 }
 
 func TestNewPublicKeySuccess(t *testing.T) {
-	for _, tc := range testCasesSupportedParameters(t) {
-		testName := fmt.Sprintf("%v-%v-%v", tc.classicalAlgorithm, tc.instance, tc.variant)
+	for _, tc := range compmldsatestvectors.TestCasesSupportedParameters(t) {
+		classicalAlgorithm := compositemldsa.ClassicalAlgorithm(tc.ClassicalAlgorithm)
+		instance := compositemldsa.MLDSAInstance(tc.Instance)
+		variant := compositemldsa.Variant(tc.Variant)
+		testName := fmt.Sprintf("%v-%v-%v", classicalAlgorithm, instance, variant)
 		t.Run(testName, func(t *testing.T) {
-			params, err := compositemldsa.NewParameters(tc.classicalAlgorithm, tc.instance, tc.variant)
+			params, err := compositemldsa.NewParameters(classicalAlgorithm, instance, variant)
 			if err != nil {
-				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
+				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", classicalAlgorithm, instance, variant, err)
 			}
 			// We don't need the private keys for this test.
-			_, mlDsaPubKey := generateMLDSAKeyPair(t, tc.instance)
-			_, classicalPubKey := generateClassicalKeyPair(t, tc.classicalAlgorithm, tc.classicalParams)
+			_, mlDsaPubKey := compmldsatestvectors.GenerateMLDSAKeyPair(t, internalcompmldsa.MLDSAInstance(instance))
+			_, classicalPubKey := compmldsatestvectors.GenerateClassicalKeyPair(t, internalcompmldsa.ClassicalAlgorithm(classicalAlgorithm), tc.ClassicalParams)
 			const keyID = uint32(0x12345678)
 			pubKey, err := compositemldsa.NewPublicKey(mlDsaPubKey, classicalPubKey, keyID, params)
 			if err != nil {
@@ -359,15 +174,18 @@ func TestNewPublicKeySuccess(t *testing.T) {
 }
 
 func TestNewPublicKeyEquals(t *testing.T) {
-	for _, tc := range testCasesSupportedParameters(t) {
-		testName := fmt.Sprintf("%v-%v-%v", tc.classicalAlgorithm, tc.instance, tc.variant)
+	for _, tc := range compmldsatestvectors.TestCasesSupportedParameters(t) {
+		classicalAlgorithm := compositemldsa.ClassicalAlgorithm(tc.ClassicalAlgorithm)
+		instance := compositemldsa.MLDSAInstance(tc.Instance)
+		variant := compositemldsa.Variant(tc.Variant)
+		testName := fmt.Sprintf("%v-%v-%v", classicalAlgorithm, instance, variant)
 		t.Run(testName, func(t *testing.T) {
-			params, err := compositemldsa.NewParameters(tc.classicalAlgorithm, tc.instance, tc.variant)
+			params, err := compositemldsa.NewParameters(classicalAlgorithm, instance, variant)
 			if err != nil {
-				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
+				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", classicalAlgorithm, instance, variant, err)
 			}
-			_, mlDsaPubKey := generateMLDSAKeyPair(t, tc.instance)
-			_, classicalPubKey := generateClassicalKeyPair(t, tc.classicalAlgorithm, tc.classicalParams)
+			_, mlDsaPubKey := compmldsatestvectors.GenerateMLDSAKeyPair(t, internalcompmldsa.MLDSAInstance(instance))
+			_, classicalPubKey := compmldsatestvectors.GenerateClassicalKeyPair(t, internalcompmldsa.ClassicalAlgorithm(classicalAlgorithm), tc.ClassicalParams)
 			keyID := uint32(0x12345678)
 			pubKey, err := compositemldsa.NewPublicKey(mlDsaPubKey, classicalPubKey, keyID, params)
 			if err != nil {
@@ -436,8 +254,8 @@ func TestNewPublicKeyMismatchClassicalParameters(t *testing.T) {
 			if err != nil {
 				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
 			}
-			_, mlDSAPubKey := generateMLDSAKeyPair(t, tc.instance)
-			_, classicalPubKey := generateClassicalKeyPair(t, tc.keyAlgorithm, tc.classicalParams)
+			_, mlDSAPubKey := compmldsatestvectors.GenerateMLDSAKeyPair(t, internalcompmldsa.MLDSAInstance(tc.instance))
+			_, classicalPubKey := compmldsatestvectors.GenerateClassicalKeyPair(t, internalcompmldsa.ClassicalAlgorithm(tc.keyAlgorithm), tc.classicalParams)
 			keyID := uint32(0x12345678)
 			_, err = compositemldsa.NewPublicKey(mlDSAPubKey, classicalPubKey, keyID, params)
 			if err == nil {
@@ -452,8 +270,8 @@ func TestNewPublicKeyRSAPSSInvalidPublicExponent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compositemldsa.NewParameters(compositemldsa.RSA3072PSS, compositemldsa.MLDSA65, compositemldsa.VariantTink) err = %v, want nil", err)
 	}
-	_, mlDsaPubKey := generateMLDSAKeyPair(t, compositemldsa.MLDSA65)
-	classicalPriv, _ := generateClassicalKeyPair(t, compositemldsa.RSA3072PSS, mustNewRSAPSSParameters(t, 3072, rsassapss.SHA256, rsassapss.SHA256, 32))
+	_, mlDsaPubKey := compmldsatestvectors.GenerateMLDSAKeyPair(t, internalcompmldsa.MLDSAInstance(compositemldsa.MLDSA65))
+	classicalPriv, _ := compmldsatestvectors.GenerateClassicalKeyPair(t, internalcompmldsa.ClassicalAlgorithm(compositemldsa.RSA3072PSS), mustNewRSAPSSParameters(t, 3072, rsassapss.SHA256, rsassapss.SHA256, 32))
 
 	// Create a new classical public key with an invalid public exponent.
 	classicalPubKeyHandle, err := classicalPriv.(*rsassapss.PrivateKey).PublicKey()
@@ -485,22 +303,25 @@ func TestNewPublicKeyRSAPSSInvalidPublicExponent(t *testing.T) {
 }
 
 func TestNewPrivateKeySuccess(t *testing.T) {
-	for _, tc := range testCasesSupportedParameters(t) {
-		testName := fmt.Sprintf("%v-%v-%v", tc.classicalAlgorithm, tc.instance, tc.variant)
+	for _, tc := range compmldsatestvectors.TestCasesSupportedParameters(t) {
+		classicalAlgorithm := compositemldsa.ClassicalAlgorithm(tc.ClassicalAlgorithm)
+		instance := compositemldsa.MLDSAInstance(tc.Instance)
+		variant := compositemldsa.Variant(tc.Variant)
+		testName := fmt.Sprintf("%v-%v-%v", classicalAlgorithm, instance, variant)
 		t.Run(testName, func(t *testing.T) {
-			params, err := compositemldsa.NewParameters(tc.classicalAlgorithm, tc.instance, tc.variant)
+			params, err := compositemldsa.NewParameters(classicalAlgorithm, instance, variant)
 			if err != nil {
-				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
+				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", classicalAlgorithm, instance, variant, err)
 			}
-			mldsaPrivKey, _ := generateMLDSAKeyPair(t, tc.instance)
-			classicalPrivKey, _ := generateClassicalKeyPair(t, tc.classicalAlgorithm, tc.classicalParams)
+			mldsaPrivKey, _ := compmldsatestvectors.GenerateMLDSAKeyPair(t, internalcompmldsa.MLDSAInstance(instance))
+			classicalPrivKey, _ := compmldsatestvectors.GenerateClassicalKeyPair(t, internalcompmldsa.ClassicalAlgorithm(classicalAlgorithm), tc.ClassicalParams)
 			keyID := uint32(0x12345678)
 			privKey, err := compositemldsa.NewPrivateKey(mldsaPrivKey, classicalPrivKey, keyID, params)
 			if err != nil {
 				t.Fatalf("compositemldsa.NewPrivateKey(%v, %v, %v, %v) err = %v, want nil", mldsaPrivKey, classicalPrivKey, keyID, params, err)
 			}
 			if !privKey.Parameters().Equal(params) {
-				t.Errorf("%v, %v, %v: privKey.Parameters() = %v, want %v", tc.classicalAlgorithm, tc.instance, tc.variant, privKey.Parameters(), params)
+				t.Errorf("%v, %v, %v: privKey.Parameters() = %v, want %v", tc.ClassicalAlgorithm, tc.Instance, tc.Variant, privKey.Parameters(), params)
 			}
 			if gotID, gotOK := privKey.IDRequirement(); gotOK != params.HasIDRequirement() || (gotOK && gotID != keyID) {
 				t.Errorf("privKey.IDRequirement() = %v, %v, want %v, %v", gotID, gotOK, keyID, params.HasIDRequirement())
@@ -523,15 +344,18 @@ func TestNewPrivateKeySuccess(t *testing.T) {
 }
 
 func TestPrivateKeyEqual(t *testing.T) {
-	for _, tc := range testCasesSupportedParameters(t) {
-		testName := fmt.Sprintf("%v-%v-%v", tc.classicalAlgorithm, tc.instance, tc.variant)
+	for _, tc := range compmldsatestvectors.TestCasesSupportedParameters(t) {
+		classicalAlgorithm := compositemldsa.ClassicalAlgorithm(tc.ClassicalAlgorithm)
+		instance := compositemldsa.MLDSAInstance(tc.Instance)
+		variant := compositemldsa.Variant(tc.Variant)
+		testName := fmt.Sprintf("%v-%v-%v", classicalAlgorithm, instance, variant)
 		t.Run(testName, func(t *testing.T) {
-			params, err := compositemldsa.NewParameters(tc.classicalAlgorithm, tc.instance, tc.variant)
+			params, err := compositemldsa.NewParameters(classicalAlgorithm, instance, variant)
 			if err != nil {
-				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
+				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", classicalAlgorithm, instance, variant, err)
 			}
-			mldsaPrivKey, _ := generateMLDSAKeyPair(t, tc.instance)
-			classicalPrivKey, _ := generateClassicalKeyPair(t, tc.classicalAlgorithm, tc.classicalParams)
+			mldsaPrivKey, _ := compmldsatestvectors.GenerateMLDSAKeyPair(t, internalcompmldsa.MLDSAInstance(instance))
+			classicalPrivKey, _ := compmldsatestvectors.GenerateClassicalKeyPair(t, internalcompmldsa.ClassicalAlgorithm(classicalAlgorithm), tc.ClassicalParams)
 			keyID := uint32(0x12345678)
 			privKey, err := compositemldsa.NewPrivateKey(mldsaPrivKey, classicalPrivKey, keyID, params)
 			if err != nil {
@@ -542,8 +366,8 @@ func TestPrivateKeyEqual(t *testing.T) {
 			}
 
 			// Create a second key with the same parameters.
-			mldsaPrivKey2, _ := generateMLDSAKeyPair(t, tc.instance)
-			classicalPrivKey2, _ := generateClassicalKeyPair(t, tc.classicalAlgorithm, tc.classicalParams)
+			mldsaPrivKey2, _ := compmldsatestvectors.GenerateMLDSAKeyPair(t, internalcompmldsa.MLDSAInstance(instance))
+			classicalPrivKey2, _ := compmldsatestvectors.GenerateClassicalKeyPair(t, internalcompmldsa.ClassicalAlgorithm(classicalAlgorithm), tc.ClassicalParams)
 			privKey2, err := compositemldsa.NewPrivateKey(mldsaPrivKey2, classicalPrivKey2, keyID, params)
 			if err != nil {
 				t.Fatalf("compositemldsa.NewPrivateKey(%v, %v, %v, %v) err = %v, want nil", mldsaPrivKey2, classicalPrivKey2, keyID, params, err)
@@ -556,15 +380,18 @@ func TestPrivateKeyEqual(t *testing.T) {
 }
 
 func TestNewPrivateKeyFailsOnMistypedClassicalKey(t *testing.T) {
-	for _, tc := range testCasesSupportedParameters(t) {
-		testName := fmt.Sprintf("%v-%v-%v", tc.classicalAlgorithm, tc.instance, tc.variant)
+	for _, tc := range compmldsatestvectors.TestCasesSupportedParameters(t) {
+		classicalAlgorithm := compositemldsa.ClassicalAlgorithm(tc.ClassicalAlgorithm)
+		instance := compositemldsa.MLDSAInstance(tc.Instance)
+		variant := compositemldsa.Variant(tc.Variant)
+		testName := fmt.Sprintf("%v-%v-%v", classicalAlgorithm, instance, variant)
 		t.Run(testName, func(t *testing.T) {
-			params, err := compositemldsa.NewParameters(tc.classicalAlgorithm, tc.instance, tc.variant)
+			params, err := compositemldsa.NewParameters(classicalAlgorithm, instance, variant)
 			if err != nil {
-				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", tc.classicalAlgorithm, tc.instance, tc.variant, err)
+				t.Fatalf("compositemldsa.NewParameters(%v, %v, %v) err = %v, want nil", classicalAlgorithm, instance, variant, err)
 			}
-			mldsaPrivKey, _ := generateMLDSAKeyPair(t, tc.instance)
-			_, classicalPubKey := generateClassicalKeyPair(t, tc.classicalAlgorithm, tc.classicalParams)
+			mldsaPrivKey, _ := compmldsatestvectors.GenerateMLDSAKeyPair(t, internalcompmldsa.MLDSAInstance(instance))
+			_, classicalPubKey := compmldsatestvectors.GenerateClassicalKeyPair(t, internalcompmldsa.ClassicalAlgorithm(classicalAlgorithm), tc.ClassicalParams)
 			const keyID = uint32(0x12345678)
 			if _, err = compositemldsa.NewPrivateKey(mldsaPrivKey, classicalPubKey, keyID, params); err == nil {
 				t.Errorf("compositemldsa.NewPrivateKey(%v, %v, %v, %v) err = nil, want error", mldsaPrivKey, classicalPubKey, keyID, params)
@@ -582,8 +409,8 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 	classicalParams := mustNewED25519Parameters(t)
 
 	// Baseline key
-	mldsaPrivKey1, _ := generateMLDSAKeyPair(t, compositemldsa.MLDSA65)
-	classicalPrivKey1, _ := generateClassicalKeyPair(t, compositemldsa.Ed25519, classicalParams)
+	mldsaPrivKey1, _ := compmldsatestvectors.GenerateMLDSAKeyPair(t, internalcompmldsa.MLDSAInstance(compositemldsa.MLDSA65))
+	classicalPrivKey1, _ := compmldsatestvectors.GenerateClassicalKeyPair(t, internalcompmldsa.ClassicalAlgorithm(compositemldsa.Ed25519), classicalParams)
 	privKey1, err := compositemldsa.NewPrivateKey(mldsaPrivKey1, classicalPrivKey1, keyID, params)
 	if err != nil {
 		t.Fatalf("compositemldsa.NewPrivateKey() err = %v, want nil", err)
@@ -608,7 +435,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 		{
 			name: "Different ML-DSA Private Key",
 			other: func() key.Key {
-				mldsaPrivKey2, _ := generateMLDSAKeyPair(t, compositemldsa.MLDSA65)
+				mldsaPrivKey2, _ := compmldsatestvectors.GenerateMLDSAKeyPair(t, internalcompmldsa.MLDSAInstance(compositemldsa.MLDSA65))
 				privKeyDiffMLDSA, err := compositemldsa.NewPrivateKey(mldsaPrivKey2, classicalPrivKey1, keyID, params)
 				if err != nil {
 					t.Fatalf("compositemldsa.NewPrivateKey() err = %v, want nil", err)
@@ -619,7 +446,7 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 		{
 			name: "Different Classical Private Key",
 			other: func() key.Key {
-				classicalPrivKey2, _ := generateClassicalKeyPair(t, compositemldsa.Ed25519, classicalParams)
+				classicalPrivKey2, _ := compmldsatestvectors.GenerateClassicalKeyPair(t, internalcompmldsa.ClassicalAlgorithm(compositemldsa.Ed25519), classicalParams)
 				privKeyDiffClassical, err := compositemldsa.NewPrivateKey(mldsaPrivKey1, classicalPrivKey2, keyID, params)
 				if err != nil {
 					t.Fatalf("compositemldsa.NewPrivateKey() err = %v, want nil", err)
@@ -636,4 +463,46 @@ func TestPrivateKeyNotEqual(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustNewED25519Parameters(t *testing.T) key.Parameters {
+	t.Helper()
+	params, err := ed25519.NewParameters(ed25519.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("ed25519.NewParameters(ed25519.VariantNoPrefix) err = %v, want nil", err)
+	}
+	return &params
+}
+
+func mustNewECDSAParameters(t *testing.T, curve ecdsa.CurveType, hashType ecdsa.HashType) key.Parameters {
+	t.Helper()
+	params, err := ecdsa.NewParameters(curve, hashType, ecdsa.DER, ecdsa.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("ecdsa.NewParameters(%v, %v, ecdsa.DER, ecdsa.VariantNoPrefix) err = %v, want nil", curve, hashType, err)
+	}
+	return params
+}
+
+func mustNewRSAPSSParameters(t *testing.T, modulusSizeBits int, sigHashType rsassapss.HashType, mgf1HashType rsassapss.HashType, saltLengthBytes int) key.Parameters {
+	t.Helper()
+	params, err := rsassapss.NewParameters(rsassapss.ParametersValues{
+		ModulusSizeBits: modulusSizeBits,
+		SigHashType:     sigHashType,
+		MGF1HashType:    mgf1HashType,
+		PublicExponent:  f4,
+		SaltLengthBytes: saltLengthBytes,
+	}, rsassapss.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("rsassapss.NewParameters err = %v, want nil", err)
+	}
+	return params
+}
+
+func mustNewRSAPKCS1Parameters(t *testing.T, modulusSizeBits int, hashType rsassapkcs1.HashType) key.Parameters {
+	t.Helper()
+	params, err := rsassapkcs1.NewParameters(modulusSizeBits, hashType, f4, rsassapkcs1.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("rsassapkcs1.NewParameters err = %v, want nil", err)
+	}
+	return params
 }
