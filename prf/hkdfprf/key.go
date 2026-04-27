@@ -64,13 +64,12 @@ func primitiveConstructor(key key.Key) (any, error) {
 		return nil, fmt.Errorf("invalid key type: got %T, want %T", key, (*Key)(nil))
 	}
     
-    // here we apply secuity patch
+    
 	params, ok := actualKey.Parameters().(*Parameters)
-	if !ok {
-		return nil, fmt.Errorf("hkdfprf: internal error, invalid parameters type")
-	}
-
-    // we mantain original validation
+	
+if !ok {
+    return nil, fmt.Errorf("invalid parameters type: %T", actualKey.Parameters())
+}    
 	if err := subtle.ValidateHKDFPRFParams(params.HashType().String(), uint32(params.KeySizeInBytes()), params.Salt()); err != nil {
 		return nil, err
 	}
