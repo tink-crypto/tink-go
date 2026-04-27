@@ -194,11 +194,21 @@ func (a rZq) useHint(gamma2 uint32, h rZq) rZq {
 
 func (a rZq) centeredAbs() uint32 {
 	// Constant time version of the following logic:
-	// if (q-1)/2 <= a {
+	// if (q-1)/2 < a {
 	// 	return uint32(q - a)
 	// }
 	// return uint32(a)
-	c := subtle.ConstantTimeLessOrEq((q-1)/2, int(a))
+	//
+	// FIPS 204 §2.3 defines a mod± α as the unique m' ∈ ℤ with
+	//   m' ≡ m (mod α) and -⌈α/2⌉ < m' ≤ ⌊α/2⌋.
+	// q = 8380417 is odd, so ⌊q/2⌋ = (q-1)/2 = 4190208 and ⌈q/2⌉ = (q+1)/2 =
+	// 4190209, giving -4190208 ≤ m' ≤ 4190208, i.e. m' ∈ [-(q-1)/2, (q-1)/2].
+	// For a ∈ [0, q):
+	//   a ≤ ⌊q/2⌋ = (q-1)/2  ⟹  m' = a, |m'| = a
+	//   a > ⌊q/2⌋ = (q-1)/2  ⟹  m' = a − q, |m'| = q − a
+	// So the predicate for the q − a branch is a > (q-1)/2; the boundary
+	// value a = (q-1)/2 is non-negative and stays in the +a branch.
+	c := subtle.ConstantTimeLessOrEq((q-1)/2+1, int(a))
 	return uint32(subtle.ConstantTimeSelect(c, int(q-a), int(a)))
 }
 
