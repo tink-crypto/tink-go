@@ -63,10 +63,17 @@ func primitiveConstructor(key key.Key) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid key type: got %T, want %T", key, (*Key)(nil))
 	}
-	params := actualKey.Parameters().(*Parameters)
+    
+    
+	params, ok := actualKey.Parameters().(*Parameters)
+	
+if !ok {
+    return nil, fmt.Errorf("invalid parameters type: %T", actualKey.Parameters())
+}    
 	if err := subtle.ValidateHKDFPRFParams(params.HashType().String(), uint32(params.KeySizeInBytes()), params.Salt()); err != nil {
 		return nil, err
 	}
+    
 	return subtle.NewHKDFPRF(params.HashType().String(), actualKey.KeyBytes().Data(insecuresecretdataaccess.Token{}), params.Salt())
 }
 
