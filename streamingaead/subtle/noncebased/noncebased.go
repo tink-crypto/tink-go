@@ -51,6 +51,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"sync/atomic"
 )
 
 var (
@@ -394,4 +395,277 @@ func generateSegmentNonce(size int, prefix []byte, segmentNum uint64, last bool)
 		nonce[offset] = 1
 	}
 	return nonce, nil
+}
+
+// ReaderAt provides random-access decryption of ciphertexts created using a
+// Writer.
+//
+// The scheme used for decrypting segments is specified by providing a
+// SegmentDecrypter implementation. The implementation must align with the
+// SegmentEncrypter used in the Writer.
+//
+// ReaderAt is safe for concurrent use; ReadAt calls execute in parallel. The
+// most recently decrypted segment is cached as an immutable snapshot via an
+// atomic pointer; concurrent reads of distinct segments may each decrypt and
+// the cache retains whichever store completes last.
+//
+// The provided SegmentDecrypter must be safe for concurrent DecryptSegment
+// calls.
+type ReaderAt struct {
+	r                            io.ReaderAt
+	segmentDecrypter             SegmentDecrypter
+	segmentDecrypterWithDst      segmentDecrypterWithDst
+	useSegmentDecrypterWithDst   bool
+	nonceSize                    int
+	noncePrefix                  []byte
+	ciphertextSegmentSize        int
+	plaintextSegmentSize         int
+	firstCiphertextSegmentOffset int
+	tagSize                      int
+
+	numberOfSegments          int64
+	lastCiphertextSegmentSize int
+	plaintextSize             int64
+
+	// cache holds the most recently decrypted segment. A stored cachedSegment is
+	// never mutated. This single-slot cache could be extended to a small LRU if
+	// profiling indicates contention on repeated decryption of a working set
+	// larger than one segment.
+	cache atomic.Pointer[cachedSegment]
+}
+
+type cachedSegment struct {
+	nr        int64
+	plaintext []byte
+}
+
+// ReaderAtParams contains the options for instantiating a ReaderAt via
+// NewReaderAt().
+type ReaderAtParams struct {
+	// R is the underlying ciphertext source. Offset 0 of R must correspond to
+	// the first byte of segment_0, i.e. the position of the stream immediately
+	// after the header has been consumed. This matches the semantics of
+	// ReaderParams.R.
+	R io.ReaderAt
+
+	// CiphertextSize is the total number of segment ciphertext bytes available
+	// via R (i.e. excluding the header).
+	CiphertextSize int64
+
+	// SegmentDecrypter provides a method for decrypting segments.
+	SegmentDecrypter SegmentDecrypter
+
+	// NonceSize is the length of generated nonces. It must match the NonceSize
+	// of the Writer used to create the ciphertext.
+	NonceSize int
+
+	// NoncePrefix is a constant that all nonces throughout the ciphertext start
+	// with. It's extracted from the header of the ciphertext.
+	NoncePrefix []byte
+
+	// CiphertextSegmentSize is the size of full ciphertext segments.
+	CiphertextSegmentSize int
+
+	// PlaintextSegmentSize is the size of full plaintext segments. It must equal
+	// CiphertextSegmentSize minus the per-segment authentication tag overhead.
+	PlaintextSegmentSize int
+
+	// FirstCiphertextSegmentOffset determines how many bytes segment_0's
+	// ciphertext is shortened by relative to CiphertextSegmentSize, accounting
+	// for the stream header and any caller alignment offset. R must still begin
+	// at the first byte of segment_0's ciphertext.
+	FirstCiphertextSegmentOffset int
+}
+
+// NewReaderAt creates a new ReaderAt instance.
+func NewReaderAt(params ReaderAtParams) (*ReaderAt, error) {
+	if params.NonceSize-len(params.NoncePrefix) < 5 {
+		return nil, ErrNonceSizeTooShort
+	}
+	tagSize := params.CiphertextSegmentSize - params.PlaintextSegmentSize
+	if tagSize <= 0 {
+		return nil, errors.New("ciphertext segment size must exceed plaintext segment size")
+	}
+	if params.FirstCiphertextSegmentOffset < 0 ||
+		params.FirstCiphertextSegmentOffset+tagSize >= params.CiphertextSegmentSize {
+		return nil, errors.New("invalid first ciphertext segment offset")
+	}
+	if params.CiphertextSize < int64(tagSize) {
+		return nil, errors.New("ciphertext too short")
+	}
+	if params.CiphertextSize > math.MaxInt64-int64(params.FirstCiphertextSegmentOffset) {
+		return nil, errors.New("ciphertext size too large")
+	}
+
+	streamSize := params.CiphertextSize + int64(params.FirstCiphertextSegmentOffset)
+	fullSegments := streamSize / int64(params.CiphertextSegmentSize)
+	remainder := streamSize % int64(params.CiphertextSegmentSize)
+	var (
+		numberOfSegments          int64
+		lastCiphertextSegmentSize int
+	)
+	if remainder > 0 {
+		numberOfSegments = fullSegments + 1
+		if remainder < int64(tagSize) {
+			return nil, errors.New("ciphertext too short")
+		}
+		lastCiphertextSegmentSize = int(remainder)
+	} else {
+		numberOfSegments = fullSegments
+		lastCiphertextSegmentSize = params.CiphertextSegmentSize
+	}
+	if numberOfSegments > math.MaxUint32 {
+		return nil, ErrTooManySegments
+	}
+
+	overhead := numberOfSegments * int64(tagSize)
+	if overhead > params.CiphertextSize {
+		return nil, errors.New("ciphertext too short")
+	}
+	plaintextSize := params.CiphertextSize - overhead
+
+	decrypterWithDst, useDecrypterWithDst := params.SegmentDecrypter.(segmentDecrypterWithDst)
+
+	return &ReaderAt{
+		r:                            params.R,
+		segmentDecrypter:             params.SegmentDecrypter,
+		segmentDecrypterWithDst:      decrypterWithDst,
+		useSegmentDecrypterWithDst:   useDecrypterWithDst,
+		nonceSize:                    params.NonceSize,
+		noncePrefix:                  params.NoncePrefix,
+		ciphertextSegmentSize:        params.CiphertextSegmentSize,
+		plaintextSegmentSize:         params.PlaintextSegmentSize,
+		firstCiphertextSegmentOffset: params.FirstCiphertextSegmentOffset,
+		tagSize:                      tagSize,
+		numberOfSegments:             numberOfSegments,
+		lastCiphertextSegmentSize:    lastCiphertextSegmentSize,
+		plaintextSize:                plaintextSize,
+	}, nil
+}
+
+// Size returns the size of the plaintext.
+//
+// The returned value is derived from the ciphertext size provided at
+// construction time and is not authenticated until the final segment has been
+// successfully decrypted.
+func (r *ReaderAt) Size() int64 {
+	return r.plaintextSize
+}
+
+// segmentNr returns the segment number containing the given plaintext offset.
+func (r *ReaderAt) segmentNr(ptOff int64) int64 {
+	return (ptOff + int64(r.firstCiphertextSegmentOffset)) / int64(r.plaintextSegmentSize)
+}
+
+// ciphertextSegmentBounds returns the offset and length within r.r of the
+// ciphertext for the given segment number.
+func (r *ReaderAt) ciphertextSegmentBounds(segmentNr int64) (off int64, length int) {
+	length = r.ciphertextSegmentSize
+	if segmentNr == r.numberOfSegments-1 {
+		length = r.lastCiphertextSegmentSize
+	}
+	if segmentNr == 0 {
+		return 0, length - r.firstCiphertextSegmentOffset
+	}
+	return segmentNr*int64(r.ciphertextSegmentSize) - int64(r.firstCiphertextSegmentOffset), length
+}
+
+// CiphertextRange returns the byte range [off, off+n) within the underlying
+// ciphertext source that ReadAt will access in order to satisfy a plaintext
+// read of [ptOff, ptOff+ptLen). Callers backed by remote storage can use this
+// to prefetch the required bytes in a single round trip.
+//
+// The returned range covers whole ciphertext segments and does not include the
+// stream header.
+func (r *ReaderAt) CiphertextRange(ptOff, ptLen int64) (off, n int64) {
+	if ptLen <= 0 || ptOff < 0 || ptOff >= r.plaintextSize {
+		return 0, 0
+	}
+	end := ptOff + ptLen
+	if end > r.plaintextSize {
+		end = r.plaintextSize
+	}
+	firstOff, _ := r.ciphertextSegmentBounds(r.segmentNr(ptOff))
+	lastOff, lastLen := r.ciphertextSegmentBounds(r.segmentNr(end - 1))
+	return firstOff, lastOff + int64(lastLen) - firstOff
+}
+
+// loadSegment returns the decrypted plaintext of the given segment, using the
+// atomic cache if it already holds segmentNr. On a cache miss the segment is
+// fetched and decrypted into a fresh buffer which is then stored in the cache
+// and returned; the returned slice is never subsequently mutated.
+func (r *ReaderAt) loadSegment(segmentNr int64) ([]byte, error) {
+	if cs := r.cache.Load(); cs != nil && cs.nr == segmentNr {
+		return cs.plaintext, nil
+	}
+	ctOff, ctLen := r.ciphertextSegmentBounds(segmentNr)
+	ct := make([]byte, ctLen)
+	if _, err := readFullAt(r.r, ct, ctOff); err != nil {
+		return nil, err
+	}
+	isLast := segmentNr == r.numberOfSegments-1
+	nonce, err := generateSegmentNonce(r.nonceSize, r.noncePrefix, uint64(segmentNr), isLast)
+	if err != nil {
+		return nil, err
+	}
+	var pt []byte
+	if r.useSegmentDecrypterWithDst {
+		pt, err = r.segmentDecrypterWithDst.DecryptSegmentWithDst(nil, ct, nonce)
+	} else {
+		pt, err = r.segmentDecrypter.DecryptSegment(ct, nonce)
+	}
+	if err != nil {
+		return nil, err
+	}
+	r.cache.Store(&cachedSegment{nr: segmentNr, plaintext: pt})
+	return pt, nil
+}
+
+// ReadAt decrypts and returns plaintext bytes at the given offset. It
+// implements io.ReaderAt.
+func (r *ReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	if off < 0 {
+		return 0, errors.New("negative offset")
+	}
+	n := 0
+	for n < len(p) && off < r.plaintextSize {
+		segNr := r.segmentNr(off)
+		var segOff int
+		if segNr == 0 {
+			segOff = int(off)
+		} else {
+			segOff = int((off + int64(r.firstCiphertextSegmentOffset)) % int64(r.plaintextSegmentSize))
+		}
+		pt, err := r.loadSegment(segNr)
+		if err != nil {
+			return n, err
+		}
+		c := copy(p[n:], pt[segOff:])
+		n += c
+		off += int64(c)
+	}
+	if n < len(p) {
+		return n, io.EOF
+	}
+	return n, nil
+}
+
+// readFullAt reads exactly len(buf) bytes from r at the given offset.
+//
+// The io.ReaderAt contract requires a non-nil error whenever n < len(buf), so a
+// single call would normally suffice; this loops defensively to tolerate
+// non-conforming implementations.
+func readFullAt(r io.ReaderAt, buf []byte, off int64) (int, error) {
+	n := 0
+	for n < len(buf) {
+		m, err := r.ReadAt(buf[n:], off+int64(n))
+		n += m
+		if err != nil {
+			if err == io.EOF && n == len(buf) {
+				return n, nil
+			}
+			return n, err
+		}
+	}
+	return n, nil
 }
