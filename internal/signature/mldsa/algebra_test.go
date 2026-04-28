@@ -164,7 +164,7 @@ func TestCenteredAbs(t *testing.T) {
 	for i := 0; i < q; i++ {
 		num := rZq(i)
 		exp := uint32(num)
-		if (q-1)/2 <= exp {
+		if (q-1)/2 < exp {
 			exp = q - exp
 		}
 		got := num.centeredAbs()
