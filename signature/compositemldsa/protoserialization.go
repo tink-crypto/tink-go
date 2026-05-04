@@ -37,7 +37,13 @@ const (
 	//
 	// Currently, only version 0 is supported; other versions are rejected.
 	publicKeyProtoVersion = 0
+	// privateKeyProtoVersion is the accepted [cmdpb.CompositeMlDsaPrivateKey] proto
+	// version.
+	//
+	// Currently, only version 0 is supported; other versions are rejected.
+	privateKeyProtoVersion = 0
 
+	signerTypeURL   = "type.googleapis.com/google.crypto.tink.CompositeMlDsaPrivateKey"
 	verifierTypeURL = "type.googleapis.com/google.crypto.tink.CompositeMlDsaPublicKey"
 )
 
@@ -90,8 +96,8 @@ func protoCompositeMlDsaClassicalAlgorithmFromCompositeMlDsaClassicalAlgorithm(a
 	}
 }
 
-func typeURLForClassicalAlgorithm(alg ClassicalAlgorithm, private bool) (string, error) {
-	switch alg {
+func typeURLForClassicalAlgorithm(algorithm ClassicalAlgorithm, private bool) (string, error) {
+	switch algorithm {
 	case Ed25519:
 		if private {
 			return "type.googleapis.com/google.crypto.tink.Ed25519PrivateKey", nil
@@ -113,7 +119,7 @@ func typeURLForClassicalAlgorithm(alg ClassicalAlgorithm, private bool) (string,
 		}
 		return "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PublicKey", nil
 	default:
-		return "", fmt.Errorf("unknown classical algorithm: %v", alg)
+		return "", fmt.Errorf("unknown classical algorithm: %v", algorithm)
 	}
 }
 
@@ -131,46 +137,46 @@ func serializeClassicalKey(k key.Key) ([]byte, error) {
 }
 
 func (s *publicKeySerializer) SerializeKey(k key.Key) (*protoserialization.KeySerialization, error) {
-	compPubKey, ok := k.(*PublicKey)
+	compositePublicKey, ok := k.(*PublicKey)
 	if !ok {
 		return nil, fmt.Errorf("invalid key type: %T, want *compositemldsa.PublicKey", k)
 	}
-	if compPubKey.params == nil {
+	if compositePublicKey.params == nil {
 		return nil, fmt.Errorf("invalid key: parameters are nil")
 	}
-	outputPrefixType, err := protoOutputPrefixTypeFromVariant(compPubKey.params.Variant())
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(compositePublicKey.params.Variant())
 	if err != nil {
 		return nil, err
 	}
-	mldsaInstance, err := protoMlDsaInstanceFromInstance(compPubKey.params.MLDSAInstance())
+	mldsaInstance, err := protoMlDsaInstanceFromInstance(compositePublicKey.params.MLDSAInstance())
 	if err != nil {
 		return nil, err
 	}
-	classicalAlgorithm, err := protoCompositeMlDsaClassicalAlgorithmFromCompositeMlDsaClassicalAlgorithm(compPubKey.params.ClassicalAlgorithm())
-	if err != nil {
-		return nil, err
-	}
-
-	classicalTypeURL, err := typeURLForClassicalAlgorithm(compPubKey.params.ClassicalAlgorithm(), false)
+	classicalAlgorithm, err := protoCompositeMlDsaClassicalAlgorithmFromCompositeMlDsaClassicalAlgorithm(compositePublicKey.params.ClassicalAlgorithm())
 	if err != nil {
 		return nil, err
 	}
 
-	classicalPubKeyBytes, err := serializeClassicalKey(compPubKey.classicalPublicKey)
+	classicalTypeURL, err := typeURLForClassicalAlgorithm(compositePublicKey.params.ClassicalAlgorithm(), false)
 	if err != nil {
 		return nil, err
 	}
-	classicalPubKeyData := &tinkpb.KeyData{
+
+	classicalPublicKeyBytes, err := serializeClassicalKey(compositePublicKey.classicalPublicKey)
+	if err != nil {
+		return nil, err
+	}
+	classicalPublicKeyData := &tinkpb.KeyData{
 		TypeUrl:         classicalTypeURL,
-		Value:           classicalPubKeyBytes,
+		Value:           classicalPublicKeyBytes,
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 	}
 
-	mldsaPubKeySerialization, err := protoserialization.SerializeKey(compPubKey.mlDSAPublicKey)
+	mldsaPublicKeySerialization, err := protoserialization.SerializeKey(compositePublicKey.mlDSAPublicKey)
 	if err != nil {
 		return nil, err
 	}
-	mldsaPubKeyData := mldsaPubKeySerialization.KeyData()
+	mldsaPublicKeyData := mldsaPublicKeySerialization.KeyData()
 
 	protoKey := &compositemldsapb.CompositeMlDsaPublicKey{
 		Version: publicKeyProtoVersion,
@@ -178,18 +184,89 @@ func (s *publicKeySerializer) SerializeKey(k key.Key) (*protoserialization.KeySe
 			MlDsaInstance:      mldsaInstance,
 			ClassicalAlgorithm: classicalAlgorithm,
 		},
-		MlDsaPublicKey:     mldsaPubKeyData,
-		ClassicalPublicKey: classicalPubKeyData,
+		MlDsaPublicKey:     mldsaPublicKeyData,
+		ClassicalPublicKey: classicalPublicKeyData,
 	}
 	serializedKey, err := proto.Marshal(protoKey)
 	if err != nil {
 		return nil, err
 	}
-	idRequirement, _ := compPubKey.IDRequirement()
+	idRequirement, _ := compositePublicKey.IDRequirement()
 	keyData := &tinkpb.KeyData{
 		TypeUrl:         verifierTypeURL,
 		Value:           serializedKey,
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+	}
+	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
+}
+
+type privateKeySerializer struct{}
+
+var _ protoserialization.KeySerializer = (*privateKeySerializer)(nil)
+
+func (s *privateKeySerializer) SerializeKey(k key.Key) (*protoserialization.KeySerialization, error) {
+	compositePrivateKey, ok := k.(*PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type: %T, want *compositemldsa.PrivateKey", k)
+	}
+	if compositePrivateKey.publicKey == nil {
+		return nil, fmt.Errorf("invalid key: public key is nil")
+	}
+	params := compositePrivateKey.publicKey.params
+	if params == nil {
+		return nil, fmt.Errorf("invalid key: public key parameters are nil")
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(params.Variant())
+	if err != nil {
+		return nil, err
+	}
+	mldsaInstance, err := protoMlDsaInstanceFromInstance(params.MLDSAInstance())
+	if err != nil {
+		return nil, err
+	}
+	classicalAlgorithm, err := protoCompositeMlDsaClassicalAlgorithmFromCompositeMlDsaClassicalAlgorithm(params.ClassicalAlgorithm())
+	if err != nil {
+		return nil, err
+	}
+
+	classicalTypeURL, err := typeURLForClassicalAlgorithm(params.ClassicalAlgorithm(), true)
+	if err != nil {
+		return nil, err
+	}
+	classicalPrivateKeyBytes, err := serializeClassicalKey(compositePrivateKey.classicalPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	classicalPrivateKeyData := &tinkpb.KeyData{
+		TypeUrl:         classicalTypeURL,
+		Value:           classicalPrivateKeyBytes,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}
+
+	mldsaPrivateKeySerialization, err := protoserialization.SerializeKey(compositePrivateKey.mlDSAPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	mldsaPrivateKeyData := mldsaPrivateKeySerialization.KeyData()
+
+	protoKey := &compositemldsapb.CompositeMlDsaPrivateKey{
+		Version: privateKeyProtoVersion,
+		Params: &compositemldsapb.CompositeMlDsaParams{
+			MlDsaInstance:      mldsaInstance,
+			ClassicalAlgorithm: classicalAlgorithm,
+		},
+		MlDsaPrivateKey:     mldsaPrivateKeyData,
+		ClassicalPrivateKey: classicalPrivateKeyData,
+	}
+	serializedKey, err := proto.Marshal(protoKey)
+	if err != nil {
+		return nil, err
+	}
+	idRequirement, _ := compositePrivateKey.IDRequirement()
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         signerTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 	}
 	return protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
 }
@@ -220,8 +297,8 @@ func instanceFromProto(instanceType mldsapb.MlDsaInstance) (MLDSAInstance, error
 	}
 }
 
-func classicalAlgorithmFromProto(algType compositemldsapb.CompositeMlDsaClassicalAlgorithm) (ClassicalAlgorithm, error) {
-	switch algType {
+func classicalAlgorithmFromProto(algorithmType compositemldsapb.CompositeMlDsaClassicalAlgorithm) (ClassicalAlgorithm, error) {
+	switch algorithmType {
 	case compositemldsapb.CompositeMlDsaClassicalAlgorithm_CLASSICAL_ALGORITHM_ED25519:
 		return Ed25519, nil
 	case compositemldsapb.CompositeMlDsaClassicalAlgorithm_CLASSICAL_ALGORITHM_ECDSA_P256:
@@ -239,16 +316,16 @@ func classicalAlgorithmFromProto(algType compositemldsapb.CompositeMlDsaClassica
 	case compositemldsapb.CompositeMlDsaClassicalAlgorithm_CLASSICAL_ALGORITHM_RSA4096_PKCS1:
 		return RSA4096PKCS1, nil
 	default:
-		return UnknownAlgorithm, fmt.Errorf("unsupported classical algorithm type: %v", algType)
+		return UnknownAlgorithm, fmt.Errorf("unsupported classical algorithm type: %v", algorithmType)
 	}
 }
 
-func parseClassicalPublicKey(classicalPubKeyData *tinkpb.KeyData) (key.Key, error) {
-	if classicalPubKeyData == nil {
+func parseClassicalPublicKey(classicalPublicKeyData *tinkpb.KeyData) (key.Key, error) {
+	if classicalPublicKeyData == nil {
 		return nil, fmt.Errorf("classical public key data is nil")
 	}
 	// Classical keys are stored with RAW prefix type within the composite key.
-	serialization, err := protoserialization.NewKeySerialization(classicalPubKeyData, tinkpb.OutputPrefixType_RAW, 0)
+	serialization, err := protoserialization.NewKeySerialization(classicalPublicKeyData, tinkpb.OutputPrefixType_RAW, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create key serialization for classical public key: %v", err)
 	}
@@ -259,12 +336,12 @@ func parseClassicalPublicKey(classicalPubKeyData *tinkpb.KeyData) (key.Key, erro
 	return parsedKey, nil
 }
 
-func parseMLDSAPublicKey(mldsaPubKeyData *tinkpb.KeyData) (*mldsa.PublicKey, error) {
-	if mldsaPubKeyData == nil {
+func parseMLDSAPublicKey(mldsaPublicKeyData *tinkpb.KeyData) (*mldsa.PublicKey, error) {
+	if mldsaPublicKeyData == nil {
 		return nil, fmt.Errorf("ml-dsa public key data is nil")
 	}
 	// The embedded ML-DSA key has no prefix.
-	mldsaKeySerialization, err := protoserialization.NewKeySerialization(mldsaPubKeyData, tinkpb.OutputPrefixType_RAW, 0)
+	mldsaKeySerialization, err := protoserialization.NewKeySerialization(mldsaPublicKeyData, tinkpb.OutputPrefixType_RAW, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create key serialization for ML-DSA public key: %v", err)
 	}
@@ -272,11 +349,27 @@ func parseMLDSAPublicKey(mldsaPubKeyData *tinkpb.KeyData) (*mldsa.PublicKey, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ML-DSA public key: %v", err)
 	}
-	mldsaPubKey, ok := parsedMLDSAKey.(*mldsa.PublicKey)
+	mldsaPublicKey, ok := parsedMLDSAKey.(*mldsa.PublicKey)
 	if !ok {
 		return nil, fmt.Errorf("parsed ML-DSA key is not a PublicKey")
 	}
-	return mldsaPubKey, nil
+	return mldsaPublicKey, nil
+}
+
+func parseClassicalPrivateKey(classicalPrivateKeyData *tinkpb.KeyData) (key.Key, error) {
+	if classicalPrivateKeyData == nil {
+		return nil, fmt.Errorf("classical private key data is nil")
+	}
+	// Classical keys are stored with RAW prefix type within the composite key.
+	serialization, err := protoserialization.NewKeySerialization(classicalPrivateKeyData, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
+		return nil, fmt.Errorf("create key serialization for classical private key: %v", err)
+	}
+	parsedKey, err := protoserialization.ParseKey(serialization)
+	if err != nil {
+		return nil, fmt.Errorf("parse classical private key: %v", err)
+	}
+	return parsedKey, nil
 }
 
 func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
@@ -315,15 +408,84 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	}
 	keyID, _ := keySerialization.IDRequirement()
 
-	mldsaPubKey, err := parseMLDSAPublicKey(protoKey.GetMlDsaPublicKey())
+	mldsaPublicKey, err := parseMLDSAPublicKey(protoKey.GetMlDsaPublicKey())
 	if err != nil {
 		return nil, err
 	}
 
-	classicalPubKey, err := parseClassicalPublicKey(protoKey.GetClassicalPublicKey())
+	classicalPublicKey, err := parseClassicalPublicKey(protoKey.GetClassicalPublicKey())
 	if err != nil {
 		return nil, err
 	}
 
-	return NewPublicKey(mldsaPubKey, classicalPubKey, keyID, params)
+	return NewPublicKey(mldsaPublicKey, classicalPublicKey, keyID, params)
+}
+
+type privateKeyParser struct{}
+
+var _ protoserialization.KeyParser = (*privateKeyParser)(nil)
+
+func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySerialization) (key.Key, error) {
+	if keySerialization == nil {
+		return nil, fmt.Errorf("key serialization is nil")
+	}
+	keyData := keySerialization.KeyData()
+	if keyData.GetTypeUrl() != signerTypeURL {
+		return nil, fmt.Errorf("invalid key type URL: %v", keyData.GetTypeUrl())
+	}
+	if keyData.GetKeyMaterialType() != tinkpb.KeyData_ASYMMETRIC_PRIVATE {
+		return nil, fmt.Errorf("invalid key material type: %v", keyData.GetKeyMaterialType())
+	}
+	protoKey := new(compositemldsapb.CompositeMlDsaPrivateKey)
+	if err := proto.Unmarshal(keyData.GetValue(), protoKey); err != nil {
+		return nil, err
+	}
+	if protoKey.GetVersion() != privateKeyProtoVersion {
+		return nil, fmt.Errorf("private key has unsupported version: %v", protoKey.GetVersion())
+	}
+
+	variant, err := variantFromProto(keySerialization.OutputPrefixType())
+	if err != nil {
+		return nil, err
+	}
+	instance, err := instanceFromProto(protoKey.GetParams().GetMlDsaInstance())
+	if err != nil {
+		return nil, err
+	}
+	classicalAlgorithm, err := classicalAlgorithmFromProto(protoKey.GetParams().GetClassicalAlgorithm())
+	if err != nil {
+		return nil, err
+	}
+	params, err := NewParameters(classicalAlgorithm, instance, variant)
+	if err != nil {
+		return nil, err
+	}
+	keyID, _ := keySerialization.IDRequirement()
+
+	mldsaPrivateKeyData := protoKey.GetMlDsaPrivateKey()
+	if mldsaPrivateKeyData == nil {
+		return nil, fmt.Errorf("ml-dsa private key data is nil")
+	}
+
+	// The embedded ML-DSA key has no prefix.
+	mldsaKeySerialization, err := protoserialization.NewKeySerialization(mldsaPrivateKeyData, tinkpb.OutputPrefixType_RAW, 0)
+	if err != nil {
+		return nil, fmt.Errorf("create key serialization for ML-DSA private key: %v", err)
+	}
+
+	parsedMLDSAKey, err := protoserialization.ParseKey(mldsaKeySerialization)
+	if err != nil {
+		return nil, fmt.Errorf("parse ML-DSA private key: %v", err)
+	}
+	mldsaPrivateKey, ok := parsedMLDSAKey.(*mldsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("parsed ML-DSA key is not a PrivateKey")
+	}
+
+	classicalPrivateKey, err := parseClassicalPrivateKey(protoKey.GetClassicalPrivateKey())
+	if err != nil {
+		return nil, err
+	}
+
+	return NewPrivateKey(mldsaPrivateKey, classicalPrivateKey, keyID, params)
 }
