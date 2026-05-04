@@ -233,6 +233,18 @@ func CreatePrivateKeyDeterministic(t *testing.T, mlDSAInstanceInt compositemldsa
 	return mlDSAPrivKey, classPrivKey
 }
 
+// CreatePublicKeyDeterministic uses test vectors to create deterministic public keys for testing.
+func CreatePublicKeyDeterministic(t *testing.T, mlDSAInstance compositemldsa.MLDSAInstance, classicalAlgorithm compositemldsa.ClassicalAlgorithm) (*mldsa.PublicKey, key.Key) {
+	t.Helper()
+	mlDsaPriv, classPriv := CreatePrivateKeyDeterministic(t, mlDSAInstance, classicalAlgorithm)
+	// In the case of ML-DSA, this method cannot fail.
+	mlDsaPub, _ := mlDsaPriv.PublicKey()
+	classPubExposed := classPriv.(interface{ PublicKey() (key.Key, error) })
+	// None of the classical keys we consider have methods that can fail.
+	classPub, _ := classPubExposed.PublicKey()
+	return mlDsaPub.(*mldsa.PublicKey), classPub
+}
+
 func mustHexDecode(t *testing.T, s string) []byte {
 	t.Helper()
 	b, err := hex.DecodeString(s)
