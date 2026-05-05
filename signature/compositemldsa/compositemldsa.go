@@ -15,3 +15,41 @@
 // Package compositemldsa provides composite ML-DSA keys and parameters definitions, and key
 // managers.
 package compositemldsa
+
+import (
+	"fmt"
+
+	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+)
+
+func init() {
+	if err := protoserialization.RegisterKeySerializer[*PublicKey](&publicKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("compositemldsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(verifierTypeURL, &publicKeyParser{}); err != nil {
+		panic(fmt.Sprintf("compositemldsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*PrivateKey](&privateKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("compositemldsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(signerTypeURL, &privateKeyParser{}); err != nil {
+		panic(fmt.Sprintf("compositemldsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
+		panic(fmt.Sprintf("compositemldsa.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(signerTypeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("compositemldsa.init() failed: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*PublicKey](verifierConstructor); err != nil {
+		panic(fmt.Sprintf("compositemldsa.init() failed: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*PrivateKey](signerConstructor); err != nil {
+		panic(fmt.Sprintf("compositemldsa.init() failed: %v", err))
+	}
+	if err := keygenregistry.RegisterKeyCreator[*Parameters](createPrivateKey); err != nil {
+		panic(fmt.Sprintf("compositemldsa.init() failed: %v", err))
+	}
+}

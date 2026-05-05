@@ -19,7 +19,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	compmldsainternal "github.com/tink-crypto/tink-go/v2/internal/signature/compositemldsa"
 	compmldsatestvectors "github.com/tink-crypto/tink-go/v2/internal/signature/compositemldsa/testing"
@@ -731,6 +733,196 @@ func TestParsePrivateKeyFails(t *testing.T) {
 			p := &privateKeyParser{}
 			if _, err := p.ParseKey(tc.keySerialization); err == nil {
 				t.Errorf("p.ParseKey(%v) err = nil, want error", tc.keySerialization)
+			}
+		})
+	}
+}
+
+type parametersTestCase struct {
+	name       string
+	parameters *Parameters
+	template   *tinkpb.KeyTemplate
+}
+
+func parametersTestCases(t *testing.T) []parametersTestCase {
+	t.Helper()
+	var tcs []parametersTestCase
+	for _, tc := range compmldsatestvectors.TestCasesSupportedParameters(t) {
+		instance := MLDSAInstance(tc.Instance)
+		classicalAlg := ClassicalAlgorithm(tc.ClassicalAlgorithm)
+		variant := Variant(tc.Variant)
+
+		name := fmt.Sprintf("%v-%v-%v", instance, classicalAlg, variant)
+		parameters := &Parameters{mlDSAInstance: instance, classicalAlgorithm: classicalAlg, variant: variant}
+
+		var prefixType tinkpb.OutputPrefixType = tinkpb.OutputPrefixType_RAW
+		if variant == VariantTink {
+			prefixType = tinkpb.OutputPrefixType_TINK
+		}
+
+		template := &tinkpb.KeyTemplate{
+			TypeUrl:          signerTypeURL,
+			OutputPrefixType: prefixType,
+			Value: mustMarshal(t, &compositemldsapb.CompositeMlDsaKeyFormat{
+				Params: &compositemldsapb.CompositeMlDsaParams{
+					MlDsaInstance:      protoInstanceEnum(instance),
+					ClassicalAlgorithm: protoClassicalEnum(classicalAlg),
+				},
+				Version: 0,
+			}),
+		}
+
+		tcs = append(tcs, parametersTestCase{
+			name:       name,
+			parameters: parameters,
+			template:   template,
+		})
+	}
+	return tcs
+}
+
+func TestParseParameters(t *testing.T) {
+	for _, tc := range parametersTestCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.ParseParameters(tc.template)
+			if err != nil {
+				t.Fatalf("protoserialization.ParseParameters(%v) err = %v, want nil", tc.template, err)
+			}
+			if diff := cmp.Diff(tc.parameters, got); diff != "" {
+				t.Errorf("protoserialization.ParseParameters(%v) returned unexpected diff (-want +got):\n%s", tc.template, diff)
+			}
+
+			// Round-trip
+			gotTemplate, err := protoserialization.SerializeParameters(got)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeParameters(%v) err = %v, want nil", got, err)
+			}
+			if diff := cmp.Diff(tc.template, gotTemplate, protocmp.Transform()); diff != "" {
+				t.Errorf("protoserialization.SerializeParameters(%v) returned unexpected diff (-want +got):\n%s", got, diff)
+			}
+		})
+	}
+}
+
+func TestSerializeParameters(t *testing.T) {
+	for _, tc := range parametersTestCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := protoserialization.SerializeParameters(tc.parameters)
+			if err != nil {
+				t.Fatalf("protoserialization.SerializeParameters(%v) err = %v, want nil", tc.parameters, err)
+			}
+			if diff := cmp.Diff(tc.template, got, protocmp.Transform()); diff != "" {
+				t.Errorf("protoserialization.SerializeParameters(%v) returned unexpected diff (-want +got):\n%s", tc.parameters, diff)
+			}
+		})
+	}
+}
+
+func TestParseParametersFails(t *testing.T) {
+	validValue := mustMarshal(t, &compositemldsapb.CompositeMlDsaKeyFormat{
+		Params: &compositemldsapb.CompositeMlDsaParams{
+			MlDsaInstance:      mldsapb.MlDsaInstance_ML_DSA_65,
+			ClassicalAlgorithm: compositemldsapb.CompositeMlDsaClassicalAlgorithm_CLASSICAL_ALGORITHM_ECDSA_P256,
+		},
+		Version: 0,
+	})
+
+	// Create a proto with unsupported version
+	protoFormat := new(compositemldsapb.CompositeMlDsaKeyFormat)
+	proto.Unmarshal(validValue, protoFormat)
+	protoFormat.Version = 1
+	invalidVersionValue, _ := proto.Marshal(protoFormat)
+
+	for _, tc := range []struct {
+		name     string
+		template *tinkpb.KeyTemplate
+	}{
+		{
+			name: "invalid type URL",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "invalid_type_url",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value:            validValue,
+			},
+		},
+		{
+			name: "invalid output prefix type",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          signerTypeURL,
+				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
+				Value:            validValue,
+			},
+		},
+		{
+			name: "invalid version",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          signerTypeURL,
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value:            invalidVersionValue,
+			},
+		},
+		{
+			name: "malformed value",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          signerTypeURL,
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value:            []byte("malformed"),
+			},
+		},
+		{
+			name: "unknown instance",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          signerTypeURL,
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshal(t, &compositemldsapb.CompositeMlDsaKeyFormat{
+					Params: &compositemldsapb.CompositeMlDsaParams{
+						MlDsaInstance:      mldsapb.MlDsaInstance_ML_DSA_UNKNOWN_INSTANCE,
+						ClassicalAlgorithm: compositemldsapb.CompositeMlDsaClassicalAlgorithm_CLASSICAL_ALGORITHM_ECDSA_P256,
+					},
+					Version: 0,
+				}),
+			},
+		},
+		{
+			name: "unknown classical algorithm",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          signerTypeURL,
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshal(t, &compositemldsapb.CompositeMlDsaKeyFormat{
+					Params: &compositemldsapb.CompositeMlDsaParams{
+						MlDsaInstance:      mldsapb.MlDsaInstance_ML_DSA_65,
+						ClassicalAlgorithm: compositemldsapb.CompositeMlDsaClassicalAlgorithm_CLASSICAL_ALGORITHM_UNKNOWN,
+					},
+					Version: 0,
+				}),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseParameters(tc.template); err == nil {
+				t.Errorf("protoserialization.ParseParameters(%v) err = nil, want error", tc.template)
+			}
+		})
+	}
+}
+
+func TestSerializeParametersFails(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		parameters key.Parameters
+	}{
+		{
+			name:       "nil parameters",
+			parameters: nil,
+		},
+		{
+			name:       "wrong parameters type",
+			parameters: &mldsa.Parameters{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.SerializeParameters(tc.parameters); err == nil {
+				t.Errorf("protoserialization.SerializeParameters(%v) err = nil, want error", tc.parameters)
 			}
 		})
 	}

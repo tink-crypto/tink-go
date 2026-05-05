@@ -489,3 +489,76 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 
 	return NewPrivateKey(mldsaPrivateKey, classicalPrivateKey, keyID, params)
 }
+
+type parametersSerializer struct{}
+
+var _ protoserialization.ParametersSerializer = (*parametersSerializer)(nil)
+
+func (s *parametersSerializer) Serialize(parameters key.Parameters) (*tinkpb.KeyTemplate, error) {
+	compParams, ok := parameters.(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want *compositemldsa.Parameters", parameters)
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(compParams.Variant())
+	if err != nil {
+		return nil, err
+	}
+	mldsaInstance, err := protoMlDsaInstanceFromInstance(compParams.MLDSAInstance())
+	if err != nil {
+		return nil, err
+	}
+	classicalAlgorithm, err := protoCompositeMlDsaClassicalAlgorithmFromCompositeMlDsaClassicalAlgorithm(compParams.ClassicalAlgorithm())
+	if err != nil {
+		return nil, err
+	}
+	format := &compositemldsapb.CompositeMlDsaKeyFormat{
+		Params: &compositemldsapb.CompositeMlDsaParams{
+			MlDsaInstance:      mldsaInstance,
+			ClassicalAlgorithm: classicalAlgorithm,
+		},
+		Version: 0,
+	}
+	serializedFormat, err := proto.Marshal(format)
+	if err != nil {
+		return nil, err
+	}
+	return &tinkpb.KeyTemplate{
+		TypeUrl:          signerTypeURL,
+		OutputPrefixType: outputPrefixType,
+		Value:            serializedFormat,
+	}, nil
+}
+
+type parametersParser struct{}
+
+var _ protoserialization.ParametersParser = (*parametersParser)(nil)
+
+func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameters, error) {
+	if keyTemplate.GetTypeUrl() != signerTypeURL {
+		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyTemplate.GetTypeUrl(), signerTypeURL)
+	}
+	format := new(compositemldsapb.CompositeMlDsaKeyFormat)
+	if err := proto.Unmarshal(keyTemplate.GetValue(), format); err != nil {
+		return nil, err
+	}
+	if format.GetVersion() != 0 {
+		return nil, fmt.Errorf("unsupported key version: got %d, want %d", format.GetVersion(), 0)
+	}
+	variant, err := variantFromProto(keyTemplate.GetOutputPrefixType())
+	if err != nil {
+		return nil, err
+	}
+	instance, err := instanceFromProto(format.GetParams().GetMlDsaInstance())
+	if err != nil {
+		return nil, err
+	}
+	classicalAlgorithm, err := classicalAlgorithmFromProto(format.GetParams().GetClassicalAlgorithm())
+	if err != nil {
+		return nil, err
+	}
+	params, err := NewParameters(classicalAlgorithm, instance, variant)
+	if err != nil {
+		return nil, err
+	}
+	return params, nil
+}
