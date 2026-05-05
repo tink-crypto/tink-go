@@ -157,6 +157,9 @@ func parseParameters(protoHashType commonpb.HashType, outputPrefixType tinkpb.Ou
 		return nil, err
 	}
 	// Tolerate leading zeros in modulus encoding.
+	if !exponent.IsInt64() {
+		return nil, fmt.Errorf("public exponent cannot be represented as int64")
+	}
 	return NewParameters(modulusSizeBits, hashType, int(exponent.Int64()), variant)
 }
 
@@ -225,6 +228,9 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 	// Tolerate leading zeros in modulus encoding.
 	modulus := new(big.Int).SetBytes(protoPublicKey.GetN())
 	exponent := new(big.Int).SetBytes(protoPublicKey.GetE())
+	if !exponent.IsInt64() {
+		return nil, fmt.Errorf("public exponent cannot be represented as int64")
+	}
 	params, err := NewParameters(modulus.BitLen(), hashType, int(exponent.Int64()), variant)
 	if err != nil {
 		return nil, err
