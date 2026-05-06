@@ -246,6 +246,12 @@ func hasSecrets(ks *tinkpb.Keyset) bool {
 		case tinkpb.KeyData_UNKNOWN_KEYMATERIAL, tinkpb.KeyData_ASYMMETRIC_PRIVATE, tinkpb.KeyData_SYMMETRIC:
 			return true
 		}
+		// For keys with unregistered type URLs, the key_material_type cannot
+		// be trusted since no parser validates it. Conservatively treat them
+		// as containing secrets.
+		if !protoserialization.HasKeyParser(protoKey.GetKeyData().GetTypeUrl()) {
+			return true
+		}
 		return false
 	})
 }
