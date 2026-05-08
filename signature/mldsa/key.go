@@ -59,6 +59,8 @@ type Instance int
 const (
 	// UnknownInstance is the default value of Instance.
 	UnknownInstance Instance = iota
+	// MLDSA44 yields ML-DSA-44 parameters.
+	MLDSA44
 	// MLDSA65 yields ML-DSA-65 parameters.
 	MLDSA65
 	// MLDSA87 yields ML-DSA-87 parameters.
@@ -67,6 +69,8 @@ const (
 
 func (instance Instance) String() string {
 	switch instance {
+	case MLDSA44:
+		return "MLDSA44"
 	case MLDSA65:
 		return "MLDSA65"
 	case MLDSA87:
@@ -137,6 +141,11 @@ func calculateOutputPrefix(variant Variant, keyID uint32) ([]byte, error) {
 
 func checkPublicKeyLengthForInstance(length int, instance Instance) error {
 	switch instance {
+	case MLDSA44:
+		expectedLength := mldsa.MLDSA44.PublicKeyLength()
+		if length != expectedLength {
+			return fmt.Errorf("public key length must be %d bytes", expectedLength)
+		}
 	case MLDSA65:
 		expectedLength := mldsa.MLDSA65.PublicKeyLength()
 		if length != expectedLength {
@@ -218,6 +227,11 @@ var _ key.Key = (*PrivateKey)(nil)
 // keyGenForInstance assumes that len(seed) == mldsa.SecretKeySeedSize.
 func keyGenForInstance(seed secretdata.Bytes, instance Instance) ([]byte, secretdata.Bytes, error) {
 	switch instance {
+	case MLDSA44:
+		var seedBytes [mldsa.SecretKeySeedSize]byte
+		copy(seedBytes[:], seed.Data(insecuresecretdataaccess.Token{}))
+		publicKey, secretKey := mldsa.MLDSA44.KeyGenFromSeed(seedBytes)
+		return publicKey.Encode(), secretdata.NewBytesFromData(secretKey.Encode(), insecuresecretdataaccess.Token{}), nil
 	case MLDSA65:
 		var seedBytes [mldsa.SecretKeySeedSize]byte
 		copy(seedBytes[:], seed.Data(insecuresecretdataaccess.Token{}))
@@ -318,8 +332,8 @@ func createPrivateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid parameters type: %T", p)
 	}
-	// Make sure the parameters are not "empty"; only MLDSA65 and MLDSA87 are supported.
-	if mlDSAParams.Instance() != MLDSA65 && mlDSAParams.Instance() != MLDSA87 {
+	// Make sure the parameters are not "empty"; only MLDSA44, MLDSA65 and MLDSA87 are supported.
+	if mlDSAParams.Instance() != MLDSA44 && mlDSAParams.Instance() != MLDSA65 && mlDSAParams.Instance() != MLDSA87 {
 		return nil, fmt.Errorf("invalid parameters")
 	}
 	seed, err := secretdata.NewBytesFromRand(mldsa.SecretKeySeedSize)

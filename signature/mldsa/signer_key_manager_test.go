@@ -38,6 +38,10 @@ func TestSignerKeyManagerGetPrimitiveBasic(t *testing.T) {
 		instance tinkmldsa.Instance
 	}{
 		{
+			name:     "ML-DSA-44",
+			instance: tinkmldsa.MLDSA44,
+		},
+		{
 			name:     "ML-DSA-65",
 			instance: tinkmldsa.MLDSA65,
 		},
@@ -112,6 +116,10 @@ func TestSignerKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {
 		instance mldsapb.MlDsaInstance
 	}{
 		{
+			name:     "ML-DSA-44",
+			instance: mldsapb.MlDsaInstance_ML_DSA_44,
+		},
+		{
 			name:     "ML-DSA-65",
 			instance: mldsapb.MlDsaInstance_ML_DSA_65,
 		},
@@ -146,6 +154,10 @@ func TestSignerKeyManagerNewKeyDataBasic(t *testing.T) {
 		name     string
 		instance mldsapb.MlDsaInstance
 	}{
+		{
+			name:     "ML-DSA-44",
+			instance: mldsapb.MlDsaInstance_ML_DSA_44,
+		},
 		{
 			name:     "ML-DSA-65",
 			instance: mldsapb.MlDsaInstance_ML_DSA_65,
@@ -190,6 +202,10 @@ func TestSignerKeyManagerPublicKeyDataBasic(t *testing.T) {
 		name     string
 		instance mldsapb.MlDsaInstance
 	}{
+		{
+			name:     "ML-DSA-44",
+			instance: mldsapb.MlDsaInstance_ML_DSA_44,
+		},
 		{
 			name:     "ML-DSA-65",
 			instance: mldsapb.MlDsaInstance_ML_DSA_65,
@@ -239,6 +255,10 @@ func TestSignerKeyManagerPublicKeyDataWithInvalidInput(t *testing.T) {
 		instance mldsapb.MlDsaInstance
 	}{
 		{
+			name:     "ML-DSA-44",
+			instance: mldsapb.MlDsaInstance_ML_DSA_44,
+		},
+		{
 			name:     "ML-DSA-65",
 			instance: mldsapb.MlDsaInstance_ML_DSA_65,
 		},
@@ -276,6 +296,21 @@ func TestSignerKeyManagerPublicKeyDataWithInvalidInput(t *testing.T) {
 
 func newMLDSAPrivateKey(instance mldsapb.MlDsaInstance) *mldsapb.MlDsaPrivateKey {
 	switch instance {
+	case mldsapb.MlDsaInstance_ML_DSA_44:
+		public, private := mldsa.MLDSA44.KeyGen()
+		publicProto := &mldsapb.MlDsaPublicKey{
+			Params: &mldsapb.MlDsaParams{
+				MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_44,
+			},
+			Version:  0,
+			KeyValue: public.Encode(),
+		}
+		seed := private.Seed()
+		return &mldsapb.MlDsaPrivateKey{
+			Version:   0,
+			PublicKey: publicProto,
+			KeyValue:  seed[:],
+		}
 	case mldsapb.MlDsaInstance_ML_DSA_65:
 		public, private := mldsa.MLDSA65.KeyGen()
 		publicProto := &mldsapb.MlDsaPublicKey{
@@ -327,6 +362,8 @@ func validateMLDSAPrivateKey(instance mldsapb.MlDsaInstance, key *mldsapb.MlDsaP
 	copy(seedBytes[:], key.KeyValue)
 
 	switch instance {
+	case mldsapb.MlDsaInstance_ML_DSA_44:
+		pub, _ = mldsa.MLDSA44.KeyGenFromSeed(seedBytes)
 	case mldsapb.MlDsaInstance_ML_DSA_65:
 		pub, _ = mldsa.MLDSA65.KeyGenFromSeed(seedBytes)
 	case mldsapb.MlDsaInstance_ML_DSA_87:

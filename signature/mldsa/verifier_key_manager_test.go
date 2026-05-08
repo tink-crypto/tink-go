@@ -35,6 +35,13 @@ func TestVerifierKeyManagerGetPrimitiveBasic(t *testing.T) {
 		msg      []byte
 	}{
 		{
+			name:     "ML-DSA-44",
+			instance: tinkmldsa.MLDSA44,
+			pub:      mustDecodeString(t, pubKey44Hex),
+			sig:      mustDecodeString(t, sig44Hex),
+			msg:      mustDecodeString(t, msg65Hex),
+		},
+		{
 			name:     "ML-DSA-65",
 			instance: tinkmldsa.MLDSA65,
 			pub:      mustDecodeString(t, pubKey65Hex),
@@ -92,6 +99,10 @@ func TestVerifierKeyManagerGetPrimitiveWithInvalidInput(t *testing.T) {
 		name     string
 		instance mldsapb.MlDsaInstance
 	}{
+		{
+			name:     "ML-DSA-44",
+			instance: mldsapb.MlDsaInstance_ML_DSA_44,
+		},
 		{
 			name:     "ML-DSA-65",
 			instance: mldsapb.MlDsaInstance_ML_DSA_65,

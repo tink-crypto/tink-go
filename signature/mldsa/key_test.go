@@ -36,6 +36,11 @@ func TestNewParameters(t *testing.T) {
 		variant  mldsa.Variant
 	}{
 		{
+			name:     "tink ML-DSA-44",
+			instance: mldsa.MLDSA44,
+			variant:  mldsa.VariantTink,
+		},
+		{
 			name:     "tink ML-DSA-65",
 			instance: mldsa.MLDSA65,
 			variant:  mldsa.VariantTink,
@@ -44,6 +49,11 @@ func TestNewParameters(t *testing.T) {
 			name:     "tink ML-DSA-87",
 			instance: mldsa.MLDSA87,
 			variant:  mldsa.VariantTink,
+		},
+		{
+			name:     "no prefix ML-DSA-44",
+			instance: mldsa.MLDSA44,
+			variant:  mldsa.VariantNoPrefix,
 		},
 		{
 			name:     "no prefix ML-DSA-65",
@@ -67,6 +77,7 @@ func TestNewParameters(t *testing.T) {
 		})
 	}
 	for _, inst := range []mldsa.Instance{
+		mldsa.MLDSA44,
 		mldsa.MLDSA65,
 		mldsa.MLDSA87,
 	} {
@@ -86,6 +97,12 @@ func TestParametersHasIDRequirement(t *testing.T) {
 		want     bool
 	}{
 		{
+			name:     "tink ML-DSA-44",
+			instance: mldsa.MLDSA44,
+			variant:  mldsa.VariantTink,
+			want:     true,
+		},
+		{
 			name:     "tink ML-DSA-65",
 			instance: mldsa.MLDSA65,
 			variant:  mldsa.VariantTink,
@@ -96,6 +113,12 @@ func TestParametersHasIDRequirement(t *testing.T) {
 			instance: mldsa.MLDSA87,
 			variant:  mldsa.VariantTink,
 			want:     true,
+		},
+		{
+			name:     "no prefix ML-DSA-44",
+			instance: mldsa.MLDSA44,
+			variant:  mldsa.VariantNoPrefix,
+			want:     false,
 		},
 		{
 			name:     "no prefix ML-DSA-65",
@@ -124,6 +147,7 @@ func TestParametersHasIDRequirement(t *testing.T) {
 
 func TestParametersEqual(t *testing.T) {
 	for _, inst := range []mldsa.Instance{
+		mldsa.MLDSA44,
 		mldsa.MLDSA65,
 		mldsa.MLDSA87,
 	} {
@@ -134,7 +158,7 @@ func TestParametersEqual(t *testing.T) {
 			}
 			noPrefixVariant, err := mldsa.NewParameters(inst, mldsa.VariantNoPrefix)
 			if err != nil {
-				t.Fatalf("mldsa.NewParameters(%v) err = %v, want	 nil", mldsa.VariantNoPrefix, err)
+				t.Fatalf("mldsa.NewParameters(%v) err = %v, want nil", mldsa.VariantNoPrefix, err)
 			}
 
 			if !tinkVariant.Equal(tinkVariant) {
@@ -151,6 +175,40 @@ func TestParametersEqual(t *testing.T) {
 }
 
 const (
+	privKey44Hex = "dddaccfaa05b0332b3fd7269c7d42de6cbe370735431f735346ccb6be7ad3174"
+	pubKey44Hex  = "6e17b61b6c7881ab6d39ee703ab4ab4888d2134e54bb0195bfd0573c03d60bb8445" +
+		"f3a2045029da4fef83f7c55869c46d73dd641bc81baf1e713cdeec5116f24338a565c4a54d9d7acf" +
+		"4413ea505e00f294e48b1c7f9a391d2f070a6a741f12c0ed605a3e9ac6bcb5b5819703b17dcd331f" +
+		"08d987d50e2aa0df091c1a182ddd5ffd19a2b9ef27a5355d962229aa9451397569917e3325b44a7f" +
+		"040f6fbea8e69dbcf42d2d0b7af204368ebed1ba6be5ecb503a8d8bd3325dcc8dbf07b64ea9884b1" +
+		"14f394cc17dcf4f80c58c1dced81a3f8ef8f201605e5f3306d436e9697a68a2b62a3fc5478e7113a" +
+		"070f5aa69385a8076d522652d6926b114838cb2e5578edba7488c1cfeabe41fdcf477aecf74755d1" +
+		"a67384c896e22a22f1106e0a1684838642afb76c3ebee45f48139fcef99afc885b2a51b519a3d598" +
+		"04b6a1a6a7077edd82705d1551bf12a215ef7053b57d2789f532ef1d5736ab088629cc09f536030c" +
+		"db4b89b2bdf547b874913cc5d62fcf98f1e537e4252315a3768710972a14066f12cc01548bd9de6a" +
+		"59425b161d1441d3f6c2abafef11e8f35756d27a7754004e449a95eb698dc66463bfe3b3f8ca47e7" +
+		"340e10b69b42b105b39d9dced186d09595e9d65ce6227c039c8c6c6f9e45d17d5a2834b073e4b7cf" +
+		"0f1ce12a9453da2ba3ebb5bc0ffac14243af76517ad7d6fbd319c54391334e97d899b04bc91a31ad" +
+		"ad7cc7a056b5987fbc818075966814776aefca64381b1d3c5d01e933dc354f63bb79d9aafec70927" +
+		"972cbf9252b96e2b02770b6c4956021a6e1552ac0258d4245e1f9de76e523377d87d57ba7d8f442a" +
+		"b52b86f180040d47b8620feeaed7d543b0f38af35127013e5e8a32813f3eb7182ab3b154734b48ff" +
+		"d31fda285873312b59713b59d1bdce3147237b9ccbdd0a9e1394f02c3636b4739d00f2251572d455" +
+		"d8ffb45d43270e42c132f96e99cfac1186e4bb27cd0510536d742f7394259207f332a2df9a7740be" +
+		"bf66c03bbe5380c0c2daa1c736c4b0c938ed12884464d6f069d9cff3e3e8cc93fea8f5e2c707e53d" +
+		"24f2d2a69623a23a456447aad4bbeab468949c8006facd119c0c3ce6f4166495b5d10395d6c55adf" +
+		"87a08c379110e0811899eb97fb6168633a487db9ffa3a3dcf6bad9870493731acc4d4ba3280c197d" +
+		"7ce2f550294349ff8d5ba196ac50f45f9c6a62fcaede31f9068a90830e89f50cd5b11adc90cefc3a" +
+		"33a96e03400346e595866fad098b5e001a3cf7579b45da72aae543c7cfb4a78aded527aa266b98f4" +
+		"ce11038bb50698d02407c4a698bf502d4222c912d90462a4cea4abf2b4434fa0f72687dcad38e432" +
+		"92b843da6273cdf2da4f430253b99bdd39b2913416ff13c366387db72738061d3269c4c3bb5518ea" +
+		"53da32112d0681f750772cc517b48263e44348a2575c745eb1fa43c44a3c19ae2e2b373c6d048849" +
+		"df1b9f09ea59167b07d8611e96d7d297a55ae13ec4f82c825d661607b39b5f820b9be55e5f0b28e2" +
+		"8b064f8faf5117eb462588e91003c0fed30d313fc4ef996f7598946714e2849580510c1496c91821" +
+		"bf16c7329c6cba46a013e40e2a5c0f9e8cd3e6830641ce8013212aa7bea6e9073c138bec6b781445" +
+		"8cc16b78b8a84fcee22c18b73976b11b22749bab5852411de427b0abbce118a0f204289ad0983bce" +
+		"87f99dea31e7172774ad3827c85165bf68aee7a983558aaa2792ddbc95bc748d4af646991ceda2b0" +
+		"95c0f35bcc0e45e8608f71cfc69fc01170b6f9c7c83adda58d3efcc340a67d54ca9f0099f999cce4" +
+		"2947499253bf798b5207c03f3c44c41da57f06ba761e029e1c768f2d77034552e2ae2a67fc956"
 	// Copied from Tink C++ ML-DSA signature verification test.
 	privKey65Hex = "7C9935A0B07694AA0C6D10E4DB6B1ADD2FD81A25CCB148032DCD739936737F2D"
 	pubKey65Hex  = "1483236FC9F943D98417809E95405384530ED83E151E8465D34E4638F1F8D7058D62E19A" +
@@ -209,6 +267,67 @@ const (
 		"2EF5AF9CDCCAF74FC13D0DB8D55862858E47E4C6F66FDA9DA423B884DB6ED79D012587F7" +
 		"57F0BD974680AD8E"
 	msg65Hex = "D81C4D8D734FCBFBEADE3D3F8A039FAA2A2C9957E835AD55B22E75BF57BB556AC8"
+	sig44Hex = "4dd0ca0f6bed11fe96e3193684b260366782ee503a9caa9fac56011b858db58aa39b7c3a3a3adf8f" +
+		"bcbdc526baa511fab2adaf4348bb6ff5998f46711aafe0d15ee2df30b4446dc8be6730875e994c3d" +
+		"432f32e2256dc0d56570ccbcb5c0d0474f79344e0780547531d33a985a0d8e68945aec4e70f8ab6f" +
+		"75a8b5472dee08ca2eb6200e57be0e6d80253b2bb38410d01848c691fb086ece51bccba53cb80cc2" +
+		"86ca97e1e1c182327f2b3aebe1cd659a885df5c3eb10fd0a25436e332baf20270c19c96a54cb112c" +
+		"a8e890da4744b2ae8b99a2aa384799219b9135a078cd86ac3197b5a59b47f731cb82dbd2a9dc3bbc" +
+		"27f5c47aa6ff719af2fb2d338403b79f91dc737b0169e0d8ec01b98819fe1bb3797ea27eb2d50c27" +
+		"dea8c2a7d52fc729318530d3019ad5e2bfff553381cd17397bf282109d2ae7879c1f43c714ec2e97" +
+		"6ecbf09a6d227a0cc53d4b7aa959e1cd1dd1e97aaf1134fdd010fcb1704ee45318b8f4da676f17b9" +
+		"6aeea65c9e0d325f8bf1556a9a033a481b10f6bcd6fd971b3baf6039aa6cbe9fe8fd2a04e62723cf" +
+		"97adef4b1503e8496b75c4888bab9b36a52e59905bea263df20bf488605120c05e9c2cc3b9b23b6f" +
+		"5f3117b169db5329ddaac70d6f51367af83b45c9fc33d15124853e7b9b9d0f816071991cd4b5ceca" +
+		"ef2fbf2202c23b0ef7b8033d79a1264a0bd019bef1b2a411b4d8bfbf07da5277d8c3e853fcc81784" +
+		"45e415c2d5faf0fa367089ccca16ad4b5cf53c68a77f2e109a00c10d9caf0f5c3eafb5ae2b33e449" +
+		"a9515fee23702c6574f72cfcc968511ae5b4324420826ef1dba24abb92a6bd7d3911a4a7fd36dec7" +
+		"1d56b7fdaa083cfbfd4b54e137e680458c2cb21a61f8a127597b871464f7f9a10c343d2552f59496" +
+		"a1cdf412e661a91e6adc87f21d2eba8d9da336308af25a20a3d2cb6c96119fcdb4ba625798ba0e3c" +
+		"252c576eb22a44a1275d9a1aecac2bdf695655ac28fd33ec5971f51b7ed0e1c4a9172d737cb859e4" +
+		"e8d19eaa5aa22cb724113790951c40c7d9e1cf7626eb92d8c7498651ab879616054d753ffb848f65" +
+		"a994b3809dd6c09e22feb5d3fc1bbf960aba30c6062ea15d67457ddef67bf7403039ed79cac1a3ff" +
+		"11732b21a75dae3443031b31c0224e56ba5f5988d6b14a1ea02d99720ed4d06328651ad7c3bdb2fc" +
+		"e2858b2bc48016d634dd09763f6a5c6496f56814b368776162f44b4bbf91554fc5c3c39d88dcb134" +
+		"6c94e86dc32cb423c066d545a3933ad7afc319ff865ba15d90793ded0a6e4725587cc05bb6955dd2" +
+		"eb7ad7743ceb28033104faa089b84fee89f82301d275ce1833124f9348d72bb1b992aded148ce9df" +
+		"5c65421d2173ba413ae657df253aaa7b84c92e4478474e8b4d45d09c9537f57cb00e894d477da275" +
+		"f28d1e3cd20b3a73f0b611f0b03291a362c9ac73231e5c2e05192de56cdcf65079305dc2d910f787" +
+		"893fa2b417d67ec26f5f78973be8bd93487117b742b592322ceca205438d1edfbba498ecd7945e9c" +
+		"9432348837660e049070c46cf8b596d15f7789d8b1c563812804d5d7c3ef1ed571ce96a73e69dff2" +
+		"986662862d5c0a192c212dbc9c4a921a18c23bff4053a6140f913287692b5a0850a5df88b05947f4" +
+		"19cb8a3350ff1110d58fbf74552c2a24d096db2a1bc32d9208a76f4992651b8ce73d7cd5bc304915" +
+		"829b6dda12864510156cbc8ddea615fc5ee684777d7c0f43dd89935985c74f29d4405b73e1cc1734" +
+		"47bce21a74c82cb0a7c975ac4d95308ef6c021cd497071db7fb3b7d9501283854eda413c3beed72e" +
+		"83c6cf9fccad708c9e7b76d9d7708a8805e37c30c5a6d9e295257b00ced9513171fe3f5d19d8ed71" +
+		"bb34d39d9add199e28d9bdd4ee9060fb7a8b76948039e2a941c7a85a48d4fd7203c49cd461a64222" +
+		"1dfbafc7b1177eab7da9cfe259e01fc47aaa977f448b844198cb4d1b04e99f7f76afe7a5e83e3be2" +
+		"183ea57533dc653de59310b5231442a01281c74998a6ac0a9d6adde7a43239763e83a5d6e85a5599" +
+		"abef5ef214f1a9450bce3c7e6e2d6a63a0ea0b2aea2255bb688cc77f70e34f530a489fe989bd0d23" +
+		"8c36c4c8d3207d23a170ff38f2f404c512b2430645f5630f1a0888dfbe2fa622427160a216826d3a" +
+		"a4710a87dc9a84216f232d4f354a30afab03c8a5035c6d5f50b1bec18815508d42d606c764db6e89" +
+		"ac7ac3d40f3eb64f74f6110f1808aceab8553a5c6ea02763812c1367497826eb14515840dae23196" +
+		"f1233cbc02e3287d2abf0a480e5c465f381dad9d1861f7fddc8b508a95ba7f85c67c2c298e2953c7" +
+		"fe94e11202a85d18bb4d641e1566cd3c34ec82b8a3f1cbf1b26c6dbee69ca842c7e4102b2a69b407" +
+		"0405e5cac40d58d3e1cb5a0d9419c5b2b9049de7b402ce8c9cbedd927a80922f177f6829129d90fc" +
+		"72844176a31cce7f4e8e605654730455a01d60640e1ecd991d061cc3746fefe0e3a84fb21ada9a5f" +
+		"2559a1b6191853c59cbfe6b223d1a9b11e698b22602be8e14a47193351104b2c3053e1d5d912b5f0" +
+		"7758a568c128c89dfd0957611e40503dbedb608c67fccb3ebb39a89aa3acabc09105386343c85c20" +
+		"7adbecd5807707b31d2c0770e961ccc873f9d78f0efa5a105b76706fa29bd6505aba081ed061d494" +
+		"6cef3cfaf040d9bfdd372011c289b1a0a227f5a008a97cbd4d387d594a4d285daee33db7e7f0b966" +
+		"91d150b71a389cd2f53c232ccde41192e6a79c92630e775c7f409fb225dc707da0ee65d4d180b183" +
+		"8f54c7082e09cae11a2174b76ff1a786f5db0ce547e1a1b58759a61c92edc24b7fb3dc137d1a5403" +
+		"c999686fee7459fb884635491e797cd822a0a725460e3f1378308d0ed9bee963e4f0308e0f4fdfd0" +
+		"b45194a518e700f84246343c3a8b192bb5207d2965b4eade14cc058df9dfb989b1b7b9abd30fff61" +
+		"26648a70b8fbcbda3cae26dd52e4c1beb6b892d3e1e1e5e5d78c330df172e184530824ec0ba20a68" +
+		"7f84711e794888d297b5bbeb7ab3465a857f3aa823910762f60fe9c8d70aed4d83acd7893ac42b69" +
+		"238248f98a5e91794ff7143b495f5776782efb16da17fa937ec37b1794f50682d8a3b6f32ef1cb4a" +
+		"3028efa511830b07b02f0626d550ccc07764f7434fb187e17b28fb86fcadafe578ddf843c001752f" +
+		"7a5d2e2bbe7139c0d3a340e14792be3a55fa80e569bffe36067812970c8a0db0ca5e93649d374f95" +
+		"d53f0902cd477c478de43cf4a2bcccb9eef36ba1551f90a71c561bc0cc1d567319e0323838777449" +
+		"91569f2bfd4f34126ec23fc27156b6911a3d4688b3f0f30b0f304354575c6e98a4b4c3cbd1def1fb" +
+		"18203c3d3f4c97b3d4e9f1f5121922393c3d5972818b8e949ebedbe7f4f900000000000000000000" +
+		"0000000000000000000000000000000007182436"
 	sig65Hex = "BD0D51DB2F225AC6D3DA8F0C2439B0BCDA26EFF7EFA67CFD3C2B98EFA08477A74088DC63" +
 		"8126865E493697B6FE360FF9C55B304D15A7474C983C3D8A4E1AB28FF9925CC9073AD986" +
 		"D4B53C28B4CC909DC36B9334CC4510AFFDEA9548620923ED2158224AC5CA8FEF19228DBB" +
@@ -513,6 +632,10 @@ func TestNewPublicKeyFails(t *testing.T) {
 		privHex string
 	}{
 		{
+			mldsa.MLDSA44,
+			privKey44Hex,
+		},
+		{
 			mldsa.MLDSA65,
 			privKey65Hex,
 		},
@@ -585,6 +708,14 @@ func TestPublicKey(t *testing.T) {
 		wantOutputPrefix []byte
 	}{
 		{
+			name:             "tink ML-DSA-44",
+			instance:         mldsa.MLDSA44,
+			variant:          mldsa.VariantTink,
+			keyHex:           pubKey44Hex,
+			idRequirement:    uint32(0x01020304),
+			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+		},
+		{
 			name:             "tink ML-DSA-65",
 			instance:         mldsa.MLDSA65,
 			variant:          mldsa.VariantTink,
@@ -599,6 +730,14 @@ func TestPublicKey(t *testing.T) {
 			keyHex:           pubKey87Hex,
 			idRequirement:    uint32(0x01020304),
 			wantOutputPrefix: []byte{cryptofmt.TinkStartByte, 0x01, 0x02, 0x03, 0x04},
+		},
+		{
+			name:             "no prefix ML-DSA-44",
+			instance:         mldsa.MLDSA44,
+			variant:          mldsa.VariantNoPrefix,
+			keyHex:           pubKey44Hex,
+			idRequirement:    0,
+			wantOutputPrefix: nil,
 		},
 		{
 			name:             "no prefix ML-DSA-65",
@@ -659,6 +798,11 @@ func TestPublicKeyEqualSelf(t *testing.T) {
 		keyHex   string
 	}{
 		{
+			name:     "ML-DSA-44",
+			instance: mldsa.MLDSA44,
+			keyHex:   pubKey44Hex,
+		},
+		{
 			name:     "ML-DSA-65",
 			instance: mldsa.MLDSA65,
 			keyHex:   pubKey65Hex,
@@ -703,6 +847,11 @@ func TestPublicKeyEqual_FalseIfDifferentType(t *testing.T) {
 		instance mldsa.Instance
 		keyHex   string
 	}{
+		{
+			name:     "ML-DSA-44",
+			instance: mldsa.MLDSA44,
+			keyHex:   pubKey44Hex,
+		},
 		{
 			name:     "ML-DSA-65",
 			instance: mldsa.MLDSA65,
@@ -1285,6 +1434,7 @@ func TestPrivateKeyEqualFalse(t *testing.T) {
 
 func TestPrivateKeyKeyBytes(t *testing.T) {
 	for _, inst := range []mldsa.Instance{
+		mldsa.MLDSA44,
 		mldsa.MLDSA65,
 		mldsa.MLDSA87,
 	} {
@@ -1313,6 +1463,16 @@ func TestPrivateKeyKeyBytes(t *testing.T) {
 func getTestKeyPair(t *testing.T, instance mldsa.Instance) ([]byte, []byte) {
 	t.Helper()
 	switch instance {
+	case mldsa.MLDSA44:
+		pubKeyBytes, err := hex.DecodeString(pubKey44Hex)
+		if err != nil {
+			t.Fatalf("hex.DecodeString(pubKeyHex) err = %v, want nil", err)
+		}
+		privKeyBytes, err := hex.DecodeString(privKey44Hex)
+		if err != nil {
+			t.Fatalf("hex.DecodeString(privKeyHex) err = %v, want nil", err)
+		}
+		return pubKeyBytes, privKeyBytes
 	case mldsa.MLDSA65:
 		pubKeyBytes, err := hex.DecodeString(pubKey65Hex)
 		if err != nil {

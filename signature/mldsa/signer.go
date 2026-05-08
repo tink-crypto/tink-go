@@ -36,6 +36,8 @@ var _ tink.Signer = (*signer)(nil)
 
 func mldsaSecretKeyFromPrivateKey(privateKey *PrivateKey) (*mldsa.SecretKey, error) {
 	switch privateKey.publicKey.params.Instance() {
+	case MLDSA44:
+		return mldsa.MLDSA44.DecodeSecretKey(privateKey.expandedKeyBytes.Data(insecuresecretdataaccess.Token{}))
 	case MLDSA65:
 		return mldsa.MLDSA65.DecodeSecretKey(privateKey.expandedKeyBytes.Data(insecuresecretdataaccess.Token{}))
 	case MLDSA87:

@@ -35,6 +35,8 @@ var _ tink.Verifier = (*verifier)(nil)
 
 func mldsaPublicKeyFromPublicKey(publicKey *PublicKey) (*mldsa.PublicKey, error) {
 	switch publicKey.params.instance {
+	case MLDSA44:
+		return mldsa.MLDSA44.DecodePublicKey(publicKey.KeyBytes())
 	case MLDSA65:
 		return mldsa.MLDSA65.DecodePublicKey(publicKey.KeyBytes())
 	case MLDSA87:

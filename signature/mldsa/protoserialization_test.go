@@ -88,7 +88,42 @@ const (
 		"812eaa10c3bb60e2e15e987d4009cf9468e28de331ba4d66103ef9b644d89a72300cc1e4" +
 		"012617a8bd4a4f958451da83bb8a64b2f09a8d5ac898693db9c36a92ab0530042d41111d" +
 		"5c1df76e8722a7cf"
+	privKeyHex44 = "dddaccfaa05b0332b3fd7269c7d42de6cbe370735431f735346ccb6be7ad3174"
+	pubKeyHex44  = "6e17b61b6c7881ab6d39ee703ab4ab4888d2134e54bb0195bfd0573c03d60bb8445" +
+		"f3a2045029da4fef83f7c55869c46d73dd641bc81baf1e713cdeec5116f24338a565c4a54d9d7acf" +
+		"4413ea505e00f294e48b1c7f9a391d2f070a6a741f12c0ed605a3e9ac6bcb5b5819703b17dcd331f" +
+		"08d987d50e2aa0df091c1a182ddd5ffd19a2b9ef27a5355d962229aa9451397569917e3325b44a7f" +
+		"040f6fbea8e69dbcf42d2d0b7af204368ebed1ba6be5ecb503a8d8bd3325dcc8dbf07b64ea9884b1" +
+		"14f394cc17dcf4f80c58c1dced81a3f8ef8f201605e5f3306d436e9697a68a2b62a3fc5478e7113a" +
+		"070f5aa69385a8076d522652d6926b114838cb2e5578edba7488c1cfeabe41fdcf477aecf74755d1" +
+		"a67384c896e22a22f1106e0a1684838642afb76c3ebee45f48139fcef99afc885b2a51b519a3d598" +
+		"04b6a1a6a7077edd82705d1551bf12a215ef7053b57d2789f532ef1d5736ab088629cc09f536030c" +
+		"db4b89b2bdf547b874913cc5d62fcf98f1e537e4252315a3768710972a14066f12cc01548bd9de6a" +
+		"59425b161d1441d3f6c2abafef11e8f35756d27a7754004e449a95eb698dc66463bfe3b3f8ca47e7" +
+		"340e10b69b42b105b39d9dced186d09595e9d65ce6227c039c8c6c6f9e45d17d5a2834b073e4b7cf" +
+		"0f1ce12a9453da2ba3ebb5bc0ffac14243af76517ad7d6fbd319c54391334e97d899b04bc91a31ad" +
+		"ad7cc7a056b5987fbc818075966814776aefca64381b1d3c5d01e933dc354f63bb79d9aafec70927" +
+		"972cbf9252b96e2b02770b6c4956021a6e1552ac0258d4245e1f9de76e523377d87d57ba7d8f442a" +
+		"b52b86f180040d47b8620feeaed7d543b0f38af35127013e5e8a32813f3eb7182ab3b154734b48ff" +
+		"d31fda285873312b59713b59d1bdce3147237b9ccbdd0a9e1394f02c3636b4739d00f2251572d455" +
+		"d8ffb45d43270e42c132f96e99cfac1186e4bb27cd0510536d742f7394259207f332a2df9a7740be" +
+		"bf66c03bbe5380c0c2daa1c736c4b0c938ed12884464d6f069d9cff3e3e8cc93fea8f5e2c707e53d" +
+		"24f2d2a69623a23a456447aad4bbeab468949c8006facd119c0c3ce6f4166495b5d10395d6c55adf" +
+		"87a08c379110e0811899eb97fb6168633a487db9ffa3a3dcf6bad9870493731acc4d4ba3280c197d" +
+		"7ce2f550294349ff8d5ba196ac50f45f9c6a62fcaede31f9068a90830e89f50cd5b11adc90cefc3a" +
+		"33a96e03400346e595866fad098b5e001a3cf7579b45da72aae543c7cfb4a78aded527aa266b98f4" +
+		"ce11038bb50698d02407c4a698bf502d4222c912d90462a4cea4abf2b4434fa0f72687dcad38e432" +
+		"92b843da6273cdf2da4f430253b99bdd39b2913416ff13c366387db72738061d3269c4c3bb5518ea" +
+		"53da32112d0681f750772cc517b48263e44348a2575c745eb1fa43c44a3c19ae2e2b373c6d048849" +
+		"df1b9f09ea59167b07d8611e96d7d297a55ae13ec4f82c825d661607b39b5f820b9be55e5f0b28e2" +
+		"8b064f8faf5117eb462588e91003c0fed30d313fc4ef996f7598946714e2849580510c1496c91821" +
+		"bf16c7329c6cba46a013e40e2a5c0f9e8cd3e6830641ce8013212aa7bea6e9073c138bec6b781445" +
+		"8cc16b78b8a84fcee22c18b73976b11b22749bab5852411de427b0abbce118a0f204289ad0983bce" +
+		"87f99dea31e7172774ad3827c85165bf68aee7a983558aaa2792ddbc95bc748d4af646991ceda2b0" +
+		"95c0f35bcc0e45e8608f71cfc69fc01170b6f9c7c83adda58d3efcc340a67d54ca9f0099f999cce4" +
+		"2947499253bf798b5207c03f3c44c41da57f06ba761e029e1c768f2d77034552e2ae2a67fc956"
 )
+
 
 func mustCreateKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
 	t.Helper()
@@ -185,28 +220,72 @@ func TestParsePublicKey(t *testing.T) {
 		t.Fatalf("proto.Marshal(protoPublicKey) err = %v, want nil", err)
 	}
 
+	keyBytes44, err := hex.DecodeString(pubKeyHex44)
+	if err != nil {
+		t.Fatalf("hex.DecodeString(pubKeyHex44) err = %v, want nil", err)
+	}
+	protoPublicKey44 := mldsapb.MlDsaPublicKey{
+		KeyValue: keyBytes44,
+		Version:  publicKeyProtoVersion,
+		Params: &mldsapb.MlDsaParams{
+			MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_44,
+		},
+	}
+	serializedProtoPublicKey44, err := proto.Marshal(&protoPublicKey44)
+	if err != nil {
+		t.Fatalf("proto.Marshal(protoPublicKey44) err = %v, want nil", err)
+	}
+
 	for _, tc := range []struct {
 		name             string
 		keySerialization *protoserialization.KeySerialization
 		wantVariant      Variant
+		wantInstance     Instance
+		protoKey         *mldsapb.MlDsaPublicKey
 	}{
 		{
-			name: "key with TINK output prefix type",
+			name: "ML-DSA-65 key with TINK output prefix type",
 			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_TINK, 12345),
-			wantVariant: VariantTink,
+			wantVariant:  VariantTink,
+			wantInstance: MLDSA65,
+			protoKey:     &protoPublicKey,
 		},
 		{
-			name: "key with RAW output prefix type",
+			name: "ML-DSA-65 key with RAW output prefix type",
 			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_RAW, 0),
-			wantVariant: VariantNoPrefix,
+			wantVariant:  VariantNoPrefix,
+			wantInstance: MLDSA65,
+			protoKey:     &protoPublicKey,
+		},
+		{
+			name: "ML-DSA-44 key with TINK output prefix type",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         verifierTypeURL,
+				Value:           serializedProtoPublicKey44,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+			wantVariant:  VariantTink,
+			wantInstance: MLDSA44,
+			protoKey:     &protoPublicKey44,
+		},
+		{
+			name: "ML-DSA-44 key with RAW output prefix type",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         verifierTypeURL,
+				Value:           serializedProtoPublicKey44,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_RAW, 0),
+			wantVariant:  VariantNoPrefix,
+			wantInstance: MLDSA44,
+			protoKey:     &protoPublicKey44,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -215,14 +294,14 @@ func TestParsePublicKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("p.ParseKey(%v) err = %v, want nil", tc.keySerialization, err)
 			}
-			wantParams, err := NewParameters(MLDSA65, tc.wantVariant)
+			wantParams, err := NewParameters(tc.wantInstance, tc.wantVariant)
 			if err != nil {
-				t.Fatalf("NewParameters(%v) err = %v, want nil", tc.wantVariant, err)
+				t.Fatalf("NewParameters(%v, %v) err = %v, want nil", tc.wantInstance, tc.wantVariant, err)
 			}
 			idRequirement, _ := tc.keySerialization.IDRequirement()
-			wantKey, err := NewPublicKey(protoPublicKey.GetKeyValue(), idRequirement, wantParams)
+			wantKey, err := NewPublicKey(tc.protoKey.GetKeyValue(), idRequirement, wantParams)
 			if err != nil {
-				t.Fatalf("NewPublicKey(%v, %v, %v) err = %v, want nil", protoPublicKey.GetKeyValue(), idRequirement, wantParams, err)
+				t.Fatalf("NewPublicKey(%v, %v, %v) err = %v, want nil", tc.protoKey.GetKeyValue(), idRequirement, wantParams, err)
 			}
 			if !gotKey.Equal(wantKey) {
 				t.Errorf("%v.Equal(%v) = false, want true", gotKey, wantKey)
@@ -281,11 +360,11 @@ func TestSerializePublicKeyFails(t *testing.T) {
 	}
 }
 
-func mustCreatePublicKey(t *testing.T, keyBytes []byte, idRequirement uint32, variant Variant) *PublicKey {
+func mustCreatePublicKey(t *testing.T, instance Instance, keyBytes []byte, idRequirement uint32, variant Variant) *PublicKey {
 	t.Helper()
-	params, err := NewParameters(MLDSA65, variant)
+	params, err := NewParameters(instance, variant)
 	if err != nil {
-		t.Fatalf("NewParameters(%v) err = %v, want nil", variant, err)
+		t.Fatalf("NewParameters(%v, %v) err = %v, want nil", instance, variant, err)
 	}
 	pubKey, err := NewPublicKey(keyBytes, idRequirement, params)
 	if err != nil {
@@ -310,14 +389,31 @@ func TestSerializePublicKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proto.Marshal(protoPublicKey) err = %v, want nil", err)
 	}
+
+	keyBytes44, err := hex.DecodeString(pubKeyHex44)
+	if err != nil {
+		t.Fatalf("hex.DecodeString(pubKeyHex44) err = %v, want nil", err)
+	}
+	protoPublicKey44 := mldsapb.MlDsaPublicKey{
+		KeyValue: keyBytes44,
+		Version:  publicKeyProtoVersion,
+		Params: &mldsapb.MlDsaParams{
+			MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_44,
+		},
+	}
+	serializedProtoPublicKey44, err := proto.Marshal(&protoPublicKey44)
+	if err != nil {
+		t.Fatalf("proto.Marshal(protoPublicKey44) err = %v, want nil", err)
+	}
+
 	for _, tc := range []struct {
 		name      string
 		publicKey key.Key
 		want      *protoserialization.KeySerialization
 	}{
 		{
-			name:      "Public key with TINK output prefix type",
-			publicKey: mustCreatePublicKey(t, keyBytes, 12345, VariantTink),
+			name:      "ML-DSA-65 Public key with TINK output prefix type",
+			publicKey: mustCreatePublicKey(t, MLDSA65, keyBytes, 12345, VariantTink),
 			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
@@ -325,11 +421,29 @@ func TestSerializePublicKey(t *testing.T) {
 			}, tinkpb.OutputPrefixType_TINK, 12345),
 		},
 		{
-			name:      "Public key with RAW output prefix type",
-			publicKey: mustCreatePublicKey(t, keyBytes, 0, VariantNoPrefix),
+			name:      "ML-DSA-65 Public key with RAW output prefix type",
+			publicKey: mustCreatePublicKey(t, MLDSA65, keyBytes, 0, VariantNoPrefix),
 			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         verifierTypeURL,
 				Value:           serializedProtoPublicKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name:      "ML-DSA-44 Public key with TINK output prefix type",
+			publicKey: mustCreatePublicKey(t, MLDSA44, keyBytes44, 12345, VariantTink),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         verifierTypeURL,
+				Value:           serializedProtoPublicKey44,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name:      "ML-DSA-44 Public key with RAW output prefix type",
+			publicKey: mustCreatePublicKey(t, MLDSA44, keyBytes44, 0, VariantNoPrefix),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         verifierTypeURL,
+				Value:           serializedProtoPublicKey44,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_RAW, 0),
 		},
@@ -596,11 +710,11 @@ func TestSerializePrivateKeyFails(t *testing.T) {
 	}
 }
 
-func mustCreatePrivateKey(t *testing.T, keyBytes secretdata.Bytes, idRequirement uint32, variant Variant) *PrivateKey {
+func mustCreatePrivateKey(t *testing.T, instance Instance, keyBytes secretdata.Bytes, idRequirement uint32, variant Variant) *PrivateKey {
 	t.Helper()
-	params, err := NewParameters(MLDSA65, variant)
+	params, err := NewParameters(instance, variant)
 	if err != nil {
-		t.Fatalf("NewParameters(%v) err = %v, want nil", variant, err)
+		t.Fatalf("NewParameters(%v, %v) err = %v, want nil", instance, variant, err)
 	}
 	pubKey, err := NewPrivateKey(keyBytes, idRequirement, params)
 	if err != nil {
@@ -628,14 +742,40 @@ func TestSerializePrivateKey(t *testing.T) {
 		t.Fatalf("proto.Marshal(protoPrivateKey) err = %v, want nil", err)
 	}
 	privateKeyBytes := secretdata.NewBytesFromData(privKeyBytes, insecuresecretdataaccess.Token{})
+
+	pubKeyBytes44, err := hex.DecodeString(pubKeyHex44)
+	if err != nil {
+		t.Fatalf("hex.DecodeString(pubKeyHex44) err = %v, want nil", err)
+	}
+	privKeyBytes44, err := hex.DecodeString(privKeyHex44)
+	if err != nil {
+		t.Fatalf("hex.DecodeString(privKeyHex44) err = %v, want nil", err)
+	}
+	protoPrivateKey44 := mldsapb.MlDsaPrivateKey{
+		KeyValue: privKeyBytes44,
+		PublicKey: &mldsapb.MlDsaPublicKey{
+			KeyValue: pubKeyBytes44,
+			Version:  publicKeyProtoVersion,
+			Params: &mldsapb.MlDsaParams{
+				MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_44,
+			},
+		},
+		Version: publicKeyProtoVersion,
+	}
+	serializedProtoPrivateKey44, err := proto.Marshal(&protoPrivateKey44)
+	if err != nil {
+		t.Fatalf("proto.Marshal(protoPrivateKey44) err = %v, want nil", err)
+	}
+	privateKeyBytes44 := secretdata.NewBytesFromData(privKeyBytes44, insecuresecretdataaccess.Token{})
+
 	for _, tc := range []struct {
 		name       string
 		privateKey *PrivateKey
 		want       *protoserialization.KeySerialization
 	}{
 		{
-			name:       "Private key with TINK output prefix type",
-			privateKey: mustCreatePrivateKey(t, privateKeyBytes, 12345, VariantTink),
+			name:       "ML-DSA-65 Private key with TINK output prefix type",
+			privateKey: mustCreatePrivateKey(t, MLDSA65, privateKeyBytes, 12345, VariantTink),
 			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
 				Value:           serializedProtoPrivateKey,
@@ -643,11 +783,29 @@ func TestSerializePrivateKey(t *testing.T) {
 			}, tinkpb.OutputPrefixType_TINK, 12345),
 		},
 		{
-			name:       "Private key with RAW output prefix type",
-			privateKey: mustCreatePrivateKey(t, privateKeyBytes, 0, VariantNoPrefix),
+			name:       "ML-DSA-65 Private key with RAW output prefix type",
+			privateKey: mustCreatePrivateKey(t, MLDSA65, privateKeyBytes, 0, VariantNoPrefix),
 			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl:         "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
 				Value:           serializedProtoPrivateKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
+			name:       "ML-DSA-44 Private key with TINK output prefix type",
+			privateKey: mustCreatePrivateKey(t, MLDSA44, privateKeyBytes44, 12345, VariantTink),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				Value:           serializedProtoPrivateKey44,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name:       "ML-DSA-44 Private key with RAW output prefix type",
+			privateKey: mustCreatePrivateKey(t, MLDSA44, privateKeyBytes44, 0, VariantNoPrefix),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				Value:           serializedProtoPrivateKey44,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_RAW, 0),
 		},
@@ -693,23 +851,35 @@ func TestSerializeParametersFailsWithWrongParameters(t *testing.T) {
 }
 
 func TestSerializeParameters(t *testing.T) {
-	format := &mldsapb.MlDsaKeyFormat{
+	format65 := &mldsapb.MlDsaKeyFormat{
 		Version: 0,
 		Params: &mldsapb.MlDsaParams{
 			MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_65,
 		},
 	}
-	serializedFormat, err := proto.Marshal(format)
+	serializedFormat65, err := proto.Marshal(format65)
 	if err != nil {
-		t.Fatalf("proto.Marshal(format) err = %v, want nil", err)
+		t.Fatalf("proto.Marshal(format65) err = %v, want nil", err)
 	}
+
+	format44 := &mldsapb.MlDsaKeyFormat{
+		Version: 0,
+		Params: &mldsapb.MlDsaParams{
+			MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_44,
+		},
+	}
+	serializedFormat44, err := proto.Marshal(format44)
+	if err != nil {
+		t.Fatalf("proto.Marshal(format44) err = %v, want nil", err)
+	}
+
 	for _, tc := range []struct {
 		name       string
 		parameters key.Parameters
 		want       *tinkpb.KeyTemplate
 	}{
 		{
-			name: "parameters with TINK variant",
+			name: "ML-DSA-65 parameters with TINK variant",
 			parameters: &Parameters{
 				instance: MLDSA65,
 				variant:  VariantTink,
@@ -717,11 +887,11 @@ func TestSerializeParameters(t *testing.T) {
 			want: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				Value:            serializedFormat,
+				Value:            serializedFormat65,
 			},
 		},
 		{
-			name: "parameters with NO_PREFIX variant",
+			name: "ML-DSA-65 parameters with NO_PREFIX variant",
 			parameters: &Parameters{
 				instance: MLDSA65,
 				variant:  VariantNoPrefix,
@@ -729,7 +899,31 @@ func TestSerializeParameters(t *testing.T) {
 			want: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
-				Value:            serializedFormat,
+				Value:            serializedFormat65,
+			},
+		},
+		{
+			name: "ML-DSA-44 parameters with TINK variant",
+			parameters: &Parameters{
+				instance: MLDSA44,
+				variant:  VariantTink,
+			},
+			want: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value:            serializedFormat44,
+			},
+		},
+		{
+			name: "ML-DSA-44 parameters with NO_PREFIX variant",
+			parameters: &Parameters{
+				instance: MLDSA44,
+				variant:  VariantNoPrefix,
+			},
+			want: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+				Value:            serializedFormat44,
 			},
 		},
 	} {
@@ -746,23 +940,35 @@ func TestSerializeParameters(t *testing.T) {
 }
 
 func TestParseParameters(t *testing.T) {
-	format := &mldsapb.MlDsaKeyFormat{
+	format65 := &mldsapb.MlDsaKeyFormat{
 		Version: 0,
 		Params: &mldsapb.MlDsaParams{
 			MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_65,
 		},
 	}
-	serializedFormat, err := proto.Marshal(format)
+	serializedFormat65, err := proto.Marshal(format65)
 	if err != nil {
-		t.Fatalf("proto.Marshal(format) err = %v, want nil", err)
+		t.Fatalf("proto.Marshal(format65) err = %v, want nil", err)
 	}
+
+	format44 := &mldsapb.MlDsaKeyFormat{
+		Version: 0,
+		Params: &mldsapb.MlDsaParams{
+			MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_44,
+		},
+	}
+	serializedFormat44, err := proto.Marshal(format44)
+	if err != nil {
+		t.Fatalf("proto.Marshal(format44) err = %v, want nil", err)
+	}
+
 	for _, tc := range []struct {
 		name     string
 		want     key.Parameters
 		template *tinkpb.KeyTemplate
 	}{
 		{
-			name: "parameters with TINK variant",
+			name: "ML-DSA-65 parameters with TINK variant",
 			want: &Parameters{
 				instance: MLDSA65,
 				variant:  VariantTink,
@@ -770,11 +976,11 @@ func TestParseParameters(t *testing.T) {
 			template: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-				Value:            serializedFormat,
+				Value:            serializedFormat65,
 			},
 		},
 		{
-			name: "parameters with NO_PREFIX variant",
+			name: "ML-DSA-65 parameters with NO_PREFIX variant",
 			want: &Parameters{
 				instance: MLDSA65,
 				variant:  VariantNoPrefix,
@@ -782,7 +988,31 @@ func TestParseParameters(t *testing.T) {
 			template: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
-				Value:            serializedFormat,
+				Value:            serializedFormat65,
+			},
+		},
+		{
+			name: "ML-DSA-44 parameters with TINK variant",
+			want: &Parameters{
+				instance: MLDSA44,
+				variant:  VariantTink,
+			},
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value:            serializedFormat44,
+			},
+		},
+		{
+			name: "ML-DSA-44 parameters with NO_PREFIX variant",
+			want: &Parameters{
+				instance: MLDSA44,
+				variant:  VariantNoPrefix,
+			},
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+				Value:            serializedFormat44,
 			},
 		},
 	} {

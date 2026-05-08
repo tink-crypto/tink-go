@@ -39,6 +39,12 @@ func TestSignVerifyManager(t *testing.T) {
 		idRequirement uint32
 	}{
 		{
+			name:          "TINK ML-DSA-44",
+			instance:      tinkmldsa.MLDSA44,
+			variant:       tinkmldsa.VariantTink,
+			idRequirement: uint32(0x01020304),
+		},
+		{
 			name:          "TINK ML-DSA-65",
 			instance:      tinkmldsa.MLDSA65,
 			variant:       tinkmldsa.VariantTink,
@@ -49,6 +55,12 @@ func TestSignVerifyManager(t *testing.T) {
 			instance:      tinkmldsa.MLDSA87,
 			variant:       tinkmldsa.VariantTink,
 			idRequirement: uint32(0x01020304),
+		},
+		{
+			name:          "RAW ML-DSA-44",
+			instance:      tinkmldsa.MLDSA44,
+			variant:       tinkmldsa.VariantNoPrefix,
+			idRequirement: uint32(0),
 		},
 		{
 			name:          "RAW ML-DSA-65",
@@ -141,6 +153,11 @@ func TestVerifyFails(t *testing.T) {
 		variant  tinkmldsa.Variant
 	}{
 		{
+			name:     "TINK ML-DSA-44",
+			instance: tinkmldsa.MLDSA44,
+			variant:  tinkmldsa.VariantTink,
+		},
+		{
 			name:     "TINK ML-DSA-65",
 			instance: tinkmldsa.MLDSA65,
 			variant:  tinkmldsa.VariantTink,
@@ -149,6 +166,11 @@ func TestVerifyFails(t *testing.T) {
 			name:     "TINK ML-DSA-87",
 			instance: tinkmldsa.MLDSA87,
 			variant:  tinkmldsa.VariantTink,
+		},
+		{
+			name:     "RAW ML-DSA-44",
+			instance: tinkmldsa.MLDSA44,
+			variant:  tinkmldsa.VariantNoPrefix,
 		},
 		{
 			name:     "RAW ML-DSA-65",
@@ -236,6 +258,11 @@ func TestSignVerifyCorrectness(t *testing.T) {
 		variant  tinkmldsa.Variant
 	}{
 		{
+			name:     "TINK ML-DSA-44",
+			instance: tinkmldsa.MLDSA44,
+			variant:  tinkmldsa.VariantTink,
+		},
+		{
 			name:     "TINK ML-DSA-65",
 			instance: tinkmldsa.MLDSA65,
 			variant:  tinkmldsa.VariantTink,
@@ -244,6 +271,11 @@ func TestSignVerifyCorrectness(t *testing.T) {
 			name:     "TINK ML-DSA-87",
 			instance: tinkmldsa.MLDSA87,
 			variant:  tinkmldsa.VariantTink,
+		},
+		{
+			name:     "RAW ML-DSA-44",
+			instance: tinkmldsa.MLDSA44,
+			variant:  tinkmldsa.VariantNoPrefix,
 		},
 		{
 			name:     "RAW ML-DSA-65",
@@ -298,6 +330,10 @@ func TestWycheproof(t *testing.T) {
 		filename string
 		instance tinkmldsa.Instance
 	}{
+		{
+			filename: "mldsa_44_verify_test.json",
+			instance: tinkmldsa.MLDSA44,
+		},
 		{
 			filename: "mldsa_65_verify_test.json",
 			instance: tinkmldsa.MLDSA65,

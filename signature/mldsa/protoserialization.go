@@ -59,6 +59,8 @@ func protoOutputPrefixTypeFromVariant(variant Variant) (tinkpb.OutputPrefixType,
 
 func protoMlDsaInstanceFromInstance(instance Instance) (mldsapb.MlDsaInstance, error) {
 	switch instance {
+	case MLDSA44:
+		return mldsapb.MlDsaInstance_ML_DSA_44, nil
 	case MLDSA65:
 		return mldsapb.MlDsaInstance_ML_DSA_65, nil
 	case MLDSA87:
@@ -171,6 +173,8 @@ func variantFromProto(prefixType tinkpb.OutputPrefixType) (Variant, error) {
 
 func instanceFromProto(instanceType mldsapb.MlDsaInstance) (Instance, error) {
 	switch instanceType {
+	case mldsapb.MlDsaInstance_ML_DSA_44:
+		return MLDSA44, nil
 	case mldsapb.MlDsaInstance_ML_DSA_65:
 		return MLDSA65, nil
 	case mldsapb.MlDsaInstance_ML_DSA_87:

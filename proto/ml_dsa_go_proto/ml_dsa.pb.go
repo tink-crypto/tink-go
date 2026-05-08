@@ -47,6 +47,7 @@ const (
 	MlDsaInstance_ML_DSA_UNKNOWN_INSTANCE MlDsaInstance = 0
 	MlDsaInstance_ML_DSA_65               MlDsaInstance = 1
 	MlDsaInstance_ML_DSA_87               MlDsaInstance = 2
+	MlDsaInstance_ML_DSA_44               MlDsaInstance = 3
 )
 
 // Enum value maps for MlDsaInstance.
@@ -55,11 +56,13 @@ var (
 		0: "ML_DSA_UNKNOWN_INSTANCE",
 		1: "ML_DSA_65",
 		2: "ML_DSA_87",
+		3: "ML_DSA_44",
 	}
 	MlDsaInstance_value = map[string]int32{
 		"ML_DSA_UNKNOWN_INSTANCE": 0,
 		"ML_DSA_65":               1,
 		"ML_DSA_87":               2,
+		"ML_DSA_44":               3,
 	}
 )
 
@@ -336,11 +339,12 @@ const file_ml_dsa_proto_rawDesc = "" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12\x1b\n" +
 	"\tkey_value\x18\x02 \x01(\fR\bkeyValue\x12A\n" +
 	"\n" +
-	"public_key\x18\x03 \x01(\v2\".google.crypto.tink.MlDsaPublicKeyR\tpublicKey*J\n" +
+	"public_key\x18\x03 \x01(\v2\".google.crypto.tink.MlDsaPublicKeyR\tpublicKey*Y\n" +
 	"\rMlDsaInstance\x12\x1b\n" +
 	"\x17ML_DSA_UNKNOWN_INSTANCE\x10\x00\x12\r\n" +
 	"\tML_DSA_65\x10\x01\x12\r\n" +
-	"\tML_DSA_87\x10\x02BV\n" +
+	"\tML_DSA_87\x10\x02\x12\r\n" +
+	"\tML_DSA_44\x10\x03BV\n" +
 	"\x1ccom.google.crypto.tink.protoP\x01Z4github.com/tink-crypto/tink-go/v2/proto/ml_dsa_protob\x06proto3"
 
 var (
