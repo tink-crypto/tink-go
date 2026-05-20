@@ -17,16 +17,15 @@ package aesgcmsiv
 import (
 	"bytes"
 	"fmt"
-	"slices"
 
-	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	internalaead "github.com/tink-crypto/tink-go/v2/internal/aead"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 type aead struct {
-	rawAEAD *subtle.AESGCMSIV
+	rawAEAD *internalaead.AESGCMSIV
 	prefix  []byte
 	variant Variant
 }
@@ -34,7 +33,7 @@ type aead struct {
 var _ tink.AEAD = (*aead)(nil)
 
 func newAEAD(key *Key) (tink.AEAD, error) {
-	rawAEAD, err := subtle.NewAESGCMSIV(key.KeyBytes().Data(insecuresecretdataaccess.Token{}))
+	rawAEAD, err := internalaead.NewAESGCMSIV(key.KeyBytes().Data(insecuresecretdataaccess.Token{}))
 	if err != nil {
 		return nil, err
 	}
@@ -47,11 +46,9 @@ func newAEAD(key *Key) (tink.AEAD, error) {
 
 // Encrypt encrypts plaintext with associatedData.
 func (ca *aead) Encrypt(plaintext []byte, associatedData []byte) ([]byte, error) {
-	ciphertext, err := ca.rawAEAD.Encrypt(plaintext, associatedData)
-	if err != nil {
-		return nil, err
-	}
-	return slices.Concat(ca.prefix, ciphertext), nil
+	dst := make([]byte, len(ca.prefix), len(ca.prefix)+internalaead.AESGCMSIVNonceSize+internalaead.AESGCMSIVTagSize+len(plaintext))
+	copy(dst, ca.prefix)
+	return ca.rawAEAD.Encrypt(dst, plaintext, associatedData)
 }
 
 // Decrypt decrypts ciphertext with associatedData.
