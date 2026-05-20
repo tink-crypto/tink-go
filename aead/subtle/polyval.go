@@ -50,10 +50,11 @@ type Polyval interface {
 // In order to reflect the Polyval standard and make binary.LittleEndian suitable
 // for marshaling these values, the bits are stored in little endian order.
 // For example:
-//   the coefficient of x^0 can be obtained by v.lo & 1.
-//   the coefficient of x^63 can be obtained by v.lo >> 63.
-//   the coefficient of x^64 can be obtained by v.hi & 1.
-//   the coefficient of x^127 can be obtained by v.hi >> 63.
+//
+//	the coefficient of x^0 can be obtained by v.lo & 1.
+//	the coefficient of x^63 can be obtained by v.lo >> 63.
+//	the coefficient of x^64 can be obtained by v.hi & 1.
+//	the coefficient of x^127 can be obtained by v.hi >> 63.
 type fieldElement struct {
 	lo, hi uint64
 }
@@ -171,20 +172,18 @@ func NewPolyval(key []byte) (Polyval, error) {
 }
 
 func (p *polyval) Update(data []byte) {
-	var block []byte
-	for len(data) > 0 {
-		if len(data) >= PolyvalBlockSize {
-			block = data[:PolyvalBlockSize]
-			data = data[PolyvalBlockSize:]
-		} else {
-			var partialBlock [PolyvalBlockSize]byte
-			copy(partialBlock[:], data)
-			block = partialBlock[:]
-			data = data[len(data):]
-		}
+	for len(data) >= PolyvalBlockSize {
+		p.acc.lo ^= binary.LittleEndian.Uint64(data[:8])
+		p.acc.hi ^= binary.LittleEndian.Uint64(data[8:16])
+		p.acc = polyvalDot(p.acc, p.key)
+		data = data[PolyvalBlockSize:]
+	}
 
-		p.acc.lo ^= binary.LittleEndian.Uint64(block[:8])
-		p.acc.hi ^= binary.LittleEndian.Uint64(block[8:])
+	if len(data) > 0 {
+		var partialBlock [PolyvalBlockSize]byte
+		copy(partialBlock[:], data)
+		p.acc.lo ^= binary.LittleEndian.Uint64(partialBlock[:8])
+		p.acc.hi ^= binary.LittleEndian.Uint64(partialBlock[8:16])
 		p.acc = polyvalDot(p.acc, p.key)
 	}
 }
