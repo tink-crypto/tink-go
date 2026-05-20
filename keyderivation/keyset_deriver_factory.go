@@ -122,7 +122,9 @@ func (w *wrappedKeysetDeriver) DeriveKeyset(salt []byte) (*keyset.Handle, error)
 		if err != nil {
 			return nil, fmt.Errorf("keyset_deriver_factory: keyset derivation failed: %v", err)
 		}
-		km.AddKeyWithOpts(derivedKey, internalapi.Token{}, keyset.WithFixedID(e.keyID))
+		if _, err := km.AddKeyWithOpts(derivedKey, internalapi.Token{}, keyset.WithFixedID(e.keyID)); err != nil {
+			return nil, fmt.Errorf("keyset_deriver_factory: cannot add derived key: %v", err)
+		}
 		if e.keyID == w.primaryKeyID {
 			if err := km.SetPrimary(e.keyID); err != nil {
 				return nil, fmt.Errorf("keyset_deriver_factory: cannot set primary key: %v", err)
