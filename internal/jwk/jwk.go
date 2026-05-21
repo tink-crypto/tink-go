@@ -218,9 +218,13 @@ func rsPublicKeyDataFromStruct(keyStruct *spb.Struct) (key.Key, error) {
 		kidStrategy = jwtrsassapkcs1.CustomKID
 	}
 
+	publicExponent := new(big.Int).SetBytes(rsaPubKey.exponent)
+	if !publicExponent.IsInt64() {
+		return nil, fmt.Errorf("public exponent cannot be represented as int64")
+	}
 	params, err := jwtrsassapkcs1.NewParameters(jwtrsassapkcs1.ParametersOpts{
 		ModulusSizeInBits: new(big.Int).SetBytes(rsaPubKey.modulus).BitLen(),
-		PublicExponent:    int(new(big.Int).SetBytes(rsaPubKey.exponent).Int64()),
+		PublicExponent:    int(publicExponent.Int64()),
 		Algorithm:         algorithm,
 		KidStrategy:       kidStrategy,
 	})
