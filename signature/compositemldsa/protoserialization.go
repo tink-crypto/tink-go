@@ -47,6 +47,26 @@ const (
 	verifierTypeURL = "type.googleapis.com/google.crypto.tink.CompositeMlDsaPublicKey"
 )
 
+// allowedClassicalPublicKeyTypeURLs restricts the classical public key slot to
+// non-composite key types, preventing unbounded recursion through the global
+// ParseKey registry when parsing untrusted composite key blobs.
+var allowedClassicalPublicKeyTypeURLs = map[string]struct{}{
+	"type.googleapis.com/google.crypto.tink.Ed25519PublicKey":     {},
+	"type.googleapis.com/google.crypto.tink.EcdsaPublicKey":       {},
+	"type.googleapis.com/google.crypto.tink.RsaSsaPssPublicKey":   {},
+	"type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PublicKey": {},
+}
+
+// allowedClassicalPrivateKeyTypeURLs restricts the classical private key slot to
+// non-composite key types, preventing unbounded recursion through the global
+// ParseKey registry when parsing untrusted composite key blobs.
+var allowedClassicalPrivateKeyTypeURLs = map[string]struct{}{
+	"type.googleapis.com/google.crypto.tink.Ed25519PrivateKey":     {},
+	"type.googleapis.com/google.crypto.tink.EcdsaPrivateKey":       {},
+	"type.googleapis.com/google.crypto.tink.RsaSsaPssPrivateKey":   {},
+	"type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey": {},
+}
+
 type publicKeySerializer struct{}
 
 var _ protoserialization.KeySerializer = (*publicKeySerializer)(nil)
@@ -324,6 +344,9 @@ func parseClassicalPublicKey(classicalPublicKeyData *tinkpb.KeyData) (key.Key, e
 	if classicalPublicKeyData == nil {
 		return nil, fmt.Errorf("classical public key data is nil")
 	}
+	if _, ok := allowedClassicalPublicKeyTypeURLs[classicalPublicKeyData.GetTypeUrl()]; !ok {
+		return nil, fmt.Errorf("unsupported classical public key type URL: %v", classicalPublicKeyData.GetTypeUrl())
+	}
 	// Classical keys are stored with RAW prefix type within the composite key.
 	serialization, err := protoserialization.NewKeySerialization(classicalPublicKeyData, tinkpb.OutputPrefixType_RAW, 0)
 	if err != nil {
@@ -359,6 +382,9 @@ func parseMLDSAPublicKey(mldsaPublicKeyData *tinkpb.KeyData) (*mldsa.PublicKey, 
 func parseClassicalPrivateKey(classicalPrivateKeyData *tinkpb.KeyData) (key.Key, error) {
 	if classicalPrivateKeyData == nil {
 		return nil, fmt.Errorf("classical private key data is nil")
+	}
+	if _, ok := allowedClassicalPrivateKeyTypeURLs[classicalPrivateKeyData.GetTypeUrl()]; !ok {
+		return nil, fmt.Errorf("unsupported classical private key type URL: %v", classicalPrivateKeyData.GetTypeUrl())
 	}
 	// Classical keys are stored with RAW prefix type within the composite key.
 	serialization, err := protoserialization.NewKeySerialization(classicalPrivateKeyData, tinkpb.OutputPrefixType_RAW, 0)
