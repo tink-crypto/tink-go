@@ -334,6 +334,14 @@ func RegisterKeyParser(keyTypeURL string, keyParser KeyParser) error {
 	return nil
 }
 
+// HasKeyParser reports whether a key parser is registered for the given type URL.
+func HasKeyParser(keyTypeURL string) bool {
+	keyParsersMu.RLock()
+	_, found := keyParsers[keyTypeURL]
+	keyParsersMu.RUnlock()
+	return found
+}
+
 // ParseKey parses the given keyset key into a key.
 //
 // If no parser is registered for the given type URL, a fallback key is returned.
