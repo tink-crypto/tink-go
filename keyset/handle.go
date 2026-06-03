@@ -303,7 +303,37 @@ func NewHandleWithNoSecrets(ks *tinkpb.Keyset) (*Handle, error) {
 	if hasSecrets(ks) {
 		return nil, fmt.Errorf("keyset.Handle: importing unencrypted secret key material is forbidden")
 	}
-	return newKeysetHandleFromProto(ks)
+	handle, err := newKeysetHandleFromProto(ks)
+	if err != nil {
+		return nil, err
+	}
+	// Cross-validate: after parsing, re-serialize each key and verify the
+	// actual KeyMaterialType from the trusted parser matches the input.
+	// This prevents spoofing where an attacker sets key_material_type to
+	// ASYMMETRIC_PUBLIC for a symmetric key (e.g., HMAC) to bypass hasSecrets.
+	for i := 0; i < handle.Len(); i++ {
+		entry, err := handle.Entry(i)
+		if err != nil {
+			return nil, fmt.Errorf("keyset.Handle: %v", err)
+		}
+		// Check if the parsed key is actually a private key.
+		if _, ok := entry.Key().(privateKey); ok {
+			return nil, fmt.Errorf("keyset.Handle: keyset contains a private key despite key_material_type claiming otherwise")
+		}
+		// Re-serialize and check the trusted KeyMaterialType.
+		protoKeySerialization, err := protoserialization.SerializeKey(entry.Key())
+		if err != nil {
+			return nil, fmt.Errorf("keyset.Handle: cannot verify key material type: %v", err)
+		}
+		trustedType := protoKeySerialization.KeyData().GetKeyMaterialType()
+		switch trustedType {
+		case tinkpb.KeyData_UNKNOWN_KEYMATERIAL, tinkpb.KeyData_ASYMMETRIC_PRIVATE, tinkpb.KeyData_SYMMETRIC:
+			return nil, fmt.Errorf(
+				"keyset.Handle: key material type mismatch: serialized key_material_type was spoofed; "+
+					"actual type from parser is %v", trustedType)
+		}
+	}
+	return handle, nil
 }
 
 // Read tries to create a Handle from an encrypted keyset obtained via reader.
