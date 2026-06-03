@@ -17,10 +17,10 @@ package jwk_test
 import (
 	"testing"
 
-	spb "google.golang.org/protobuf/types/known/structpb"
 	"github.com/google/go-cmp/cmp"
-	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/internal/jwk"
+	"google.golang.org/protobuf/testing/protocmp"
+	spb "google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestEd25519KeyConversion(t *testing.T) {
@@ -72,6 +72,8 @@ func TestEd25519KeyConversion(t *testing.T) {
 }
 
 // n2048Base64 is a base64url-encoded 2048-bit RSA modulus used in tests.
+// Taken from:
+// https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/rsa_pkcs1_2048_test.json#L13
 const n2048Base64 = "s1EKK81M5kTFtZSuUFnhKy8FS2WNXaWVmi_fGHG4CLw98-Yo0nkuUarVwSS0O9pFPcpc3kvPKOe9Tv-6DLS3Qru21aATy2PRqjqJ4CYn71OYtSwM_ZfSCKvrjXybzgu-sBmobdtYm-sppbdL-GEHXGd8gdQw8DDCZSR6-dPJFAzLZTCdB-Ctwe_RXPF-ewVdfaOGjkZIzDoYDw7n-OHnsYCYozkbTOcWHpjVevipR-IBpGPi1rvKgFnlcG6d_tj0hWRl_6cS7RqhjoiNEtxqoJzpXs_Kg8xbCxXbCchkf11STA8udiCjQWuWI8rcDwl69XMmHJjIQAqhKvOOQ8rYTQ"
 
 // TestRS256OversizedPublicExponentRejected verifies that a JWK with a
@@ -102,7 +104,7 @@ func TestRS256OversizedPublicExponentRejected(t *testing.T) {
 
 	_, err := jwk.ToPublicKeysetHandle([]byte(jwkSet), jwk.Ed25519SupportNone)
 	if err == nil {
-		t.Fatal("ToPublicKeysetHandle() err = nil, want error for oversized public exponent")
+		t.Errorf("ToPublicKeysetHandle() err = nil, want error for oversized public exponent")
 	}
 }
 
@@ -124,7 +126,7 @@ func TestRS256NormalPublicExponentAccepted(t *testing.T) {
 
 	_, err := jwk.ToPublicKeysetHandle([]byte(jwkSet), jwk.Ed25519SupportNone)
 	if err != nil {
-		t.Fatalf("ToPublicKeysetHandle() err = %v, want nil for valid RS256 key", err)
+		t.Errorf("ToPublicKeysetHandle() err = %v, want nil for valid RS256 key", err)
 	}
 }
 
