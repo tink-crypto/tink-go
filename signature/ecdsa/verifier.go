@@ -117,7 +117,7 @@ func (e *verifier) Verify(signatureBytes, data []byte) error {
 	case DER:
 		asn1Signature = rawSignature
 	case IEEEP1363:
-		decodedSig, err := internalecdsa.IEEEP1363Decode(rawSignature)
+		decodedSig, err := internalecdsa.IEEEP1363DecodeWithCurve(rawSignature, e.key.Curve.Params().Name)
 		if err != nil {
 			return err
 		}

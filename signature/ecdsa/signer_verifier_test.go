@@ -313,6 +313,26 @@ func TestVerifyFails(t *testing.T) {
 			}(),
 		},
 		{
+			name:      "padded IEEE_P1363 signature",
+			publicKey: mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 123, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantTink)),
+			signature: func() []byte {
+				privateKey := mustCreatePrivateKey(t, bytesFromHex(t, privKeyValueP256Hex), 123, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.IEEEP1363, ecdsa.VariantTink))
+				s, err := ecdsa.NewSigner(privateKey, internalapi.Token{})
+				if err != nil {
+					t.Fatalf("ecdsa.NewSigner(%v) err = %v, want nil", privateKey, err)
+				}
+				signature, err := s.Sign(data)
+				if err != nil {
+					t.Fatalf("signer.Sign(%v) err = %v, want nil", data, err)
+				}
+
+				prefix := privateKey.OutputPrefix()
+				rawSig := signature[len(prefix):]
+				mutatedSignature := slices.Concat(prefix, []byte{0x00}, rawSig[:len(rawSig)/2], []byte{0x00}, rawSig[len(rawSig)/2:])
+				return mutatedSignature
+			}(),
+		},
+		{
 			name:      "invalid signature",
 			publicKey: mustCreatePublicKey(t, bytesFromHex(t, pubKeyUncompressedP256Hex), 123, mustCreateParameters(t, ecdsa.NistP256, ecdsa.SHA256, ecdsa.DER, ecdsa.VariantTink)),
 			signature: func() []byte {

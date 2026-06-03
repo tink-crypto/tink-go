@@ -89,6 +89,33 @@ func TestECDSAInvalidCurve(t *testing.T) {
 	}
 }
 
+func TestECDSAVerifyPaddedIEEEP1363SignatureFails(t *testing.T) {
+	data := random.GetRandomBytes(20)
+	hash := "SHA256"
+	curve := "NIST_P256"
+	priv, err := ecdsa.GenerateKey(subtle.GetCurve(curve), rand.Reader)
+	if err != nil {
+		t.Fatalf("ecdsa.GenerateKey() err = %q, want nil", err)
+	}
+	signer, err := subtleSignature.NewECDSASignerFromPrivateKey(hash, "IEEE_P1363", priv)
+	if err != nil {
+		t.Fatalf("unexpected error when creating ECDSASigner: %s", err)
+	}
+	verifier, err := subtleSignature.NewECDSAVerifierFromPublicKey(hash, "IEEE_P1363", &priv.PublicKey)
+	if err != nil {
+		t.Fatalf("unexpected error when creating ECDSAVerifier: %s", err)
+	}
+	signature, err := signer.Sign(data)
+	if err != nil {
+		t.Fatalf("unexpected error when signing: %s", err)
+	}
+
+	paddedSignature := slices.Concat([]byte{0x00}, signature[:len(signature)/2], []byte{0x00}, signature[len(signature)/2:])
+	if err := verifier.Verify(paddedSignature, data); err == nil {
+		t.Errorf("verifier.Verify(paddedSignature) err = nil, want error")
+	}
+}
+
 func TestECDSAWycheproofCases(t *testing.T) {
 	vectors := []struct {
 		Filename string

@@ -200,22 +200,40 @@ func TestIEEEP1363Decode(t *testing.T) {
 		ieeeHex string
 	}{
 		{
-			name:    "16 bytes",
-			rHex:    "0102030405060708090a0b0c0d0e0f10",
-			sHex:    "1102030405060708090a0b0c0d0e0fff",
-			ieeeHex: "0102030405060708090a0b0c0d0e0f101102030405060708090a0b0c0d0e0fff",
+			name:    "64 bytes",
+			rHex:    "112233445566778899aaabbccddeeff0112233445566778899aaabbccddeeff0",
+			sHex:    "112233445566778899aaabbccddeeff0112233445566778899aaabbccddeeff0",
+			ieeeHex: "112233445566778899aaabbccddeeff0112233445566778899aaabbccddeeff0112233445566778899aaabbccddeeff0112233445566778899aaabbccddeeff0",
 		},
 		{
-			name:    "66 bytes",
-			rHex:    "010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000203",
-			sHex:    "0f0000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000204",
-			ieeeHex: "0100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000002030f0000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000010000000204",
+			name:    "64 bytes (leading zeros)",
+			rHex:    "445566778899aaabbccddeeff0000000445566778899aaabbccddeeff0",
+			sHex:    "8899aaabbccddeeff0000000445566778899aaabbccddeeff0",
+			ieeeHex: "000000445566778899aaabbccddeeff0000000445566778899aaabbccddeeff0000000000000008899aaabbccddeeff0000000445566778899aaabbccddeeff0",
 		},
 		{
-			name:    "30 bytes",
-			rHex:    "02030405060708090a0b0c0d0e0f10",
-			sHex:    "02030405060708090a0b0c0d0e0f10",
-			ieeeHex: "02030405060708090a0b0c0d0e0f1002030405060708090a0b0c0d0e0f10",
+			name:    "96 bytes",
+			rHex:    "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456",
+			sHex:    "abababababababababababababababababababababababababababababababababababababababababababababababab",
+			ieeeHex: "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456abababababababababababababababababababababababababababababababababababababababababababababababab",
+		},
+		{
+			name:    "96 bytes (leading zeros)",
+			rHex:    "12345678901234567890123456789012345678901234567890123456789012345678901234567890123456",
+			sHex:    "ababababababababababababababababababababababababababababababababababababababababababababababab",
+			ieeeHex: "00000000001234567890123456789012345678901234567890123456789012345678901234567890123456789012345600ababababababababababababababababababababababababababababababababababababababababababababababab",
+		},
+		{
+			name:    "132 bytes",
+			rHex:    "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456445566778899aaabbccddeeff00000004455",
+			sHex:    "abbccddeeff0000000445566778899aaabbccddeeff0000000445566778899abbccddeeff0000000445566778899aaabbccddeeff0000000445566778899aaaaaaaa",
+			ieeeHex: "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456445566778899aaabbccddeeff00000004455abbccddeeff0000000445566778899aaabbccddeeff0000000445566778899abbccddeeff0000000445566778899aaabbccddeeff0000000445566778899aaaaaaaa",
+		},
+		{
+			name:    "132 bytes (leading zeros)",
+			rHex:    "445678901234567890123456789012345678901234567890123456789012345678901234567890123456445566778899aaabbccddeeff00000004455",
+			sHex:    "bccddeeff0000000445566778899aaabbccddeeff0000000445566778899abbccddeeff0000000445566778899aaabbccddeeff0000000445566778899aaaaaaaa",
+			ieeeHex: "000000000000445678901234567890123456789012345678901234567890123456789012345678901234567890123456445566778899aaabbccddeeff0000000445500bccddeeff0000000445566778899aaabbccddeeff0000000445566778899abbccddeeff0000000445566778899aaabbccddeeff0000000445566778899aaaaaaaa",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -243,6 +261,10 @@ func TestIEEEP1363DecodeFails(t *testing.T) {
 			encoded: big.NewInt(1).Bytes(),
 		},
 		{
+			name:    "invalid size",
+			encoded: big.NewInt(12345).Bytes(),
+		},
+		{
 			name:    "too large",
 			encoded: new(big.Int).Lsh(big.NewInt(1), 132).Bytes(),
 		},
@@ -250,6 +272,117 @@ func TestIEEEP1363DecodeFails(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := ecdsa.IEEEP1363Decode(tc.encoded); err == nil {
 				t.Fatalf("ecdsa.IEEEP1363Decode(%v) err = nil, want error", tc.encoded)
+			}
+		})
+	}
+}
+
+func TestIEEEP1363DecodeWithCurve(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		curveName string
+		rHex      string
+		sHex      string
+		ieeeHex   string
+	}{
+		{
+			name:      "64 bytes P-256",
+			curveName: "P-256",
+			rHex:      "112233445566778899aaabbccddeeff0112233445566778899aaabbccddeeff0",
+			sHex:      "112233445566778899aaabbccddeeff0112233445566778899aaabbccddeeff0",
+			ieeeHex:   "112233445566778899aaabbccddeeff0112233445566778899aaabbccddeeff0112233445566778899aaabbccddeeff0112233445566778899aaabbccddeeff0",
+		},
+		{
+			name:      "64 bytes P-256 (leading zeros)",
+			curveName: "P-256",
+			rHex:      "445566778899aaabbccddeeff0000000445566778899aaabbccddeeff0",
+			sHex:      "8899aaabbccddeeff0000000445566778899aaabbccddeeff0",
+			ieeeHex:   "000000445566778899aaabbccddeeff0000000445566778899aaabbccddeeff0000000000000008899aaabbccddeeff0000000445566778899aaabbccddeeff0",
+		},
+		{
+			name:      "96 bytes P-384",
+			curveName: "P-384",
+			rHex:      "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456",
+			sHex:      "abababababababababababababababababababababababababababababababababababababababababababababababab",
+			ieeeHex:   "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456abababababababababababababababababababababababababababababababababababababababababababababababab",
+		},
+		{
+			name:      "96 bytes P-384 (leading zeros)",
+			curveName: "P-384",
+			rHex:      "12345678901234567890123456789012345678901234567890123456789012345678901234567890123456",
+			sHex:      "ababababababababababababababababababababababababababababababababababababababababababababababab",
+			ieeeHex:   "00000000001234567890123456789012345678901234567890123456789012345678901234567890123456789012345600ababababababababababababababababababababababababababababababababababababababababababababababab",
+		},
+		{
+			name:      "132 bytes P-521",
+			curveName: "P-521",
+			rHex:      "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456445566778899aaabbccddeeff00000004455",
+			sHex:      "abbccddeeff0000000445566778899aaabbccddeeff0000000445566778899abbccddeeff0000000445566778899aaabbccddeeff0000000445566778899aaaaaaaa",
+			ieeeHex:   "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456445566778899aaabbccddeeff00000004455abbccddeeff0000000445566778899aaabbccddeeff0000000445566778899abbccddeeff0000000445566778899aaabbccddeeff0000000445566778899aaaaaaaa",
+		},
+		{
+			name:      "132 bytes P-521 (leading zeros)",
+			curveName: "P-521",
+			rHex:      "445678901234567890123456789012345678901234567890123456789012345678901234567890123456445566778899aaabbccddeeff00000004455",
+			sHex:      "bccddeeff0000000445566778899aaabbccddeeff0000000445566778899abbccddeeff0000000445566778899aaabbccddeeff0000000445566778899aaaaaaaa",
+			ieeeHex:   "000000000000445678901234567890123456789012345678901234567890123456789012345678901234567890123456445566778899aaabbccddeeff0000000445500bccddeeff0000000445566778899aaabbccddeeff0000000445566778899abbccddeeff0000000445566778899aaabbccddeeff0000000445566778899aaaaaaaa",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ecdsa.IEEEP1363DecodeWithCurve(hexToBytes(t, tc.ieeeHex), tc.curveName)
+			if err != nil {
+				t.Fatalf("ecdsa.IEEEP1363DecodeWithCurve(%v, %q) err = %v, want nil", tc.ieeeHex, tc.curveName, err)
+			}
+			if want := new(big.Int).SetBytes(hexToBytes(t, tc.rHex)); got.R.Cmp(want) != 0 {
+				t.Errorf("ecdsa.IEEEP1363DecodeWithCurve(%v, %q).R = %v, want %v", tc.ieeeHex, tc.curveName, got.R, want)
+			}
+			if want := new(big.Int).SetBytes(hexToBytes(t, tc.sHex)); got.S.Cmp(want) != 0 {
+				t.Errorf("ecdsa.IEEEP1363DecodeWithCurve(%v, %q).S = %v, want %v", tc.ieeeHex, tc.curveName, got.S, want)
+			}
+		})
+	}
+}
+
+func TestIEEEP1363DecodeWithCurveFails(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		encoded   []byte
+		curveName string
+	}{
+		{
+			name:      "too small for P-256",
+			encoded:   big.NewInt(1).Bytes(),
+			curveName: "P-256",
+		},
+		{
+			name:      "invalid size for P-256",
+			encoded:   make([]byte, 65),
+			curveName: "P-256",
+		},
+		{
+			name:      "64 bytes but curve P-384",
+			encoded:   make([]byte, 64),
+			curveName: "P-384",
+		},
+		{
+			name:      "too large for P-521",
+			encoded:   new(big.Int).Lsh(big.NewInt(1), 132).Bytes(),
+			curveName: "P-521",
+		},
+		{
+			name:      "padded signature for P-256",
+			encoded:   make([]byte, 66),
+			curveName: "P-256",
+		},
+		{
+			name:      "invalid curve",
+			encoded:   make([]byte, 64),
+			curveName: "invalid",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := ecdsa.IEEEP1363DecodeWithCurve(tc.encoded, tc.curveName); err == nil {
+				t.Fatalf("ecdsa.IEEEP1363DecodeWithCurve(%v, %q) err = nil, want error", tc.encoded, tc.curveName)
 			}
 		})
 	}

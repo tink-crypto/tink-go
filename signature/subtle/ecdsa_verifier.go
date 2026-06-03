@@ -75,7 +75,7 @@ func (e *ECDSAVerifier) Verify(signatureBytes, data []byte) error {
 	case "DER":
 		asn1Signature = signatureBytes
 	case "IEEE_P1363":
-		decodedSig, err := internalecdsa.IEEEP1363Decode(signatureBytes)
+		decodedSig, err := internalecdsa.IEEEP1363DecodeWithCurve(signatureBytes, e.publicKey.Curve.Params().Name)
 		if err != nil {
 			return err
 		}

@@ -94,10 +94,24 @@ func IEEEP1363Encode(sig *Signature, curveName string) ([]byte, error) {
 	return enc, nil
 }
 
+// IEEEP1363DecodeWithCurve decodes the given ECDSA signature using IEEE_P1363 encoding.
+func IEEEP1363DecodeWithCurve(encodedBytes []byte, curveName string) (*Signature, error) {
+	sigSize, err := ieeeSignatureSize(curveName)
+	if err != nil {
+		return nil, err
+	}
+	if len(encodedBytes) != sigSize {
+		return nil, fmt.Errorf("ecdsa: invalid IEEE_P1363 encoded bytes length: got %d, want %d", len(encodedBytes), sigSize)
+	}
+	r := new(big.Int).SetBytes(encodedBytes[:len(encodedBytes)/2])
+	s := new(big.Int).SetBytes(encodedBytes[len(encodedBytes)/2:])
+	return &Signature{R: r, S: s}, nil
+}
+
 // IEEEP1363Decode decodes the given ECDSA signature using IEEE_P1363 encoding.
 func IEEEP1363Decode(encodedBytes []byte) (*Signature, error) {
-	if len(encodedBytes) == 0 || len(encodedBytes) > 132 || len(encodedBytes)%2 != 0 {
-		return nil, fmt.Errorf("ecdsa: Invalid IEEE_P1363 encoded bytes")
+	if len(encodedBytes) != 64 && len(encodedBytes) != 96 && len(encodedBytes) != 132 {
+		return nil, fmt.Errorf("ecdsa: invalid IEEE_P1363 encoded bytes length: %d", len(encodedBytes))
 	}
 	r := new(big.Int).SetBytes(encodedBytes[:len(encodedBytes)/2])
 	s := new(big.Int).SetBytes(encodedBytes[len(encodedBytes)/2:])

@@ -56,6 +56,9 @@ func (sig *ECDSASignature) EncodeECDSASignature(encoding, curveName string) ([]b
 // DecodeECDSASignature creates a new ECDSA signature using the given byte slice.
 // The function assumes that the byte slice is the concatenation of the BigEndian
 // representation of two big integer r and s.
+//
+// NOTE: For IEEE_P1363 encoding, the caller should validate the size of the
+// encoded bytes w.r.t. the curve size to
 func DecodeECDSASignature(encodedBytes []byte, encoding string) (*ECDSASignature, error) {
 	var sig *ecdsa.Signature
 	var err error
