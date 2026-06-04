@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"hash"
 	"math/big"
+	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -74,6 +75,22 @@ func NewSigner(k *PrivateKey, _ internalapi.Token) (tink.Signer, error) {
 	}, nil
 }
 
+func signImpl(pk *ecdsa.PrivateKey, hashed []byte, encoding SignatureEncoding) ([]byte, error) {
+	switch encoding {
+	case IEEEP1363:
+		r, s, err := ecdsa.Sign(rand.Reader, pk, hashed)
+		if err != nil {
+			return nil, err
+		}
+		sig := internalecdsa.Signature{R: r, S: s}
+		return internalecdsa.IEEEP1363Encode(&sig, pk.PublicKey.Curve.Params().Name)
+	case DER:
+		return ecdsa.SignASN1(rand.Reader, pk, hashed)
+	default:
+		return nil, fmt.Errorf("unsupported encoding: %s", encoding)
+	}
+}
+
 // Sign computes a signature for the given data.
 //
 // The returned signature is of the form: prefix || signature, where prefix is
@@ -86,27 +103,12 @@ func (e *signer) Sign(data []byte) ([]byte, error) {
 		h.Write([]byte{0})
 	}
 	hashed := h.Sum(nil)
-	switch encoding := e.parameters.SignatureEncoding(); encoding {
-	case IEEEP1363:
-		r, s, err := ecdsa.Sign(rand.Reader, e.key, hashed)
-		if err != nil {
-			return nil, err
-		}
-		sig := internalecdsa.Signature{R: r, S: s}
-		signatureBytes, err := internalecdsa.IEEEP1363Encode(&sig, e.key.PublicKey.Curve.Params().Name)
-		if err != nil {
-			return nil, fmt.Errorf("ecdsa_signer: signing failed: %s", err)
-		}
-		return append(e.prefix, signatureBytes...), nil
-	case DER:
-		signatureBytes, err := ecdsa.SignASN1(rand.Reader, e.key, hashed)
-		if err != nil {
-			return nil, fmt.Errorf("ecdsa_signer: signing failed: %s", err)
-		}
-		return append(e.prefix, signatureBytes...), nil
-	default:
-		return nil, fmt.Errorf("ecdsa_signer: unsupported encoding: %s", encoding)
+	encoding := e.parameters.SignatureEncoding()
+	signatureBytes, err := signImpl(e.key, hashed, encoding)
+	if err != nil {
+		return nil, fmt.Errorf("ecdsa_signer: signing failed: %s", err)
 	}
+	return slices.Concat(e.prefix, signatureBytes), nil
 }
 
 func signerConstructor(key key.Key) (any, error) {
