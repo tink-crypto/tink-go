@@ -18,14 +18,13 @@ package primitiveregistry
 import (
 	"fmt"
 	"reflect"
-	"sync"
 
+	"github.com/tink-crypto/tink-go/v2/internal/syncmap"
 	"github.com/tink-crypto/tink-go/v2/key"
 )
 
 var (
-	primitiveConstructorsMu sync.RWMutex
-	primitiveConstructors   = make(map[reflect.Type]primitiveConstructor)
+	primitiveConstructors = syncmap.New[reflect.Type, primitiveConstructor]()
 )
 
 type primitiveConstructor func(key key.Key) (any, error)
@@ -34,12 +33,10 @@ type primitiveConstructor func(key key.Key) (any, error)
 // from a given [key.Key] to the global registry.
 func RegisterPrimitiveConstructor[K key.Key](constructor primitiveConstructor) error {
 	keyType := reflect.TypeFor[K]()
-	primitiveConstructorsMu.Lock()
-	defer primitiveConstructorsMu.Unlock()
-	if existingCreator, found := primitiveConstructors[keyType]; found && reflect.ValueOf(existingCreator).Pointer() != reflect.ValueOf(constructor).Pointer() {
+	existing, loaded := primitiveConstructors.LoadOrStore(keyType, constructor)
+	if loaded && reflect.ValueOf(existing).Pointer() != reflect.ValueOf(constructor).Pointer() {
 		return fmt.Errorf("a different constructor already registered for %v", keyType)
 	}
-	primitiveConstructors[keyType] = constructor
 	return nil
 }
 
@@ -48,9 +45,7 @@ func RegisterPrimitiveConstructor[K key.Key](constructor primitiveConstructor) e
 //
 // This function is intended to be used in tests only.
 func UnregisterPrimitiveConstructor[K key.Key]() {
-	primitiveConstructorsMu.Lock()
-	defer primitiveConstructorsMu.Unlock()
-	delete(primitiveConstructors, reflect.TypeFor[K]())
+	primitiveConstructors.Delete(reflect.TypeFor[K]())
 }
 
 // Primitive constructs a primitive from a given [key.Key].
@@ -58,9 +53,7 @@ func Primitive(key key.Key) (any, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key is nil")
 	}
-	primitiveConstructorsMu.RLock()
-	constructor, found := primitiveConstructors[reflect.TypeOf(key)]
-	primitiveConstructorsMu.RUnlock()
+	constructor, found := primitiveConstructors.Load(reflect.TypeOf(key))
 	if !found {
 		return nil, fmt.Errorf("no constructor found for key %T", key)
 	}

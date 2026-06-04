@@ -18,16 +18,15 @@ package keygenregistry
 import (
 	"fmt"
 	"reflect"
-	"sync"
 
+	"github.com/tink-crypto/tink-go/v2/internal/syncmap"
 	"github.com/tink-crypto/tink-go/v2/key"
 )
 
 type keyCreator = func(p key.Parameters, idRequirement uint32) (key.Key, error)
 
 var (
-	keyCreatorsMutex sync.RWMutex
-	keyCreators      = make(map[reflect.Type]keyCreator)
+	keyCreators = syncmap.New[reflect.Type, keyCreator]()
 )
 
 // RegisterKeyCreator registers a function that creates a key from
@@ -37,21 +36,16 @@ var (
 // matter whether it's the same object or different, since constructors are of
 // type [Func] and they are never considered equal in Go unless they are nil).
 func RegisterKeyCreator[P key.Parameters](creator func(p key.Parameters, idRequirement uint32) (key.Key, error)) error {
-	defer keyCreatorsMutex.Unlock()
-	keyCreatorsMutex.Lock()
 	parametersType := reflect.TypeFor[P]()
-	if _, found := keyCreators[parametersType]; found {
+	if _, found := keyCreators.LoadOrStore(parametersType, creator); found {
 		return fmt.Errorf("a different key creator already registered for %v", parametersType)
 	}
-	keyCreators[parametersType] = creator
 	return nil
 }
 
 // CreateKey creates a key from the given [key.Parameters] using the registry.
 func CreateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
-	keyCreatorsMutex.RLock()
-	creator, found := keyCreators[reflect.TypeOf(p)]
-	keyCreatorsMutex.RUnlock()
+	creator, found := keyCreators.Load(reflect.TypeOf(p))
 	if !found {
 		return nil, fmt.Errorf("no creator found for parameters %T", p)
 	}
@@ -61,9 +55,4 @@ func CreateKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
 // UnregisterKeyCreator unregisters a key creator for the given parametersType.
 //
 // This is for testing only.
-func UnregisterKeyCreator[P key.Parameters]() {
-	defer keyCreatorsMutex.Unlock()
-	keyCreatorsMutex.Lock()
-	parametersType := reflect.TypeFor[P]()
-	delete(keyCreators, parametersType)
-}
+func UnregisterKeyCreator[P key.Parameters]() { keyCreators.Delete(reflect.TypeFor[P]()) }

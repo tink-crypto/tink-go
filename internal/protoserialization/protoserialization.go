@@ -21,46 +21,21 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
-	"sync"
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/outputprefix"
+	"github.com/tink-crypto/tink-go/v2/internal/syncmap"
 	"github.com/tink-crypto/tink-go/v2/key"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-// syncMap is a wrapper of [sync.Map] that provides better type safety.
-type syncMap[K any, V any] struct {
-	sm sync.Map
-}
-
-func newSyncMap[K any, V any]() *syncMap[K, V] { return &syncMap[K, V]{} }
-
-func (m *syncMap[K, V]) Load(key K) (V, bool) {
-	val, ok := m.sm.Load(key)
-	if !ok {
-		var zero V
-		return zero, false
-	}
-	return val.(V), true
-}
-
-func (m *syncMap[K, V]) Delete(key K) { m.sm.Delete(key) }
-
-func (m *syncMap[K, V]) LoadOrStore(key K, value V) (V, bool) {
-	val, loaded := m.sm.LoadOrStore(key, value)
-	return val.(V), loaded
-}
-
-func (m *syncMap[K, V]) Clear() { m.sm.Clear() }
-
 var (
-	keyParsers           = newSyncMap[string, KeyParser]()                  // TypeURL -> KeyParser
-	keySerializers       = newSyncMap[reflect.Type, KeySerializer]()        // KeyType -> KeySerializer
-	parameterSerializers = newSyncMap[reflect.Type, ParametersSerializer]() // ParameterType -> ParametersSerializer
-	parameterParsers     = newSyncMap[string, ParametersParser]()           // TypeURL -> ParametersParser
+	keyParsers           = syncmap.New[string, KeyParser]()                  // TypeURL -> KeyParser
+	keySerializers       = syncmap.New[reflect.Type, KeySerializer]()        // KeyType -> KeySerializer
+	parameterSerializers = syncmap.New[reflect.Type, ParametersSerializer]() // ParameterType -> ParametersSerializer
+	parameterParsers     = syncmap.New[string, ParametersParser]()           // TypeURL -> ParametersParser
 )
 
 type fallbackProtoKeyParams struct {

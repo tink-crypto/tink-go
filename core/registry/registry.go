@@ -34,34 +34,29 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/syncmap"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 var (
-	keyManagersMu sync.RWMutex
-	keyManagers   = make(map[string]KeyManager) // typeURL -> KeyManager
-	kmsClientsMu  sync.RWMutex
-	kmsClients    = []KMSClient{}
+	keyManagers  = syncmap.New[string, KeyManager]() // typeURL -> KeyManager
+	kmsClientsMu sync.RWMutex
+	kmsClients   = []KMSClient{}
 )
 
 // RegisterKeyManager registers the given key manager.
 // Does not allow to overwrite existing key managers.
 func RegisterKeyManager(keyManager KeyManager) error {
-	keyManagersMu.Lock()
-	defer keyManagersMu.Unlock()
 	typeURL := keyManager.TypeURL()
-	if _, existed := keyManagers[typeURL]; existed {
+	if _, existed := keyManagers.LoadOrStore(typeURL, keyManager); existed {
 		return fmt.Errorf("registry.RegisterKeyManager: type %s already registered", typeURL)
 	}
-	keyManagers[typeURL] = keyManager
 	return nil
 }
 
 // GetKeyManager returns the key manager for the given typeURL if existed.
 func GetKeyManager(typeURL string) (KeyManager, error) {
-	keyManagersMu.RLock()
-	defer keyManagersMu.RUnlock()
-	keyManager, existed := keyManagers[typeURL]
+	keyManager, existed := keyManagers.Load(typeURL)
 	if !existed {
 		return nil, fmt.Errorf("registry.GetKeyManager: unsupported key type: %s", typeURL)
 	}
@@ -159,8 +154,4 @@ func ClearKMSClients() {
 // Does nothing if the key manager is not registered.
 //
 // This function is intended to be used in tests only and is an internal API.
-func UnregisterKeyManager(typeURL string, _ internalapi.Token) {
-	keyManagersMu.Lock()
-	defer keyManagersMu.Unlock()
-	delete(keyManagers, typeURL)
-}
+func UnregisterKeyManager(typeURL string, _ internalapi.Token) { keyManagers.Delete(typeURL) }
