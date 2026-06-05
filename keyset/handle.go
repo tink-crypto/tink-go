@@ -118,7 +118,10 @@ func (e *Entry) KeyStatus() KeyStatus {
 	return e.status
 }
 
-func (e *Entry) toUnmonitored() *Entry {
+// ToUnmonitoredEntry returns a copy of the entry that is not monitored.
+//
+// This is an internal API.
+func (e *Entry) ToUnmonitoredEntry(_ internalapi.Token) *Entry {
 	return newUnmonitoredEntry(e.key, e.isPrimary, e.keyID, e.status)
 }
 
@@ -176,7 +179,7 @@ func entriesToProtoKeyset(entries []*Entry, shouldLogKeyExport bool) (*tinkpb.Ke
 
 	for i, entry := range entries {
 		if !shouldLogKeyExport {
-			entry = entry.toUnmonitored()
+			entry = entry.ToUnmonitoredEntry(internalapi.Token{})
 		}
 		protoKey, err := entryToProtoKey(entry)
 		if err != nil {
@@ -425,7 +428,7 @@ func entriesToKeysetInfo(entries []*Entry) (*tinkpb.KeysetInfo, error) {
 	var primaryKeyID uint32
 
 	for i, entry := range entries {
-		entry = entry.toUnmonitored()
+		entry = entry.ToUnmonitoredEntry(internalapi.Token{})
 		if entry.IsPrimary() {
 			primaryKeyID = entry.KeyID()
 		}
@@ -519,6 +522,11 @@ func (h *Handle) WriteWithNoSecrets(w Writer) error {
 	return w.Write(protoKeyset)
 }
 
+// Annotations returns the annotations of the keyset.
+//
+// This is an internal API.
+func (h *Handle) Annotations(_ internalapi.Token) map[string]string { return h.annotations }
+
 // Config provides methods to create primitives from [key.Key]s.
 type Config interface {
 	// PrimitiveFromKey creates a primitive from a [key.Key].
@@ -566,7 +574,7 @@ func Primitives[T any](h *Handle, config Config, _ internalapi.Token) (*primitiv
 
 func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry *Entry, config Config) error {
 	// Don't monitor this as key export.
-	entry = entry.toUnmonitored()
+	entry = entry.ToUnmonitoredEntry(internalapi.Token{})
 	var primitive any
 	isFullPrimitive := true
 	primitive, err := config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
