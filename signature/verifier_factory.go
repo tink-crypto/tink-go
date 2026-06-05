@@ -19,9 +19,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
@@ -40,7 +39,27 @@ func NewVerifierWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Ve
 	if err != nil {
 		return nil, fmt.Errorf("verifier_factory: cannot obtain primitive set: %s", err)
 	}
-	return newWrappedVerifier(ps)
+	verifiers := prefixmap.New[verifierAndID]()
+	for _, entries := range ps.Entries {
+		for _, e := range entries {
+			verifier, err := extractFullVerifier(e)
+			if err != nil {
+				return nil, err
+			}
+			verifiers.Insert(string(e.OutputPrefix()), verifierAndID{
+				verifier: verifier,
+				keyID:    e.KeyID,
+			})
+		}
+	}
+	logger, err := createVerifierLogger(handle)
+	if err != nil {
+		return nil, err
+	}
+	return &wrappedVerifier{
+		verifiers: verifiers,
+		logger:    logger,
+	}, nil
 }
 
 // NewVerifier returns a [tink.Verifier] primitive from the given
@@ -107,44 +126,12 @@ func extractFullVerifier(e *primitiveset.Entry[tink.Verifier]) (tink.Verifier, e
 	}, nil
 }
 
-func newWrappedVerifier(ps *primitiveset.PrimitiveSet[tink.Verifier]) (*wrappedVerifier, error) {
-	verifiers := prefixmap.New[verifierAndID]()
-	for _, entries := range ps.Entries {
-		for _, e := range entries {
-			verifier, err := extractFullVerifier(e)
-			if err != nil {
-				return nil, err
-			}
-			verifiers.Insert(string(e.OutputPrefix()), verifierAndID{
-				verifier: verifier,
-				keyID:    e.KeyID,
-			})
-		}
-	}
-	logger, err := createVerifierLogger(ps)
+func createVerifierLogger(kh *keyset.Handle) (monitoring.Logger, error) {
+	factory, err := factoryutil.NewLoggerFactory(kh)
 	if err != nil {
 		return nil, err
 	}
-	return &wrappedVerifier{
-		verifiers: verifiers,
-		logger:    logger,
-	}, nil
-}
-
-func createVerifierLogger(ps *primitiveset.PrimitiveSet[tink.Verifier]) (monitoring.Logger, error) {
-	// only keysets which contain annotations are monitored.
-	if len(ps.Annotations) == 0 {
-		return &monitoringutil.DoNothingLogger{}, nil
-	}
-	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
-	if err != nil {
-		return nil, err
-	}
-	return internalregistry.GetMonitoringClient().NewLogger(&monitoring.Context{
-		KeysetInfo:  keysetInfo,
-		Primitive:   "public_key_verify",
-		APIFunction: "verify",
-	})
+	return factory.CreateFor("public_key_verify", "verify")
 }
 
 // Verify checks whether the given signature is a valid signature of the given data.

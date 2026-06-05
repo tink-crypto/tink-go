@@ -18,9 +18,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
@@ -37,7 +36,19 @@ func NewSignerWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Sign
 	if err != nil {
 		return nil, fmt.Errorf("public_key_sign_factory: cannot obtain primitive set: %s", err)
 	}
-	return newWrappedSigner(ps)
+	signer, err := extractFullSigner(ps.Primary)
+	if err != nil {
+		return nil, err
+	}
+	logger, err := createSignerLogger(handle)
+	if err != nil {
+		return nil, err
+	}
+	return &wrappedSigner{
+		signer:      signer,
+		signerKeyID: ps.Primary.KeyID,
+		logger:      logger,
+	}, nil
 }
 
 // NewSigner returns a [tink.Signer] primitive from the given
@@ -95,36 +106,12 @@ func extractFullSigner(e *primitiveset.Entry[tink.Signer]) (tink.Signer, error) 
 	}, nil
 }
 
-func newWrappedSigner(ps *primitiveset.PrimitiveSet[tink.Signer]) (*wrappedSigner, error) {
-	signer, err := extractFullSigner(ps.Primary)
+func createSignerLogger(kh *keyset.Handle) (monitoring.Logger, error) {
+	factory, err := factoryutil.NewLoggerFactory(kh)
 	if err != nil {
 		return nil, err
 	}
-	logger, err := createSignerLogger(ps)
-	if err != nil {
-		return nil, err
-	}
-	return &wrappedSigner{
-		signer:      signer,
-		signerKeyID: ps.Primary.KeyID,
-		logger:      logger,
-	}, nil
-}
-
-func createSignerLogger(ps *primitiveset.PrimitiveSet[tink.Signer]) (monitoring.Logger, error) {
-	// Only keysets which contain annotations are monitored.
-	if len(ps.Annotations) == 0 {
-		return &monitoringutil.DoNothingLogger{}, nil
-	}
-	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
-	if err != nil {
-		return nil, err
-	}
-	return internalregistry.GetMonitoringClient().NewLogger(&monitoring.Context{
-		KeysetInfo:  keysetInfo,
-		Primitive:   "public_key_sign",
-		APIFunction: "sign",
-	})
+	return factory.CreateFor("public_key_sign", "sign")
 }
 
 // Sign signs the given data using the primary key.

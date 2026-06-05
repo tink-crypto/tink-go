@@ -17,10 +17,8 @@ package jwt
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -50,11 +48,7 @@ func NewVerifierWithConfig(handle *keyset.Handle, config keyset.Config) (Verifie
 	if err != nil {
 		return nil, fmt.Errorf("jwt_verifier_factory: cannot obtain primitive set: %v", err)
 	}
-	return newWrappedVerifier(ps)
-}
-
-func newWrappedVerifier(ps *primitiveset.PrimitiveSet[Verifier]) (Verifier, error) {
-	logger, err := createVerifierLogger(ps)
+	logger, err := createVerifierLogger(handle)
 	if err != nil {
 		return nil, err
 	}
@@ -77,20 +71,12 @@ func newWrappedVerifier(ps *primitiveset.PrimitiveSet[Verifier]) (Verifier, erro
 	}, nil
 }
 
-func createVerifierLogger[T any](ps *primitiveset.PrimitiveSet[T]) (monitoring.Logger, error) {
-	// Only keysets with annotations are monitored.
-	if len(ps.Annotations) == 0 {
-		return &monitoringutil.DoNothingLogger{}, nil
-	}
-	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
+func createVerifierLogger(kh *keyset.Handle) (monitoring.Logger, error) {
+	factory, err := factoryutil.NewLoggerFactory(kh)
 	if err != nil {
 		return nil, err
 	}
-	return internalregistry.GetMonitoringClient().NewLogger(&monitoring.Context{
-		KeysetInfo:  keysetInfo,
-		Primitive:   "jwtverify",
-		APIFunction: "verify",
-	})
+	return factory.CreateFor("jwtverify", "verify")
 }
 
 // wrappedVerifier is a JWT Verifier implementation that tries all the available

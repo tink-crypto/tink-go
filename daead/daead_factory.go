@@ -18,9 +18,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
@@ -41,7 +40,31 @@ func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Determinis
 	if err != nil {
 		return nil, fmt.Errorf("daead_factory: cannot obtain primitive set: %s", err)
 	}
-	return newWrappedDeterministicAEAD(ps)
+	primary, err := extractFullDAEAD(ps.Primary)
+	if err != nil {
+		return nil, err
+	}
+	primitives := prefixmap.New[daeadAndKeyID]()
+	for _, entries := range ps.Entries {
+		for _, entry := range entries {
+			p, err := extractFullDAEAD(entry)
+			if err != nil {
+				return nil, err
+			}
+			primitives.Insert(string(entry.OutputPrefix()), *p)
+		}
+	}
+
+	encLogger, decLogger, err := createLoggers(handle)
+	if err != nil {
+		return nil, err
+	}
+	return &wrappedDAEAD{
+		primary:    *primary,
+		primitives: primitives,
+		encLogger:  encLogger,
+		decLogger:  decLogger,
+	}, nil
 }
 
 type daeadAndKeyID struct {
@@ -106,56 +129,16 @@ type wrappedDAEAD struct {
 
 var _ tink.DeterministicAEAD = (*wrappedDAEAD)(nil)
 
-func newWrappedDeterministicAEAD(ps *primitiveset.PrimitiveSet[tink.DeterministicAEAD]) (*wrappedDAEAD, error) {
-	primary, err := extractFullDAEAD(ps.Primary)
-	if err != nil {
-		return nil, err
-	}
-	primitives := prefixmap.New[daeadAndKeyID]()
-	for _, entries := range ps.Entries {
-		for _, entry := range entries {
-			p, err := extractFullDAEAD(entry)
-			if err != nil {
-				return nil, err
-			}
-			primitives.Insert(string(entry.OutputPrefix()), *p)
-		}
-	}
-
-	encLogger, decLogger, err := createLoggers(ps)
-	if err != nil {
-		return nil, err
-	}
-	return &wrappedDAEAD{
-		primary:    *primary,
-		primitives: primitives,
-		encLogger:  encLogger,
-		decLogger:  decLogger,
-	}, nil
-}
-
-func createLoggers(ps *primitiveset.PrimitiveSet[tink.DeterministicAEAD]) (monitoring.Logger, monitoring.Logger, error) {
-	if len(ps.Annotations) == 0 {
-		return &monitoringutil.DoNothingLogger{}, &monitoringutil.DoNothingLogger{}, nil
-	}
-	client := internalregistry.GetMonitoringClient()
-	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
+func createLoggers(kh *keyset.Handle) (monitoring.Logger, monitoring.Logger, error) {
+	factory, err := factoryutil.NewLoggerFactory(kh)
 	if err != nil {
 		return nil, nil, err
 	}
-	encLogger, err := client.NewLogger(&monitoring.Context{
-		Primitive:   "daead",
-		APIFunction: "encrypt",
-		KeysetInfo:  keysetInfo,
-	})
+	encLogger, err := factory.CreateFor("daead", "encrypt")
 	if err != nil {
 		return nil, nil, err
 	}
-	decLogger, err := client.NewLogger(&monitoring.Context{
-		Primitive:   "daead",
-		APIFunction: "decrypt",
-		KeysetInfo:  keysetInfo,
-	})
+	decLogger, err := factory.CreateFor("daead", "decrypt")
 	if err != nil {
 		return nil, nil, err
 	}

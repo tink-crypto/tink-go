@@ -17,10 +17,8 @@ package jwt
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -45,11 +43,7 @@ func NewSignerWithConfig(handle *keyset.Handle, config keyset.Config) (Signer, e
 	if err != nil {
 		return nil, fmt.Errorf("jwt_signer_factory: cannot obtain primitive set: %v", err)
 	}
-	return newWrappedSigner(ps)
-}
-
-func newWrappedSigner(ps *primitiveset.PrimitiveSet[Signer]) (Signer, error) {
-	logger, err := createSignerLogger(ps)
+	logger, err := createSignerLogger(handle)
 	if err != nil {
 		return nil, err
 	}
@@ -75,20 +69,12 @@ type wrappedSigner struct {
 
 var _ Signer = (*wrappedSigner)(nil)
 
-func createSignerLogger[T any](ps *primitiveset.PrimitiveSet[T]) (monitoring.Logger, error) {
-	// Only keysets with annotations are monitored.
-	if len(ps.Annotations) == 0 {
-		return &monitoringutil.DoNothingLogger{}, nil
-	}
-	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
+func createSignerLogger(kh *keyset.Handle) (monitoring.Logger, error) {
+	factory, err := factoryutil.NewLoggerFactory(kh)
 	if err != nil {
 		return nil, err
 	}
-	return internalregistry.GetMonitoringClient().NewLogger(&monitoring.Context{
-		KeysetInfo:  keysetInfo,
-		Primitive:   "jwtsign",
-		APIFunction: "sign",
-	})
+	return factory.CreateFor("jwtsign", "sign")
 }
 
 func (w *wrappedSigner) SignAndEncode(rawJWT *RawJWT) (string, error) {

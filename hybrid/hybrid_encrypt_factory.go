@@ -18,10 +18,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -44,7 +42,35 @@ func NewHybridEncryptWithConfig(handle *keyset.Handle, config keyset.Config) (ti
 	if err != nil {
 		return nil, fmt.Errorf("hybrid_factory: cannot obtain primitive set: %s", err)
 	}
-	return newWrappedHybridEncrypt(ps)
+	// Make sure the primitives do not implement tink.AEAD.
+	if isAEAD(ps.Primary.Primitive) || isAEAD(ps.Primary.FullPrimitive) {
+		return nil, fmt.Errorf("hybrid_factory: primary primitive must NOT implement tink.AEAD")
+	}
+	for _, primitives := range ps.Entries {
+		for _, p := range primitives {
+			if isAEAD(p.Primitive) || isAEAD(p.FullPrimitive) {
+				return nil, fmt.Errorf("hybrid_factory: primitive must NOT implement tink.AEAD")
+			}
+		}
+	}
+
+	primitive := ps.Primary.FullPrimitive
+	if primitive == nil {
+		primitive = &fullHybridEncryptAdapter{
+			rawHybridEncrypt: ps.Primary.Primitive,
+			prefix:           ps.Primary.OutputPrefix(),
+		}
+	}
+
+	logger, err := createEncryptLogger(handle)
+	if err != nil {
+		return nil, err
+	}
+	return &wrappedHybridEncrypt{
+		fullPrimitive: primitive,
+		logger:        logger,
+		keyID:         ps.Primary.KeyID,
+	}, nil
 }
 
 // fullHybridEncryptAdapter is an [tink.HybridEncrypt] implementation that
@@ -95,49 +121,10 @@ func isAEAD(p any) bool {
 	return ok
 }
 
-func newWrappedHybridEncrypt(ps *primitiveset.PrimitiveSet[tink.HybridEncrypt]) (*wrappedHybridEncrypt, error) {
-	// Make sure the primitives do not implement tink.AEAD.
-	if isAEAD(ps.Primary.Primitive) || isAEAD(ps.Primary.FullPrimitive) {
-		return nil, fmt.Errorf("hybrid_factory: primary primitive must NOT implement tink.AEAD")
-	}
-	for _, primitives := range ps.Entries {
-		for _, p := range primitives {
-			if isAEAD(p.Primitive) || isAEAD(p.FullPrimitive) {
-				return nil, fmt.Errorf("hybrid_factory: primitive must NOT implement tink.AEAD")
-			}
-		}
-	}
-
-	primitive := ps.Primary.FullPrimitive
-	if primitive == nil {
-		primitive = &fullHybridEncryptAdapter{
-			rawHybridEncrypt: ps.Primary.Primitive,
-			prefix:           ps.Primary.OutputPrefix(),
-		}
-	}
-
-	logger, err := createEncryptLogger(ps)
+func createEncryptLogger(kh *keyset.Handle) (monitoring.Logger, error) {
+	factory, err := factoryutil.NewLoggerFactory(kh)
 	if err != nil {
 		return nil, err
 	}
-	return &wrappedHybridEncrypt{
-		fullPrimitive: primitive,
-		logger:        logger,
-		keyID:         ps.Primary.KeyID,
-	}, nil
-}
-
-func createEncryptLogger(ps *primitiveset.PrimitiveSet[tink.HybridEncrypt]) (monitoring.Logger, error) {
-	if len(ps.Annotations) == 0 {
-		return &monitoringutil.DoNothingLogger{}, nil
-	}
-	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
-	if err != nil {
-		return nil, err
-	}
-	return internalregistry.GetMonitoringClient().NewLogger(&monitoring.Context{
-		KeysetInfo:  keysetInfo,
-		Primitive:   "hybrid_encrypt",
-		APIFunction: "encrypt",
-	})
+	return factory.CreateFor("hybrid_encrypt", "encrypt")
 }

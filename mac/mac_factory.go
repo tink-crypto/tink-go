@@ -20,9 +20,8 @@ import (
 	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
@@ -44,7 +43,32 @@ func NewWithConfig(handle *keyset.Handle, c keyset.Config) (tink.MAC, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mac_factory: cannot obtain primitive set: %s", err)
 	}
-	return newWrappedMAC(ps)
+	primary, err := toFullPrimitive(ps.Primary)
+	if err != nil {
+		return nil, err
+	}
+	primitives := make(map[string][]macAndKeyID)
+	for _, entries := range ps.Entries {
+		for _, entry := range entries {
+			primitive, err := toFullPrimitive(entry)
+			if err != nil {
+				return nil, err
+			}
+			prefix := string(entry.OutputPrefix())
+			primitives[prefix] = append(primitives[prefix], primitive)
+		}
+	}
+
+	computeLogger, verifyLogger, err := createLoggers(handle)
+	if err != nil {
+		return nil, err
+	}
+	return &wrappedMAC{
+		primary:       primary,
+		primitives:    primitives,
+		computeLogger: computeLogger,
+		verifyLogger:  verifyLogger,
+	}, nil
 }
 
 // New creates a [tink.MAC] primitive from the given [keyset.Handle] using the
@@ -154,57 +178,16 @@ func toFullPrimitive(entry *primitiveset.Entry[tink.MAC]) (macAndKeyID, error) {
 	}, nil
 }
 
-func newWrappedMAC(ps *primitiveset.PrimitiveSet[tink.MAC]) (*wrappedMAC, error) {
-	primary, err := toFullPrimitive(ps.Primary)
-	if err != nil {
-		return nil, err
-	}
-	primitives := make(map[string][]macAndKeyID)
-	for _, entries := range ps.Entries {
-		for _, entry := range entries {
-			primitive, err := toFullPrimitive(entry)
-			if err != nil {
-				return nil, err
-			}
-			prefix := string(entry.OutputPrefix())
-			primitives[prefix] = append(primitives[prefix], primitive)
-		}
-	}
-
-	computeLogger, verifyLogger, err := createLoggers(ps)
-	if err != nil {
-		return nil, err
-	}
-	return &wrappedMAC{
-		primary:       primary,
-		primitives:    primitives,
-		computeLogger: computeLogger,
-		verifyLogger:  verifyLogger,
-	}, nil
-}
-
-func createLoggers(ps *primitiveset.PrimitiveSet[tink.MAC]) (monitoring.Logger, monitoring.Logger, error) {
-	if len(ps.Annotations) == 0 {
-		return &monitoringutil.DoNothingLogger{}, &monitoringutil.DoNothingLogger{}, nil
-	}
-	client := internalregistry.GetMonitoringClient()
-	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
+func createLoggers(kh *keyset.Handle) (monitoring.Logger, monitoring.Logger, error) {
+	factory, err := factoryutil.NewLoggerFactory(kh)
 	if err != nil {
 		return nil, nil, err
 	}
-	computeLogger, err := client.NewLogger(&monitoring.Context{
-		Primitive:   "mac",
-		APIFunction: "compute",
-		KeysetInfo:  keysetInfo,
-	})
+	computeLogger, err := factory.CreateFor("mac", "compute")
 	if err != nil {
 		return nil, nil, err
 	}
-	verifyLogger, err := client.NewLogger(&monitoring.Context{
-		Primitive:   "mac",
-		APIFunction: "verify",
-		KeysetInfo:  keysetInfo,
-	})
+	verifyLogger, err := factory.CreateFor("mac", "verify")
 	if err != nil {
 		return nil, nil, err
 	}

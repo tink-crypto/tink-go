@@ -17,10 +17,8 @@ package prf
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -39,14 +37,10 @@ func NewPRFSetWithConfig(handle *keyset.Handle, config keyset.Config) (*Set, err
 	if err != nil {
 		return nil, fmt.Errorf("prf_set_factory: cannot obtain primitive set: %s", err)
 	}
-	return wrapPRFset(ps)
-}
-
-func wrapPRFset(ps *primitiveset.PrimitiveSet[PRF]) (*Set, error) {
 	set := &Set{}
 	set.PrimaryID = ps.Primary.KeyID
 	set.PRFs = make(map[uint32]PRF)
-	logger, err := createLogger(ps)
+	logger, err := createLogger(handle)
 	if err != nil {
 		return nil, err
 	}
@@ -74,17 +68,10 @@ func wrapPRFset(ps *primitiveset.PrimitiveSet[PRF]) (*Set, error) {
 	return set, nil
 }
 
-func createLogger(ps *primitiveset.PrimitiveSet[PRF]) (monitoring.Logger, error) {
-	if len(ps.Annotations) == 0 {
-		return &monitoringutil.DoNothingLogger{}, nil
-	}
-	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
+func createLogger(kh *keyset.Handle) (monitoring.Logger, error) {
+	factory, err := factoryutil.NewLoggerFactory(kh)
 	if err != nil {
 		return nil, err
 	}
-	return internalregistry.GetMonitoringClient().NewLogger(&monitoring.Context{
-		KeysetInfo:  keysetInfo,
-		Primitive:   "prf",
-		APIFunction: "compute",
-	})
+	return factory.CreateFor("prf", "compute")
 }

@@ -18,9 +18,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
@@ -31,11 +30,7 @@ import (
 
 // New returns an AEAD primitive from the given keyset handle.
 func New(handle *keyset.Handle) (tink.AEAD, error) {
-	ps, err := keyset.Primitives[tink.AEAD](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("aead_factory: cannot obtain primitive set: %s", err)
-	}
-	return newWrappedAead(ps)
+	return NewWithConfig(handle, &registryconfig.RegistryConfig{})
 }
 
 // NewWithConfig creates an AEAD primitive from the given [keyset.Handle] using
@@ -45,7 +40,30 @@ func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.AEAD, erro
 	if err != nil {
 		return nil, fmt.Errorf("aead_factory: cannot obtain primitive set with config: %s", err)
 	}
-	return newWrappedAead(ps)
+	primary, err := extractFullAEAD(ps.Primary)
+	if err != nil {
+		return nil, err
+	}
+	primitives := prefixmap.New[aeadAndKeyID]()
+	for _, entries := range ps.Entries {
+		for _, e := range entries {
+			p, err := extractFullAEAD(e)
+			if err != nil {
+				return nil, err
+			}
+			primitives.Insert(string(e.OutputPrefix()), *p)
+		}
+	}
+	encLogger, decLogger, err := createLoggers(handle)
+	if err != nil {
+		return nil, err
+	}
+	return &wrappedAead{
+		primary:    *primary,
+		primitives: primitives,
+		encLogger:  encLogger,
+		decLogger:  decLogger,
+	}, nil
 }
 
 // wrappedAead is an AEAD implementation that uses the underlying primitive set for encryption
@@ -102,55 +120,16 @@ func extractFullAEAD(entry *primitiveset.Entry[tink.AEAD]) (*aeadAndKeyID, error
 	}, nil
 }
 
-func newWrappedAead(ps *primitiveset.PrimitiveSet[tink.AEAD]) (*wrappedAead, error) {
-	primary, err := extractFullAEAD(ps.Primary)
-	if err != nil {
-		return nil, err
-	}
-	primitives := prefixmap.New[aeadAndKeyID]()
-	for _, entries := range ps.Entries {
-		for _, e := range entries {
-			p, err := extractFullAEAD(e)
-			if err != nil {
-				return nil, err
-			}
-			primitives.Insert(string(e.OutputPrefix()), *p)
-		}
-	}
-	encLogger, decLogger, err := createLoggers(ps)
-	if err != nil {
-		return nil, err
-	}
-	return &wrappedAead{
-		primary:    *primary,
-		primitives: primitives,
-		encLogger:  encLogger,
-		decLogger:  decLogger,
-	}, nil
-}
-
-func createLoggers(ps *primitiveset.PrimitiveSet[tink.AEAD]) (monitoring.Logger, monitoring.Logger, error) {
-	if len(ps.Annotations) == 0 {
-		return &monitoringutil.DoNothingLogger{}, &monitoringutil.DoNothingLogger{}, nil
-	}
-	client := internalregistry.GetMonitoringClient()
-	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
+func createLoggers(kh *keyset.Handle) (monitoring.Logger, monitoring.Logger, error) {
+	factory, err := factoryutil.NewLoggerFactory(kh)
 	if err != nil {
 		return nil, nil, err
 	}
-	encLogger, err := client.NewLogger(&monitoring.Context{
-		Primitive:   "aead",
-		APIFunction: "encrypt",
-		KeysetInfo:  keysetInfo,
-	})
+	encLogger, err := factory.CreateFor("aead", "encrypt")
 	if err != nil {
 		return nil, nil, err
 	}
-	decLogger, err := client.NewLogger(&monitoring.Context{
-		Primitive:   "aead",
-		APIFunction: "decrypt",
-		KeysetInfo:  keysetInfo,
-	})
+	decLogger, err := factory.CreateFor("aead", "decrypt")
 	if err != nil {
 		return nil, nil, err
 	}

@@ -17,10 +17,8 @@ package jwt
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
-	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -46,15 +44,11 @@ func NewMACWithConfig(handle *keyset.Handle, config keyset.Config) (MAC, error) 
 	if err != nil {
 		return nil, fmt.Errorf("jwt_mac_factory: cannot obtain primitive set: %v", err)
 	}
-	return newWrappedJWTMAC(ps)
-}
-
-func newWrappedJWTMAC(ps *primitiveset.PrimitiveSet[MAC]) (*wrappedJWTMAC, error) {
 	var macs []macAndKeyID
 	var primary macAndKeyID
 	var computeLogger monitoring.Logger
 	var verifyLogger monitoring.Logger
-	computeLogger, verifyLogger, err := createMacLoggers(ps)
+	computeLogger, verifyLogger, err = createMacLoggers(handle)
 	if err != nil {
 		return nil, err
 	}
@@ -94,28 +88,16 @@ type wrappedJWTMAC struct {
 
 var _ MAC = (*wrappedJWTMAC)(nil)
 
-func createMacLoggers[T any](ps *primitiveset.PrimitiveSet[T]) (monitoring.Logger, monitoring.Logger, error) {
-	if len(ps.Annotations) == 0 {
-		return &monitoringutil.DoNothingLogger{}, &monitoringutil.DoNothingLogger{}, nil
-	}
-	client := internalregistry.GetMonitoringClient()
-	keysetInfo, err := monitoringutil.KeysetInfoFromPrimitiveSet(ps)
+func createMacLoggers(kh *keyset.Handle) (monitoring.Logger, monitoring.Logger, error) {
+	factory, err := factoryutil.NewLoggerFactory(kh)
 	if err != nil {
 		return nil, nil, err
 	}
-	computeLogger, err := client.NewLogger(&monitoring.Context{
-		Primitive:   "jwtmac",
-		APIFunction: "compute",
-		KeysetInfo:  keysetInfo,
-	})
+	computeLogger, err := factory.CreateFor("jwtmac", "compute")
 	if err != nil {
 		return nil, nil, err
 	}
-	verifyLogger, err := client.NewLogger(&monitoring.Context{
-		Primitive:   "jwtmac",
-		APIFunction: "verify",
-		KeysetInfo:  keysetInfo,
-	})
+	verifyLogger, err := factory.CreateFor("jwtmac", "verify")
 	if err != nil {
 		return nil, nil, err
 	}
