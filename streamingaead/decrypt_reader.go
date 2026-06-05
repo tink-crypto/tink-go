@@ -53,12 +53,7 @@ func (dr *decryptReader) Read(p []byte) (n int, err error) {
 	//
 	// For legacy reasons (Tink always encrypted with non-RAW keys) we use all
 	// primitives, even those which have output_prefix_type != RAW.
-	for _, e := range dr.wrapped.ps.EntriesInKeysetOrder {
-		primitive := e.Primitive
-		if primitive == nil {
-			primitive = e.FullPrimitive
-		}
-
+	for _, primitive := range dr.wrapped.primitives {
 		sa, ok := primitive.(tink.StreamingAEAD)
 		if !ok {
 			continue

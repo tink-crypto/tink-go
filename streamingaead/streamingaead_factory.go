@@ -19,7 +19,7 @@ import (
 	"io"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig/legacyprimitive"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -34,19 +34,47 @@ func New(handle *keyset.Handle) (tink.StreamingAEAD, error) {
 // NewWithConfig returns a [tink.StreamingAEAD] primitive from the given keyset
 // handle with the provided [keyset.Config].
 func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.StreamingAEAD, error) {
-	ps, err := keyset.Primitives[tink.StreamingAEAD](handle, config, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("streamingaead_factory: cannot obtain primitive set: %s", err)
+	var primitives []tink.StreamingAEAD
+	var primary tink.StreamingAEAD
+
+	for i := 0; i < handle.Len(); i++ {
+		entry, err := handle.Entry(i)
+		if err != nil {
+			return nil, err
+		}
+		if entry.KeyStatus() != keyset.Enabled {
+			continue
+		}
+
+		primitive, err := config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
+		if err != nil {
+			return nil, err
+		}
+		if legacyPrimitive, ok := primitive.(legacyprimitive.LegacyPrimitive); ok {
+			primitive = legacyPrimitive.Primitive()
+		}
+		streamingAEADPrimitive, ok := primitive.(tink.StreamingAEAD)
+		if !ok {
+			return nil, fmt.Errorf("streamingaead_factory: primitive is not a StreamingAEAD")
+		}
+
+		primitives = append(primitives, streamingAEADPrimitive)
+		if entry.IsPrimary() {
+			primary = streamingAEADPrimitive
+		}
 	}
-	ret := new(wrappedStreamingAEAD)
-	ret.ps = ps
-	return tink.StreamingAEAD(ret), nil
+
+	return &wrappedStreamingAEAD{
+		primary:    primary,
+		primitives: primitives,
+	}, nil
 }
 
 // wrappedStreamingAEAD is a StreamingAEAD implementation that uses the underlying primitive set
 // for streaming encryption and decryption.
 type wrappedStreamingAEAD struct {
-	ps *primitiveset.PrimitiveSet[tink.StreamingAEAD]
+	primary    tink.StreamingAEAD
+	primitives []tink.StreamingAEAD
 }
 
 // Asserts that wrappedStreamingAEAD implements the StreamingAEAD interface.
@@ -57,11 +85,7 @@ var _ tink.StreamingAEAD = (*wrappedStreamingAEAD)(nil)
 // as associated authenticated data. The associated data is not included in the ciphertext
 // and has to be passed in as parameter for decryption.
 func (s *wrappedStreamingAEAD) NewEncryptingWriter(w io.Writer, aad []byte) (io.WriteCloser, error) {
-	primary := s.ps.Primary.Primitive
-	if primary == nil {
-		primary = s.ps.Primary.FullPrimitive
-	}
-	return primary.NewEncryptingWriter(w, aad)
+	return s.primary.NewEncryptingWriter(w, aad)
 }
 
 // NewDecryptingReader returns a wrapper around underlying io.Reader, such that any read-operation
