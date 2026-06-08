@@ -19,9 +19,7 @@ import (
 	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -36,23 +34,25 @@ func New(handle *keyset.Handle) (tink.DeterministicAEAD, error) {
 // NewWithConfig creates a DeterministicAEAD primitive from the given [keyset.Handle] using
 // the provided [keyset.Config].
 func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.DeterministicAEAD, error) {
-	ps, err := keyset.Primitives[tink.DeterministicAEAD](handle, config, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("daead_factory: cannot obtain primitive set: %s", err)
-	}
-	primary, err := extractFullDAEAD(ps.Primary)
-	if err != nil {
-		return nil, err
-	}
 	primitives := prefixmap.New[daeadAndKeyID]()
-	for _, entries := range ps.Entries {
-		for _, entry := range entries {
-			p, err := extractFullDAEAD(entry)
-			if err != nil {
-				return nil, err
-			}
-			primitives.Insert(string(entry.OutputPrefix()), *p)
+	var primary daeadAndKeyID
+	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
+		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.DeterministicAEAD](entry.Key(), config)
+		if err != nil {
+			return nil, err
 		}
+		outputPrefix, err := factoryutil.OutputPrefix(entry.Key())
+		if err != nil {
+			return nil, err
+		}
+		if isLegacyPrimitive {
+			p = &fullDAEADPrimitiveAdapter{primitive: p, prefix: outputPrefix}
+		}
+		a := daeadAndKeyID{primitive: p, keyID: entry.KeyID()}
+		if entry.IsPrimary() {
+			primary = a
+		}
+		primitives.Insert(string(outputPrefix), a)
 	}
 
 	encLogger, decLogger, err := createLoggers(handle)
@@ -60,7 +60,7 @@ func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Determinis
 		return nil, err
 	}
 	return &wrappedDAEAD{
-		primary:    *primary,
+		primary:    primary,
 		primitives: primitives,
 		encLogger:  encLogger,
 		decLogger:  decLogger,
@@ -99,22 +99,6 @@ func (a *fullDAEADPrimitiveAdapter) EncryptDeterministically(plaintext, associat
 
 func (a *fullDAEADPrimitiveAdapter) DecryptDeterministically(ciphertext, associatedData []byte) ([]byte, error) {
 	return a.primitive.DecryptDeterministically(ciphertext[len(a.prefix):], associatedData)
-}
-
-func extractFullDAEAD(entry *primitiveset.Entry[tink.DeterministicAEAD]) (*daeadAndKeyID, error) {
-	if entry.FullPrimitive != nil {
-		return &daeadAndKeyID{
-			primitive: entry.FullPrimitive,
-			keyID:     entry.KeyID,
-		}, nil
-	}
-	return &daeadAndKeyID{
-		primitive: &fullDAEADPrimitiveAdapter{
-			primitive: entry.Primitive,
-			prefix:    entry.OutputPrefix(),
-		},
-		keyID: entry.KeyID,
-	}, nil
 }
 
 // wrappedDAEAD is a DeterministicAEAD implementation that uses an underlying

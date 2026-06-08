@@ -38,27 +38,35 @@ func NewHybridEncrypt(handle *keyset.Handle) (tink.HybridEncrypt, error) {
 // NOTE: [keyset.Config] is currently a type that can only be used internally;
 // thus this function is not part of the public API.
 func NewHybridEncryptWithConfig(handle *keyset.Handle, config keyset.Config) (tink.HybridEncrypt, error) {
-	ps, err := keyset.Primitives[tink.HybridEncrypt](handle, config, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("hybrid_factory: cannot obtain primitive set: %s", err)
-	}
 	// Make sure the primitives do not implement tink.AEAD.
-	if isAEAD(ps.Primary.Primitive) || isAEAD(ps.Primary.FullPrimitive) {
-		return nil, fmt.Errorf("hybrid_factory: primary primitive must NOT implement tink.AEAD")
-	}
-	for _, primitives := range ps.Entries {
-		for _, p := range primitives {
-			if isAEAD(p.Primitive) || isAEAD(p.FullPrimitive) {
-				return nil, fmt.Errorf("hybrid_factory: primitive must NOT implement tink.AEAD")
-			}
+	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
+		p, _, err := factoryutil.PrimitiveFromKey[tink.HybridEncrypt](entry.Key(), config)
+		if err != nil {
+			return nil, err
+		}
+		if isAEAD(p) {
+			return nil, fmt.Errorf("hybrid_factory: primitive must NOT implement tink.AEAD")
 		}
 	}
 
-	primitive := ps.Primary.FullPrimitive
-	if primitive == nil {
+	primaryEntry, err := handle.Primary()
+	if err != nil {
+		return nil, err
+	}
+	// Make sure this access doesn't get logged as key export.
+	primaryEntry = primaryEntry.ToUnmonitoredEntry(internalapi.Token{})
+	primitive, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.HybridEncrypt](primaryEntry.Key(), config)
+	if err != nil {
+		return nil, err
+	}
+	if isLegacyPrimitive {
+		outputPrefix, err := factoryutil.OutputPrefix(primaryEntry.Key())
+		if err != nil {
+			return nil, err
+		}
 		primitive = &fullHybridEncryptAdapter{
-			rawHybridEncrypt: ps.Primary.Primitive,
-			prefix:           ps.Primary.OutputPrefix(),
+			rawHybridEncrypt: primitive,
+			prefix:           outputPrefix,
 		}
 	}
 
@@ -69,7 +77,7 @@ func NewHybridEncryptWithConfig(handle *keyset.Handle, config keyset.Config) (ti
 	return &wrappedHybridEncrypt{
 		fullPrimitive: primitive,
 		logger:        logger,
-		keyID:         ps.Primary.KeyID,
+		keyID:         primaryEntry.KeyID(),
 	}, nil
 }
 

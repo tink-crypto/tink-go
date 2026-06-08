@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -39,33 +38,34 @@ func NewHybridDecrypt(handle *keyset.Handle) (tink.HybridDecrypt, error) {
 // NOTE: [keyset.Config] is currently a type that can only be used internally;
 // thus this function is not part of the public API.
 func NewHybridDecryptWithConfig(handle *keyset.Handle, config keyset.Config) (tink.HybridDecrypt, error) {
-	ps, err := keyset.Primitives[tink.HybridDecrypt](handle, config, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("hybrid_factory: cannot obtain primitive set: %s", err)
+	if handle.Len() == 0 {
+		return nil, fmt.Errorf("hybrid_factory: handle is empty")
 	}
 	// Make sure the primitives do not implement tink.AEAD.
 	decrypters := prefixmap.New[decrypterAndID]()
-
-	if isAEAD(ps.Primary.Primitive) || isAEAD(ps.Primary.FullPrimitive) {
-		return nil, fmt.Errorf("hybrid_factory: primary primitive must NOT implement tink.AEAD")
-	}
-	for _, primitives := range ps.Entries {
-		for _, p := range primitives {
-			if isAEAD(p.Primitive) || isAEAD(p.FullPrimitive) {
-				return nil, fmt.Errorf("hybrid_factory: primitive must NOT implement tink.AEAD")
-			}
-			fullPrimitive := p.FullPrimitive
-			if fullPrimitive == nil {
-				fullPrimitive = &fullHybridDecryptAdapter{
-					rawHybridDecrypt: p.Primitive,
-					prefix:           p.OutputPrefix(),
-				}
-			}
-			decrypters.Insert(string(p.OutputPrefix()), decrypterAndID{
-				decrypter: fullPrimitive,
-				keyID:     p.KeyID,
-			})
+	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
+		// Make sure this access doesn't get logged as key export.
+		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.HybridDecrypt](entry.Key(), config)
+		if err != nil {
+			return nil, err
 		}
+		if isAEAD(p) {
+			return nil, fmt.Errorf("hybrid_factory: primitive must NOT implement tink.AEAD")
+		}
+		outputPrefix, err := factoryutil.OutputPrefix(entry.Key())
+		if err != nil {
+			return nil, err
+		}
+		if isLegacyPrimitive {
+			p = &fullHybridDecryptAdapter{
+				rawHybridDecrypt: p,
+				prefix:           outputPrefix,
+			}
+		}
+		decrypters.Insert(string(outputPrefix), decrypterAndID{
+			decrypter: p,
+			keyID:     entry.KeyID(),
+		})
 	}
 	logger, err := createDecryptLogger(handle)
 	if err != nil {
