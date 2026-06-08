@@ -16,6 +16,7 @@
 package factoryutil
 
 import (
+	"iter"
 	"strings"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -43,6 +44,30 @@ func stripTypeURLPrefix(s string) string {
 	return strings.TrimPrefix(s, "type.googleapis.com/google.crypto.")
 }
 
+// EnabledUnmonitoredEntries returns an iterator over the enabled entries in a
+// [keyset.Handle].
+func EnabledUnmonitoredEntries(kh *keyset.Handle) iter.Seq[*keyset.Entry] {
+	if kh == nil {
+		return func(yield func(*keyset.Entry) bool) { /*do nothing*/ }
+	}
+	return func(yield func(*keyset.Entry) bool) {
+		for i := 0; i < kh.Len(); i++ {
+			entry, err := kh.Entry(i)
+			if err != nil {
+				panic(err) // Should never happen.
+			}
+			if entry.KeyStatus() != keyset.Enabled {
+				continue
+			}
+			// Make sure this access doesn't get logged as key export.
+			entry = entry.ToUnmonitoredEntry(internalapi.Token{})
+			if !yield(entry) {
+				return
+			}
+		}
+	}
+}
+
 // keysetInfo returns the monitoring info for the given keyset handle.
 func keysetInfo(kh *keyset.Handle) (*monitoring.KeysetInfo, error) {
 	annotations := kh.Annotations(internalapi.Token{})
@@ -53,27 +78,14 @@ func keysetInfo(kh *keyset.Handle) (*monitoring.KeysetInfo, error) {
 
 	primaryKeyID := uint32(0)
 	var entries []*monitoring.Entry
-	for i := 0; i < kh.Len(); i++ {
-		entry, err := kh.Entry(i)
-		if err != nil {
-			return nil, err
-		}
-		if entry.KeyStatus() != keyset.Enabled {
-			continue
-		}
-
-		// Make sure this access doesn't get logged as key export.
-		entry = entry.ToUnmonitoredEntry(internalapi.Token{})
-
+	for entry := range EnabledUnmonitoredEntries(kh) {
 		if entry.IsPrimary() {
 			primaryKeyID = entry.KeyID()
 		}
-
 		protoSerialization, err := protoserialization.SerializeKey(entry.Key())
 		if err != nil {
 			return nil, err
 		}
-
 		entries = append(entries, &monitoring.Entry{
 			Status:    monitoringKeyStatusFromKeysetStatus(entry.KeyStatus()),
 			KeyID:     entry.KeyID(),

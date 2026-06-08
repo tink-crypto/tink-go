@@ -205,3 +205,55 @@ func TestLoggerBuilder_NoClientReturnsDoNothingLogger(t *testing.T) {
 		t.Errorf("logger is %T, want *monitoringutil.DoNothingLogger", logger)
 	}
 }
+
+func TestEnabledUnmonitoredEntries(t *testing.T) {
+	internalregistry.ClearMonitoringClient()
+	fakeClient := fakemonitoring.NewClient("fake")
+	if err := internalregistry.RegisterMonitoringClient(fakeClient); err != nil {
+		t.Fatalf("RegisterMonitoringClient() err = %v, want nil", err)
+	}
+	defer internalregistry.ClearMonitoringClient()
+
+	manager := keyset.NewManager()
+	_, err := manager.AddKeyWithOpts(mustCreateHMACKey(hmac.VariantTink, 1), internalapi.Token{}, keyset.AsPrimary())
+	if err != nil {
+		t.Fatalf("AddKeyWithOpts() err = %v, want nil", err)
+	}
+	_, err = manager.AddKeyWithOpts(mustCreateHMACKey(hmac.VariantTink, 2), internalapi.Token{}, keyset.WithStatus(keyset.Disabled))
+	if err != nil {
+		t.Fatalf("AddKeyWithOpts() err = %v, want nil", err)
+	}
+	_, err = manager.AddKeyWithOpts(mustCreateHMACKey(hmac.VariantNoPrefix, 0), internalapi.Token{}, keyset.WithFixedID(1234))
+	if err != nil {
+		t.Fatalf("AddKey() err = %v, want nil", err)
+	}
+	if err := manager.SetAnnotations(map[string]string{"foo": "bar"}); err != nil {
+		t.Fatalf("SetAnnotations() err = %v, want nil", err)
+	}
+	kh, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("Handle() err = %v, want nil", err)
+	}
+
+	var got []uint32
+	for entry := range factoryutil.EnabledUnmonitoredEntries(kh) {
+		got = append(got, entry.KeyID())
+	}
+	want := []uint32{1, 1234}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("EnabledUnmonitoredEntries() mismatch (-want +got): %s", diff)
+	}
+	if len(fakeClient.KeyExportsLogs()) != 0 {
+		t.Errorf("KeyExportsLogs() = %d, want 0", len(fakeClient.KeyExportsLogs()))
+	}
+}
+
+func TestEnabledUnmonitoredEntries_Empty(t *testing.T) {
+	var got []uint32
+	for entry := range factoryutil.EnabledUnmonitoredEntries(nil) {
+		got = append(got, entry.KeyID())
+	}
+	if len(got) != 0 {
+		t.Errorf("EnabledUnmonitoredEntries() = %d, want 0", len(got))
+	}
+}
