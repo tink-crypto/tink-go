@@ -18,7 +18,6 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -44,26 +43,24 @@ func NewVerifierWithConfig(handle *keyset.Handle, config keyset.Config) (Verifie
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := keyset.Primitives[Verifier](handle, config, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("jwt_verifier_factory: cannot obtain primitive set: %v", err)
-	}
 	logger, err := createVerifierLogger(handle)
 	if err != nil {
 		return nil, err
 	}
 	var verifiers []verifierAndKeyID
-	for _, primitives := range ps.Entries {
-		for _, p := range primitives {
-			if p.FullPrimitive == nil {
-				// Something is wrong, this should not happen.
-				return nil, fmt.Errorf("jwt_verifier_factory: primary full primitive is nil")
-			}
-			verifiers = append(verifiers, verifierAndKeyID{
-				verifier: p.FullPrimitive,
-				keyID:    p.KeyID,
-			})
+	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
+		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[Verifier](entry.Key(), config)
+		if err != nil {
+			return nil, err
 		}
+		if isLegacyPrimitive {
+			// Something is wrong, this should not happen.
+			return nil, fmt.Errorf("jwt_verifier_factory: full primitive is nil")
+		}
+		verifiers = append(verifiers, verifierAndKeyID{
+			verifier: p,
+			keyID:    entry.KeyID(),
+		})
 	}
 	return &wrappedVerifier{
 		verifiers: verifiers,

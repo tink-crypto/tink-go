@@ -39,21 +39,26 @@ func NewSignerWithConfig(handle *keyset.Handle, config keyset.Config) (Signer, e
 	if handle == nil {
 		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-	ps, err := keyset.Primitives[Signer](handle, config, internalapi.Token{})
+	entry, err := handle.Primary()
 	if err != nil {
-		return nil, fmt.Errorf("jwt_signer_factory: cannot obtain primitive set: %v", err)
+		return nil, err
+	}
+	entry = entry.ToUnmonitoredEntry(internalapi.Token{})
+	p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[Signer](entry.Key(), config)
+	if err != nil {
+		return nil, err
+	}
+	if isLegacyPrimitive {
+		// Something is wrong, this should not happen.
+		return nil, fmt.Errorf("jwt_signer_factory: full primitive is nil")
 	}
 	logger, err := createSignerLogger(handle)
 	if err != nil {
 		return nil, err
 	}
-	if ps.Primary.FullPrimitive == nil {
-		// Something is wrong, this should not happen.
-		return nil, fmt.Errorf("jwt_signer_factory: primary full primitive is nil")
-	}
 	return &wrappedSigner{
-		primaryFullPrimitive: ps.Primary.FullPrimitive,
-		keyID:                ps.Primary.KeyID,
+		primaryFullPrimitive: p,
+		keyID:                entry.KeyID(),
 		logger:               logger,
 	}, nil
 }

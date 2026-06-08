@@ -18,7 +18,6 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -40,35 +39,29 @@ func NewMACWithConfig(handle *keyset.Handle, config keyset.Config) (MAC, error) 
 	if handle == nil {
 		return nil, fmt.Errorf("jwt_mac_factory: keyset handle can't be nil")
 	}
-	ps, err := keyset.Primitives[MAC](handle, config, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("jwt_mac_factory: cannot obtain primitive set: %v", err)
-	}
 	var macs []macAndKeyID
 	var primary macAndKeyID
-	var computeLogger monitoring.Logger
-	var verifyLogger monitoring.Logger
-	computeLogger, verifyLogger, err = createMacLoggers(handle)
+	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
+		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[MAC](entry.Key(), config)
+		if err != nil {
+			return nil, err
+		}
+		if isLegacyPrimitive {
+			// Something is wrong, this should not happen.
+			return nil, fmt.Errorf("jwt_mac_factory: full primitive is nil")
+		}
+		a := macAndKeyID{mac: p, keyID: entry.KeyID()}
+		if entry.IsPrimary() {
+			primary = a
+		}
+		macs = append(macs, a)
+	}
+
+	computeLogger, verifyLogger, err := createMacLoggers(handle)
 	if err != nil {
 		return nil, err
 	}
-	for _, primitives := range ps.Entries {
-		for _, p := range primitives {
-			// Only full primitives are supported.
-			if p.FullPrimitive == nil {
-				// Something is wrong, this should not happen.
-				return nil, fmt.Errorf("jwt_mac_factory: full primitive is nil")
-			}
-			macs = append(macs, macAndKeyID{
-				mac:   p.FullPrimitive,
-				keyID: p.KeyID,
-			})
-		}
-	}
-	primary = macAndKeyID{
-		mac:   ps.Primary.FullPrimitive,
-		keyID: ps.Primary.KeyID,
-	}
+
 	return &wrappedJWTMAC{
 		macs:          macs,
 		primary:       primary,
