@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
-	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
@@ -81,39 +79,5 @@ func MonitoringKeysetInfoFromKeysetInfo(keysetInfo *tpb.KeysetInfo, annotations 
 		Annotations:  annotations,
 		PrimaryKeyID: keysetInfo.GetPrimaryKeyId(),
 		Entries:      keysetInfoEntries,
-	}, nil
-}
-
-// KeysetInfoFromPrimitiveSet creates a `KeysetInfo` from a `PrimitiveSet`.
-// This function doesn't guarantee to preserve the ordering of the keys in the keyset.
-func KeysetInfoFromPrimitiveSet[T any](ps *primitiveset.PrimitiveSet[T]) (*monitoring.KeysetInfo, error) {
-	if ps == nil {
-		return nil, fmt.Errorf("primitive set is nil")
-	}
-	if len(ps.Entries) == 0 {
-		return nil, fmt.Errorf("primitive set is empty")
-	}
-	if ps.Primary == nil {
-		return nil, fmt.Errorf("primary key must not be nil")
-	}
-
-	entries := []*monitoring.Entry{}
-	for _, pe := range ps.EntriesInKeysetOrder {
-		protoKey, err := protoserialization.SerializeKey(pe.Key)
-		if err != nil {
-			return nil, err
-		}
-		e := &monitoring.Entry{
-			KeyID:     pe.KeyID,
-			Status:    monitoring.Enabled, // Primitiveset only contains enabled keys.
-			KeyType:   parseKeyTypeURL(protoKey.KeyData().GetTypeUrl()),
-			KeyPrefix: protoKey.OutputPrefixType().String(),
-		}
-		entries = append(entries, e)
-	}
-	return &monitoring.KeysetInfo{
-		Annotations:  ps.Annotations,
-		PrimaryKeyID: ps.Primary.KeyID,
-		Entries:      entries,
 	}, nil
 }
