@@ -15,19 +15,25 @@
 package factoryutil_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
+	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
 func mustCreateHMACKey(variant hmac.Variant, idRequirement uint32) key.Key {
@@ -255,5 +261,98 @@ func TestEnabledUnmonitoredEntries_Empty(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Errorf("EnabledUnmonitoredEntries() = %d, want 0", len(got))
+	}
+}
+
+func TestPrimitiveFromKey_Full(t *testing.T) {
+	primitive := "primitive"
+	cb := config.NewBuilder()
+	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*hmac.Key](), func(key key.Key) (any, error) {
+		return primitive, nil
+	}, internalapi.Token{}); err != nil {
+		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	config := cb.Build()
+	key := mustCreateHMACKey(hmac.VariantTink, 1)
+	got, isLegacy, err := factoryutil.PrimitiveFromKey[string](key, &config)
+	if err != nil {
+		t.Fatalf("PrimitiveFromKey() err = %v, want nil", err)
+	}
+	if diff := cmp.Diff(primitive, got); diff != "" || isLegacy {
+		t.Errorf("PrimitiveFromKey() mismatch (-want +got): %s", diff)
+	}
+
+	// Try to create a primitive of the wrong type.
+	_, _, err = factoryutil.PrimitiveFromKey[int](key, &config)
+	if err == nil {
+		t.Errorf("PrimitiveFromKey() err = nil, want error")
+	}
+}
+
+func TestPrimitiveFromKey_Legacy(t *testing.T) {
+	// RegistryConfig is the only config that can create legacy primitives.
+	config := registryconfig.RegistryConfig{}
+
+	// Artificially unregister the primitive constructor to force the legacy path.
+	primitiveregistry.UnregisterPrimitiveConstructor[*hmac.Key]()
+
+	key := mustCreateHMACKey(hmac.VariantTink, 1)
+	m, isLegacy, err := factoryutil.PrimitiveFromKey[tink.MAC](key, &config)
+	if err != nil {
+		t.Fatalf("PrimitiveFromKey() err = %v, want nil", err)
+	}
+	if !isLegacy {
+		t.Errorf("PrimitiveFromKey() isLegacy = false, want true")
+	}
+
+	d, err := m.ComputeMAC([]byte("data"))
+	if err != nil {
+		t.Fatalf("ComputeMAC() err = %v, want nil", err)
+	}
+	if err := m.VerifyMAC(d, []byte("data")); err != nil {
+		t.Errorf("VerifyMAC() err = %v, want nil", err)
+	}
+}
+
+func TestOutputPrefix(t *testing.T) {
+	key := mustCreateHMACKey(hmac.VariantTink, 1)
+	got, err := factoryutil.OutputPrefix(key)
+	if err != nil {
+		t.Fatalf("OutputPrefix() err = %v, want nil", err)
+	}
+	if diff := cmp.Diff([]byte{cryptofmt.TinkStartByte, 0, 0, 0, 1}, got); diff != "" {
+		t.Errorf("OutputPrefix() mismatch (-want +got): %s", diff)
+	}
+}
+
+func TestOutputPrefix_NoPrefix(t *testing.T) {
+	key := mustCreateHMACKey(hmac.VariantNoPrefix, 0)
+	got, err := factoryutil.OutputPrefix(key)
+	if err != nil {
+		t.Fatalf("OutputPrefix() err = %v, want nil", err)
+	}
+	if got != nil {
+		t.Errorf("OutputPrefix() = %v, want nil", got)
+	}
+}
+
+type noOutputPrefixParameters struct{}
+
+func (p *noOutputPrefixParameters) HasIDRequirement() bool { return false }
+
+func (p *noOutputPrefixParameters) Equal(other key.Parameters) bool { return false }
+
+type noOutputPrefixKey struct{}
+
+func (k *noOutputPrefixKey) Parameters() key.Parameters {
+	return &noOutputPrefixParameters{}
+}
+func (k *noOutputPrefixKey) IDRequirement() (idRequirement uint32, required bool) { return 0, false }
+
+func (k *noOutputPrefixKey) Equal(other key.Key) bool { return false }
+
+func TestOutputPrefix_DoesNotHaveOutputPrefix(t *testing.T) {
+	if _, err := factoryutil.OutputPrefix(&noOutputPrefixKey{}); err == nil {
+		t.Errorf("OutputPrefix() err = nil, want error")
 	}
 }

@@ -16,6 +16,7 @@
 package factoryutil
 
 import (
+	"fmt"
 	"iter"
 	"strings"
 
@@ -23,6 +24,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/internal/registryconfig/legacyprimitive"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 )
@@ -130,4 +133,47 @@ func (lb *LoggerFactory) CreateFor(primitive, apiFunction string) (monitoring.Lo
 		APIFunction: apiFunction,
 		KeysetInfo:  lb.info,
 	})
+}
+
+// PrimitiveFromKey returns the primitive of type T from the given key and config.
+//
+// On success, it also returns whether the primitive is a legacy "non-full"
+// primitive.
+//
+// k and config must not be nil.
+func PrimitiveFromKey[T any](k key.Key, config keyset.Config) (T, bool, error) {
+	primitive, err := config.PrimitiveFromKey(k, internalapi.Token{})
+	if err != nil {
+		var zero T
+		return zero, false, err
+	}
+	isLegacy := false
+	if legacyPrimitive, ok := primitive.(legacyprimitive.LegacyPrimitive); ok {
+		primitive = legacyPrimitive.Primitive()
+		isLegacy = true
+	}
+	result, ok := primitive.(T)
+	if !ok {
+		var zero T
+		return zero, isLegacy, fmt.Errorf("factoryutil: primitive is not a %T", *new(T))
+	}
+	return result, isLegacy, nil
+}
+
+type withOutputPrefix interface {
+	OutputPrefix() []byte
+}
+
+// OutputPrefix returns the output prefix of the given key.
+//
+// It leverages the fact that almost all [key.Key] implementations in Tink have
+// an OutputPrefix() method.
+//
+// Returns and error if the key does not have an OutputPrefix() method.
+func OutputPrefix(k key.Key) ([]byte, error) {
+	v, ok := k.(withOutputPrefix)
+	if !ok {
+		return nil, fmt.Errorf("factoryutil: key does not have an OutputPrefix() method")
+	}
+	return v.OutputPrefix(), nil
 }
