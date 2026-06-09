@@ -243,3 +243,13 @@ func TestNewWithConfigFailsWithEmptyConfig(t *testing.T) {
 		t.Errorf("streamingaead.NewWithConfig(kh, &cfg) err = nil, want error")
 	}
 }
+
+func TestNewWithConfigEmptyOrNilKeySetHandle(t *testing.T) {
+	cfg := config.NewBuilder().Build()
+	if _, err := streamingaead.NewWithConfig(nil, &cfg); err == nil {
+		t.Errorf("streamingaead.NewWithConfig(nil, &cfg) err = nil, want error")
+	}
+	if _, err := streamingaead.NewWithConfig(&keyset.Handle{}, &cfg); err == nil {
+		t.Errorf("streamingaead.NewWithConfig(&keyset.Handle{}, &cfg) err = nil, want error")
+	}
+}

@@ -63,6 +63,28 @@ func TestSignerVerifierFactoryNilKeyset(t *testing.T) {
 	if _, err := jwt.NewVerifier(nil); err == nil {
 		t.Errorf("jwt.NewVerifier(nil) err = nil, want error")
 	}
+	if _, err := jwt.NewSigner(&keyset.Handle{}); err == nil {
+		t.Errorf("jwt.NewSigner(&keyset.Handle{}) err = nil, want error")
+	}
+	if _, err := jwt.NewVerifier(&keyset.Handle{}); err == nil {
+		t.Errorf("jwt.NewVerifier(&keyset.Handle{}) err = nil, want error")
+	}
+}
+
+func TestNewSignerVerifierWithConfigEmptyOrNilKeySetHandle(t *testing.T) {
+	c := config.NewBuilder().Build()
+	if _, err := jwt.NewSignerWithConfig(nil, &c); err == nil {
+		t.Errorf("jwt.NewSignerWithConfig(nil) err = nil, want error")
+	}
+	if _, err := jwt.NewSignerWithConfig(&keyset.Handle{}, &c); err == nil {
+		t.Errorf("jwt.NewSignerWithConfig(&keyset.Handle{}) err = nil, want error")
+	}
+	if _, err := jwt.NewVerifierWithConfig(nil, &c); err == nil {
+		t.Errorf("jwt.NewVerifierWithConfig(nil) err = nil, want error")
+	}
+	if _, err := jwt.NewVerifierWithConfig(&keyset.Handle{}, &c); err == nil {
+		t.Errorf("jwt.NewVerifierWithConfig(&keyset.Handle{}) err = nil, want error")
+	}
 }
 
 func createJWTECDSAKey(kid *string) (*jepb.JwtEcdsaPrivateKey, error) {

@@ -38,6 +38,9 @@ const (
 // NewWithConfig creates a [tink.MAC] primitive from the given [keyset.Handle]
 // and [keyset.Config].
 func NewWithConfig(handle *keyset.Handle, c keyset.Config) (tink.MAC, error) {
+	if handle.Len() == 0 {
+		return nil, fmt.Errorf("mac_factory: empty or nil keyset handle")
+	}
 	primitives := prefixmap.New[macAndKeyID]()
 	var primary macAndKeyID
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {

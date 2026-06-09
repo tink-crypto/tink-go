@@ -124,7 +124,7 @@ func (a *stubAEAD) Decrypt(c, _ []byte) ([]byte, error) {
 	return c[len(a.prefix):], nil
 }
 
-func TestNewWithConfigNilKeySetHandle(t *testing.T) {
+func TestNewWithConfigEmptyOrNilKeySetHandle(t *testing.T) {
 	cb := config.NewBuilder()
 	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*aesgcm.Key](), func(key key.Key) (any, error) {
 		return &stubAEAD{prefix: key.(*aesgcm.Key).OutputPrefix()}, nil
@@ -133,7 +133,10 @@ func TestNewWithConfigNilKeySetHandle(t *testing.T) {
 	}
 	c := cb.Build()
 	if _, err := aead.NewWithConfig(nil, &c); err == nil {
-		t.Errorf("aead.NewWithConfig() err = %v, want empty or nil keyset handle", err)
+		t.Errorf("aead.NewWithConfig(nil) err = nil, want error")
+	}
+	if _, err := aead.NewWithConfig(&keyset.Handle{}, &c); err == nil {
+		t.Errorf("aead.NewWithConfig(&keyset.Handle{}) err = nil, want error")
 	}
 }
 

@@ -66,6 +66,25 @@ func TestNewWrappedKeysetDeriverWrongPrimitiveFails(t *testing.T) {
 	}
 }
 
+func TestNilKeysetHandle(t *testing.T) {
+	if _, err := keyderivation.New(nil); err == nil {
+		t.Errorf("keyderivation.New(nil) err = nil, want error")
+	}
+	if _, err := keyderivation.New(&keyset.Handle{}); err == nil {
+		t.Errorf("keyderivation.New(&keyset.Handle{}) err = nil, want error")
+	}
+}
+
+func TestNewWithConfigEmptyOrNilKeySetHandle(t *testing.T) {
+	c := config.NewBuilder().Build()
+	if _, err := keyderivation.NewWithConfig(nil, &c); err == nil {
+		t.Errorf("keyderivation.NewWithConfig(nil) err = nil, want error")
+	}
+	if _, err := keyderivation.NewWithConfig(&keyset.Handle{}, &c); err == nil {
+		t.Errorf("keyderivation.NewWithConfig(&keyset.Handle{}) err = nil, want error")
+	}
+}
+
 const (
 	stubKeysetDeriverURL = "type.googleapis.com/google.crypto.tink.StubKeysetDeriver"
 )

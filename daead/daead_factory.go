@@ -34,6 +34,9 @@ func New(handle *keyset.Handle) (tink.DeterministicAEAD, error) {
 // NewWithConfig creates a DeterministicAEAD primitive from the given [keyset.Handle] using
 // the provided [keyset.Config].
 func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.DeterministicAEAD, error) {
+	if handle.Len() == 0 {
+		return nil, fmt.Errorf("daead_factory: empty or nil keyset handle")
+	}
 	primitives := prefixmap.New[daeadAndKeyID]()
 	var primary daeadAndKeyID
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {

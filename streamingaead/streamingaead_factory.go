@@ -15,6 +15,7 @@
 package streamingaead
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
@@ -32,6 +33,9 @@ func New(handle *keyset.Handle) (tink.StreamingAEAD, error) {
 // NewWithConfig returns a [tink.StreamingAEAD] primitive from the given keyset
 // handle with the provided [keyset.Config].
 func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.StreamingAEAD, error) {
+	if handle.Len() == 0 {
+		return nil, fmt.Errorf("streamingaead_factory: empty or nil keyset handle")
+	}
 	var primitives []tink.StreamingAEAD
 	var primary tink.StreamingAEAD
 

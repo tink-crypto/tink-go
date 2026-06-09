@@ -38,6 +38,9 @@ func NewHybridEncrypt(handle *keyset.Handle) (tink.HybridEncrypt, error) {
 // NOTE: [keyset.Config] is currently a type that can only be used internally;
 // thus this function is not part of the public API.
 func NewHybridEncryptWithConfig(handle *keyset.Handle, config keyset.Config) (tink.HybridEncrypt, error) {
+	if handle.Len() == 0 {
+		return nil, fmt.Errorf("hybrid_factory: empty or nil keyset handle")
+	}
 	// Make sure the primitives do not implement tink.AEAD.
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
 		p, _, err := factoryutil.PrimitiveFromKey[tink.HybridEncrypt](entry.Key(), config)

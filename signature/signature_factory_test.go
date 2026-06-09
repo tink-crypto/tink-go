@@ -115,8 +115,33 @@ func TestSignerVerifyFactory(t *testing.T) {
 
 func TestPrimitiveFactoryFailsWithEmptyHandle(t *testing.T) {
 	handle := &keyset.Handle{}
+	if _, err := signature.NewSigner(handle); err == nil {
+		t.Errorf("signature.NewSigner(handle) err = nil, want not nil")
+	}
 	if _, err := signature.NewVerifier(handle); err == nil {
 		t.Errorf("signature.NewVerifier(handle) err = nil, want not nil")
+	}
+	if _, err := signature.NewSigner(nil); err == nil {
+		t.Errorf("signature.NewSigner(nil) err = nil, want not nil")
+	}
+	if _, err := signature.NewVerifier(nil); err == nil {
+		t.Errorf("signature.NewVerifier(nil) err = nil, want not nil")
+	}
+}
+
+func TestNewWithConfigEmptyOrNilKeySetHandle(t *testing.T) {
+	c := config.NewBuilder().Build()
+	if _, err := signature.NewSignerWithConfig(nil, &c); err == nil {
+		t.Errorf("signature.NewSignerWithConfig(nil) err = nil, want error")
+	}
+	if _, err := signature.NewSignerWithConfig(&keyset.Handle{}, &c); err == nil {
+		t.Errorf("signature.NewSignerWithConfig(&keyset.Handle{}) err = nil, want error")
+	}
+	if _, err := signature.NewVerifierWithConfig(nil, &c); err == nil {
+		t.Errorf("signature.NewVerifierWithConfig(nil) err = nil, want error")
+	}
+	if _, err := signature.NewVerifierWithConfig(&keyset.Handle{}, &c); err == nil {
+		t.Errorf("signature.NewVerifierWithConfig(&keyset.Handle{}) err = nil, want error")
 	}
 }
 

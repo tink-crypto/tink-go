@@ -39,7 +39,7 @@ func NewHybridDecrypt(handle *keyset.Handle) (tink.HybridDecrypt, error) {
 // thus this function is not part of the public API.
 func NewHybridDecryptWithConfig(handle *keyset.Handle, config keyset.Config) (tink.HybridDecrypt, error) {
 	if handle.Len() == 0 {
-		return nil, fmt.Errorf("hybrid_factory: handle is empty")
+		return nil, fmt.Errorf("hybrid_factory: empty or nil keyset handle")
 	}
 	// Make sure the primitives do not implement tink.AEAD.
 	decrypters := prefixmap.New[decrypterAndID]()

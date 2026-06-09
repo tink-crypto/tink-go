@@ -35,12 +35,13 @@ import (
 // [keyset.Handle] and [keyset.Config].
 func NewVerifierWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Verifier, error) {
 	if handle.Len() == 0 {
-		return nil, fmt.Errorf("verifier_factory: empty keyset")
+		return nil, fmt.Errorf("verifier_factory: empty or nil keyset handle")
 	}
 	verifiers := prefixmap.New[verifierAndID]()
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
 		verifier, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.Verifier](entry.Key(), config)
 		if err != nil {
+			// Using this error message for backwards compatibility with existing clients.
 			return nil, fmt.Errorf("verifier_factory: cannot obtain primitive set: %s", err)
 		}
 

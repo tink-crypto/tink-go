@@ -34,7 +34,7 @@ import (
 // [keyset.Handle] and [keyset.Config].
 func NewSignerWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Signer, error) {
 	if handle.Len() == 0 {
-		return nil, fmt.Errorf("verifier_factory: empty keyset")
+		return nil, fmt.Errorf("signer_factory: empty or nil keyset handle")
 	}
 	primaryEntry, err := handle.Primary()
 	if err != nil {

@@ -187,6 +187,16 @@ func TestNonPRFPrimitives(t *testing.T) {
 	}
 }
 
+func TestNewPRFSetWithConfigEmptyOrNilKeySetHandle(t *testing.T) {
+	c := config.NewBuilder().Build()
+	if _, err := prf.NewPRFSetWithConfig(nil, &c); err == nil {
+		t.Errorf("prf.NewPRFSetWithConfig(nil) err = nil, want error")
+	}
+	if _, err := prf.NewPRFSetWithConfig(&keyset.Handle{}, &c); err == nil {
+		t.Errorf("prf.NewPRFSetWithConfig(&keyset.Handle{}) err = nil, want error")
+	}
+}
+
 func runZTests(results [][]byte, t *testing.T) {
 	for i, result1 := range results {
 		if err := testutil.ZTestUniformString(result1); err != nil {

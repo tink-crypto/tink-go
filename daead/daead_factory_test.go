@@ -875,6 +875,20 @@ func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
 	}
 }
 
+func TestNewWithConfigEmptyOrNilKeySetHandle(t *testing.T) {
+	configBuilder := config.NewBuilder()
+	if err := configBuilder.RegisterPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullDEAD{}, nil }, internalapi.Token{}); err != nil {
+		t.Fatalf("configBuilder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	c := configBuilder.Build()
+	if _, err := daead.NewWithConfig(nil, &c); err == nil {
+		t.Errorf("daead.NewWithConfig(nil) err = nil, want error")
+	}
+	if _, err := daead.NewWithConfig(&keyset.Handle{}, &c); err == nil {
+		t.Errorf("daead.NewWithConfig(&keyset.Handle{}) err = nil, want error")
+	}
+}
+
 func TestNewWithConfig(t *testing.T) {
 	defer protoserialization.UnregisterKeyParser(stubKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*stubKey]()

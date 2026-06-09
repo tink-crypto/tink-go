@@ -160,6 +160,22 @@ func TestFactoryWithInvalidPrimitiveSetType(t *testing.T) {
 	}
 }
 
+func TestNewWithConfigEmptyOrNilKeySetHandle(t *testing.T) {
+	c := config.NewBuilder().Build()
+	if _, err := hybrid.NewHybridEncryptWithConfig(nil, &c); err == nil {
+		t.Errorf("hybrid.NewHybridEncryptWithConfig(nil) err = nil, want error")
+	}
+	if _, err := hybrid.NewHybridEncryptWithConfig(&keyset.Handle{}, &c); err == nil {
+		t.Errorf("hybrid.NewHybridEncryptWithConfig(&keyset.Handle{}) err = nil, want error")
+	}
+	if _, err := hybrid.NewHybridDecryptWithConfig(nil, &c); err == nil {
+		t.Errorf("hybrid.NewHybridDecryptWithConfig(nil) err = nil, want error")
+	}
+	if _, err := hybrid.NewHybridDecryptWithConfig(&keyset.Handle{}, &c); err == nil {
+		t.Errorf("hybrid.NewHybridDecryptWithConfig(&keyset.Handle{}) err = nil, want error")
+	}
+}
+
 func TestFactoryWithValidPrimitiveSetType(t *testing.T) {
 	goodKH, err := keyset.NewHandle(hybrid.ECIESHKDFAES128GCMKeyTemplate())
 	if err != nil {
@@ -188,6 +204,12 @@ func TestPrimitiveFactoryFailsWhenHandleIsEmpty(t *testing.T) {
 	}
 	if _, err := hybrid.NewHybridDecrypt(handle); err == nil {
 		t.Errorf("NewHybridDecrypt(handle) err = nil, want not nil")
+	}
+	if _, err := hybrid.NewHybridEncrypt(nil); err == nil {
+		t.Errorf("NewHybridEncrypt(nil) err = nil, want not nil")
+	}
+	if _, err := hybrid.NewHybridDecrypt(nil); err == nil {
+		t.Errorf("NewHybridDecrypt(nil) err = nil, want not nil")
 	}
 }
 

@@ -40,8 +40,8 @@ func NewVerifier(handle *keyset.Handle) (Verifier, error) {
 // NOTE: This is currently not usable in OSS because [keyset.Config]
 // is not user-implementable.
 func NewVerifierWithConfig(handle *keyset.Handle, config keyset.Config) (Verifier, error) {
-	if handle == nil {
-		return nil, fmt.Errorf("keyset handle can't be nil")
+	if handle.Len() == 0 {
+		return nil, fmt.Errorf("jwt_verifier_factory: empty or nil keyset handle")
 	}
 	logger, err := createVerifierLogger(handle)
 	if err != nil {

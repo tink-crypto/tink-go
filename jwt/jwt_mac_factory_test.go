@@ -93,7 +93,20 @@ func verifyMACCompareSubject(p jwt.MAC, compact string, validator *jwt.Validator
 
 func TestNilKeyHandle(t *testing.T) {
 	if _, err := jwt.NewMAC(nil); err == nil {
-		t.Errorf("TestNilKeyHandle(nil) err = nil, want error")
+		t.Errorf("jwt.NewMAC(nil) err = nil, want error")
+	}
+	if _, err := jwt.NewMAC(&keyset.Handle{}); err == nil {
+		t.Errorf("jwt.NewMAC(&keyset.Handle{}) err = nil, want error")
+	}
+}
+
+func TestNewMACWithConfigEmptyOrNilKeySetHandle(t *testing.T) {
+	c := config.NewBuilder().Build()
+	if _, err := jwt.NewMACWithConfig(nil, &c); err == nil {
+		t.Errorf("jwt.NewMACWithConfig(nil) err = nil, want error")
+	}
+	if _, err := jwt.NewMACWithConfig(&keyset.Handle{}, &c); err == nil {
+		t.Errorf("jwt.NewMACWithConfig(&keyset.Handle{}) err = nil, want error")
 	}
 }
 

@@ -15,6 +15,8 @@
 package prf
 
 import (
+	"fmt"
+
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -30,6 +32,9 @@ func NewPRFSet(handle *keyset.Handle) (*Set, error) {
 // NewPRFSetWithConfig creates a [prf.Set] primitive from the given [keyset.Handle] and
 // [keyset.Config].
 func NewPRFSetWithConfig(handle *keyset.Handle, config keyset.Config) (*Set, error) {
+	if handle.Len() == 0 {
+		return nil, fmt.Errorf("prf_set_factory: empty or nil keyset handle")
+	}
 	logger, err := createLogger(handle)
 	if err != nil {
 		return nil, err

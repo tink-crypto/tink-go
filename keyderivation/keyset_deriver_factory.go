@@ -64,8 +64,8 @@ func New(handle *keyset.Handle) (KeysetDeriver, error) {
 // NOTE: This is currently not usable in OSS because [keyset.Config]
 // is not user-implementable.
 func NewWithConfig(handle *keyset.Handle, config keyset.Config) (KeysetDeriver, error) {
-	if handle == nil {
-		return nil, fmt.Errorf("keyset handle can't be nil")
+	if handle.Len() == 0 {
+		return nil, fmt.Errorf("keyset_deriver_factory: empty or nil keyset handle")
 	}
 	var fullKeyDerivers []fullKeyDeriverWithKeyID
 	primaryKeyID := uint32(0)
