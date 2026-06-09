@@ -15,12 +15,13 @@
 package signature
 
 import (
+	"bytes"
 	"fmt"
 	"slices"
 
+	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -32,13 +33,37 @@ import (
 // NewSignerWithConfig returns a [tink.Signer] primitive from the given
 // [keyset.Handle] and [keyset.Config].
 func NewSignerWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Signer, error) {
-	ps, err := keyset.Primitives[tink.Signer](handle, config, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("public_key_sign_factory: cannot obtain primitive set: %s", err)
+	if handle.Len() == 0 {
+		return nil, fmt.Errorf("verifier_factory: empty keyset")
 	}
-	signer, err := extractFullSigner(ps.Primary)
+	primaryEntry, err := handle.Primary()
 	if err != nil {
 		return nil, err
+	}
+	// Make sure this access doesn't get logged as key export.
+	primaryEntry = primaryEntry.ToUnmonitoredEntry(internalapi.Token{})
+	signer, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.Signer](primaryEntry.Key(), config)
+	if err != nil {
+		return nil, err
+	}
+	if isLegacyPrimitive {
+		hasLegacyPrefix := false
+		outputPrefix, err := factoryutil.OutputPrefix(primaryEntry.Key())
+		if err != nil {
+			return nil, err
+		}
+		if bytes.HasPrefix(outputPrefix, []byte{cryptofmt.LegacyStartByte}) { // CRUNCHY or LEGACY
+			protoKey, err := protoserialization.SerializeKey(primaryEntry.Key())
+			if err != nil {
+				return nil, err
+			}
+			hasLegacyPrefix = protoKey.OutputPrefixType() == tinkpb.OutputPrefixType_LEGACY
+		}
+		signer = &fullSignerAdapter{
+			primitive:       signer,
+			prefix:          outputPrefix,
+			hasLegacyPrefix: hasLegacyPrefix,
+		}
 	}
 	logger, err := createSignerLogger(handle)
 	if err != nil {
@@ -46,7 +71,7 @@ func NewSignerWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Sign
 	}
 	return &wrappedSigner{
 		signer:      signer,
-		signerKeyID: ps.Primary.KeyID,
+		signerKeyID: primaryEntry.KeyID(),
 		logger:      logger,
 	}, nil
 }
@@ -68,16 +93,16 @@ type wrappedSigner struct {
 var _ tink.Signer = (*wrappedSigner)(nil)
 
 type fullSignerAdapter struct {
-	primitive  tink.Signer
-	prefix     []byte
-	prefixType tinkpb.OutputPrefixType
+	primitive       tink.Signer
+	prefix          []byte
+	hasLegacyPrefix bool
 }
 
 var _ tink.Signer = (*fullSignerAdapter)(nil)
 
 func (a *fullSignerAdapter) Sign(data []byte) ([]byte, error) {
 	toSign := data
-	if a.prefixType == tinkpb.OutputPrefixType_LEGACY {
+	if a.hasLegacyPrefix {
 		toSign = slices.Concat(data, []byte{0})
 	}
 	s, err := a.primitive.Sign(toSign)
@@ -85,25 +110,6 @@ func (a *fullSignerAdapter) Sign(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	return slices.Concat(a.prefix, s), nil
-}
-
-// extractFullSigner returns a [tink.Signer] from the given entry as a "full"
-// primitive.
-//
-// It wraps legacy primitives in a full primitive adapter.
-func extractFullSigner(e *primitiveset.Entry[tink.Signer]) (tink.Signer, error) {
-	if e.FullPrimitive != nil {
-		return e.FullPrimitive, nil
-	}
-	protoKey, err := protoserialization.SerializeKey(e.Key)
-	if err != nil {
-		return nil, err
-	}
-	return &fullSignerAdapter{
-		primitive:  e.Primitive,
-		prefix:     e.OutputPrefix(),
-		prefixType: protoKey.OutputPrefixType(),
-	}, nil
 }
 
 func createSignerLogger(kh *keyset.Handle) (monitoring.Logger, error) {

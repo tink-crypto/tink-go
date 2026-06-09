@@ -19,10 +19,9 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -35,22 +34,41 @@ import (
 // NewVerifierWithConfig returns a [tink.Verifier] primitive from the given
 // [keyset.Handle] and [keyset.Config].
 func NewVerifierWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Verifier, error) {
-	ps, err := keyset.Primitives[tink.Verifier](handle, config, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("verifier_factory: cannot obtain primitive set: %s", err)
+	if handle.Len() == 0 {
+		return nil, fmt.Errorf("verifier_factory: empty keyset")
 	}
 	verifiers := prefixmap.New[verifierAndID]()
-	for _, entries := range ps.Entries {
-		for _, e := range entries {
-			verifier, err := extractFullVerifier(e)
-			if err != nil {
-				return nil, err
-			}
-			verifiers.Insert(string(e.OutputPrefix()), verifierAndID{
-				verifier: verifier,
-				keyID:    e.KeyID,
-			})
+	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
+		verifier, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.Verifier](entry.Key(), config)
+		if err != nil {
+			return nil, err
 		}
+
+		outputPrefix, err := factoryutil.OutputPrefix(entry.Key())
+		if err != nil {
+			return nil, err
+		}
+
+		if isLegacyPrimitive {
+			hasLegacyPrefix := false
+			if bytes.HasPrefix(outputPrefix, []byte{cryptofmt.LegacyStartByte}) { // CRUNCHY or LEGACY
+				protoKey, err := protoserialization.SerializeKey(entry.Key())
+				if err != nil {
+					return nil, err
+				}
+				hasLegacyPrefix = protoKey.OutputPrefixType() == tinkpb.OutputPrefixType_LEGACY
+			}
+			verifier = &fullVerifierAdapter{
+				primitive:       verifier,
+				prefix:          outputPrefix,
+				hasLegacyPrefix: hasLegacyPrefix,
+			}
+		}
+
+		verifiers.Insert(string(outputPrefix), verifierAndID{
+			verifier: verifier,
+			keyID:    entry.KeyID(),
+		})
 	}
 	logger, err := createVerifierLogger(handle)
 	if err != nil {
@@ -88,9 +106,9 @@ func (a *verifierAndID) Verify(signatureBytes, data []byte) error {
 var _ tink.Verifier = (*wrappedVerifier)(nil)
 
 type fullVerifierAdapter struct {
-	primitive        tink.Verifier
-	prefix           []byte
-	outputPrefixType tinkpb.OutputPrefixType
+	primitive       tink.Verifier
+	prefix          []byte
+	hasLegacyPrefix bool
 }
 
 var _ tink.Verifier = (*fullVerifierAdapter)(nil)
@@ -100,30 +118,10 @@ func (a *fullVerifierAdapter) Verify(signatureBytes, data []byte) error {
 		return fmt.Errorf("verifier_factory: invalid signature prefix")
 	}
 	message := data
-	if a.outputPrefixType == tinkpb.OutputPrefixType_LEGACY {
+	if a.hasLegacyPrefix {
 		message = slices.Concat(message, []byte{0})
 	}
 	return a.primitive.Verify(signatureBytes[len(a.prefix):], message)
-}
-
-// extractFullVerifier returns a [tink.Verifier] from the given entry as a
-// "full" primitive.
-//
-// It wraps legacy primitives in a full primitive adapter.
-func extractFullVerifier(e *primitiveset.Entry[tink.Verifier]) (tink.Verifier, error) {
-	if e.FullPrimitive != nil {
-		return e.FullPrimitive, nil
-	}
-	protoKey, err := protoserialization.SerializeKey(e.Key)
-	if err != nil {
-		return nil, err
-	}
-	prefixType := protoKey.OutputPrefixType()
-	return &fullVerifierAdapter{
-		primitive:        e.Primitive,
-		prefix:           e.OutputPrefix(),
-		outputPrefixType: prefixType,
-	}, nil
 }
 
 func createVerifierLogger(kh *keyset.Handle) (monitoring.Logger, error) {
