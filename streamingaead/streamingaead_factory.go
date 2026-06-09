@@ -15,11 +15,9 @@
 package streamingaead
 
 import (
-	"fmt"
 	"io"
 
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig/legacyprimitive"
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -37,30 +35,17 @@ func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.StreamingA
 	var primitives []tink.StreamingAEAD
 	var primary tink.StreamingAEAD
 
-	for i := 0; i < handle.Len(); i++ {
-		entry, err := handle.Entry(i)
+	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
+		// We ignore the boolean indicating whether the primitive is a legacy
+		// "non-full" primitive, because Streaming AEAD primitives are always
+		// without output prefix.
+		primitive, _, err := factoryutil.PrimitiveFromKey[tink.StreamingAEAD](entry.Key(), config)
 		if err != nil {
 			return nil, err
 		}
-		if entry.KeyStatus() != keyset.Enabled {
-			continue
-		}
-
-		primitive, err := config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
-		if err != nil {
-			return nil, err
-		}
-		if legacyPrimitive, ok := primitive.(legacyprimitive.LegacyPrimitive); ok {
-			primitive = legacyPrimitive.Primitive()
-		}
-		streamingAEADPrimitive, ok := primitive.(tink.StreamingAEAD)
-		if !ok {
-			return nil, fmt.Errorf("streamingaead_factory: primitive is not a StreamingAEAD")
-		}
-
-		primitives = append(primitives, streamingAEADPrimitive)
+		primitives = append(primitives, primitive)
 		if entry.IsPrimary() {
-			primary = streamingAEADPrimitive
+			primary = primitive
 		}
 	}
 
