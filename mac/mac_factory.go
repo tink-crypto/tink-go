@@ -21,8 +21,7 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
+	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -39,23 +38,39 @@ const (
 // NewWithConfig creates a [tink.MAC] primitive from the given [keyset.Handle]
 // and [keyset.Config].
 func NewWithConfig(handle *keyset.Handle, c keyset.Config) (tink.MAC, error) {
-	ps, err := keyset.Primitives[tink.MAC](handle, c, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("mac_factory: cannot obtain primitive set: %s", err)
-	}
-	primary, err := toFullPrimitive(ps.Primary)
-	if err != nil {
-		return nil, err
-	}
-	primitives := make(map[string][]macAndKeyID)
-	for _, entries := range ps.Entries {
-		for _, entry := range entries {
-			primitive, err := toFullPrimitive(entry)
+	primitives := prefixmap.New[macAndKeyID]()
+	var primary macAndKeyID
+	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
+		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.MAC](entry.Key(), c)
+		if err != nil {
+			return nil, err
+		}
+		outputPrefix, err := factoryutil.OutputPrefix(entry.Key())
+		if err != nil {
+			return nil, err
+		}
+
+		if isLegacyPrimitive {
+			protoKey, err := protoserialization.SerializeKey(entry.Key())
 			if err != nil {
 				return nil, err
 			}
-			prefix := string(entry.OutputPrefix())
-			primitives[prefix] = append(primitives[prefix], primitive)
+			hasLegacyPrefix := protoKey.OutputPrefixType() == tinkpb.OutputPrefixType_LEGACY
+			p = &fullMACAdapter{
+				rawPrimitive:    p,
+				prefix:          outputPrefix,
+				hasLegacyPrefix: hasLegacyPrefix,
+			}
+		}
+		primitives.Insert(string(outputPrefix), macAndKeyID{
+			primitive: p,
+			keyID:     entry.KeyID(),
+		})
+		if entry.IsPrimary() {
+			primary = macAndKeyID{
+				primitive: p,
+				keyID:     entry.KeyID(),
+			}
 		}
 	}
 
@@ -95,15 +110,15 @@ func (m *macAndKeyID) VerifyMAC(mac, data []byte) error {
 // fullMACAdapter is a [tink.MAC] implementation that turns a RAW MAC primitive
 // into a full MAC primitive.
 type fullMACAdapter struct {
-	rawPrimitive tink.MAC
-	prefix       []byte
-	isLegacy     bool
+	rawPrimitive    tink.MAC
+	prefix          []byte
+	hasLegacyPrefix bool
 }
 
 var _ (tink.MAC) = (*fullMACAdapter)(nil)
 
 func (m *fullMACAdapter) data(data []byte) ([]byte, error) {
-	if m.isLegacy {
+	if m.hasLegacyPrefix {
 		d := data
 		if len(d) == maxInt {
 			return nil, fmt.Errorf("data too long")
@@ -147,36 +162,13 @@ func (m *fullMACAdapter) VerifyMAC(mac, data []byte) error {
 // primitive that should be used for verification.
 type wrappedMAC struct {
 	primary    macAndKeyID
-	primitives map[string][]macAndKeyID
+	primitives *prefixmap.PrefixMap[macAndKeyID]
 
 	computeLogger monitoring.Logger
 	verifyLogger  monitoring.Logger
 }
 
 var _ (tink.MAC) = (*wrappedMAC)(nil)
-
-// toFullPrimitive converts a primitive to a full [tink.MAC] primitive.
-func toFullPrimitive(entry *primitiveset.Entry[tink.MAC]) (macAndKeyID, error) {
-	if entry.FullPrimitive != nil {
-		return macAndKeyID{
-			primitive: entry.FullPrimitive,
-			keyID:     entry.KeyID,
-		}, nil
-	}
-	protoKey, err := protoserialization.SerializeKey(entry.Key)
-	if err != nil {
-		return macAndKeyID{}, err
-	}
-	isLegacy := protoKey.OutputPrefixType() == tinkpb.OutputPrefixType_LEGACY
-	return macAndKeyID{
-		primitive: &fullMACAdapter{
-			rawPrimitive: entry.Primitive,
-			prefix:       entry.OutputPrefix(),
-			isLegacy:     isLegacy,
-		},
-		keyID: entry.KeyID,
-	}, nil
-}
 
 func createLoggers(kh *keyset.Handle) (monitoring.Logger, monitoring.Logger, error) {
 	factory, err := factoryutil.NewLoggerFactory(kh)
@@ -206,8 +198,8 @@ func (m *wrappedMAC) ComputeMAC(data []byte) ([]byte, error) {
 	return mac, nil
 }
 
-func (m *wrappedMAC) tryVerifyMAC(mac []byte, data []byte, primitives []macAndKeyID) bool {
-	for _, primitive := range primitives {
+func (m *wrappedMAC) tryVerifyMAC(mac []byte, data []byte, it *prefixmap.Iterator[macAndKeyID]) bool {
+	for primitive, ok := it.Next(); ok; primitive, ok = it.Next() {
 		if err := primitive.VerifyMAC(mac, data); err == nil {
 			m.verifyLogger.Log(primitive.keyID, len(data))
 			return true
@@ -227,18 +219,14 @@ func (m *wrappedMAC) VerifyMAC(mac, data []byte) error {
 		return fmt.Errorf("mac_factory: invalid mac")
 	}
 	// Try non raw keys.
-	primitives, ok := m.primitives[string(mac[:prefixSize])]
-	if ok {
-		if m.tryVerifyMAC(mac, data, primitives) {
-			return nil
-		}
+	it := m.primitives.PrimitivesMatchingPrefix(mac[:prefixSize])
+	if m.tryVerifyMAC(mac, data, it) {
+		return nil
 	}
 	// Try raw keys.
-	primitives, ok = m.primitives[""]
-	if ok {
-		if m.tryVerifyMAC(mac, data, primitives) {
-			return nil
-		}
+	it = m.primitives.PrimitivesMatchingPrefix(nil)
+	if m.tryVerifyMAC(mac, data, it) {
+		return nil
 	}
 	// nothing worked
 	m.verifyLogger.LogFailure()
