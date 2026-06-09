@@ -19,12 +19,9 @@ import (
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/aead"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
-	"github.com/tink-crypto/tink-go/v2/tink"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -79,21 +76,6 @@ func BenchmarkNewHandleWithNoSecrets(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				if _, err := keyset.NewHandleWithNoSecrets(publicKeyset); err != nil {
-					b.Fatalf("%v", err)
-				}
-			}
-		})
-	}
-}
-
-func BenchmarkHandlePrimitives(b *testing.B) {
-	for _, tc := range benchmarkTestCases {
-		b.Run(tc.name, func(b *testing.B) {
-			h := newTestKeysetHandle(b, aead.AES128GCMKeyTemplate(), tc.numKeys)
-			b.ResetTimer()
-			b.ReportAllocs()
-			for i := 0; i < b.N; i++ {
-				if _, err := keyset.Primitives[tink.AEAD](h, &registryconfig.RegistryConfig{}, internalapi.Token{}); err != nil {
 					b.Fatalf("%v", err)
 				}
 			}

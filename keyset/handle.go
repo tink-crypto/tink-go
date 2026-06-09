@@ -24,9 +24,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig/legacyprimitive"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -531,76 +529,6 @@ func (h *Handle) Annotations(_ internalapi.Token) map[string]string { return h.a
 type Config interface {
 	// PrimitiveFromKey creates a primitive from a [key.Key].
 	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
-}
-
-type primitiveOptions struct {
-	config Config
-}
-
-// Primitives creates a [primitiveset.PrimitiveSet] with primitives of type T
-// from keys in h.
-//
-// Only ENABLED keys are considered. This function uses either the given
-// [Config] or a global registry to create the primitives.
-//
-// Example usage:
-//
-//	ps, err := keyset.Primitives[tink.AEAD](h, internalapi.Token{}, keyset.WithConfig(config.V0()))
-//
-// The returned [primitiveset.PrimitiveSet] is intended to be used by primitive
-// factories.
-//
-// NOTE: This is an internal API.
-func Primitives[T any](h *Handle, config Config, _ internalapi.Token) (*primitiveset.PrimitiveSet[T], error) {
-	if h == nil {
-		return nil, fmt.Errorf("keyset.Handle: nil handle")
-	}
-	if h.Len() == 0 {
-		return nil, fmt.Errorf("keyset.Handle: empty keyset")
-	}
-	primitiveSet := primitiveset.New[T]()
-	primitiveSet.Annotations = h.annotations
-	for _, entry := range h.entries {
-		// Don't add disabled keys to the primitive set.
-		if entry.KeyStatus() != Enabled {
-			continue
-		}
-		if err := addToPrimitiveSet(primitiveSet, entry, config); err != nil {
-			return nil, fmt.Errorf("keyset.Handle: cannot add primitive: %v", err)
-		}
-	}
-	return primitiveSet, nil
-}
-
-func addToPrimitiveSet[T any](primitiveSet *primitiveset.PrimitiveSet[T], entry *Entry, config Config) error {
-	// Don't monitor this as key export.
-	entry = entry.ToUnmonitoredEntry(internalapi.Token{})
-	var primitive any
-	isFullPrimitive := true
-	primitive, err := config.PrimitiveFromKey(entry.Key(), internalapi.Token{})
-	if err != nil {
-		return err
-	}
-	// Check if the primitive is a legacy primitive.
-	if legacyPrimitive, ok := primitive.(legacyprimitive.LegacyPrimitive); ok {
-		isFullPrimitive = false
-		primitive = legacyPrimitive.Primitive()
-	}
-	actualPrimitive, ok := primitive.(T)
-	if !ok {
-		return fmt.Errorf("primitive is of type %T, want %T", primitive, (*T)(nil))
-	}
-	psEntry := &primitiveset.Entry[T]{
-		KeyID:     entry.KeyID(),
-		Key:       entry.Key(),
-		IsPrimary: entry.isPrimary,
-	}
-	if isFullPrimitive {
-		psEntry.FullPrimitive = actualPrimitive
-	} else {
-		psEntry.Primitive = actualPrimitive
-	}
-	return primitiveSet.Add(psEntry)
 }
 
 func decrypt(encryptedKeyset *tinkpb.EncryptedKeyset, keyEncryptionAEAD tink.AEAD, associatedData []byte) (*tinkpb.Keyset, error) {

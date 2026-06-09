@@ -20,25 +20,18 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead"
-	"github.com/tink-crypto/tink-go/v2/aead/aesgcm"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
-	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig/legacyprimitive"
-	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
-	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac/aescmac"
 	"github.com/tink-crypto/tink-go/v2/mac/hmac"
@@ -496,30 +489,6 @@ func TestEntryReturnsError(t *testing.T) {
 			_, err := tc.handle.Entry(0)
 			if err == nil {
 				t.Errorf("handle.Entry(0) err = nil, want err")
-			}
-		})
-	}
-}
-
-func TestPrimitivesReturnsError(t *testing.T) {
-	testCases := []struct {
-		name   string
-		handle *keyset.Handle
-	}{
-		{
-			name:   "zero value handle",
-			handle: &keyset.Handle{},
-		},
-		{
-			name:   "nil handle",
-			handle: nil,
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := keyset.Primitives[any](tc.handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
-			if err == nil {
-				t.Errorf("keyset.Primitives[any](tc.handle, internalapi.Token{}) err = nil, want err")
 			}
 		})
 	}
@@ -986,88 +955,6 @@ func TestPrimitivesWithRegistry(t *testing.T) {
 	}
 }
 
-type stubPrimitive struct {
-	isFull bool
-}
-
-func TestPrimitives(t *testing.T) {
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
-	if err != nil {
-		t.Fatalf("keyset.NewHandle(%v) = %v, want nil", mac.HMACSHA256Tag128KeyTemplate(), err)
-	}
-	primitives, err := keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
-	if err != nil {
-		t.Fatalf("keyset.Primitives[tink.MAC](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %v, want nil", err)
-	}
-	if len(primitives.EntriesInKeysetOrder) != 1 {
-		t.Fatalf("len(handle.Primitives(internalapi.Token{})) = %d, want 1", len(primitives.EntriesInKeysetOrder))
-	}
-	if primitives.Primary.FullPrimitive == nil {
-		t.Fatalf("handle.Primitives(internalapi.Token{}).Primary.FullPrimitive = nil, want non-nil")
-	}
-	if _, ok := primitives.Primary.FullPrimitive.(tink.MAC); !ok {
-		t.Fatalf("handle.Primitives(internalapi.Token{}).Primary.Primitive = %T, want %T", primitives.Primary.FullPrimitive, (tink.MAC)(nil))
-	}
-}
-
-func TestPrimitivesWithConfig(t *testing.T) {
-	cb := config.NewBuilder()
-	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*aesgcm.Key](), func(key key.Key) (any, error) {
-		return &stubPrimitive{true}, nil
-	}, internalapi.Token{}); err != nil {
-		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
-	}
-	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*hmac.Key](), func(key key.Key) (any, error) {
-		return legacyprimitive.New(&stubPrimitive{false}), nil
-	}, internalapi.Token{}); err != nil {
-		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
-	}
-	c := cb.Build()
-
-	for _, tc := range []struct {
-		name        string
-		keyTemplate *tinkpb.KeyTemplate
-		wantFull    bool
-	}{
-		{
-			name:        "legacy primitive",
-			keyTemplate: mac.HMACSHA256Tag128KeyTemplate(),
-			wantFull:    false,
-		},
-		{
-			name:        "full primitive",
-			keyTemplate: aead.AES256GCMKeyTemplate(),
-			wantFull:    true,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			handle, err := keyset.NewHandle(tc.keyTemplate)
-			if err != nil {
-				t.Fatalf("keyset.NewHandle(%v) = %v, want nil", tc.keyTemplate, err)
-			}
-			primitives, err := keyset.Primitives[*stubPrimitive](handle, &c, internalapi.Token{})
-			if err != nil {
-				t.Fatalf("keyset.Primitives[*stubPrimitive](handle, &c, internalapi.Token{})) err = %v, want nil", err)
-			}
-			if len(primitives.EntriesInKeysetOrder) != 1 {
-				t.Fatalf("len(keyset.Primitives[*stubPrimitive](handle, &c, internalapi.Token{})) = %d, want 1", len(primitives.EntriesInKeysetOrder))
-			}
-			var p *stubPrimitive
-			if tc.wantFull {
-				p = primitives.Primary.FullPrimitive
-			} else {
-				p = primitives.Primary.Primitive
-			}
-			if p == nil {
-				t.Fatalf("keyset.Primitives[*stubPrimitive](handle, &c, internalapi.Token{})) = nil, want instance of `*stubPrimitive`")
-			}
-			if p.isFull != tc.wantFull {
-				t.Errorf("keyset.Primitives[*stubPrimitive](handle, &c, internalapi.Token{}).Primary.FullPrimitive.isFull = %v, want %v", p.isFull, tc.wantFull)
-			}
-		})
-	}
-}
-
 func TestLenWithOneKey(t *testing.T) {
 	template := mac.HMACSHA256Tag128KeyTemplate()
 	handle, err := keyset.NewHandle(template)
@@ -1285,34 +1172,6 @@ func TestKeysetInfoIsThreadSafe(t *testing.T) {
 			t.Parallel()
 			if handle.KeysetInfo() == nil {
 				t.Fatalf("handle.KeysetInfo() == nul, want non-nil")
-			}
-		})
-	}
-}
-
-func TestPrimitivesIsThreadSafe(t *testing.T) {
-	template := signature.ECDSAP256KeyTemplate()
-	manager := keyset.NewManager()
-	// Add 10 keys. Last one is the primary.
-	for i := 0; i < 10; i++ {
-		keyID, err := manager.Add(template)
-		if err != nil {
-			t.Fatalf("manager.Add(template) err = %v, want nil", err)
-		}
-		if err = manager.SetPrimary(keyID); err != nil {
-			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
-		}
-	}
-	handle, err := manager.Handle()
-	if err != nil {
-		t.Fatalf("manager.Handle() err = %v, want nil", err)
-	}
-	for i := 0; i < 50; i++ {
-		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
-			t.Parallel()
-			_, err := keyset.Primitives[tink.Signer](handle, &registryconfig.RegistryConfig{}, internalapi.Token{})
-			if err != nil {
-				t.Fatalf("keyset.Primitives[tink.Signer](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %v, want nil", err)
 			}
 		})
 	}
@@ -1664,58 +1523,6 @@ func TestKeyExportNotMonitored(t *testing.T) {
 		}
 	}
 
-	if fakeClient.KeyExportsLogs() != nil {
-		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
-	}
-}
-
-func TestPublicAndPrimitivesGenerateNoKeyExport(t *testing.T) {
-	defer internalregistry.ClearMonitoringClient()
-	fakeClient := fakemonitoring.NewClient("fake_client")
-	if err := internalregistry.RegisterMonitoringClient(fakeClient); err != nil {
-		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
-	}
-
-	km := keyset.NewManager()
-	keyID1, err := km.Add(signature.ECDSAP256KeyTemplate())
-	if err != nil {
-		t.Fatalf("km.Add(template) err = %v, want nil", err)
-	}
-	_, err = km.Add(signature.ECDSAP256KeyTemplate())
-	if err != nil {
-		t.Fatalf("km.Add(template) err = %v, want nil", err)
-	}
-	if err = km.SetPrimary(keyID1); err != nil {
-		t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID1, err)
-	}
-	if err := km.SetAnnotations(map[string]string{"foo": "bar"}); err != nil {
-		t.Fatalf("km.SetAnnotations() err = %v, want nil", err)
-	}
-
-	handle, err := km.Handle()
-	if err != nil {
-		t.Fatalf("km.Handle() err = %v, want nil", err)
-	}
-
-	publicHandle, err := handle.Public()
-	if err != nil {
-		t.Fatalf("handle.Public() err = %v, want nil", err)
-	}
-	if fakeClient.KeyExportsLogs() != nil {
-		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
-	}
-
-	// Getting primitives should not trigger key export monitoring.
-	if _, err = keyset.Primitives[tink.Signer](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}); err != nil {
-		t.Fatalf("keyset.Primitives[tink.Signer](handle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %v, want nil", err)
-	}
-	if fakeClient.KeyExportsLogs() != nil {
-		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
-	}
-
-	if _, err = keyset.Primitives[tink.Verifier](publicHandle, &registryconfig.RegistryConfig{}, internalapi.Token{}); err != nil {
-		t.Fatalf("keyset.Primitives[tink.Verifier](publicHandle, &registryconfig.RegistryConfig{}, internalapi.Token{}) err = %v, want nil", err)
-	}
 	if fakeClient.KeyExportsLogs() != nil {
 		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
 	}
