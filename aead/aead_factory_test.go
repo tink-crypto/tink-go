@@ -124,6 +124,19 @@ func (a *stubAEAD) Decrypt(c, _ []byte) ([]byte, error) {
 	return c[len(a.prefix):], nil
 }
 
+func TestNewWithConfigNilKeySetHandle(t *testing.T) {
+	cb := config.NewBuilder()
+	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*aesgcm.Key](), func(key key.Key) (any, error) {
+		return &stubAEAD{prefix: key.(*aesgcm.Key).OutputPrefix()}, nil
+	}, internalapi.Token{}); err != nil {
+		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	c := cb.Build()
+	if _, err := aead.NewWithConfig(nil, &c); err == nil {
+		t.Errorf("aead.NewWithConfig() err = %v, want empty or nil keyset handle", err)
+	}
+}
+
 func TestNewWithConfig(t *testing.T) {
 	annotations := map[string]string{"foo": "bar"}
 	// Last key is primary.
