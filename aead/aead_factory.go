@@ -19,9 +19,7 @@ import (
 	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/prefixmap"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveset"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -36,30 +34,33 @@ func New(handle *keyset.Handle) (tink.AEAD, error) {
 // NewWithConfig creates an AEAD primitive from the given [keyset.Handle] using
 // the provided [Config].
 func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.AEAD, error) {
-	ps, err := keyset.Primitives[tink.AEAD](handle, config, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("aead_factory: cannot obtain primitive set with config: %s", err)
-	}
-	primary, err := extractFullAEAD(ps.Primary)
-	if err != nil {
-		return nil, err
-	}
 	primitives := prefixmap.New[aeadAndKeyID]()
-	for _, entries := range ps.Entries {
-		for _, e := range entries {
-			p, err := extractFullAEAD(e)
-			if err != nil {
-				return nil, err
-			}
-			primitives.Insert(string(e.OutputPrefix()), *p)
+	var primary aeadAndKeyID
+	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
+		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.AEAD](entry.Key(), config)
+		if err != nil {
+			return nil, err
 		}
+		outputPrefix, err := factoryutil.OutputPrefix(entry.Key())
+		if err != nil {
+			return nil, err
+		}
+		if isLegacyPrimitive {
+			p = &fullAEADPrimitiveAdapter{primitive: p, prefix: outputPrefix}
+		}
+		a := aeadAndKeyID{primitive: p, keyID: entry.KeyID()}
+		if entry.IsPrimary() {
+			primary = a
+		}
+		primitives.Insert(string(outputPrefix), a)
 	}
+
 	encLogger, decLogger, err := createLoggers(handle)
 	if err != nil {
 		return nil, err
 	}
 	return &wrappedAead{
-		primary:    *primary,
+		primary:    primary,
 		primitives: primitives,
 		encLogger:  encLogger,
 		decLogger:  decLogger,
@@ -106,18 +107,6 @@ func (a *fullAEADPrimitiveAdapter) Encrypt(plaintext, associatedData []byte) ([]
 
 func (a *fullAEADPrimitiveAdapter) Decrypt(ciphertext, associatedData []byte) ([]byte, error) {
 	return a.primitive.Decrypt(ciphertext[len(a.prefix):], associatedData)
-}
-
-// extractFullAEAD returns a full aeadAndKeyID primitive from the given
-// [primitiveset.Entry[tink.AEAD]].
-func extractFullAEAD(entry *primitiveset.Entry[tink.AEAD]) (*aeadAndKeyID, error) {
-	if entry.FullPrimitive != nil {
-		return &aeadAndKeyID{primitive: entry.FullPrimitive, keyID: entry.KeyID}, nil
-	}
-	return &aeadAndKeyID{
-		primitive: &fullAEADPrimitiveAdapter{primitive: entry.Primitive, prefix: entry.OutputPrefix()},
-		keyID:     entry.KeyID,
-	}, nil
 }
 
 func createLoggers(kh *keyset.Handle) (monitoring.Logger, monitoring.Logger, error) {

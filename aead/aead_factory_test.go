@@ -738,3 +738,88 @@ func TestPrimitiveFactoryEncryptDecryptWithoutAnnotationsDoesNothing(t *testing.
 		t.Errorf("len(client.Failures()) = %d, want 0", failures)
 	}
 }
+
+func TestPrimitiveFactoryDecryptionWithDisabledKeyFailsAndLogsFailure(t *testing.T) {
+	defer internalregistry.ClearMonitoringClient()
+
+	manager := keyset.NewManager()
+	keyID1, err := manager.Add(aead.AES128GCMKeyTemplate())
+	if err != nil {
+		t.Fatalf("manager.Add() err = %v, want nil", err)
+	}
+	keyID2, err := manager.Add(aead.AES128GCMKeyTemplate())
+	if err != nil {
+		t.Fatalf("manager.Add() err = %v, want nil", err)
+	}
+	if err := manager.SetPrimary(keyID2); err != nil {
+		t.Fatalf("manager.SetPrimary(%d) err = %v, want nil", keyID2, err)
+	}
+
+	khKey2, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+	pKey2, err := aead.New(khKey2)
+	if err != nil {
+		t.Fatalf("aead.New() err = %v, want nil", err)
+	}
+	ct, err := pKey2.Encrypt([]byte("data"), []byte("ad"))
+	if err != nil {
+		t.Fatalf("pKey2.Encrypt() err = %v, want nil", err)
+	}
+
+	client := fakemonitoring.NewClient("fake-client")
+	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+	annotations := map[string]string{"foo": "bar"}
+
+	if err := manager.SetPrimary(keyID1); err != nil {
+		t.Fatalf("manager.SetPrimary(%d) err = %v, want nil", keyID1, err)
+	}
+	if err := manager.Disable(keyID2); err != nil {
+		t.Fatalf("manager.Disable(%d) err = %v, want nil", keyID2, err)
+	}
+	if err := manager.SetAnnotations(annotations); err != nil {
+		t.Fatalf("manager.SetAnnotations(%v) err = %v, want nil", annotations, err)
+	}
+	khDisabled, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+
+	pDisabled, err := aead.New(khDisabled)
+	if err != nil {
+		t.Fatalf("aead.New() err = %v, want nil", err)
+	}
+
+	if _, err := pDisabled.Decrypt(ct, []byte("ad")); err == nil {
+		t.Fatalf("Decrypt() err = nil, want error")
+	}
+
+	if len(client.Events()) != 0 {
+		t.Errorf("len(client.Events()) = %d, want 0", len(client.Events()))
+	}
+
+	gotFailures := client.Failures()
+	wantKeysetInfo := monitoring.NewKeysetInfo(
+		annotations,
+		keyID1,
+		[]*monitoring.Entry{
+			{
+				KeyID:     keyID1,
+				Status:    monitoring.Enabled,
+				KeyType:   "tink.AesGcmKey",
+				KeyPrefix: "TINK",
+			},
+		},
+	)
+	wantFailures := []*fakemonitoring.LogFailure{
+		{
+			Context: monitoring.NewContext("aead", "decrypt", wantKeysetInfo),
+		},
+	}
+	if cmp.Diff(gotFailures, wantFailures) != "" {
+		t.Errorf("%v", cmp.Diff(gotFailures, wantFailures))
+	}
+}
