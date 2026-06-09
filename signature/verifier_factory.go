@@ -41,7 +41,7 @@ func NewVerifierWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Ve
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
 		verifier, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.Verifier](entry.Key(), config)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("verifier_factory: cannot obtain primitive set: %s", err)
 		}
 
 		outputPrefix, err := factoryutil.OutputPrefix(entry.Key())
