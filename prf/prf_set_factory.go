@@ -15,10 +15,7 @@
 package prf
 
 import (
-	"fmt"
-
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -33,39 +30,30 @@ func NewPRFSet(handle *keyset.Handle) (*Set, error) {
 // NewPRFSetWithConfig creates a [prf.Set] primitive from the given [keyset.Handle] and
 // [keyset.Config].
 func NewPRFSetWithConfig(handle *keyset.Handle, config keyset.Config) (*Set, error) {
-	ps, err := keyset.Primitives[PRF](handle, config, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("prf_set_factory: cannot obtain primitive set: %s", err)
-	}
-	set := &Set{}
-	set.PrimaryID = ps.Primary.KeyID
-	set.PRFs = make(map[uint32]PRF)
 	logger, err := createLogger(handle)
 	if err != nil {
 		return nil, err
 	}
-	entries, err := ps.RawEntries()
-	if err != nil {
-		return nil, fmt.Errorf("Could not get raw entries: %v", err)
-	}
-	if len(entries) == 0 {
-		return nil, fmt.Errorf("Did not find any raw entries")
-	}
-	if len(ps.Entries) != 1 {
-		return nil, fmt.Errorf("Only raw entries allowed for prf.Set")
-	}
-	for _, entry := range entries {
-		prf := entry.Primitive
-		if prf == nil {
-			prf = entry.FullPrimitive
+	prfs := map[uint32]PRF{}
+	primaryKeyID := uint32(0)
+	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
+		primitive, _, err := factoryutil.PrimitiveFromKey[PRF](entry.Key(), config)
+		if err != nil {
+			return nil, err
 		}
-		set.PRFs[entry.KeyID] = &monitoredPRF{
-			prf:    prf,
-			keyID:  entry.KeyID,
+		if entry.IsPrimary() {
+			primaryKeyID = entry.KeyID()
+		}
+		prfs[entry.KeyID()] = &monitoredPRF{
+			prf:    primitive,
+			keyID:  entry.KeyID(),
 			logger: logger,
 		}
 	}
-	return set, nil
+	return &Set{
+		PrimaryID: primaryKeyID,
+		PRFs:      prfs,
+	}, nil
 }
 
 func createLogger(kh *keyset.Handle) (monitoring.Logger, error) {
