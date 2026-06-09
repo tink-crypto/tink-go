@@ -17,6 +17,7 @@ package keyderivation
 import (
 	"fmt"
 
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
@@ -63,39 +64,41 @@ func New(handle *keyset.Handle) (KeysetDeriver, error) {
 // NOTE: This is currently not usable in OSS because [keyset.Config]
 // is not user-implementable.
 func NewWithConfig(handle *keyset.Handle, config keyset.Config) (KeysetDeriver, error) {
-	ps, err := keyset.Primitives[keyderiver.KeyDeriver](handle, config, internalapi.Token{})
-	if err != nil {
-		return nil, fmt.Errorf("keyset_deriver_factory: cannot obtain primitive set: %v", err)
+	if handle == nil {
+		return nil, fmt.Errorf("keyset handle can't be nil")
 	}
-
 	var fullKeyDerivers []fullKeyDeriverWithKeyID
-	for _, e := range ps.EntriesInKeysetOrder {
-		if e.Primitive == nil {
-			fullKeyDerivers = append(fullKeyDerivers, fullKeyDeriverWithKeyID{
-				fullKeyDeriver: e.FullPrimitive,
-				keyID:          e.KeyID,
-			})
-		} else {
-			idRequirement := e.KeyID
-			protoKey, err := protoserialization.SerializeKey(e.Key)
+	primaryKeyID := uint32(0)
+	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
+		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[keyderiver.KeyDeriver](entry.Key(), config)
+		if err != nil {
+			return nil, err
+		}
+		if entry.IsPrimary() {
+			primaryKeyID = entry.KeyID()
+		}
+		if isLegacyPrimitive {
+			idRequirement := entry.KeyID()
+			protoKey, err := protoserialization.SerializeKey(entry.Key())
 			if err != nil {
 				return nil, fmt.Errorf("keyset_deriver_factory: cannot get proto key from entry: %v", err)
 			}
 			if protoKey.OutputPrefixType() == tinkpb.OutputPrefixType_RAW {
 				idRequirement = 0
 			}
-			fullKeyDerivers = append(fullKeyDerivers, fullKeyDeriverWithKeyID{
-				fullKeyDeriver: &fullPrimitiveWrapper{
-					rawPrimitive:  e.Primitive,
-					idRequirement: idRequirement,
-					prefixType:    protoKey.OutputPrefixType(),
-				},
-				keyID: e.KeyID,
-			})
+			p = &fullPrimitiveWrapper{
+				rawPrimitive:  p,
+				idRequirement: idRequirement,
+				prefixType:    protoKey.OutputPrefixType(),
+			}
 		}
+		fullKeyDerivers = append(fullKeyDerivers, fullKeyDeriverWithKeyID{
+			fullKeyDeriver: p,
+			keyID:          entry.KeyID(),
+		})
 	}
 
-	return &wrappedKeysetDeriver{fullKeyDerivers: fullKeyDerivers, primaryKeyID: ps.Primary.KeyID}, nil
+	return &wrappedKeysetDeriver{fullKeyDerivers: fullKeyDerivers, primaryKeyID: primaryKeyID}, nil
 }
 
 type fullKeyDeriverWithKeyID struct {
