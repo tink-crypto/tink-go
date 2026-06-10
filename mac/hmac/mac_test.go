@@ -360,7 +360,7 @@ func TestMACFromPublicAPITestVectors(t *testing.T) {
 	}
 }
 
-func TestDecryptFailsWithInvalidInputs(t *testing.T) {
+func TestVerifyFailsWithInvalidInputs(t *testing.T) {
 	for _, variant := range []hmac.Variant{
 		hmac.VariantNoPrefix,
 		hmac.VariantTink,
