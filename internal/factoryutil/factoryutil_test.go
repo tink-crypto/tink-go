@@ -16,6 +16,7 @@ package factoryutil_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -282,10 +283,41 @@ func TestPrimitiveFromKey_Full(t *testing.T) {
 		t.Errorf("PrimitiveFromKey() mismatch (-want +got): %s", diff)
 	}
 
-	// Try to create a primitive of the wrong type.
-	_, _, err = factoryutil.PrimitiveFromKey[int](key, &config)
+}
+
+func TestPrimitiveFromKey_WrongType(t *testing.T) {
+	primitive := "primitive"
+	cb := config.NewBuilder()
+	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*hmac.Key](), func(key key.Key) (any, error) {
+		return primitive, nil
+	}, internalapi.Token{}); err != nil {
+		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	}
+	config := cb.Build()
+	key := mustCreateHMACKey(hmac.VariantTink, 1)
+
+	_, isLegacy, err := factoryutil.PrimitiveFromKey[int](key, &config)
 	if err == nil {
-		t.Errorf("PrimitiveFromKey() err = nil, want error")
+		t.Fatalf("PrimitiveFromKey() err = nil, want error")
+	}
+
+	if wantStr := "int"; !strings.HasSuffix(err.Error(), wantStr) {
+		t.Errorf("PrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
+	}
+	if isLegacy {
+		t.Errorf("PrimitiveFromKey() isLegacy = true, want false")
+	}
+
+	_, isLegacy, err = factoryutil.PrimitiveFromKey[tink.AEAD](key, &config)
+	if err == nil {
+		t.Fatalf("PrimitiveFromKey() err = nil, want error")
+	}
+
+	if wantStr := "tink.AEAD"; !strings.HasSuffix(err.Error(), wantStr) {
+		t.Errorf("PrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
+	}
+	if isLegacy {
+		t.Errorf("PrimitiveFromKey() isLegacy = true, want false")
 	}
 }
 
@@ -311,6 +343,37 @@ func TestPrimitiveFromKey_Legacy(t *testing.T) {
 	}
 	if err := m.VerifyMAC(d, []byte("data")); err != nil {
 		t.Errorf("VerifyMAC() err = %v, want nil", err)
+	}
+}
+
+func TestPrimitiveFromKey_LegacyWrongType(t *testing.T) {
+	config := registryconfig.RegistryConfig{}
+
+	// Artificially unregister the primitive constructor to force the legacy path.
+	primitiveregistry.UnregisterPrimitiveConstructor[*hmac.Key]()
+
+	key := mustCreateHMACKey(hmac.VariantTink, 1)
+	_, isLegacy, err := factoryutil.PrimitiveFromKey[int](key, &config)
+	if err == nil {
+		t.Fatalf("PrimitiveFromKey() err = nil, want error")
+	}
+
+	if wantStr := "int"; !strings.HasSuffix(err.Error(), wantStr) {
+		t.Errorf("PrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
+	}
+	if !isLegacy {
+		t.Errorf("PrimitiveFromKey() isLegacy = false, want true")
+	}
+
+	_, isLegacy, err = factoryutil.PrimitiveFromKey[tink.AEAD](key, &config)
+	if err == nil {
+		t.Fatalf("PrimitiveFromKey() err = nil, want error")
+	}
+	if wantStr := "tink.AEAD"; !strings.HasSuffix(err.Error(), wantStr) {
+		t.Errorf("PrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
+	}
+	if !isLegacy {
+		t.Errorf("PrimitiveFromKey() isLegacy = false, want true")
 	}
 }
 

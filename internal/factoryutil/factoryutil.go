@@ -18,6 +18,7 @@ package factoryutil
 import (
 	"fmt"
 	"iter"
+	"reflect"
 	"strings"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
@@ -155,7 +156,7 @@ func PrimitiveFromKey[T any](k key.Key, config keyset.Config) (T, bool, error) {
 	result, ok := primitive.(T)
 	if !ok {
 		var zero T
-		return zero, isLegacy, fmt.Errorf("factoryutil: primitive is not a %T", *new(T))
+		return zero, isLegacy, fmt.Errorf("factoryutil: primitive is not a %v", reflect.TypeFor[T]())
 	}
 	return result, isLegacy, nil
 }
