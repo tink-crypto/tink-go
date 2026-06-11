@@ -22,6 +22,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/internal/mac/aescmac"
@@ -59,9 +60,6 @@ type AESSIV struct {
 const (
 	// AESSIVKeySize is the key size in bytes.
 	AESSIVKeySize = 64
-
-	intSize = 32 << (^uint(0) >> 63) // 32 or 64
-	maxInt  = 1<<(intSize-1) - 1
 )
 
 // NewAESSIV returns an AESSIV instance.
@@ -95,7 +93,7 @@ func multiplyByX(block []byte) {
 
 // EncryptDeterministically deterministically encrypts plaintext with associatedData.
 func (asc *AESSIV) EncryptDeterministically(plaintext, associatedData []byte) ([]byte, error) {
-	if len(plaintext) > maxInt-aes.BlockSize {
+	if len(plaintext) > math.MaxInt-aes.BlockSize {
 		return nil, fmt.Errorf("aes_siv: plaintext too long")
 	}
 	siv := asc.s2v(plaintext, associatedData)

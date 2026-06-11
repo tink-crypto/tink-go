@@ -18,6 +18,7 @@ import (
 	"crypto/cipher"
 	"errors"
 	"fmt"
+	"math"
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/internal/random"
@@ -51,7 +52,7 @@ func NewXChaCha20Poly1305(key []byte) (*XChaCha20Poly1305, error) {
 //  1. the nonce used for encryption
 //  2. the actual ciphertext
 func (x *XChaCha20Poly1305) Encrypt(plaintext []byte, associatedData []byte) ([]byte, error) {
-	if len(plaintext) > maxInt-chacha20poly1305.NonceSizeX-chacha20poly1305.Overhead {
+	if len(plaintext) > math.MaxInt-chacha20poly1305.NonceSizeX-chacha20poly1305.Overhead {
 		return nil, fmt.Errorf("xchacha20poly1305: plaintext too long")
 	}
 

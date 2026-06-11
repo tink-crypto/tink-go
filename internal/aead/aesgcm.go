@@ -16,6 +16,7 @@ package aead
 
 import (
 	"fmt"
+	"math"
 )
 
 const (
@@ -27,9 +28,7 @@ const (
 	// aesGCMMaxPlaintextSize is the maximum plaintext size defined by RFC 5116.
 	aesGCMMaxPlaintextSize = (1 << 36) - 31
 
-	intSize             = 32 << (^uint(0) >> 63) // 32 or 64
-	maxInt              = 1<<(intSize-1) - 1
-	maxIntPlaintextSize = maxInt - AESGCMIVSize - AESGCMTagSize
+	maxIntPlaintextSize = math.MaxInt - AESGCMIVSize - AESGCMTagSize
 )
 
 // CheckAESGCMPlaintextSize checks if the given plaintext size is valid for AES-GCM.

@@ -19,6 +19,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"fmt"
+	"math"
 	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
@@ -27,14 +28,13 @@ import (
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/subtle"
 	"github.com/tink-crypto/tink-go/v2/tink"
+
+	internalaead "github.com/tink-crypto/tink-go/v2/internal/aead"
 )
 
 const (
-	ivSize  = 12
-	tagSize = 16
-
-	intSize = 32 << (^uint(0) >> 63) // 32 or 64
-	maxInt  = 1<<(intSize-1) - 1
+	ivSize  = internalaead.AESGCMIVSize
+	tagSize = internalaead.AESGCMTagSize
 )
 
 // aead is an implementation of [tink.AEAD] for X-AES-GCM.
@@ -95,7 +95,7 @@ func newAESGCMCipher(key []byte) (cipher.AEAD, error) {
 }
 
 func (a *aead) Encrypt(plaintext, associatedData []byte) ([]byte, error) {
-	maxPlaintextSize := maxInt - (ivSize + tagSize + a.saltSizeInBytes + len(a.prefix))
+	maxPlaintextSize := math.MaxInt - (ivSize + tagSize + a.saltSizeInBytes + len(a.prefix))
 	if len(plaintext) > maxPlaintextSize {
 		return nil, fmt.Errorf("xaesgcm: plaintext with size %d is too large", len(plaintext))
 	}

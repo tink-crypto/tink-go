@@ -18,6 +18,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"fmt"
+	"math"
 
 	"github.com/tink-crypto/tink-go/v2/internal/random"
 )
@@ -50,7 +51,7 @@ func NewAESCTR(key []byte, ivSize int) (*AESCTR, error) {
 
 // Encrypt encrypts plaintext using AES in CTR mode.
 func (a *AESCTR) Encrypt(dst, plaintext []byte) ([]byte, error) {
-	if len(plaintext) > maxInt-a.ivSize {
+	if len(plaintext) > math.MaxInt-a.ivSize {
 		return nil, fmt.Errorf("aes_ctr: plaintext too long")
 	}
 	ctSize := len(plaintext) + a.ivSize

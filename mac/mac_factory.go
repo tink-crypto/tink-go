@@ -17,6 +17,7 @@ package mac
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
@@ -28,11 +29,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
-)
-
-const (
-	intSize = 32 << (^uint(0) >> 63) // 32 or 64
-	maxInt  = 1<<(intSize-1) - 1
 )
 
 // NewWithConfig creates a [tink.MAC] primitive from the given [keyset.Handle]
@@ -123,7 +119,7 @@ var _ (tink.MAC) = (*fullMACAdapter)(nil)
 func (m *fullMACAdapter) data(data []byte) ([]byte, error) {
 	if m.hasLegacyPrefix {
 		d := data
-		if len(d) == maxInt {
+		if len(d) == math.MaxInt {
 			return nil, fmt.Errorf("data too long")
 		}
 		return append(d, byte(0)), nil

@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"crypto/cipher"
 	"fmt"
+	"math"
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
@@ -27,10 +28,8 @@ import (
 )
 
 const (
-	intSize           = 32 << (^uint(0) >> 63) // 32 or 64
-	maxInt            = 1<<(intSize-1) - 1
-	maxPlaintextSize  = maxInt - chacha20poly1305.NonceSizeX - chacha20poly1305.Overhead
-	maxCiphertextSize = maxInt
+	maxPlaintextSize  = math.MaxInt - chacha20poly1305.NonceSizeX - chacha20poly1305.Overhead
+	maxCiphertextSize = math.MaxInt
 )
 
 // aead is a [tink.AEAD] implementation for XChaCha20Poly1305.

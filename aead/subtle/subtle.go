@@ -17,11 +17,6 @@ package subtle
 
 import internalaead "github.com/tink-crypto/tink-go/v2/internal/aead"
 
-const (
-	intSize = 32 << (^uint(0) >> 63) // 32 or 64
-	maxInt  = 1<<(intSize-1) - 1
-)
-
 // ValidateAESKeySize checks if the given key size is a valid AES key size.
 func ValidateAESKeySize(sizeInBytes uint32) error {
 	return internalaead.ValidateAESKeySize(sizeInBytes)
