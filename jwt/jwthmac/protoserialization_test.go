@@ -358,3 +358,34 @@ func TestKeyParser(t *testing.T) {
 		})
 	}
 }
+
+func TestKeyParser_Errors(t *testing.T) {
+	keyBytes32 := secretdata.NewBytesFromData([]byte("01234567890123456789012345678901"), insecuresecretdataaccess.Token{})
+	for _, tc := range []struct {
+		name             string
+		keySerialization *protoserialization.KeySerialization
+	}{
+		{
+			name: "invalid_key_material_type",
+			keySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.JwtHmacKey",
+				Value:           mustMarshal(t, &jwthmacpb.JwtHmacKey{Version: 0, Algorithm: jwthmacpb.JwtHmacAlgorithm_HS256, KeyValue: keyBytes32.Data(insecuresecretdataaccess.Token{})}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+		},
+		{
+			name: "invalid_version",
+			keySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.JwtHmacKey",
+				Value:           mustMarshal(t, &jwthmacpb.JwtHmacKey{Version: 1, Algorithm: jwthmacpb.JwtHmacAlgorithm_HS256, KeyValue: keyBytes32.Data(insecuresecretdataaccess.Token{})}),
+				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := protoserialization.ParseKey(tc.keySerialization); err == nil {
+				t.Errorf("protoserialization.ParseKey(%v) err = nil, want error", tc.keySerialization)
+			}
+		})
+	}
+}

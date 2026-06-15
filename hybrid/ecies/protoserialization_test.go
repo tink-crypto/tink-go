@@ -851,6 +851,28 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		privateKeySerialization *protoserialization.KeySerialization
 	}{
 		{
+			name: "invalid key material type",
+			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPrivateKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+				&eciespb.EciesAeadHkdfPrivateKey{
+					Version: 0,
+					PublicKey: &eciespb.EciesAeadHkdfPublicKey{
+						Params: &eciespb.EciesAeadHkdfParams{
+							KemParams: &eciespb.EciesHkdfKemParams{
+								CurveType:    commonpb.EllipticCurveType_CURVE25519,
+								HkdfHashType: commonpb.HashType_SHA256,
+								HkdfSalt:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+							},
+							DemParams: &eciespb.EciesAeadDemParams{
+								AeadDem: aead.AES256GCMNoPrefixKeyTemplate(),
+							},
+							EcPointFormat: commonpb.EcPointFormat_COMPRESSED,
+						},
+						X: x25519PublicKeyBytes,
+					},
+					KeyValue: x25519PrivateKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
 			name: "invalid proto key",
 			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.EciesAeadHkdfPrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 				&eciespb.EciesAeadHkdfPublicKey{
