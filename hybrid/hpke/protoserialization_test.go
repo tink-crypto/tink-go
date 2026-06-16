@@ -419,6 +419,23 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		privateKeySerialization *protoserialization.KeySerialization
 	}{
 		{
+			name: "invalid key material type",
+			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePrivateKey", tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+				&hpkepb.HpkePrivateKey{
+					Version: 0,
+					PublicKey: &hpkepb.HpkePublicKey{
+						Version: 0,
+						Params: &hpkepb.HpkeParams{
+							Kem:  hpkepb.HpkeKem_DHKEM_P256_HKDF_SHA256,
+							Kdf:  hpkepb.HpkeKdf_HKDF_SHA256,
+							Aead: hpkepb.HpkeAead_AES_256_GCM,
+						},
+						PublicKey: p256SHA256PublicKeyBytes,
+					},
+					PrivateKey: p256SHA256PrivateKeyBytes,
+				}, tinkpb.OutputPrefixType_RAW, 0),
+		},
+		{
 			name: "invalid proto private key",
 			privateKeySerialization: mustCreateKeySerialization(t, "type.googleapis.com/google.crypto.tink.HpkePrivateKey", tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 				&hpkepb.HpkePrivateKey{

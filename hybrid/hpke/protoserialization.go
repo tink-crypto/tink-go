@@ -344,6 +344,9 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 	if keyData.GetTypeUrl() != privateKeyTypeURL {
 		return nil, fmt.Errorf("invalid key type URL %v, want %v", keyData.GetTypeUrl(), privateKeyTypeURL)
 	}
+	if got, want := keyData.GetKeyMaterialType(), tinkpb.KeyData_ASYMMETRIC_PRIVATE; got != want {
+		return nil, fmt.Errorf("key material type is %v, want %v", got, want)
+	}
 	protoHPKEKey := new(hpkepb.HpkePrivateKey)
 	if err := proto.Unmarshal(keyData.GetValue(), protoHPKEKey); err != nil {
 		return nil, err
