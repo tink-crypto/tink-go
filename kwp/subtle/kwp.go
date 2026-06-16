@@ -38,9 +38,9 @@ package subtle
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/subtle"
 	"encoding/binary"
 	"fmt"
-	"math"
 
 	// Placeholder for internal crypto/cipher allowlist, please ignore.
 )
@@ -82,44 +82,6 @@ func NewKWP(wrappingKey []byte) (*KWP, error) {
 func wrappingSize(inputSize int) int {
 	paddingSize := 7 - (inputSize+7)%8
 	return inputSize + paddingSize + 8
-}
-
-// computeW computes the pseudorandom permutation W over the IV concatenated
-// with zero-padded key material.
-func (kwp *KWP) computeW(iv, key []byte) ([]byte, error) {
-	// Checks the parameter sizes for which W is defined.
-	// Note that the caller ensures stricter limits.
-	if len(key) <= 8 || len(key) > math.MaxInt32-16 || len(iv) != 8 {
-		return nil, fmt.Errorf("kwp: computeW called with invalid parameters")
-	}
-
-	data := make([]byte, wrappingSize(len(key)))
-	copy(data, iv)
-	copy(data[8:], key)
-	blockCount := len(data)/8 - 1
-
-	buf := make([]byte, 16)
-	copy(buf, data[:8])
-
-	for i := 0; i < roundCount; i++ {
-		for j := 0; j < blockCount; j++ {
-
-			copy(buf[8:], data[8*(j+1):])
-			kwp.block.Encrypt(buf, buf)
-
-			// xor the round constant in big endian order
-			// to the left half of the buffer
-			roundConst := uint(i*blockCount + j + 1)
-			for b := 0; b < 4; b++ {
-				buf[7-b] ^= byte(roundConst & 0xFF)
-				roundConst >>= 8
-			}
-
-			copy(data[8*(j+1):], buf[8:])
-		}
-	}
-	copy(data[:8], buf)
-	return data, nil
 }
 
 // invertW computes the inverse of the pseudorandom permutation W. Note that
@@ -169,11 +131,45 @@ func (kwp *KWP) Wrap(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("kwp: key size to wrap too large")
 	}
 
-	iv := make([]byte, 8)
-	binary.BigEndian.PutUint32(iv, ivPrefix)
-	binary.BigEndian.PutUint32(iv[4:], uint32(len(data)))
+	wrapped := make([]byte, wrappingSize(len(data)))
+	// Leave the first 8 bytes for the IV, to be filled in later.
+	copy(wrapped[8:], data)
 
-	return kwp.computeW(iv, data)
+	//  integrity value (8 bytes) || data block (8 bytes)
+	var buf [16]byte
+	// Initial integrity value is: ivPrefix || len(data)
+	binary.BigEndian.PutUint32(buf[:4], ivPrefix)
+	binary.BigEndian.PutUint32(buf[4:8], uint32(len(data)))
+
+	// Tracks the number of AES encryptions.
+	// NOTE: We know kek size is between [MinWrapSize, MaxWrapSize], so
+	// counter will not overflow.
+	var roundCounter uint32 = 0
+	// Big endian representation of the roundCounter.
+	var roundCounterBytes [4]byte
+	for i := 0; i < roundCount; i++ {
+		// Skip the first block, which is the IV.
+		it := wrapped[8:]
+		for len(it) > 0 {
+			// R_i is the current 64-bit data block.
+			ri := it[:8]
+			// Copy R_i to the 2nd half of the buffer, so we have: IV || R_i
+			copy(buf[8:], ri)
+			// AES encrypt the buffer.
+			kwp.block.Encrypt(buf[:], buf[:])
+			roundCounter++
+			// buf[:8] = buf[:8] XOR roundCounter
+			binary.BigEndian.PutUint32(roundCounterBytes[:], roundCounter)
+			subtle.XORBytes(buf[4:8], buf[4:8], roundCounterBytes[:])
+			// Copy the encrypted data block back to the output.
+			copy(ri, buf[8:])
+			it = it[8:]
+		}
+	}
+	// Copy the final integrity value to the output.
+	copy(wrapped[:8], buf[:])
+	return wrapped, nil
+
 }
 
 var errIntegrity = fmt.Errorf("kwp: unwrap failed integrity check")
