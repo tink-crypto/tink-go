@@ -629,3 +629,16 @@ func TestECWycheproofCases(t *testing.T) {
 		}
 	}
 }
+
+func TestPointDecode_InvalidCompressed(t *testing.T) {
+	curve := elliptic.P256()
+	// x = 1 is a quadratic non-residue for P-256 (x^3 - 3x + b is not a square mod p)
+	e := make([]byte, 33)
+	e[0] = 2
+	e[32] = 1
+
+	_, err := subtle.PointDecode(curve, "COMPRESSED", e)
+	if err == nil {
+		t.Errorf("PointDecode(COMPRESSED) succeeded for invalid point (x=1), want error")
+	}
+}

@@ -183,6 +183,9 @@ func PointDecode(c elliptic.Curve, pFormat string, e []byte) (*ECPoint, error) {
 			return nil, errors.New("x is out of range")
 		}
 		y := getY(x, lsb, c)
+		if y == nil || !c.IsOnCurve(x, y) {
+			return nil, errors.New("invalid point")
+		}
 		return &ECPoint{
 			X: x,
 			Y: y,
@@ -203,7 +206,9 @@ func getY(x *big.Int, lsb bool, c elliptic.Curve) *big.Int {
 
 	x3.Sub(x3, threeX)
 	x3.Add(x3, b)
-	x3.ModSqrt(x3, p)
+	if x3.ModSqrt(x3, p) == nil {
+		return nil
+	}
 	e := uint(1)
 	if lsb {
 		e = 0
