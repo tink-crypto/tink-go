@@ -109,11 +109,14 @@ func PointEncode(c elliptic.Curve, pFormat string, pt ECPoint) ([]byte, error) {
 		return encoded, nil
 	case "DO_NOT_USE_CRUNCHY_UNCOMPRESSED":
 		encoded := make([]byte, 2*cSize)
+		// Strip leading bytes if coordinate exceeds field size.
+		// Previously used bytes.Replace which incorrectly removed ALL zero bytes,
+		// not just leading zeros.
 		if len(x) > cSize {
-			x = bytes.Replace(x, []byte("\x00"), []byte{}, -1)
+			x = x[len(x)-cSize:]
 		}
 		if len(y) > cSize {
-			y = bytes.Replace(y, []byte("\x00"), []byte{}, -1)
+			y = y[len(y)-cSize:]
 		}
 		copy(encoded[2*cSize-len(y):], y)
 		copy(encoded[cSize-len(x):], x)
