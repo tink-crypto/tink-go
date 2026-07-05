@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"testing"
+	"testing/iotest"
 
 	"github.com/tink-crypto/tink-go/v2/streamingaead/subtle/noncebased"
 )
@@ -542,5 +543,541 @@ func TestDecryptTruncatedCiphertext(t *testing.T) {
 			t.Errorf("io.ReadAll on ciphertext truncated at %d/%d bytes returned nil error; decrypted %d bytes of plaintext: %x (want error)",
 				i, len(ciphertext), len(got), got)
 		}
+	}
+}
+
+// TestReadWithSmallInitialBuffer exercises the lazily-allocated ciphertext
+// buffer in Reader. The buffer starts at a small initial size and grows
+// toward CiphertextSegmentSize+1 as segments prove larger than the current
+// allocation, so the interesting boundaries are ciphertext sizes and
+// ciphertext segment sizes just below, at, and just above the initial buffer
+// size (4096 bytes), and a segment large enough to walk the whole growth
+// sequence up to the jump to the full buffer size, including their
+// interaction with last-segment detection, the first-segment offset, and
+// readers that return data in small chunks.
+func TestReadWithSmallInitialBuffer(t *testing.T) {
+	// initialBufferSize must match initialSegmentBufferSize() in
+	// noncebased.go. The tests below probe ciphertext sizes around this
+	// boundary; if the constant changes, they still pass but no longer pin
+	// the boundary itself.
+	const initialBufferSize = 4096
+
+	const (
+		nonceSize       = 10
+		noncePrefixSize = 5
+	)
+	// With the test SegmentEncrypter a ciphertext segment is its plaintext
+	// segment plus nonceSize trailing bytes, so a single-segment ciphertext
+	// of size S corresponds to a plaintext of size S-nonceSize.
+	testcases := []struct {
+		name                         string
+		plaintextSize                int
+		plaintextSegmentSize         int
+		firstCiphertextSegmentOffset int
+		chunkSize                    int
+		oneByteReads                 bool
+		dataErrReads                 bool
+	}{
+		{
+			name:                 "singleSegmentCiphertextJustBelowInitialBuffer",
+			plaintextSize:        initialBufferSize - nonceSize - 1, // ciphertext: 4095 bytes
+			plaintextSegmentSize: 1 << 20,
+			chunkSize:            1000,
+		},
+		{
+			name:                 "singleSegmentCiphertextExactlyInitialBuffer",
+			plaintextSize:        initialBufferSize - nonceSize, // ciphertext: 4096 bytes
+			plaintextSegmentSize: 1 << 20,
+			chunkSize:            1000,
+		},
+		{
+			name:                 "singleSegmentCiphertextJustAboveInitialBuffer",
+			plaintextSize:        initialBufferSize - nonceSize + 1, // ciphertext: 4097 bytes
+			plaintextSegmentSize: 1 << 20,
+			chunkSize:            1000,
+		},
+		{
+			name:                 "singleSegmentCiphertextWellAboveInitialBuffer",
+			plaintextSize:        100000,
+			plaintextSegmentSize: 1 << 20,
+			chunkSize:            1000,
+		},
+		{
+			name:                 "emptyPlaintextLargeSegmentSize",
+			plaintextSize:        0,
+			plaintextSegmentSize: 1 << 20,
+			chunkSize:            1000,
+		},
+		{
+			// Ciphertext segments of exactly initialBufferSize-1: the buffer
+			// limit equals the initial size, so the buffer never grows and
+			// every non-final segment fills it completely.
+			name:                 "multiSegmentCiphertextSegmentJustBelowInitialBuffer",
+			plaintextSize:        3*(initialBufferSize-nonceSize-1) + 100,
+			plaintextSegmentSize: initialBufferSize - nonceSize - 1,
+			chunkSize:            1000,
+		},
+		{
+			// Ciphertext segments of exactly initialBufferSize: the buffer
+			// limit is initialBufferSize+1, so the very first segment grows
+			// the buffer by a single byte.
+			name:                 "multiSegmentCiphertextSegmentExactlyInitialBuffer",
+			plaintextSize:        3*(initialBufferSize-nonceSize) + 100,
+			plaintextSegmentSize: initialBufferSize - nonceSize,
+			chunkSize:            1000,
+		},
+		{
+			name:                 "multiSegmentCiphertextSegmentJustAboveInitialBuffer",
+			plaintextSize:        3*(initialBufferSize-nonceSize+1) + 100,
+			plaintextSegmentSize: initialBufferSize - nonceSize + 1,
+			chunkSize:            1000,
+		},
+		{
+			// A segment large enough that the buffer walks the whole growth
+			// sequence, ending with the jump to the full buffer size, and
+			// then completes segments in the fully-grown buffer.
+			name:                 "multiSegmentRequiringMultipleGrowthSteps",
+			plaintextSize:        1<<20 + 100,
+			plaintextSegmentSize: 1 << 20,
+			chunkSize:            1000,
+		},
+		{
+			// A plaintext that ends exactly at a segment boundary, so the
+			// last ciphertext segment is a full-sized segment.
+			name:                 "multiSegmentPlaintextAlignedWithSegmentSize",
+			plaintextSize:        2 * (initialBufferSize - nonceSize),
+			plaintextSegmentSize: initialBufferSize - nonceSize,
+			chunkSize:            1000,
+		},
+		{
+			name:                         "firstSegmentOffsetWithCiphertextAtInitialBuffer",
+			plaintextSize:                initialBufferSize - nonceSize,
+			plaintextSegmentSize:         1 << 20,
+			firstCiphertextSegmentOffset: 10,
+			chunkSize:                    1000,
+		},
+		{
+			name:                         "firstSegmentOffsetWithMultipleSegmentsAtInitialBuffer",
+			plaintextSize:                3*(initialBufferSize-nonceSize) + 100,
+			plaintextSegmentSize:         initialBufferSize - nonceSize,
+			firstCiphertextSegmentOffset: 10,
+			chunkSize:                    1000,
+		},
+		{
+			name:                 "oneByteReadsAcrossGrowBoundary",
+			plaintextSize:        initialBufferSize - nonceSize + 1,
+			plaintextSegmentSize: 1 << 20,
+			chunkSize:            1000,
+			oneByteReads:         true,
+		},
+		{
+			name:                 "oneByteReadsMultiSegment",
+			plaintextSize:        3*(initialBufferSize-nonceSize) + 100,
+			plaintextSegmentSize: initialBufferSize - nonceSize,
+			chunkSize:            7,
+			oneByteReads:         true,
+		},
+		{
+			// A reader that returns the final bytes together with io.EOF in
+			// a single call, at a ciphertext size where the final read ends
+			// mid-buffer.
+			name:                 "dataWithEOFAcrossGrowBoundary",
+			plaintextSize:        initialBufferSize - nonceSize + 1, // ciphertext: 4097 bytes
+			plaintextSegmentSize: 1 << 20,
+			chunkSize:            1000,
+			dataErrReads:         true,
+		},
+		{
+			// A reader that returns the final bytes together with io.EOF in
+			// a single call, at a ciphertext size where the final read ends
+			// exactly at a buffer boundary.
+			name:                 "dataWithEOFAtBufferBoundary",
+			plaintextSize:        initialBufferSize - nonceSize, // ciphertext: 4096 bytes
+			plaintextSegmentSize: 1 << 20,
+			chunkSize:            1000,
+			dataErrReads:         true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			writerParams := noncebased.WriterParams{
+				NonceSize:                    nonceSize,
+				PlaintextSegmentSize:         tc.plaintextSegmentSize,
+				FirstCiphertextSegmentOffset: tc.firstCiphertextSegmentOffset,
+			}
+			plaintext, ciphertext, noncePrefix, err := testEncrypt(tc.plaintextSize, noncePrefixSize, writerParams)
+			if err != nil {
+				t.Fatalf("encrypting failed: %v", err)
+			}
+
+			var r io.Reader = bytes.NewReader(ciphertext)
+			if tc.oneByteReads {
+				r = iotest.OneByteReader(r)
+			}
+			if tc.dataErrReads {
+				r = iotest.DataErrReader(r)
+			}
+			reader, err := noncebased.NewReader(noncebased.ReaderParams{
+				R:                            r,
+				SegmentDecrypter:             testDecrypterWithDst{},
+				NonceSize:                    nonceSize,
+				NoncePrefix:                  noncePrefix,
+				CiphertextSegmentSize:        tc.plaintextSegmentSize + nonceSize,
+				FirstCiphertextSegmentOffset: tc.firstCiphertextSegmentOffset,
+			})
+			if err != nil {
+				t.Fatalf("noncebased.NewReader() = _, err = %v, want nil", err)
+			}
+
+			var decrypted bytes.Buffer
+			chunk := make([]byte, tc.chunkSize)
+			for {
+				n, err := reader.Read(chunk)
+				decrypted.Write(chunk[:n])
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					t.Fatalf("reader.Read() = _, err = %v, want nil", err)
+				}
+			}
+			if !bytes.Equal(decrypted.Bytes(), plaintext) {
+				t.Fatalf("decrypted data does not match plaintext. Got %d bytes, want %d bytes", decrypted.Len(), len(plaintext))
+			}
+		})
+	}
+}
+
+// TestReadTruncatedCiphertext pins Reader behavior for ciphertexts truncated
+// at boundaries around the initial buffer size: every case must behave
+// exactly as it did with the fully pre-allocated buffer.
+func TestReadTruncatedCiphertext(t *testing.T) {
+	const (
+		nonceSize       = 10
+		noncePrefixSize = 5
+	)
+	plaintextSegmentSize := 4096 - nonceSize
+	writerParams := noncebased.WriterParams{
+		NonceSize:            nonceSize,
+		PlaintextSegmentSize: plaintextSegmentSize,
+	}
+	_, ciphertext, noncePrefix, err := testEncrypt(3*plaintextSegmentSize+100, noncePrefixSize, writerParams)
+	if err != nil {
+		t.Fatalf("encrypting failed: %v", err)
+	}
+
+	testcases := []struct {
+		truncate     int
+		dataErrReads bool
+		wantErr      bool
+	}{
+		{truncate: 1, wantErr: true},
+		{truncate: 4095, wantErr: true},
+		{truncate: 4096, wantErr: true},
+		// Truncating to exactly one full non-final segment plus its 1-byte
+		// lookahead leaves that dangling byte to be decrypted as the final
+		// segment, which fails authentication.
+		{truncate: 4097, wantErr: true},
+		// The same boundary with a reader that returns the final byte
+		// together with io.EOF, so that the read which exactly fills the
+		// segment buffer also reports the end of the stream.
+		{truncate: 4097, dataErrReads: true, wantErr: true},
+		{truncate: len(ciphertext) - 1, wantErr: true},
+	}
+	for _, tc := range testcases {
+		name := fmt.Sprintf("truncatedAt%d", tc.truncate)
+		if tc.dataErrReads {
+			name += "DataErrReads"
+		}
+		t.Run(name, func(t *testing.T) {
+			var r io.Reader = bytes.NewReader(ciphertext[:tc.truncate])
+			if tc.dataErrReads {
+				r = iotest.DataErrReader(r)
+			}
+			reader, err := noncebased.NewReader(noncebased.ReaderParams{
+				R:                     r,
+				SegmentDecrypter:      testDecrypterWithDst{},
+				NonceSize:             nonceSize,
+				NoncePrefix:           noncePrefix,
+				CiphertextSegmentSize: plaintextSegmentSize + nonceSize,
+			})
+			if err != nil {
+				t.Fatalf("noncebased.NewReader() = _, err = %v, want nil", err)
+			}
+			_, err = io.ReadAll(reader)
+			if gotErr := err != nil; gotErr != tc.wantErr {
+				t.Fatalf("io.ReadAll() = _, err = %v, want error: %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+// TestReadDegenerateFirstSegmentOffset verifies that a Reader constructed
+// with a FirstCiphertextSegmentOffset outside [0, CiphertextSegmentSize+1]
+// fails cleanly on the first Read. The keyset-based streamingaead API never
+// produces such offsets, but the exported subtle constructors only bound the
+// offset from above, so a negative offset can reach Read.
+func TestReadDegenerateFirstSegmentOffset(t *testing.T) {
+	const (
+		nonceSize             = 10
+		ciphertextSegmentSize = 100
+	)
+	for _, offset := range []int{-5, ciphertextSegmentSize + 2} {
+		t.Run(fmt.Sprintf("offset%d", offset), func(t *testing.T) {
+			reader, err := noncebased.NewReader(noncebased.ReaderParams{
+				R:                            bytes.NewReader(make([]byte, 50)),
+				SegmentDecrypter:             testDecrypterWithDst{},
+				NonceSize:                    nonceSize,
+				NoncePrefix:                  make([]byte, 5),
+				CiphertextSegmentSize:        ciphertextSegmentSize,
+				FirstCiphertextSegmentOffset: offset,
+			})
+			if err != nil {
+				t.Fatalf("noncebased.NewReader() = _, err = %v, want nil", err)
+			}
+			if _, err := reader.Read(make([]byte, 10)); err != noncebased.ErrCiphertextSegmentTooShort {
+				t.Fatalf("reader.Read() = _, err = %v, want ErrCiphertextSegmentTooShort", err)
+			}
+		})
+	}
+}
+
+// TestWriteWithSmallInitialBuffer exercises the lazily-allocated plaintext
+// buffer in Writer. The buffer starts at a small initial size and grows
+// toward PlaintextSegmentSize as the written data proves larger than the
+// current allocation, so the interesting boundaries are plaintext sizes and
+// plaintext segment sizes just below, at, and just above the initial buffer
+// size (4096 bytes), and a segment large enough to walk the whole growth
+// sequence up to the jump to the full segment size, including their
+// interaction with the first-segment offset and callers that write in small
+// chunks. Each case additionally
+// verifies that the produced ciphertext is byte-identical to one produced by
+// a single Write call of the whole plaintext: the write pattern must not
+// influence the output.
+func TestWriteWithSmallInitialBuffer(t *testing.T) {
+	// initialBufferSize must match initialSegmentBufferSize() in
+	// noncebased.go. The tests below probe plaintext sizes around this
+	// boundary; if the constant changes, they still pass but no longer pin
+	// the boundary itself.
+	const initialBufferSize = 4096
+
+	const (
+		nonceSize       = 10
+		noncePrefixSize = 5
+	)
+	testcases := []struct {
+		name                         string
+		plaintextSize                int
+		plaintextSegmentSize         int
+		firstCiphertextSegmentOffset int
+		writeChunkSize               int
+	}{
+		{
+			name:                 "singleSegmentPlaintextJustBelowInitialBuffer",
+			plaintextSize:        initialBufferSize - 1,
+			plaintextSegmentSize: 1 << 20,
+			writeChunkSize:       1000,
+		},
+		{
+			name:                 "singleSegmentPlaintextExactlyInitialBuffer",
+			plaintextSize:        initialBufferSize,
+			plaintextSegmentSize: 1 << 20,
+			writeChunkSize:       1000,
+		},
+		{
+			name:                 "singleSegmentPlaintextJustAboveInitialBuffer",
+			plaintextSize:        initialBufferSize + 1,
+			plaintextSegmentSize: 1 << 20,
+			writeChunkSize:       1000,
+		},
+		{
+			name:                 "singleSegmentPlaintextWellAboveInitialBuffer",
+			plaintextSize:        100000,
+			plaintextSegmentSize: 1 << 20,
+			writeChunkSize:       1000,
+		},
+		{
+			name:                 "emptyPlaintextLargeSegmentSize",
+			plaintextSize:        0,
+			plaintextSegmentSize: 1 << 20,
+			writeChunkSize:       1000,
+		},
+		{
+			// Plaintext segments one byte below the initial buffer size: the
+			// buffer limit is below the initial size, so the buffer starts at
+			// the limit and never grows.
+			name:                 "multiSegmentSegmentJustBelowInitialBuffer",
+			plaintextSize:        3*(initialBufferSize-1) + 100,
+			plaintextSegmentSize: initialBufferSize - 1,
+			writeChunkSize:       1000,
+		},
+		{
+			// Plaintext segments of exactly the initial buffer size: the
+			// buffer starts at the full segment size and never grows.
+			name:                 "multiSegmentSegmentExactlyInitialBuffer",
+			plaintextSize:        3*initialBufferSize + 100,
+			plaintextSegmentSize: initialBufferSize,
+			writeChunkSize:       1000,
+		},
+		{
+			// Plaintext segments one byte above the initial buffer size: the
+			// very first segment grows the buffer by a single byte.
+			name:                 "multiSegmentSegmentJustAboveInitialBuffer",
+			plaintextSize:        3*(initialBufferSize+1) + 100,
+			plaintextSegmentSize: initialBufferSize + 1,
+			writeChunkSize:       1000,
+		},
+		{
+			// A segment large enough that the buffer walks the whole growth
+			// sequence, ending with the jump to the full segment size, and
+			// then completes segments in the fully-grown buffer.
+			name:                 "multiSegmentRequiringMultipleGrowthSteps",
+			plaintextSize:        1<<20 + 100,
+			plaintextSegmentSize: 1 << 20,
+			writeChunkSize:       1000,
+		},
+		{
+			// A first Write large enough that the buffer is sized to the
+			// pending data exactly, followed by writes that grow it from
+			// that intermediate size and complete segments.
+			name:                 "largeFirstWriteThenGrowthFromOddSize",
+			plaintextSize:        1<<20 + 100,
+			plaintextSegmentSize: 1 << 20,
+			writeChunkSize:       500000,
+		},
+		{
+			// A plaintext that ends exactly at a segment boundary: Write
+			// defers the exactly-filled segment, and Close emits it as the
+			// last segment.
+			name:                 "multiSegmentPlaintextAlignedWithSegmentSize",
+			plaintextSize:        2 * initialBufferSize,
+			plaintextSegmentSize: initialBufferSize,
+			writeChunkSize:       1000,
+		},
+		{
+			// A single Write that fills the initial buffer exactly without
+			// completing a segment, followed directly by Close.
+			name:                 "singleWriteFillingInitialBufferThenClose",
+			plaintextSize:        initialBufferSize,
+			plaintextSegmentSize: 1 << 20,
+			writeChunkSize:       initialBufferSize,
+		},
+		{
+			name:                         "firstSegmentOffsetWithPlaintextAtInitialBuffer",
+			plaintextSize:                initialBufferSize,
+			plaintextSegmentSize:         1 << 20,
+			firstCiphertextSegmentOffset: 10,
+			writeChunkSize:               1000,
+		},
+		{
+			name:                         "firstSegmentOffsetWithMultipleSegmentsAtInitialBuffer",
+			plaintextSize:                3*initialBufferSize + 100,
+			plaintextSegmentSize:         initialBufferSize,
+			firstCiphertextSegmentOffset: 10,
+			writeChunkSize:               1000,
+		},
+		{
+			name:                 "oneByteWritesAcrossGrowBoundary",
+			plaintextSize:        initialBufferSize + 1,
+			plaintextSegmentSize: 1 << 20,
+			writeChunkSize:       1,
+		},
+		{
+			name:                 "oneByteWritesMultiSegment",
+			plaintextSize:        2*initialBufferSize + 50,
+			plaintextSegmentSize: initialBufferSize,
+			writeChunkSize:       1,
+		},
+	}
+
+	encryptChunked := func(t *testing.T, plaintext, noncePrefix []byte, segmentSize, offset, chunkSize int) []byte {
+		t.Helper()
+		var buf bytes.Buffer
+		w, err := noncebased.NewWriter(noncebased.WriterParams{
+			W:                            &buf,
+			SegmentEncrypter:             testEncrypterWithDst{},
+			NonceSize:                    nonceSize,
+			NoncePrefix:                  noncePrefix,
+			PlaintextSegmentSize:         segmentSize,
+			FirstCiphertextSegmentOffset: offset,
+		})
+		if err != nil {
+			t.Fatalf("noncebased.NewWriter() = _, err = %v, want nil", err)
+		}
+		for pos := 0; pos < len(plaintext); {
+			end := pos + chunkSize
+			if end > len(plaintext) {
+				end = len(plaintext)
+			}
+			n, err := w.Write(plaintext[pos:end])
+			if err != nil {
+				t.Fatalf("w.Write() = _, err = %v, want nil", err)
+			}
+			pos += n
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("w.Close() = err = %v, want nil", err)
+		}
+		return buf.Bytes()
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			plaintext := make([]byte, tc.plaintextSize)
+			if _, err := rand.Read(plaintext); err != nil {
+				t.Fatalf("rand.Read() = _, err = %v, want nil", err)
+			}
+			noncePrefix := make([]byte, noncePrefixSize)
+			if _, err := rand.Read(noncePrefix); err != nil {
+				t.Fatalf("rand.Read() = _, err = %v, want nil", err)
+			}
+
+			ciphertext := encryptChunked(t, plaintext, noncePrefix, tc.plaintextSegmentSize, tc.firstCiphertextSegmentOffset, tc.writeChunkSize)
+			singleWrite := encryptChunked(t, plaintext, noncePrefix, tc.plaintextSegmentSize, tc.firstCiphertextSegmentOffset, tc.plaintextSize+1)
+			if !bytes.Equal(ciphertext, singleWrite) {
+				t.Fatalf("chunked writes produced a different ciphertext than a single write. Got %d bytes, want %d bytes", len(ciphertext), len(singleWrite))
+			}
+
+			readerParams := noncebased.ReaderParams{
+				NonceSize:                    nonceSize,
+				NoncePrefix:                  noncePrefix,
+				CiphertextSegmentSize:        tc.plaintextSegmentSize + nonceSize,
+				FirstCiphertextSegmentOffset: tc.firstCiphertextSegmentOffset,
+			}
+			if err := testDecrypt(plaintext, ciphertext, 1000, readerParams); err != nil {
+				t.Fatalf("decrypting failed: %v", err)
+			}
+		})
+	}
+}
+
+// TestWriteDegenerateFirstSegmentOffset verifies that a Writer constructed
+// with a FirstCiphertextSegmentOffset outside [0, PlaintextSegmentSize] fails
+// cleanly on the first Write. The keyset-based streamingaead API never
+// produces such offsets, but the exported subtle constructors only bound the
+// offset from above, so a negative offset can reach Write.
+func TestWriteDegenerateFirstSegmentOffset(t *testing.T) {
+	const (
+		nonceSize            = 10
+		plaintextSegmentSize = 100
+	)
+	for _, offset := range []int{-5, plaintextSegmentSize + 1} {
+		t.Run(fmt.Sprintf("offset%d", offset), func(t *testing.T) {
+			w, err := noncebased.NewWriter(noncebased.WriterParams{
+				W:                            &bytes.Buffer{},
+				SegmentEncrypter:             testEncrypterWithDst{},
+				NonceSize:                    nonceSize,
+				NoncePrefix:                  make([]byte, 5),
+				PlaintextSegmentSize:         plaintextSegmentSize,
+				FirstCiphertextSegmentOffset: offset,
+			})
+			if err != nil {
+				t.Fatalf("noncebased.NewWriter() = _, err = %v, want nil", err)
+			}
+			if _, err := w.Write(make([]byte, 50)); err == nil {
+				t.Fatal("w.Write() = _, err = nil, want error")
+			}
+		})
 	}
 }

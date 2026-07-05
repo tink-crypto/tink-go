@@ -98,8 +98,12 @@ type Writer struct {
 	noncePrefix                  []byte
 	plaintext                    []byte
 	plaintextPos                 int
-	ciphertext                   []byte
-	closed                       bool
+	// plaintextBufferLimit is the full plaintext segment size. w.plaintext
+	// starts small and grows toward this limit only if data actually
+	// arrives.
+	plaintextBufferLimit int
+	ciphertext           []byte
+	closed               bool
 }
 
 // WriterParams contains the options for instantiating a Writer via NewWriter().
@@ -146,7 +150,13 @@ func NewWriter(params WriterParams) (*Writer, error) {
 		nonceSize:                    params.NonceSize,
 		noncePrefix:                  params.NoncePrefix,
 		firstCiphertextSegmentOffset: params.FirstCiphertextSegmentOffset,
-		plaintext:                    make([]byte, params.PlaintextSegmentSize),
+
+		// The buffer must be able to hold a full plaintext segment, but is
+		// allocated small and grown as data actually arrives, so that
+		// plaintexts much smaller than the segment size do not pay for a
+		// full segment-sized allocation.
+		plaintext:            make([]byte, initialSegmentBufferSize(params.PlaintextSegmentSize)),
+		plaintextBufferLimit: params.PlaintextSegmentSize,
 	}, nil
 }
 
@@ -158,15 +168,36 @@ func (w *Writer) Write(p []byte) (int, error) {
 
 	pos := 0
 	for {
-		ptLim := len(w.plaintext)
+		ptLim := w.plaintextBufferLimit
 		if w.encryptedSegmentCnt == 0 {
+			if w.firstCiphertextSegmentOffset < 0 || w.firstCiphertextSegmentOffset > w.plaintextBufferLimit {
+				// A FirstCiphertextSegmentOffset outside the interval
+				// [0, PlaintextSegmentSize] cannot yield a valid first
+				// segment. The keyset-based streamingaead API never
+				// constructs such a Writer, but the exported subtle
+				// constructors only bound the offset from above.
+				return pos, errors.New("first ciphertext segment offset out of range")
+			}
 			ptLim -= w.firstCiphertextSegmentOffset
 		}
-		n := copy(w.plaintext[w.plaintextPos:ptLim], p[pos:])
+		copyLim := min(ptLim, len(w.plaintext))
+		n := copy(w.plaintext[w.plaintextPos:copyLim], p[pos:])
 		w.plaintextPos += n
 		pos += n
 		if pos == len(p) {
 			break
+		}
+
+		if w.plaintextPos < ptLim {
+			// The buffer is full but the segment is not complete: grow
+			// toward the full segment size, no less than the buffered data
+			// plus the data still pending in p, so that a single large
+			// Write skips the intermediate growth steps.
+			needed := w.plaintextPos + len(p) - pos
+			grown := make([]byte, grownSegmentBufferSize(len(w.plaintext), needed, w.plaintextBufferLimit))
+			copy(grown, w.plaintext[:w.plaintextPos])
+			w.plaintext = grown
+			continue
 		}
 
 		nonce, err := generateSegmentNonce(w.nonceSize, w.noncePrefix, w.encryptedSegmentCnt, false)
@@ -257,6 +288,10 @@ type Reader struct {
 	ciphertext                   []byte
 	ciphertextPos                int
 	lastSegmentDecrypted         bool
+	// ciphertextBufferLimit is the full segment buffer size
+	// (CiphertextSegmentSize + 1 lookahead byte). r.ciphertext starts small
+	// and grows toward this limit only if bytes actually arrive.
+	ciphertextBufferLimit int
 }
 
 // ReaderParams contains the options for instantiating a Reader via NewReader().
@@ -302,8 +337,12 @@ func NewReader(params ReaderParams) (*Reader, error) {
 		noncePrefix:                  params.NoncePrefix,
 		firstCiphertextSegmentOffset: params.FirstCiphertextSegmentOffset,
 
-		// Allocate an extra byte to detect the last segment.
-		ciphertext: make([]byte, params.CiphertextSegmentSize+1),
+		// The buffer must be able to hold a full segment plus an extra byte
+		// to detect the last segment, but is allocated small and grown as
+		// bytes actually arrive, so that plaintexts much smaller than the
+		// segment size do not pay for a full segment-sized allocation.
+		ciphertext:            make([]byte, initialSegmentBufferSize(params.CiphertextSegmentSize+1)),
+		ciphertextBufferLimit: params.CiphertextSegmentSize + 1,
 	}, nil
 }
 
@@ -321,11 +360,18 @@ func (r *Reader) Read(p []byte) (int, error) {
 	r.plaintext = r.plaintext[:0]
 	r.plaintextPos = 0
 
-	ctLim := len(r.ciphertext)
+	ctLim := r.ciphertextBufferLimit
 	if r.decryptedSegmentCnt == 0 {
 		ctLim -= r.firstCiphertextSegmentOffset
+		if ctLim > r.ciphertextBufferLimit {
+			// A negative FirstCiphertextSegmentOffset would require reading
+			// more bytes than the segment buffer can hold. The keyset-based
+			// streamingaead API never constructs such a Reader, but the
+			// exported subtle constructors only bound the offset from above.
+			return 0, ErrCiphertextSegmentTooShort
+		}
 	}
-	n, err := io.ReadFull(r.r, r.ciphertext[r.ciphertextPos:ctLim])
+	n, err := r.readSegmentGrowing(ctLim)
 	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
 		return 0, err
 	}
@@ -371,6 +417,87 @@ func (r *Reader) Read(p []byte) (int, error) {
 	n = copy(p, r.plaintext)
 	r.plaintextPos = n
 	return n, nil
+}
+
+// readSegmentGrowing reads into r.ciphertext[r.ciphertextPos:ctLim], growing
+// r.ciphertext toward the full segment buffer size as the stream proves to
+// have more data than the current buffer. ctLim must not exceed
+// r.ciphertextBufferLimit; Read guarantees this. It is semantically identical
+// to
+//
+//	io.ReadFull(r.r, r.ciphertext[r.ciphertextPos:ctLim])
+//
+// with a fully pre-allocated buffer: it returns the number of bytes read,
+// io.EOF if no bytes were read, and io.ErrUnexpectedEOF if the stream ended
+// after some bytes but before ctLim was reached.
+//
+// Throughout, end is the index one past the last buffered ciphertext byte,
+// and each read fills r.ciphertext[end:] up to ctLim or the current buffer
+// size, whichever is smaller. The loop and the error classification
+// otherwise mirror io.ReadAtLeast.
+func (r *Reader) readSegmentGrowing(ctLim int) (int, error) {
+	start := r.ciphertextPos
+	end := start
+	var err error
+	for end < ctLim && err == nil {
+		if end == len(r.ciphertext) {
+			// The buffer is full but the segment is not complete: grow
+			// toward the full segment buffer size. Unlike the Writer, the
+			// Reader never knows how much data is still pending.
+			grown := make([]byte, grownSegmentBufferSize(len(r.ciphertext), 0, r.ciphertextBufferLimit))
+			copy(grown, r.ciphertext[:end])
+			r.ciphertext = grown
+		}
+		readLim := min(len(r.ciphertext), ctLim)
+		var m int
+		m, err = r.r.Read(r.ciphertext[end:readLim])
+		end += m
+	}
+	if end >= ctLim {
+		err = nil
+	} else if end > start && err == io.EOF {
+		err = io.ErrUnexpectedEOF
+	}
+	return end - start, err
+}
+
+// initialSegmentBufferSize returns the initial allocation size for a segment
+// buffer: small, unless the full segment buffer is smaller still.
+func initialSegmentBufferSize(limit int) int {
+	const initial = 4096
+	if limit < initial {
+		return limit
+	}
+	return initial
+}
+
+// grownSegmentBufferSize returns the next size for a segment buffer of size
+// cur that must grow toward limit: cur multiplied by the growth factor, but
+// no smaller than needed, and limit itself once the chosen size would reach
+// at least three quarters of it. needed is the number of buffered and
+// pending bytes already known to the caller, or zero when unknown: a caller
+// holding more data than a growth step covers allocates for that data in one
+// step instead of paying for the intermediate steps. The large factor and
+// the final jump bound the number of reallocations and the memory traffic of
+// growth for segment-sized streams, and the jump also prevents a
+// nearly-full-sized step, such as one covering all but the Reader's one-byte
+// lookahead. The thresholds are arranged so that the multiplication cannot
+// overflow: it is taken only when the result is below three quarters of
+// limit.
+func grownSegmentBufferSize(cur, needed, limit int) int {
+	const growthFactor = 8
+	jumpThreshold := limit - limit/4
+	newSize := limit
+	if cur < jumpThreshold/growthFactor {
+		newSize = cur * growthFactor
+	}
+	if needed > newSize {
+		newSize = needed
+	}
+	if newSize >= jumpThreshold {
+		newSize = limit
+	}
+	return newSize
 }
 
 // generateSegmentNonce returns a nonce for a segment.
