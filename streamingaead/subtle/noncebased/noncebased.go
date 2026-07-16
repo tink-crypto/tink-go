@@ -256,6 +256,7 @@ type Reader struct {
 	plaintextPos                 int
 	ciphertext                   []byte
 	ciphertextPos                int
+	lastSegmentDecrypted         bool
 }
 
 // ReaderParams contains the options for instantiating a Reader via NewReader().
@@ -313,6 +314,9 @@ func (r *Reader) Read(p []byte) (int, error) {
 		r.plaintextPos += n
 		return n, nil
 	}
+	if r.lastSegmentDecrypted {
+		return 0, io.EOF
+	}
 
 	r.plaintext = r.plaintext[:0]
 	r.plaintextPos = 0
@@ -322,7 +326,7 @@ func (r *Reader) Read(p []byte) (int, error) {
 		ctLim -= r.firstCiphertextSegmentOffset
 	}
 	n, err := io.ReadFull(r.r, r.ciphertext[r.ciphertextPos:ctLim])
-	if err != nil && err != io.ErrUnexpectedEOF {
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
 		return 0, err
 	}
 
@@ -332,6 +336,7 @@ func (r *Reader) Read(p []byte) (int, error) {
 	)
 	if err != nil {
 		lastSegment = true
+		r.lastSegmentDecrypted = true
 		segment = r.ciphertextPos + n
 	} else {
 		segment = r.ciphertextPos + n - 1

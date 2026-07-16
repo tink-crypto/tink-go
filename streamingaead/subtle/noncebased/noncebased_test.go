@@ -497,3 +497,50 @@ func TestEncryptDecryptWithOldInterface(t *testing.T) {
 		t.Fatalf("Number of decrypted bytes does not match. Got=%d,want=%d", decrypted, len(plaintext))
 	}
 }
+
+func TestDecryptTruncatedCiphertext(t *testing.T) {
+	var (
+		nonceSize                    = 10
+		noncePrefixSize              = 5
+		plaintextSegmentSize         = 20
+		firstCiphertextSegmentOffset = 10
+		plaintextSize                = 100
+	)
+
+	writerParams := noncebased.WriterParams{
+		NonceSize:                    nonceSize,
+		PlaintextSegmentSize:         plaintextSegmentSize,
+		FirstCiphertextSegmentOffset: firstCiphertextSegmentOffset,
+	}
+
+	_, ciphertext, noncePrefix, err := testEncrypt(plaintextSize, noncePrefixSize, writerParams)
+	if err != nil {
+		t.Fatalf("testEncrypt failed: %v", err)
+	}
+
+	readerParams := noncebased.ReaderParams{
+		NonceSize:                    nonceSize,
+		NoncePrefix:                  noncePrefix,
+		CiphertextSegmentSize:        plaintextSegmentSize + nonceSize,
+		FirstCiphertextSegmentOffset: firstCiphertextSegmentOffset,
+		SegmentDecrypter:             testDecrypterWithDst{},
+	}
+
+	// Test all possible truncation lengths of the ciphertext stream.
+	// Any truncated stream must produce an error upon reading.
+	for i := 0; i < len(ciphertext); i++ {
+		rp := readerParams
+		rp.R = bytes.NewReader(ciphertext[:i])
+
+		r, err := noncebased.NewReader(rp)
+		if err != nil {
+			t.Fatalf("noncebased.NewReader() failed: %v", err)
+		}
+
+		got, err := io.ReadAll(r)
+		if err == nil {
+			t.Errorf("io.ReadAll on ciphertext truncated at %d/%d bytes returned nil error; decrypted %d bytes of plaintext: %x (want error)",
+				i, len(ciphertext), len(got), got)
+		}
+	}
+}
