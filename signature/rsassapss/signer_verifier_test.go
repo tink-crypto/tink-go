@@ -15,10 +15,8 @@
 package rsassapss_test
 
 import (
-	"crypto/rsa"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"slices"
 	"testing"
 
@@ -47,7 +45,7 @@ func mustDecodeHex(t *testing.T, value string) []byte {
 }
 
 func TestSignVerify(t *testing.T) {
-	for _, tc := range primitiveTestCases(t) {
+	for _, tc := range mustCreatePrimitiveTestCases(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			signer, err := rsassapss.NewSigner(tc.privateKey, internalapi.Token{})
 			if err != nil {
@@ -69,11 +67,8 @@ func TestSignVerify(t *testing.T) {
 	}
 }
 
-func primitiveTestCases(t *testing.T) []primtiveTesCase {
+func rawRsa2048Values(t *testing.T) ([]byte, rsassapss.PrivateKeyValues) {
 	t.Helper()
-	// Test vectors from
-	// https://github.com/tink-crypto/tink-java/tree/v1.15.0/src/main/java/com/google/crypto/tink/signature/internal/testing/RsaSsaPssTestUtil.java#L35.
-	// Only test vectors with no prefix are used.
 	n2048Base64 := "t6Q8PWSi1dkJj9hTP8hNYFlvadM7DflW9mWepOJhJ66w7nyoK1gPNqFMSQRy" +
 		"O125Gp-TEkodhWr0iujjHVx7BcV0llS4w5ACGgPrcAd6ZcSR0-Iqom-QFcNP" +
 		"8Sjg086MwoqQU_LYywlAGZ21WSdS_PERyGFiNnj3QQlO8Yns5jCtLCRwLHL0" +
@@ -93,6 +88,17 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		"rY15k9qMSpG9OX_IJAXmxzAh_tWiZOwk2K4yxH9tS3Lq1yX8C1EWmeRDkK2a" +
 		"hecG85-oLKQt5VEpWHKmjOi_gJSdSgqcN96X52esAQ"
 
+	n2048 := mustDecodeBase64(t, n2048Base64)
+	privateValues2048 := rsassapss.PrivateKeyValues{
+		D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), insecuresecretdataaccess.Token{}),
+		P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), insecuresecretdataaccess.Token{}),
+		Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), insecuresecretdataaccess.Token{}),
+	}
+	return n2048, privateValues2048
+}
+
+func rawRsa4096Values(t *testing.T) ([]byte, rsassapss.PrivateKeyValues) {
+	t.Helper()
 	n4096Base64 := "AK9mcI3PaEhMPR2ICXxCsK0lek917W01OVK24Q6_eMKVJkzVKhf2muYn2B1Pkx_yvdWr7g0B1tjNSN66-A" +
 		"PH7osa9F1x6WnzY16d2WY3xvidHxHMFol1sPa-xGKu94uFBp4rHqrj7nYBJX4QmHzLG95QANhJPz" +
 		"C4P9M-lrVSyCVlHr2732NZpjoFN8dZtvNvNI_ndUb4fTgozmxbaRKGKawTjocP1DAtOzwwuOKPZM" +
@@ -121,30 +127,25 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		"i39ioGRddlGIMmMt_ddYpHNgt16qfLBGjJU2rveyxXm2zPZz-W-lJC8AjH8RqzFYikec2LNZ49xM" +
 		"KiBAijpghSCoVCO_kTaesc6crJ125AL5T5df_C65JeXoCQsbbvQRdqQs4TG9uObkY8OWZ1VHjhUF" +
 		"b1frplDQvc4bUqYFgQxGhrDFAbwKBECyUwqh0hJnDtQpFFcvhJj6AILVoLlVqNeWIK3iE"
+	n4096 := mustDecodeBase64(t, n4096Base64)
+	privateValues4096 := rsassapss.PrivateKeyValues{
+		D: secretdata.NewBytesFromData(mustDecodeBase64(t, d4096Base64), insecuresecretdataaccess.Token{}),
+		P: secretdata.NewBytesFromData(mustDecodeBase64(t, p4096Base64), insecuresecretdataaccess.Token{}),
+		Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q4096Base64), insecuresecretdataaccess.Token{}),
+	}
+	return n4096, privateValues4096
+}
+
+func mustCreatePrimitiveTestCases(t *testing.T) []primtiveTesCase {
+	t.Helper()
+	// Test vectors from
+	// https://github.com/tink-crypto/tink-java/tree/v1.15.0/src/main/java/com/google/crypto/tink/signature/internal/testing/RsaSsaPssTestUtil.java#L35.
+	// Only test vectors with no prefix are used.
+	n2048, privateValues2048 := rawRsa2048Values(t)
 
 	var testCases []primtiveTesCase
-	publicKey2048 := &rsa.PublicKey{
-		N: new(big.Int).SetBytes(mustDecodeBase64(t, n2048Base64)),
-		E: 65537,
-	}
-	privateKey2048 := &rsa.PrivateKey{
-		PublicKey: *publicKey2048,
-		D:         new(big.Int).SetBytes(mustDecodeBase64(t, d2048Base64)),
-		Primes: []*big.Int{
-			new(big.Int).SetBytes(mustDecodeBase64(t, p2048Base64)),
-			new(big.Int).SetBytes(mustDecodeBase64(t, q2048Base64)),
-		},
-	}
-	privateKey2048.Precompute()
-
-	privateValues2048 := rsassapss.PrivateKeyValues{
-		D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), insecuresecretdataaccess.Token{}),
-		P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), insecuresecretdataaccess.Token{}),
-		Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), insecuresecretdataaccess.Token{}),
-	}
-
 	// Test vector 0.
-	testVec0PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec0PublicKey := mustCreatePublicKey(t, n2048, 0, mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -169,7 +170,7 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 1.
-	testVec1PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec1PublicKey := mustCreatePublicKey(t, n2048, 0, mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA512,
 		MGF1HashType:    rsassapss.SHA512,
@@ -194,7 +195,7 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 2.
-	testVec2PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), uint32(0x99887766), mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec2PublicKey := mustCreatePublicKey(t, n2048, uint32(0x99887766), mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -220,7 +221,7 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 3.
-	testVec3PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), uint32(0x99887766), mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec3PublicKey := mustCreatePublicKey(t, n2048, uint32(0x99887766), mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -246,7 +247,7 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 4.
-	testVec4PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), uint32(0x99887766), mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec4PublicKey := mustCreatePublicKey(t, n2048, uint32(0x99887766), mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -272,7 +273,7 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 5.
-	testVec5PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec5PublicKey := mustCreatePublicKey(t, n2048, 0, mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -297,32 +298,16 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		message: mustDecodeHex(t, "aa"),
 	})
 
-	publicKey4096 := &rsa.PublicKey{
-		N: new(big.Int).SetBytes(mustDecodeBase64(t, n4096Base64)),
-		E: 65537,
-	}
-	privateKey4096 := &rsa.PrivateKey{
-		PublicKey: *publicKey4096,
-		D:         new(big.Int).SetBytes(mustDecodeBase64(t, d4096Base64)),
-		Primes: []*big.Int{
-			new(big.Int).SetBytes(mustDecodeBase64(t, p4096Base64)),
-			new(big.Int).SetBytes(mustDecodeBase64(t, q4096Base64)),
-		},
-	}
-	privateKey4096.Precompute()
+	n4096, privateValues4096 := rawRsa4096Values(t)
 	// Test vector 6.
-	testVec6PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n4096Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec6PublicKey := mustCreatePublicKey(t, n4096, 0, mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 4096,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
 		PublicExponent:  f4,
 		SaltLengthBytes: 32,
 	}, rsassapss.VariantNoPrefix))
-	privateValues4096 := rsassapss.PrivateKeyValues{
-		D: secretdata.NewBytesFromData(mustDecodeBase64(t, d4096Base64), insecuresecretdataaccess.Token{}),
-		P: secretdata.NewBytesFromData(mustDecodeBase64(t, p4096Base64), insecuresecretdataaccess.Token{}),
-		Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q4096Base64), insecuresecretdataaccess.Token{}),
-	}
+
 	testVec6PrivateKey, err := rsassapss.NewPrivateKey(testVec6PublicKey, privateValues4096)
 	if err != nil {
 		t.Fatalf("rsassapss.NewPrivateKey() err = %v, want nil", err)
@@ -347,7 +332,7 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 7.
-	testVec7PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec7PublicKey := mustCreatePublicKey(t, n2048, 0, mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA384,
 		MGF1HashType:    rsassapss.SHA384,
@@ -372,7 +357,7 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 		message: mustDecodeHex(t, "aa"),
 	})
 	// Test vector 8.
-	testVec8PublicKey := mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), 0, mustCreateParameters(t, rsassapss.ParametersValues{
+	testVec8PublicKey := mustCreatePublicKey(t, n2048, 0, mustCreateParameters(t, rsassapss.ParametersValues{
 		ModulusSizeBits: 2048,
 		SigHashType:     rsassapss.SHA256,
 		MGF1HashType:    rsassapss.SHA256,
@@ -400,7 +385,7 @@ func primitiveTestCases(t *testing.T) []primtiveTesCase {
 }
 
 func TestVerifyCorrectness(t *testing.T) {
-	for _, tc := range primitiveTestCases(t) {
+	for _, tc := range mustCreatePrimitiveTestCases(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			verifier, err := rsassapss.NewVerifier(tc.publicKey, internalapi.Token{})
 			if err != nil {
@@ -414,7 +399,7 @@ func TestVerifyCorrectness(t *testing.T) {
 }
 
 func TestVerifyFails(t *testing.T) {
-	for _, tc := range primitiveTestCases(t) {
+	for _, tc := range mustCreatePrimitiveTestCases(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			verifier, err := rsassapss.NewVerifier(tc.publicKey, internalapi.Token{})
 			if err != nil {
