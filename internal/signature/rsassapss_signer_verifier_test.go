@@ -50,7 +50,7 @@ func hexDecode(t *testing.T, value string) []byte {
 }
 
 func TestRSASSAPSSSignVerify(t *testing.T) {
-	for _, tc := range rsaSSAPSSTestCases(t) {
+	for _, tc := range mustCreateRSASSAPSSTestCases(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			signer, err := signature.New_RSA_SSA_PSS_Signer(tc.hash, 10, tc.privateKey)
 			if err != nil {
@@ -72,11 +72,7 @@ func TestRSASSAPSSSignVerify(t *testing.T) {
 	}
 }
 
-func rsaSSAPSSTestCases(t *testing.T) []rsaSSAPSSTestCase {
-	t.Helper()
-	// Test vectors from
-	// https://github.com/tink-crypto/tink-java/tree/v1.15.0/src/main/java/com/google/crypto/tink/signature/internal/testing/RsaSsaPssTestUtil.java#L35.
-	// Only test vectors with no prefix are used.
+func mustCreateRsa2048KeyPair(t *testing.T) (*rsa.PublicKey, *rsa.PrivateKey) {
 	n2048Base64 := "t6Q8PWSi1dkJj9hTP8hNYFlvadM7DflW9mWepOJhJ66w7nyoK1gPNqFMSQRy" +
 		"O125Gp-TEkodhWr0iujjHVx7BcV0llS4w5ACGgPrcAd6ZcSR0-Iqom-QFcNP" +
 		"8Sjg086MwoqQU_LYywlAGZ21WSdS_PERyGFiNnj3QQlO8Yns5jCtLCRwLHL0" +
@@ -96,6 +92,24 @@ func rsaSSAPSSTestCases(t *testing.T) []rsaSSAPSSTestCase {
 		"rY15k9qMSpG9OX_IJAXmxzAh_tWiZOwk2K4yxH9tS3Lq1yX8C1EWmeRDkK2a" +
 		"hecG85-oLKQt5VEpWHKmjOi_gJSdSgqcN96X52esAQ"
 
+	publicKey2048 := &rsa.PublicKey{
+		N: new(big.Int).SetBytes(base64Decode(t, n2048Base64)),
+		E: 65537,
+	}
+	privateKey2048 := &rsa.PrivateKey{
+		PublicKey: *publicKey2048,
+		D:         new(big.Int).SetBytes(base64Decode(t, d2048Base64)),
+		Primes: []*big.Int{
+			new(big.Int).SetBytes(base64Decode(t, p2048Base64)),
+			new(big.Int).SetBytes(base64Decode(t, q2048Base64)),
+		},
+	}
+	privateKey2048.Precompute()
+
+	return publicKey2048, privateKey2048
+}
+
+func mustCreateRsa4096KeyPair(t *testing.T) (*rsa.PublicKey, *rsa.PrivateKey) {
 	n4096Base64 := "AK9mcI3PaEhMPR2ICXxCsK0lek917W01OVK24Q6_eMKVJkzVKhf2muYn2B1Pkx_yvdWr7g0B1tjNSN66-A" +
 		"PH7osa9F1x6WnzY16d2WY3xvidHxHMFol1sPa-xGKu94uFBp4rHqrj7nYBJX4QmHzLG95QANhJPz" +
 		"C4P9M-lrVSyCVlHr2732NZpjoFN8dZtvNvNI_ndUb4fTgozmxbaRKGKawTjocP1DAtOzwwuOKPZM" +
@@ -125,20 +139,33 @@ func rsaSSAPSSTestCases(t *testing.T) []rsaSSAPSSTestCase {
 		"KiBAijpghSCoVCO_kTaesc6crJ125AL5T5df_C65JeXoCQsbbvQRdqQs4TG9uObkY8OWZ1VHjhUF" +
 		"b1frplDQvc4bUqYFgQxGhrDFAbwKBECyUwqh0hJnDtQpFFcvhJj6AILVoLlVqNeWIK3iE"
 
-	var testCases []rsaSSAPSSTestCase
-	publicKey2048 := &rsa.PublicKey{
-		N: new(big.Int).SetBytes(base64Decode(t, n2048Base64)),
+	publicKey4096 := &rsa.PublicKey{
+		N: new(big.Int).SetBytes(base64Decode(t, n4096Base64)),
 		E: 65537,
 	}
-	privateKey2048 := &rsa.PrivateKey{
-		PublicKey: *publicKey2048,
-		D:         new(big.Int).SetBytes(base64Decode(t, d2048Base64)),
+	privateKey4096 := &rsa.PrivateKey{
+		PublicKey: *publicKey4096,
+		D:         new(big.Int).SetBytes(base64Decode(t, d4096Base64)),
 		Primes: []*big.Int{
-			new(big.Int).SetBytes(base64Decode(t, p2048Base64)),
-			new(big.Int).SetBytes(base64Decode(t, q2048Base64)),
+			new(big.Int).SetBytes(base64Decode(t, p4096Base64)),
+			new(big.Int).SetBytes(base64Decode(t, q4096Base64)),
 		},
 	}
-	privateKey2048.Precompute()
+	privateKey4096.Precompute()
+
+	return publicKey4096, privateKey4096
+}
+
+func mustCreateRSASSAPSSTestCases(t *testing.T) []rsaSSAPSSTestCase {
+	t.Helper()
+	// Test vectors from
+	// https://github.com/tink-crypto/tink-java/tree/v1.15.0/src/main/java/com/google/crypto/tink/signature/internal/testing/RsaSsaPssTestUtil.java#L35.
+	// Only test vectors with no prefix are used.
+
+	publicKey2048, privateKey2048 := mustCreateRsa2048KeyPair(t)
+	publicKey4096, privateKey4096 := mustCreateRsa4096KeyPair(t)
+
+	var testCases []rsaSSAPSSTestCase
 
 	// Test vector 0.
 	testCases = append(testCases, rsaSSAPSSTestCase{
@@ -188,19 +215,6 @@ func rsaSSAPSSTestCases(t *testing.T) []rsaSSAPSSTestCase {
 			"aa471a190c7f40e26c85440fc8"),
 		message: hexDecode(t, "aa"),
 	})
-	publicKey4096 := &rsa.PublicKey{
-		N: new(big.Int).SetBytes(base64Decode(t, n4096Base64)),
-		E: 65537,
-	}
-	privateKey4096 := &rsa.PrivateKey{
-		PublicKey: *publicKey4096,
-		D:         new(big.Int).SetBytes(base64Decode(t, d4096Base64)),
-		Primes: []*big.Int{
-			new(big.Int).SetBytes(base64Decode(t, p4096Base64)),
-			new(big.Int).SetBytes(base64Decode(t, q4096Base64)),
-		},
-	}
-	privateKey4096.Precompute()
 	// Test vector 6.
 	testCases = append(testCases, rsaSSAPSSTestCase{
 		name:       fmt.Sprintf("4096-SHA256-salt32"),
@@ -259,7 +273,7 @@ func rsaSSAPSSTestCases(t *testing.T) []rsaSSAPSSTestCase {
 }
 
 func TestRSASSAPSSVerifyCorrectness(t *testing.T) {
-	for _, tc := range rsaSSAPSSTestCases(t) {
+	for _, tc := range mustCreateRSASSAPSSTestCases(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			verifier, err := signature.New_RSA_SSA_PSS_Verifier(tc.hash, tc.saltLength, tc.publicKey)
 			if err != nil {
@@ -273,7 +287,7 @@ func TestRSASSAPSSVerifyCorrectness(t *testing.T) {
 }
 
 func TestRSASSAPSSVerifyFails(t *testing.T) {
-	for _, tc := range rsaSSAPSSTestCases(t) {
+	for _, tc := range mustCreateRSASSAPSSTestCases(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			verifier, err := signature.New_RSA_SSA_PSS_Verifier(tc.hash, tc.saltLength, tc.publicKey)
 			if err != nil {
