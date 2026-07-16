@@ -859,9 +859,9 @@ func TestKeysetInfo(t *testing.T) {
 
 // RSA-SSA-PSS keys with salt length is 0 are different in tink-go than in other Tink
 // implementations. For backwards compatibility, we continue to allow these keys in
-// tink-go, but we don't want to allow them to be serialized anymore. This test makes sure
-// that KeysetInfo() works with these special keys.
-func TestKeysetInfo_withRSAPSSAndSaltLengthZero_works(t *testing.T) {
+// tink-go, but we don't want to allow them to be serialized anymore. This also means
+// that you cannot use KeysetInfo() with these keys.
+func TestKeysetInfo_withRSAPSSAndSaltLengthZero_panics(t *testing.T) {
 	n2048Base64 := "s1EKK81M5kTFtZSuUFnhKy8FS2WNXaWVmi_fGHG4CLw98-Yo0nkuUarVwSS0O9pFPcpc3kvPKOe9Tv-6DLS3Qru21aATy2PRqjqJ4CYn71OYtSwM_ZfSCKvrjXybzgu-sBmobdtYm-sppbdL-GEHXGd8gdQw8DDCZSR6-dPJFAzLZTCdB-Ctwe_RXPF-ewVdfaOGjkZIzDoYDw7n-OHnsYCYozkbTOcWHpjVevipR-IBpGPi1rvKgFnlcG6d_tj0hWRl_6cS7RqhjoiNEtxqoJzpXs_Kg8xbCxXbCchkf11STA8udiCjQWuWI8rcDwl69XMmHJjIQAqhKvOOQ8rYTQ"
 	n2048, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(n2048Base64)
 	if err != nil {
@@ -895,22 +895,11 @@ func TestKeysetInfo_withRSAPSSAndSaltLengthZero_works(t *testing.T) {
 		t.Fatalf("km.Handle() err = %v, want nil", err)
 	}
 
-	gotInfo := handle.KeysetInfo()
+	defer func() { recover() }()
 
-	wantInfo := &tinkpb.KeysetInfo{
-		PrimaryKeyId: 1234,
-		KeyInfo: []*tinkpb.KeysetInfo_KeyInfo{
-			&tinkpb.KeysetInfo_KeyInfo{
-				KeyId:            1234,
-				Status:           tinkpb.KeyStatusType_ENABLED,
-				TypeUrl:          "type.googleapis.com/google.crypto.tink.RsaSsaPssPublicKey",
-				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
-			},
-		},
-	}
-	if diff := cmp.Diff(wantInfo, gotInfo, protocmp.Transform()); diff != "" {
-		t.Errorf("handle.KeysetInfo() returned unexpected diff (-want +got):\n%s", diff)
-	}
+	_ = handle.KeysetInfo()
+
+	t.Errorf("handle.KeysetInfo() did not panic")
 }
 
 func TestPrimitivesWithRegistry(t *testing.T) {

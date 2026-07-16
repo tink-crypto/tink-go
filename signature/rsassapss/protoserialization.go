@@ -85,6 +85,9 @@ func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.Key
 	if rsaSsaPssPublicKey.parameters == nil {
 		return nil, fmt.Errorf("invalid key")
 	}
+	if rsaSsaPssPublicKey.parameters.SaltLengthBytes() == 0 {
+		return nil, fmt.Errorf("salt length zero cannot be serialized")
+	}
 	outputPrefixType, err := protoOutputPrefixTypeFromVariant(rsaSsaPssPublicKey.parameters.Variant())
 	if err != nil {
 		return nil, err
@@ -197,6 +200,9 @@ func (s *publicKeyParser) ParseKey(keySerialization *protoserialization.KeySeria
 	signHash := protoKey.GetParams().GetSigHash()
 	mgf1Hash := protoKey.GetParams().GetMgf1Hash()
 	saltLength := int(protoKey.GetParams().GetSaltLength())
+	if saltLength == 0 {
+		return nil, fmt.Errorf("salt length zero cannot be parsed")
+	}
 	params, err := parseParameters(signHash, mgf1Hash, keySerialization.OutputPrefixType(), modulus.BitLen(), exponent, saltLength)
 	if err != nil {
 		return nil, err
@@ -248,12 +254,16 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 	// Tolerate leading zeros in modulus encoding.
 	modulus := new(big.Int).SetBytes(protoPublicKey.GetN())
 	exponent := new(big.Int).SetBytes(protoPublicKey.GetE())
+	saltLength := int(protoPublicKey.GetParams().GetSaltLength())
+	if saltLength == 0 {
+		return nil, fmt.Errorf("salt length zero cannot be parsed")
+	}
 	params, err := NewParameters(ParametersValues{
 		ModulusSizeBits: modulus.BitLen(),
 		SigHashType:     sigHashType,
 		MGF1HashType:    mgf1HashType,
 		PublicExponent:  int(exponent.Int64()),
-		SaltLengthBytes: int(protoPublicKey.GetParams().GetSaltLength()),
+		SaltLengthBytes: saltLength,
 	}, variant)
 	if err != nil {
 		return nil, err
@@ -303,6 +313,9 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 		return nil, fmt.Errorf("invalid key: public key is nil")
 	}
 	params := rsaSsaPssPrivateKey.publicKey.parameters
+	if params.SaltLengthBytes() == 0 {
+		return nil, fmt.Errorf("salt length zero cannot be serialized")
+	}
 	outputPrefixType, err := protoOutputPrefixTypeFromVariant(params.Variant())
 	if err != nil {
 		return nil, err
