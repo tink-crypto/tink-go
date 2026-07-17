@@ -239,7 +239,7 @@ func TestAESGCMHKDFModifiedCiphertext(t *testing.T) {
 	}
 
 	t.Run("truncate ciphertext", func(t *testing.T) {
-		for i := 0; i < len(ct); i += 8 {
+		for i := 0; i < len(ct); i++ {
 			if err := decrypt(cipher, aad, pt, ct[:i], chunkSize); err == nil {
 				t.Errorf("expected error")
 			}
