@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package jwtmldsa defines JWT ML-DSA keys and parameters.
 package jwtmldsa
 
 import (
