@@ -36,6 +36,9 @@ func mustCreateConfigV0() config.Config {
 	if err := jwt.RegisterJWTRSASSAPSSPrimitiveConstructor(builder, internalapi.Token{}); err != nil {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register JWT RSA SSA PSS: %v", err))
 	}
+	if err := jwt.RegisterJWTMLDSAPrimitiveConstructor(builder, internalapi.Token{}); err != nil {
+		panic(fmt.Sprintf("mustCreateConfigV0() failed to register JWT ML-DSA: %v", err))
+	}
 	return builder.Build()
 }
 
