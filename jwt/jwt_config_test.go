@@ -23,9 +23,11 @@ import (
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/signature/mldsa"
 	"github.com/tink-crypto/tink-go/v2/jwt"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwthmac"
+	"github.com/tink-crypto/tink-go/v2/jwt/jwtmldsa"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -168,6 +170,7 @@ func TestRegisterJWTECDSAPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("NewRawJWT() = %v, want nil", err)
 	}
 	signedJWT, err := signer.SignAndEncode(rawJWT)
+	t.Logf("SIGNED JWT = %s", signedJWT)
 	if err != nil {
 		t.Fatalf("signer.SignAndEncode() = %v, want nil", err)
 	}
@@ -285,6 +288,7 @@ func TestRegisterJWTRSASSAPKCS1PrimitiveConstructor(t *testing.T) {
 		t.Fatalf("NewRawJWT() = %v, want nil", err)
 	}
 	signedJWT, err := signer.SignAndEncode(rawJWT)
+	t.Logf("SIGNED JWT = %s", signedJWT)
 	if err != nil {
 		t.Fatalf("signer.SignAndEncode() = %v, want nil", err)
 	}
@@ -396,6 +400,7 @@ func TestRegisterJWTRSASSAPSSPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("NewRawJWT() = %v, want nil", err)
 	}
 	signedJWT, err := signer.SignAndEncode(rawJWT)
+	t.Logf("SIGNED JWT = %s", signedJWT)
 	if err != nil {
 		t.Fatalf("signer.SignAndEncode() = %v, want nil", err)
 	}
@@ -407,6 +412,88 @@ func TestRegisterJWTRSASSAPSSPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("NewValidator() = %v, want nil", err)
 	}
 	if _, err := verifier.VerifyAndDecode(signedJWT, validator2); err != nil {
+		t.Errorf("verifier.VerifyAndDecode() = %v, want nil", err)
+	}
+}
+
+func TestRegisterJWTMLDSAPrimitiveConstructor(t *testing.T) {
+	params, err := jwtmldsa.NewParameters(jwtmldsa.IgnoredKID, jwtmldsa.MLDSA44)
+	if err != nil {
+		t.Fatalf("jwtmldsa.NewParameters() err = %v, want nil", err)
+	}
+	seedBytes := mustHexDecode(t, "dddaccfaa05b0332b3fd7269c7d42de6cbe370735431f735346ccb6be7ad3174")
+	var seed [32]byte
+	copy(seed[:], seedBytes)
+	pubKeyMLDSA, _ := mldsa.MLDSA44.KeyGenFromSeed(seed)
+
+	publicKey, err := jwtmldsa.NewPublicKey(jwtmldsa.PublicKeyOpts{
+		Parameters:    params,
+		KeyBytes:      pubKeyMLDSA.Encode(),
+		IDRequirement: 0,
+	})
+	if err != nil {
+		t.Fatalf("jwtmldsa.NewPublicKey() err = %v, want nil", err)
+	}
+	privateKey, err := jwtmldsa.NewPrivateKeyFromPublicKey(secretdata.NewBytesFromData(seedBytes, insecuresecretdataaccess.Token{}), publicKey)
+	if err != nil {
+		t.Fatalf("jwtmldsa.NewPrivateKeyFromPublicKey() err = %v, want nil", err)
+	}
+
+	b := config.NewBuilder()
+	configWithoutJWTMLDSA := b.Build()
+
+	// Should fail because jwt.RegisterJWTMLDSAPrimitiveConstructor() was not called.
+	if _, err := configWithoutJWTMLDSA.PrimitiveFromKey(publicKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutJWTMLDSA.PrimitiveFromKey(publicKey) err = nil, want error")
+	}
+	if _, err := configWithoutJWTMLDSA.PrimitiveFromKey(privateKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutJWTMLDSA.PrimitiveFromKey(privateKey) err = nil, want error")
+	}
+
+	// Register jwt.RegisterJWTMLDSAPrimitiveConstructor() and check that it now works.
+	if err := jwt.RegisterJWTMLDSAPrimitiveConstructor(b, internalapi.Token{}); err != nil {
+		t.Fatalf("jwt.RegisterJWTMLDSAPrimitiveConstructor() err = %v, want nil", err)
+	}
+	configWithJWTMLDSA := b.Build()
+	p1, err := configWithJWTMLDSA.PrimitiveFromKey(privateKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf(" configWithJWTMLDSA.PrimitiveFromKey() err = %v, want nil", err)
+	}
+	signer, ok := p1.(jwt.Signer)
+	if !ok {
+		t.Fatalf("p was of type %v, want jwt.Signer", reflect.TypeOf(p1))
+	}
+	p2, err := configWithJWTMLDSA.PrimitiveFromKey(publicKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf(" configWithJWTMLDSA.PrimitiveFromKey() err = %v, want nil", err)
+	}
+	verifier, ok := p2.(jwt.Verifier)
+	if !ok {
+		t.Fatalf("p was of type %v, want jwt.Verifier", reflect.TypeOf(p2))
+	}
+	iss := "joe"
+
+	// Sign and verify
+	rawJWT, err := jwt.NewRawJWT(&jwt.RawJWTOptions{
+		Issuer:            &iss,
+		WithoutExpiration: true,
+	})
+	if err != nil {
+		t.Fatalf("NewRawJWT() = %v, want nil", err)
+	}
+	signedJWT, err := signer.SignAndEncode(rawJWT)
+	t.Logf("SIGNED JWT = %s", signedJWT)
+	if err != nil {
+		t.Fatalf("signer.SignAndEncode() = %v, want nil", err)
+	}
+	validator, err := jwt.NewValidator(&jwt.ValidatorOpts{
+		ExpectedIssuer:         &iss,
+		AllowMissingExpiration: true,
+	})
+	if err != nil {
+		t.Fatalf("NewValidator() = %v, want nil", err)
+	}
+	if _, err := verifier.VerifyAndDecode(signedJWT, validator); err != nil {
 		t.Errorf("verifier.VerifyAndDecode() = %v, want nil", err)
 	}
 }

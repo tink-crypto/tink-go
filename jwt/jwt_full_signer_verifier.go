@@ -19,10 +19,12 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"
+	"github.com/tink-crypto/tink-go/v2/jwt/jwtmldsa"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
+	"github.com/tink-crypto/tink-go/v2/signature/mldsa"
 	"github.com/tink-crypto/tink-go/v2/signature/rsassapkcs1"
 	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
 	"github.com/tink-crypto/tink-go/v2/tink"
@@ -234,6 +236,53 @@ func createJWTRSASSAPSSSigner(key key.Key) (any, error) {
 	return newFullSigner(jwtParams.HasIDRequirement(), jwtParams.KIDStrategy() == jwtrsassapss.CustomKID, kid, jwtParams.Algorithm().String(), rsaSSAPSSSigner)
 }
 
+func mldsaInstanceFromJWTAlgorithm(algorithm jwtmldsa.Algorithm) (mldsa.Instance, error) {
+	switch algorithm {
+	case jwtmldsa.MLDSA44:
+		return mldsa.MLDSA44, nil
+	case jwtmldsa.MLDSA65:
+		return mldsa.MLDSA65, nil
+	case jwtmldsa.MLDSA87:
+		return mldsa.MLDSA87, nil
+	default:
+		return mldsa.UnknownInstance, fmt.Errorf("unsupported algorithm: %s", algorithm)
+	}
+}
+
+func createJWTMLDSASigner(k key.Key) (any, error) {
+	privateKey, ok := k.(*jwtmldsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("expected %T, got %T", (*jwtmldsa.PrivateKey)(nil), k)
+	}
+	publicKey, err := privateKey.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	jwtPublicKey := publicKey.(*jwtmldsa.PublicKey)
+	jwtParams := privateKey.Parameters().(*jwtmldsa.Parameters)
+
+	instance, err := mldsaInstanceFromJWTAlgorithm(jwtParams.Algorithm())
+	if err != nil {
+		return nil, err
+	}
+
+	mldsaParams, err := mldsa.NewParameters(instance, mldsa.VariantNoPrefix)
+	if err != nil {
+		return nil, err
+	}
+	mldsaPrivateKey, err := mldsa.NewPrivateKey(privateKey.PrivateKeyValue(), 0, mldsaParams)
+	if err != nil {
+		return nil, err
+	}
+	mldsaSigner, err := mldsa.NewSigner(mldsaPrivateKey, internalapi.Token{})
+	if err != nil {
+		return nil, err
+	}
+
+	kid, _ := jwtPublicKey.KID()
+	return newFullSigner(jwtParams.HasIDRequirement(), jwtParams.KIDStrategy() == jwtmldsa.CustomKID, kid, jwtParams.Algorithm().String(), mldsaSigner)
+}
+
 // Implementation of the [Verifier] interface as a full primitive.
 //
 // A full primitive is bound to a specific key ID.
@@ -367,4 +416,33 @@ func createJWTRSASSAPSSVerifier(key key.Key) (any, error) {
 
 	kid, _ := jwtPublicKey.KID()
 	return newFullVerifier(jwtParams.HasIDRequirement(), jwtParams.KIDStrategy() == jwtrsassapss.CustomKID, kid, jwtParams.Algorithm().String(), rsaSSAPSSVerifier)
+}
+
+func createJWTMLDSAVerifier(k key.Key) (any, error) {
+	jwtPublicKey, ok := k.(*jwtmldsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("expected %T, got %T", (*jwtmldsa.PublicKey)(nil), k)
+	}
+	jwtParams := jwtPublicKey.Parameters().(*jwtmldsa.Parameters)
+
+	instance, err := mldsaInstanceFromJWTAlgorithm(jwtParams.Algorithm())
+	if err != nil {
+		return nil, err
+	}
+
+	mldsaParams, err := mldsa.NewParameters(instance, mldsa.VariantNoPrefix)
+	if err != nil {
+		return nil, err
+	}
+	mldsaPublicKey, err := mldsa.NewPublicKey(jwtPublicKey.KeyBytes(), 0, mldsaParams)
+	if err != nil {
+		return nil, err
+	}
+	mldsaVerifier, err := mldsa.NewVerifier(mldsaPublicKey, internalapi.Token{})
+	if err != nil {
+		return nil, err
+	}
+
+	kid, _ := jwtPublicKey.KID()
+	return newFullVerifier(jwtParams.HasIDRequirement(), jwtParams.KIDStrategy() == jwtmldsa.CustomKID, kid, jwtParams.Algorithm().String(), mldsaVerifier)
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtecdsa"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwthmac"
+	"github.com/tink-crypto/tink-go/v2/jwt/jwtmldsa"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapkcs1"
 	"github.com/tink-crypto/tink-go/v2/jwt/jwtrsassapss"
 )
@@ -60,4 +61,14 @@ func RegisterJWTRSASSAPSSPrimitiveConstructor(c *config.Builder, t internalapi.T
 		return err
 	}
 	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*jwtrsassapss.PrivateKey](), createJWTRSASSAPSSSigner, t)
+}
+
+// RegisterJWTMLDSAPrimitiveConstructor registers the JWT Signature primitive constructors
+// to the provided config.
+// It is not part of Tink's public API.
+func RegisterJWTMLDSAPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
+	if err := c.RegisterPrimitiveConstructor(reflect.TypeFor[*jwtmldsa.PublicKey](), createJWTMLDSAVerifier, t); err != nil {
+		return err
+	}
+	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*jwtmldsa.PrivateKey](), createJWTMLDSASigner, t)
 }
