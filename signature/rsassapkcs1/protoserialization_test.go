@@ -21,15 +21,15 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
-	"github.com/tink-crypto/tink-go/v2/secretdata"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	rsassapkcs1pb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pkcs1_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 const (
@@ -166,6 +166,21 @@ func TestParsePublicKeyFails(t *testing.T) {
 					N:       mustDecodeBase64(t, n2048Base64),
 					E:       new(big.Int).Sub(new(big.Int).SetUint64(uint64(f4)), big.NewInt(1)).Bytes(),
 					Version: publicKeyProtoVersion + 1,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+		},
+		{
+			name: "public exponent too large to fit in int64",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: verifierTypeURL,
+				Value: mustMarshalProto(t, &rsassapkcs1pb.RsaSsaPkcs1PublicKey{
+					Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+						HashType: commonpb.HashType_SHA256,
+					},
+					N:       mustDecodeBase64(t, n2048Base64),
+					E:       new(big.Int).Lsh(big.NewInt(1), 64).Bytes(),
+					Version: publicKeyProtoVersion,
 				}),
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_TINK, 123),
@@ -537,6 +552,10 @@ func TestParsePrivateKeyFails(t *testing.T) {
 	}
 	serializedPrivateKeyWithWrongPublicKeyBytes := mustMarshalProto(t, privateKeyWithWrongPublicKey)
 
+	privateKeyWithLargeExponent := proto.Clone(privateKey).(*rsassapkcs1pb.RsaSsaPkcs1PrivateKey)
+	privateKeyWithLargeExponent.PublicKey.E = new(big.Int).Lsh(big.NewInt(1), 64).Bytes()
+	serializedPrivateKeyWithLargeExponent := mustMarshalProto(t, privateKeyWithLargeExponent)
+
 	// From https://github.com/C2SP/wycheproof/blob/cd27d6419bedd83cbd24611ec54b6d4bfdb0cdca/testvectors/rsa_pkcs1_2048_test.json#L348.
 	invalidDp := "PGEOZW9DtcYO0D3S4T0NwSICkvg7_RWlbW_-O5GZjbLgiqkelWeRFcdcP7_St5VDouNKsCS7F0lRRlQyZ91tpCF3TBuOj9tCmHfme3xbZYCnRUplwniDErBQOLCRzW2EanRrsTk5wfjNTCa24C-ONAoum42GFTnaZQbHXLy90VE"
 	invalidDq := "qy_pDD2wmbqstiLK09V9Gb_BAWbZRIilYHIbBr8PtZmiaIJc9bZcdaaCCW1cYg4OevITF7nfyDAlE--acEqfDvzC-kd775MeNh2w5VzQ6SOZiKneGD7Ko98jFaUyF7mG-6RDS6Cs9DfmJGZ4rtsrt2ivYjQ-pujTPux9TYSOeAE"
@@ -549,6 +568,14 @@ func TestParsePrivateKeyFails(t *testing.T) {
 		{
 			name:             "key data is nil",
 			keySerialization: mustCreateKeySerialization(t, nil, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "public exponent too large to fit in int64",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey",
+				Value:           serializedPrivateKeyWithLargeExponent,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
 		},
 		{
 			name: "wrong type URL",

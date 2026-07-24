@@ -18,15 +18,15 @@ import (
 	"fmt"
 	"math/big"
 
-	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/signature"
 	"github.com/tink-crypto/tink-go/v2/key"
-	"github.com/tink-crypto/tink-go/v2/secretdata"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	rsassapkcs1pb "github.com/tink-crypto/tink-go/v2/proto/rsa_ssa_pkcs1_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/secretdata"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -157,6 +157,9 @@ func parseParameters(protoHashType commonpb.HashType, outputPrefixType tinkpb.Ou
 		return nil, err
 	}
 	// Tolerate leading zeros in modulus encoding.
+	if !exponent.IsInt64() {
+		return nil, fmt.Errorf("public exponent cannot be represented as int64")
+	}
 	return NewParameters(modulusSizeBits, hashType, int(exponent.Int64()), variant)
 }
 
@@ -225,6 +228,9 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 	// Tolerate leading zeros in modulus encoding.
 	modulus := new(big.Int).SetBytes(protoPublicKey.GetN())
 	exponent := new(big.Int).SetBytes(protoPublicKey.GetE())
+	if !exponent.IsInt64() {
+		return nil, fmt.Errorf("public exponent cannot be represented as int64")
+	}
 	params, err := NewParameters(modulus.BitLen(), hashType, int(exponent.Int64()), variant)
 	if err != nil {
 		return nil, err
