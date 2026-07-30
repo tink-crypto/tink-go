@@ -1579,3 +1579,51 @@ func TestWriteGeneratesNoKeyExport(t *testing.T) {
 		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
 	}
 }
+
+// Tink allows keysets in which key IDs are repeated. When a repeated ID is also
+// the primary key ID, several entries report IsPrimary, and only an enabled one
+// may be selected: otherwise a disabled or destroyed key would be used to sign
+// and encrypt new data.
+func TestNewHandleWithDuplicatePrimaryKeyIDSelectsEnabledKey(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status tinkpb.KeyStatusType
+	}{
+		{name: "disabled duplicate", status: tinkpb.KeyStatusType_DISABLED},
+		{name: "destroyed duplicate", status: tinkpb.KeyStatusType_DESTROYED},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Both keys have ID 1, which is also the primary key ID. The
+			// enabled key comes first so that the non-enabled duplicate is the
+			// last entry reporting IsPrimary.
+			ks := &tinkpb.Keyset{
+				PrimaryKeyId: 1,
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_ENABLED,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tc.status,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+				},
+			}
+			handle, err := testkeyset.NewHandle(ks)
+			if err != nil {
+				t.Fatalf("testkeyset.NewHandle(ks) err = %v, want nil", err)
+			}
+			primary, err := handle.Primary()
+			if err != nil {
+				t.Fatalf("handle.Primary() err = %v, want nil", err)
+			}
+			if got, want := primary.KeyStatus(), keyset.Enabled; got != want {
+				t.Errorf("handle.Primary().KeyStatus() = %v, want %v", got, want)
+			}
+		})
+	}
+}

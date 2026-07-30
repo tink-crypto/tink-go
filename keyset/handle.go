@@ -216,7 +216,11 @@ func setEntryMonitoringIfNeeded(h *Handle) error {
 func newFromEntries(entries []*Entry, opts ...Option) (*Handle, error) {
 	var primaryKeyEntry *Entry = nil
 	for _, entry := range entries {
-		if entry.IsPrimary() {
+		// A keyset may contain more than one entry whose key ID equals the
+		// primary key ID, so more than one entry here can report IsPrimary.
+		// Only an enabled key may become the primary: otherwise a disabled or
+		// destroyed key could end up being used to sign or encrypt new data.
+		if entry.IsPrimary() && entry.KeyStatus() == Enabled {
 			primaryKeyEntry = entry
 		}
 		if entry.KeyStatus() == Unknown {
