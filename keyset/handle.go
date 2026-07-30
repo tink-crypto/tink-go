@@ -217,12 +217,6 @@ func newFromEntries(entries []*Entry, opts ...Option) (*Handle, error) {
 	var primaryKeyEntry *Entry = nil
 	for _, entry := range entries {
 		if entry.IsPrimary() {
-			// Callers other than keysetToEntries construct entries directly, so
-			// fail closed rather than let a non-enabled key be used to sign or
-			// encrypt new data.
-			if entry.KeyStatus() != Enabled {
-				return nil, fmt.Errorf("keyset.Handle: primary key must be enabled")
-			}
 			primaryKeyEntry = entry
 		}
 		if entry.KeyStatus() == Unknown {
