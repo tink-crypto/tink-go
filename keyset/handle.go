@@ -216,11 +216,13 @@ func setEntryMonitoringIfNeeded(h *Handle) error {
 func newFromEntries(entries []*Entry, opts ...Option) (*Handle, error) {
 	var primaryKeyEntry *Entry = nil
 	for _, entry := range entries {
-		// A keyset may contain more than one entry whose key ID equals the
-		// primary key ID, so more than one entry here can report IsPrimary.
-		// Only an enabled key may become the primary: otherwise a disabled or
-		// destroyed key could end up being used to sign or encrypt new data.
-		if entry.IsPrimary() && entry.KeyStatus() == Enabled {
+		if entry.IsPrimary() {
+			// Callers other than keysetToEntries construct entries directly, so
+			// fail closed rather than let a non-enabled key be used to sign or
+			// encrypt new data.
+			if entry.KeyStatus() != Enabled {
+				return nil, fmt.Errorf("keyset.Handle: primary key must be enabled")
+			}
 			primaryKeyEntry = entry
 		}
 		if entry.KeyStatus() == Unknown {
@@ -278,7 +280,12 @@ func keysetToEntries(ks *tinkpb.Keyset) ([]*Entry, error) {
 		if err != nil {
 			return nil, err
 		}
-		entries[i] = newUnmonitoredEntry(key, protoKey.GetKeyId() == ks.GetPrimaryKeyId(), protoKey.GetKeyId(), keyStatus)
+		// A key is the primary only if it is both designated by primary_key_id
+		// and enabled. Keysets may repeat key IDs, so without the status check
+		// a disabled or destroyed duplicate of the primary would also be
+		// marked primary.
+		isPrimary := protoKey.GetKeyId() == ks.GetPrimaryKeyId() && keyStatus == Enabled
+		entries[i] = newUnmonitoredEntry(key, isPrimary, protoKey.GetKeyId(), keyStatus)
 	}
 	return entries, nil
 }
