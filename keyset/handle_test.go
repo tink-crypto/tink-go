@@ -1613,6 +1613,8 @@ func TestNewHandleWithDuplicatePrimaryKeyIDSelectsEnabledKey(t *testing.T) {
 					},
 				},
 			}
+			// testkeyset.NewHandle eventually calls keysetToEntries, which is
+			// where isPrimary is assigned from the key ID and the status.
 			handle, err := testkeyset.NewHandle(ks)
 			if err != nil {
 				t.Fatalf("testkeyset.NewHandle(ks) err = %v, want nil", err)
@@ -1623,6 +1625,22 @@ func TestNewHandleWithDuplicatePrimaryKeyIDSelectsEnabledKey(t *testing.T) {
 			}
 			if got, want := primary.KeyStatus(), keyset.Enabled; got != want {
 				t.Errorf("handle.Primary().KeyStatus() = %v, want %v", got, want)
+			}
+			// The non-enabled duplicate shares the primary key ID, so it must
+			// not report itself as primary either.
+			if handle.Len() != 2 {
+				t.Fatalf("handle.Len() = %d, want 2", handle.Len())
+			}
+			for i := 0; i < handle.Len(); i++ {
+				entry, err := handle.Entry(i)
+				if err != nil {
+					t.Fatalf("handle.Entry(%d) err = %v, want nil", i, err)
+				}
+				want := entry.KeyStatus() == keyset.Enabled
+				if got := entry.IsPrimary(); got != want {
+					t.Errorf("handle.Entry(%d).IsPrimary() = %v, want %v (status %v)",
+						i, got, want, entry.KeyStatus())
+				}
 			}
 		})
 	}
