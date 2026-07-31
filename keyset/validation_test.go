@@ -57,6 +57,14 @@ func TestValidate(t *testing.T) {
 	if err = keyset.Validate(testutil.NewKeyset(2, keys)); err == nil {
 		t.Errorf("expect an error when primary key is disabled")
 	}
+	// primary key is not KeyStatusType_ENABLED.
+	keys = []*tinkpb.Keyset_Key{
+		testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+		testutil.NewDummyKey(2, tinkpb.KeyStatusType_DESTROYED, tinkpb.OutputPrefixType_LEGACY),
+	}
+	if err = keyset.Validate(testutil.NewKeyset(2, keys)); err == nil {
+		t.Errorf("expect an error when primary key is not KeyStatusType_ENABLED")
+	}
 	// multiple primary keys
 	keys = []*tinkpb.Keyset_Key{
 		testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
@@ -64,6 +72,15 @@ func TestValidate(t *testing.T) {
 	}
 	if err = keyset.Validate(testutil.NewKeyset(1, keys)); err == nil {
 		t.Errorf("expect an error when there are multiple primary keys")
+	}
+	// duplicate key IDs
+	keys = []*tinkpb.Keyset_Key{
+		testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+		testutil.NewDummyKey(2, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+		testutil.NewDummyKey(2, tinkpb.KeyStatusType_DISABLED, tinkpb.OutputPrefixType_TINK),
+	}
+	if err = keyset.Validate(testutil.NewKeyset(1, keys)); err == nil {
+		t.Errorf("expect an error when there are duplicate key IDs")
 	}
 	// invalid keys
 	invalidKeys := generateInvalidKeys()
@@ -73,7 +90,7 @@ func TestValidate(t *testing.T) {
 			t.Errorf("expect an error when validate invalid key %d", i)
 		}
 	}
-	//no primary keys
+	// no primary keys
 	keys = []*tinkpb.Keyset_Key{
 		testutil.NewDummyKey(1, tinkpb.KeyStatusType_DISABLED, tinkpb.OutputPrefixType_TINK),
 		testutil.NewDummyKey(1, tinkpb.KeyStatusType_DISABLED, tinkpb.OutputPrefixType_LEGACY),

@@ -31,6 +31,15 @@ func ValidateKeyVersion(version, maxExpected uint32) error {
 }
 
 // Validate validates the given key set.
+//
+// The keyset is valid if all of the following are true:
+// - The keyset is not nil.
+// - The keyset has at least one key.
+// - The keyset does not contain duplicate key IDs.
+// - The keyset does not contain a non-ENABLED primary key.
+// - The keyset does not contain multiple primary keys.
+// - The keyset does not contain any invalid keys.
+//
 // Returns nil if it is valid; an error otherwise.
 func Validate(keyset *tinkpb.Keyset) error {
 	if keyset == nil {
@@ -39,6 +48,8 @@ func Validate(keyset *tinkpb.Keyset) error {
 	if len(keyset.Key) == 0 {
 		return fmt.Errorf("empty keyset")
 	}
+	// Check for duplicate key IDs.
+	keyIDs := make(map[uint32]bool)
 	primaryKeyID := keyset.PrimaryKeyId
 	hasPrimaryKey := false
 	numEnabledKeys := 0
@@ -46,6 +57,13 @@ func Validate(keyset *tinkpb.Keyset) error {
 		if err := validateKey(key); err != nil {
 			return err
 		}
+		if keyIDs[key.KeyId] {
+			return fmt.Errorf("keyset contains duplicate key ID %d", key.KeyId)
+		}
+		if key.Status != tinkpb.KeyStatusType_ENABLED && key.GetKeyId() == primaryKeyID {
+			return fmt.Errorf("keyset contains a non-ENABLED primary key")
+		}
+		keyIDs[key.KeyId] = true
 		if key.Status != tinkpb.KeyStatusType_ENABLED {
 			continue
 		}

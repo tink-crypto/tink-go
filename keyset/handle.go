@@ -274,10 +274,9 @@ func keysetToEntries(ks *tinkpb.Keyset) ([]*Entry, error) {
 		if err != nil {
 			return nil, err
 		}
-		// A key is the primary only if it is both designated by primary_key_id
-		// and enabled.
-		// TODO(ambrosin): Reject keysets with duplicate key IDs.
-		isPrimary := protoKey.GetKeyId() == ks.GetPrimaryKeyId() && keyStatus == Enabled
+		// Safe to only check the key ID because we reject non-ENABLED primary keys
+		// in Validate.
+		isPrimary := protoKey.GetKeyId() == ks.GetPrimaryKeyId()
 		entries[i] = newUnmonitoredEntry(key, isPrimary, protoKey.GetKeyId(), keyStatus)
 	}
 	return entries, nil
