@@ -1579,3 +1579,65 @@ func TestWriteGeneratesNoKeyExport(t *testing.T) {
 		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
 	}
 }
+
+func TestNewHandleWithDuplicatePrimaryKeyIDSelectsEnabledKey(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status tinkpb.KeyStatusType
+	}{
+		{name: "disabled duplicate", status: tinkpb.KeyStatusType_DISABLED},
+		{name: "destroyed duplicate", status: tinkpb.KeyStatusType_DESTROYED},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Both keys have ID 1, which is also the primary key ID. The
+			// enabled key comes first so that the non-enabled duplicate is the
+			// last entry reporting IsPrimary.
+			ks := &tinkpb.Keyset{
+				PrimaryKeyId: 1,
+				Key: []*tinkpb.Keyset_Key{
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tinkpb.KeyStatusType_ENABLED,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+					&tinkpb.Keyset_Key{
+						KeyId:            1,
+						Status:           tc.status,
+						OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+						KeyData:          testutil.NewKeyData("some type url", []byte{0}, tinkpb.KeyData_SYMMETRIC),
+					},
+				},
+			}
+			// testkeyset.NewHandle eventually calls keysetToEntries, which is
+			// where isPrimary is assigned from the key ID and the status.
+			handle, err := testkeyset.NewHandle(ks)
+			if err != nil {
+				t.Fatalf("testkeyset.NewHandle(ks) err = %v, want nil", err)
+			}
+			primary, err := handle.Primary()
+			if err != nil {
+				t.Fatalf("handle.Primary() err = %v, want nil", err)
+			}
+			if got, want := primary.KeyStatus(), keyset.Enabled; got != want {
+				t.Errorf("handle.Primary().KeyStatus() = %v, want %v", got, want)
+			}
+			// The non-enabled duplicate shares the primary key ID, so it must
+			// not report itself as primary either.
+			if handle.Len() != 2 {
+				t.Fatalf("handle.Len() = %d, want 2", handle.Len())
+			}
+			for i := 0; i < handle.Len(); i++ {
+				entry, err := handle.Entry(i)
+				if err != nil {
+					t.Fatalf("handle.Entry(%d) err = %v, want nil", i, err)
+				}
+				want := entry.KeyStatus() == keyset.Enabled
+				if got := entry.IsPrimary(); got != want {
+					t.Errorf("handle.Entry(%d).IsPrimary() = %v, want %v (status %v)",
+						i, got, want, entry.KeyStatus())
+				}
+			}
+		})
+	}
+}
