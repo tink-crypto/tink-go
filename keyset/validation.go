@@ -42,7 +42,13 @@ func Validate(keyset *tinkpb.Keyset) error {
 	primaryKeyID := keyset.PrimaryKeyId
 	hasPrimaryKey := false
 	numEnabledKeys := 0
+	seenKeyIDs := make(map[uint32]struct{})
 	for _, key := range keyset.Key {
+		if _, exists := seenKeyIDs[key.KeyId]; exists {
+			return fmt.Errorf("keyset contains duplicate key_id: %d", key.KeyId)
+		}
+		seenKeyIDs[key.KeyId] = struct{}{}
+
 		if err := validateKey(key); err != nil {
 			return err
 		}
