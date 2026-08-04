@@ -38,7 +38,7 @@ const (
 	// Currently, only version 0 is supported; other versions are rejected.
 	privateKeyProtoVersion = 0
 
-	signerTypeURL = "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey"
+	signerTypeURL   = "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey"
 	verifierTypeURL = "type.googleapis.com/google.crypto.tink.MlDsaPublicKey"
 )
 
@@ -52,6 +52,8 @@ func protoOutputPrefixTypeFromVariant(variant Variant) (tinkpb.OutputPrefixType,
 		return tinkpb.OutputPrefixType_TINK, nil
 	case VariantNoPrefix:
 		return tinkpb.OutputPrefixType_RAW, nil
+	case VariantNoPrefixWithPrehashID:
+		return tinkpb.OutputPrefixType_WITH_ID_REQUIREMENT, nil
 	default:
 		return tinkpb.OutputPrefixType_UNKNOWN_PREFIX, fmt.Errorf("unknown output prefix variant: %v", variant)
 	}
@@ -166,6 +168,8 @@ func variantFromProto(prefixType tinkpb.OutputPrefixType) (Variant, error) {
 		return VariantTink, nil
 	case tinkpb.OutputPrefixType_RAW:
 		return VariantNoPrefix, nil
+	case tinkpb.OutputPrefixType_WITH_ID_REQUIREMENT:
+		return VariantNoPrefixWithPrehashID, nil
 	default:
 		return VariantUnknown, fmt.Errorf("unsupported output prefix type: %v", prefixType)
 	}

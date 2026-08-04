@@ -27,10 +27,11 @@ import (
 
 // Variant is the prefix variant of a ML-DSA key.
 //
-// It describes the format of the signature. For ML-DSA, there are two options:
+// It describes the format of the signature. For ML-DSA, there are three options:
 //
 //   - TINK: prepends '0x01<big endian key id>' to the signature.
 //   - NO_PREFIX: adds no prefix to the signature.
+//   - NO_PREFIX_WITH_PREHASH_ID: adds no prefix to the signature, but requires a key ID.
 type Variant int
 
 const (
@@ -40,6 +41,8 @@ const (
 	VariantTink
 	// VariantNoPrefix does not prefix the signature with the key id.
 	VariantNoPrefix
+	// VariantNoPrefixWithPrehashID does not prefix the signature with the key id, but requires a key ID.
+	VariantNoPrefixWithPrehashID
 )
 
 func (variant Variant) String() string {
@@ -48,6 +51,8 @@ func (variant Variant) String() string {
 		return "TINK"
 	case VariantNoPrefix:
 		return "NO_PREFIX"
+	case VariantNoPrefixWithPrehashID:
+		return "EXTERNAL_MU"
 	default:
 		return "UNKNOWN"
 	}
@@ -132,7 +137,7 @@ func calculateOutputPrefix(variant Variant, keyID uint32) ([]byte, error) {
 	switch variant {
 	case VariantTink:
 		return outputprefix.Tink(keyID), nil
-	case VariantNoPrefix:
+	case VariantNoPrefix, VariantNoPrefixWithPrehashID:
 		return nil, nil
 	default:
 		return nil, fmt.Errorf("invalid output prefix variant: %v", variant)

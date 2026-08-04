@@ -124,7 +124,6 @@ const (
 		"2947499253bf798b5207c03f3c44c41da57f06ba761e029e1c768f2d77034552e2ae2a67fc956"
 )
 
-
 func mustCreateKeySerialization(t *testing.T, keyData *tinkpb.KeyData, outputPrefixType tinkpb.OutputPrefixType, idRequirement uint32) *protoserialization.KeySerialization {
 	t.Helper()
 	ks, err := protoserialization.NewKeySerialization(keyData, outputPrefixType, idRequirement)
@@ -192,6 +191,14 @@ func TestParsePublicKeyFails(t *testing.T) {
 				Value:           serializedProtoPublicKeyWithWrongVersion,
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "unsupported output prefix type LEGACY",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         verifierTypeURL,
+				Value:           serializedProtoPublicKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_LEGACY, 12345),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -286,6 +293,17 @@ func TestParsePublicKey(t *testing.T) {
 			wantVariant:  VariantNoPrefix,
 			wantInstance: MLDSA44,
 			protoKey:     &protoPublicKey44,
+		},
+		{
+			name: "ML-DSA-65 key with WITH_ID_REQUIREMENT output prefix type",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         verifierTypeURL,
+				Value:           serializedProtoPublicKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_WITH_ID_REQUIREMENT, 12345),
+			wantVariant:  VariantNoPrefixWithPrehashID,
+			wantInstance: MLDSA65,
+			protoKey:     &protoPublicKey,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -447,6 +465,15 @@ func TestSerializePublicKey(t *testing.T) {
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_RAW, 0),
 		},
+		{
+			name:      "ML-DSA-65 Public key with WITH_ID_REQUIREMENT output prefix type",
+			publicKey: mustCreatePublicKey(t, MLDSA65, keyBytes, 12345, VariantNoPrefixWithPrehashID),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         verifierTypeURL,
+				Value:           serializedProtoPublicKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_WITH_ID_REQUIREMENT, 12345),
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := &publicKeySerializer{}
@@ -598,6 +625,14 @@ func TestParsePrivateKeyFails(t *testing.T) {
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_TINK, 12345),
 		},
+		{
+			name: "unsupported output prefix type LEGACY",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				Value:           serializedProtoPrivateKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_LEGACY, 12345),
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &privateKeyParser{}
@@ -650,6 +685,15 @@ func TestParsePrivateKey(t *testing.T) {
 			}, tinkpb.OutputPrefixType_RAW, 0),
 			wantVariant: VariantNoPrefix,
 		},
+		{
+			name: "key with WITH_ID_REQUIREMENT output prefix type",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				Value:           serializedProtoPrivateKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_WITH_ID_REQUIREMENT, 12345),
+			wantVariant: VariantNoPrefixWithPrehashID,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &privateKeyParser{}
@@ -693,7 +737,7 @@ func TestSerializePrivateKeyFails(t *testing.T) {
 			privateKey: nil,
 		},
 		{
-			name:       "invlid private key",
+			name:       "invalid private key",
 			privateKey: &PrivateKey{},
 		},
 		{
@@ -809,6 +853,15 @@ func TestSerializePrivateKey(t *testing.T) {
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 			}, tinkpb.OutputPrefixType_RAW, 0),
 		},
+		{
+			name:       "ML-DSA-65 Private key with WITH_ID_REQUIREMENT output prefix type",
+			privateKey: mustCreatePrivateKey(t, MLDSA65, privateKeyBytes, 12345, VariantNoPrefixWithPrehashID),
+			want: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				Value:           serializedProtoPrivateKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_WITH_ID_REQUIREMENT, 12345),
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := &privateKeySerializer{}
@@ -903,6 +956,18 @@ func TestSerializeParameters(t *testing.T) {
 			},
 		},
 		{
+			name: "ML-DSA-65 parameters with WITH_ID_REQUIREMENT variant",
+			parameters: &Parameters{
+				instance: MLDSA65,
+				variant:  VariantNoPrefixWithPrehashID,
+			},
+			want: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_WITH_ID_REQUIREMENT,
+				Value:            serializedFormat65,
+			},
+		},
+		{
 			name: "ML-DSA-44 parameters with TINK variant",
 			parameters: &Parameters{
 				instance: MLDSA44,
@@ -992,6 +1057,18 @@ func TestParseParameters(t *testing.T) {
 			},
 		},
 		{
+			name: "ML-DSA-65 parameters with WITH_ID_REQUIREMENT variant",
+			want: &Parameters{
+				instance: MLDSA65,
+				variant:  VariantNoPrefixWithPrehashID,
+			},
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_WITH_ID_REQUIREMENT,
+				Value:            serializedFormat65,
+			},
+		},
+		{
 			name: "ML-DSA-44 parameters with TINK variant",
 			want: &Parameters{
 				instance: MLDSA44,
@@ -1047,6 +1124,19 @@ func TestParseParametersFails(t *testing.T) {
 			template: &tinkpb.KeyTemplate{
 				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_UNKNOWN_PREFIX,
+				Value: mustMarshal(t, &mldsapb.MlDsaKeyFormat{
+					Version: 0,
+					Params: &mldsapb.MlDsaParams{
+						MlDsaInstance: mldsapb.MlDsaInstance_ML_DSA_65,
+					},
+				}),
+			},
+		},
+		{
+			name: "unsupported output prefix type LEGACY",
+			template: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.MlDsaPrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_LEGACY,
 				Value: mustMarshal(t, &mldsapb.MlDsaKeyFormat{
 					Version: 0,
 					Params: &mldsapb.MlDsaParams{

@@ -65,6 +65,21 @@ func TestNewParameters(t *testing.T) {
 			instance: mldsa.MLDSA87,
 			variant:  mldsa.VariantNoPrefix,
 		},
+		{
+			name:     "external mu ML-DSA-44",
+			instance: mldsa.MLDSA44,
+			variant:  mldsa.VariantNoPrefixWithPrehashID,
+		},
+		{
+			name:     "external mu ML-DSA-65",
+			instance: mldsa.MLDSA65,
+			variant:  mldsa.VariantNoPrefixWithPrehashID,
+		},
+		{
+			name:     "external mu ML-DSA-87",
+			instance: mldsa.MLDSA87,
+			variant:  mldsa.VariantNoPrefixWithPrehashID,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			params, err := mldsa.NewParameters(tc.instance, tc.variant)
@@ -132,6 +147,24 @@ func TestParametersHasIDRequirement(t *testing.T) {
 			variant:  mldsa.VariantNoPrefix,
 			want:     false,
 		},
+		{
+			name:     "external mu ML-DSA-44",
+			instance: mldsa.MLDSA44,
+			variant:  mldsa.VariantNoPrefixWithPrehashID,
+			want:     true,
+		},
+		{
+			name:     "external mu ML-DSA-65",
+			instance: mldsa.MLDSA65,
+			variant:  mldsa.VariantNoPrefixWithPrehashID,
+			want:     true,
+		},
+		{
+			name:     "external mu ML-DSA-87",
+			instance: mldsa.MLDSA87,
+			variant:  mldsa.VariantNoPrefixWithPrehashID,
+			want:     true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			params, err := mldsa.NewParameters(tc.instance, tc.variant)
@@ -160,6 +193,10 @@ func TestParametersEqual(t *testing.T) {
 			if err != nil {
 				t.Fatalf("mldsa.NewParameters(%v) err = %v, want nil", mldsa.VariantNoPrefix, err)
 			}
+			externalMuVariant, err := mldsa.NewParameters(inst, mldsa.VariantNoPrefixWithPrehashID)
+			if err != nil {
+				t.Fatalf("mldsa.NewParameters(%v) err = %v, want nil", mldsa.VariantNoPrefixWithPrehashID, err)
+			}
 
 			if !tinkVariant.Equal(tinkVariant) {
 				t.Errorf("tinkVariant.Equal(tinkVariant) = false, want true")
@@ -167,8 +204,17 @@ func TestParametersEqual(t *testing.T) {
 			if !noPrefixVariant.Equal(noPrefixVariant) {
 				t.Errorf("noPrefixVariant.Equal(noPrefixVariant) = false, want true")
 			}
+			if !externalMuVariant.Equal(externalMuVariant) {
+				t.Errorf("externalMuVariant.Equal(externalMuVariant) = false, want true")
+			}
 			if tinkVariant.Equal(noPrefixVariant) {
 				t.Errorf("tinkVariant.Equal(noPrefixVariant) = true, want false")
+			}
+			if externalMuVariant.Equal(noPrefixVariant) {
+				t.Errorf("externalMuVariant.Equal(noPrefixVariant) = true, want false")
+			}
+			if externalMuVariant.Equal(tinkVariant) {
+				t.Errorf("externalMuVariant.Equal(tinkVariant) = true, want false")
 			}
 		})
 	}
@@ -653,6 +699,10 @@ func TestNewPublicKeyFails(t *testing.T) {
 			if err != nil {
 				t.Fatalf("mldsa.NewParameters(%v) err = %v, want nil", mldsa.VariantNoPrefix, err)
 			}
+			externalMuParams, err := mldsa.NewParameters(tc.inst, mldsa.VariantNoPrefixWithPrehashID)
+			if err != nil {
+				t.Fatalf("mldsa.NewParameters(%v) err = %v, want nil", mldsa.VariantNoPrefixWithPrehashID, err)
+			}
 			privKeyBytes, err := hex.DecodeString(tc.privHex)
 			if err != nil {
 				t.Fatalf("hex.DecodeString(inst.privHex) err = %v, want nil", err)
@@ -676,10 +726,16 @@ func TestNewPublicKeyFails(t *testing.T) {
 					idRequirement: 123,
 				},
 				{
-					name:          "invalid ID requirement",
+					name:          "invalid ID requirement (non-zero for VariantNoPrefix)",
 					params:        noPrefixParams,
 					keyBytes:      privKeyBytes,
 					idRequirement: 123,
+				},
+				{
+					name:          "invalid ID requirement (zero for VariantNoPrefixWithPrehashID)",
+					params:        externalMuParams,
+					keyBytes:      privKeyBytes,
+					idRequirement: 0,
 				},
 				{
 					name:          "invalid params",
@@ -753,6 +809,30 @@ func TestPublicKey(t *testing.T) {
 			variant:          mldsa.VariantNoPrefix,
 			keyHex:           pubKey87Hex,
 			idRequirement:    0,
+			wantOutputPrefix: nil,
+		},
+		{
+			name:             "no prefix with prehash ID ML-DSA-44",
+			instance:         mldsa.MLDSA44,
+			variant:          mldsa.VariantNoPrefixWithPrehashID,
+			keyHex:           pubKey44Hex,
+			idRequirement:    uint32(0x01020304),
+			wantOutputPrefix: nil,
+		},
+		{
+			name:             "no prefix with prehash ID ML-DSA-65",
+			instance:         mldsa.MLDSA65,
+			variant:          mldsa.VariantNoPrefixWithPrehashID,
+			keyHex:           pubKey65Hex,
+			idRequirement:    uint32(0x01020304),
+			wantOutputPrefix: nil,
+		},
+		{
+			name:             "no prefix with prehash ID ML-DSA-87",
+			instance:         mldsa.MLDSA87,
+			variant:          mldsa.VariantNoPrefixWithPrehashID,
+			keyHex:           pubKey87Hex,
+			idRequirement:    uint32(0x01020304),
 			wantOutputPrefix: nil,
 		},
 	} {
@@ -1073,6 +1153,24 @@ var testCases = []struct {
 		privKeyBytesHex:  privKey87Hex,
 		pubKeyBytesHex:   pubKey87Hex,
 		idRequirement:    0,
+		wantOutputPrefix: nil,
+	},
+	{
+		name:             "no prefix with prehash ID ML-DSA-65",
+		instance:         mldsa.MLDSA65,
+		variant:          mldsa.VariantNoPrefixWithPrehashID,
+		privKeyBytesHex:  privKey65Hex,
+		pubKeyBytesHex:   pubKey65Hex,
+		idRequirement:    uint32(0x01020304),
+		wantOutputPrefix: nil,
+	},
+	{
+		name:             "no prefix with prehash ID ML-DSA-87",
+		instance:         mldsa.MLDSA87,
+		variant:          mldsa.VariantNoPrefixWithPrehashID,
+		privKeyBytesHex:  privKey87Hex,
+		pubKeyBytesHex:   pubKey87Hex,
+		idRequirement:    uint32(0x01020304),
 		wantOutputPrefix: nil,
 	},
 }
