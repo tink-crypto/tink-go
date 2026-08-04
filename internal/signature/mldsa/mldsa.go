@@ -124,6 +124,9 @@ type PublicKey struct {
 	par *params
 }
 
+// TR returns the cached public key hash tr.
+func (pk *PublicKey) TR() [64]byte { return pk.tr }
+
 // SecretKey represents a ML-DSA secret key.
 type SecretKey struct {
 	rho [32]byte

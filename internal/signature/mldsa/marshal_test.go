@@ -19,6 +19,8 @@ import (
 	"crypto/rand"
 	mathrand "math/rand/v2"
 	"testing"
+
+	"golang.org/x/crypto/sha3"
 )
 
 func randomPolyN(n int) *poly {
@@ -210,5 +212,39 @@ func TestKeyEncodeDecode(t *testing.T) {
 				t.Errorf("SkDecode(%v) = %v, want %v", par.name, skDec, sk)
 			}
 		}
+	}
+}
+
+func TestPublicKeyTR(t *testing.T) {
+	pars := []struct {
+		name string
+		par  *params
+	}{
+		{"MLDSA44", MLDSA44},
+		{"MLDSA65", MLDSA65},
+		{"MLDSA87", MLDSA87},
+	}
+	for _, par := range pars {
+		t.Run(par.name, func(t *testing.T) {
+			pk, _ := par.par.KeyGen()
+			pkEnc := pk.Encode()
+			var wantTR [64]byte
+			sha3.ShakeSum256(wantTR[:], pkEnc)
+
+			gotTR := pk.TR()
+			if !bytes.Equal(gotTR[:], wantTR[:]) {
+				t.Errorf("pk.TR() = %x, want %x", gotTR, wantTR)
+			}
+
+			// Test on decoded public key as well.
+			pkDec, err := par.par.DecodePublicKey(pkEnc)
+			if err != nil {
+				t.Fatalf("DecodePublicKey() err = %v, want nil", err)
+			}
+			gotTRDec := pkDec.TR()
+			if !bytes.Equal(gotTRDec[:], wantTR[:]) {
+				t.Errorf("pkDec.TR() = %x, want %x", gotTRDec, wantTR)
+			}
+		})
 	}
 }
