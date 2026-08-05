@@ -213,3 +213,15 @@ func TestParametersEqual_FalseIfDifferent(t *testing.T) {
 		})
 	}
 }
+
+func TestNewParameters_SegmentSizeTooLarge(t *testing.T) {
+	opts := aesgcmhkdf.ParametersOpts{
+		KeySizeInBytes:        32,
+		DerivedKeySizeInBytes: 32,
+		HKDFHashType:          aesgcmhkdf.SHA256,
+		SegmentSizeInBytes:    16*1024*1024 + 1, // 16MB + 1 byte (Sınırı aşan değer)
+	}
+	if _, err := aesgcmhkdf.NewParameters(opts); err == nil {
+		t.Errorf("aesgcmhkdf.NewParameters(%v) err = nil, want error for segment size > 16MB", opts)
+	}
+}
