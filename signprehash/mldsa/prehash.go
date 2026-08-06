@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package mldsa implements the ML-DSA prehash primitive.
 package mldsa
 
 import (
