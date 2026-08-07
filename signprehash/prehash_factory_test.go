@@ -15,13 +15,17 @@
 package signprehash_test
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
+	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	tinkmldsa "github.com/tink-crypto/tink-go/v2/signature/mldsa"
 	"github.com/tink-crypto/tink-go/v2/signprehash"
+	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
 )
 
 func TestNewPrehashFailsWithNilHandle(t *testing.T) {
@@ -137,5 +141,68 @@ func TestNewPrehashSucceeds(t *testing.T) {
 				t.Errorf("len(prehash) = %d, want %d", len(prehash), 5+64)
 			}
 		})
+	}
+}
+
+func TestPrehashFactoryMonitoring(t *testing.T) {
+	defer internalregistry.ClearMonitoringClient()
+	client := fakemonitoring.NewClient("fake-client")
+	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+
+	params, err := tinkmldsa.NewParameters(tinkmldsa.MLDSA65, tinkmldsa.VariantTink)
+	if err != nil {
+		t.Fatalf("tinkmldsa.NewParameters() err = %v, want nil", err)
+	}
+	manager := keyset.NewManager()
+	keyID, err := manager.AddNewKeyFromParameters(params)
+	if err != nil {
+		t.Fatalf("manager.AddNewKeyFromParameters() err = %v, want nil", err)
+	}
+	if err := manager.SetPrimary(keyID); err != nil {
+		t.Fatalf("manager.SetPrimary() err = %v, want nil", err)
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %v, want nil", err)
+	}
+	pubHandle, err := handle.Public()
+	if err != nil {
+		t.Fatalf("handle.Public() err = %v, want nil", err)
+	}
+
+	buff := &bytes.Buffer{}
+	if err := insecurecleartextkeyset.Write(pubHandle, keyset.NewBinaryWriter(buff)); err != nil {
+		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
+	}
+	annotations := map[string]string{"foo": "bar"}
+	pubHandleWithAnnotations, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(buff), keyset.WithAnnotations(annotations))
+	if err != nil {
+		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
+	}
+
+	prehasher, err := signprehash.NewPrehash(pubHandleWithAnnotations)
+	if err != nil {
+		t.Fatalf("signprehash.NewPrehash() err = %v, want nil", err)
+	}
+
+	data := []byte("sample data for monitoring test")
+	if _, err := prehasher.ComputePrehash(data); err != nil {
+		t.Fatalf("prehasher.ComputePrehash() err = %v, want nil", err)
+	}
+
+	if len(client.Failures()) != 0 {
+		t.Errorf("len(client.Failures()) = %d, want 0", len(client.Failures()))
+	}
+	gotEvents := client.Events()
+	if len(gotEvents) != 1 {
+		t.Fatalf("len(gotEvents) = %d, want 1", len(gotEvents))
+	}
+	if gotEvents[0].KeyID != keyID {
+		t.Errorf("gotEvents[0].KeyID = %d, want %d", gotEvents[0].KeyID, keyID)
+	}
+	if gotEvents[0].NumBytes != len(data) {
+		t.Errorf("gotEvents[0].NumBytes = %d, want %d", gotEvents[0].NumBytes, len(data))
 	}
 }

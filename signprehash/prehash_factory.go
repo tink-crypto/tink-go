@@ -19,26 +19,73 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/internal/config/signprehashconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
-// NewPrehash returns a [tink.Prehash] primitive from the given keyset handle.
-func NewPrehash(handle *keyset.Handle) (tink.Prehash, error) {
+// NewPrehashWithConfig returns a [tink.Prehash] primitive from the given
+// [keyset.Handle] and [keyset.Config].
+func NewPrehashWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Prehash, error) {
 	if handle == nil {
-		return nil, fmt.Errorf("signprehash.NewPrehash: handle cannot be nil")
+		return nil, fmt.Errorf("signprehash.NewPrehashWithConfig: handle cannot be nil")
 	}
-	cfg := signprehashconfig.V0()
+	if handle.Len() == 0 {
+		return nil, fmt.Errorf("signprehash.NewPrehashWithConfig: empty keyset handle")
+	}
 	primaryEntry, err := handle.Primary()
 	if err != nil {
-		return nil, fmt.Errorf("signprehash.NewPrehash: failed to get primary entry: %v", err)
+		return nil, fmt.Errorf("signprehash.NewPrehashWithConfig: failed to get primary entry: %v", err)
 	}
 	if primaryEntry.KeyStatus() != keyset.Enabled {
-		return nil, fmt.Errorf("signprehash.NewPrehash: primary entry is not enabled")
+		return nil, fmt.Errorf("signprehash.NewPrehashWithConfig: primary entry is not enabled")
 	}
-	primary, _, err := factoryutil.PrimitiveFromKey[tink.Prehash](primaryEntry.Key(), &cfg)
+	// Make sure this access doesn't get logged as key export.
+	primaryEntry = primaryEntry.ToUnmonitoredEntry(internalapi.Token{})
+	primary, _, err := factoryutil.PrimitiveFromKey[tink.Prehash](primaryEntry.Key(), config)
 	if err != nil {
-		return nil, fmt.Errorf("signprehash.NewPrehash: failed to get primitive for primary key: %v", err)
+		return nil, fmt.Errorf("signprehash.NewPrehashWithConfig: failed to get primitive for primary key: %v", err)
 	}
-	return primary, nil
+	logger, err := createPrehashLogger(handle)
+	if err != nil {
+		return nil, err
+	}
+	return &wrappedPrehash{
+		prehash: primary,
+		keyID:   primaryEntry.KeyID(),
+		logger:  logger,
+	}, nil
+}
+
+// NewPrehash returns a [tink.Prehash] primitive from the given keyset handle.
+func NewPrehash(handle *keyset.Handle) (tink.Prehash, error) {
+	cfg := signprehashconfig.V0()
+	return NewPrehashWithConfig(handle, &cfg)
+}
+
+type wrappedPrehash struct {
+	prehash tink.Prehash
+	keyID   uint32
+	logger  monitoring.Logger
+}
+
+var _ tink.Prehash = (*wrappedPrehash)(nil)
+
+func (w *wrappedPrehash) ComputePrehash(data []byte) ([]byte, error) {
+	prehash, err := w.prehash.ComputePrehash(data)
+	if err != nil {
+		w.logger.LogFailure()
+		return nil, err
+	}
+	w.logger.Log(w.keyID, len(data))
+	return prehash, nil
+}
+
+func createPrehashLogger(kh *keyset.Handle) (monitoring.Logger, error) {
+	factory, err := factoryutil.NewLoggerFactory(kh)
+	if err != nil {
+		return nil, err
+	}
+	return factory.CreateFor("prehash", "compute")
 }
