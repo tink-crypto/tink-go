@@ -67,6 +67,52 @@ func TestSignVerify(t *testing.T) {
 	}
 }
 
+func TestCreateSignerWithSaltLengthZeroFails(t *testing.T) {
+	n2048, privateValues2048 := rawRsa2048Values(t)
+	publicKey := mustCreatePublicKey(t, n2048, 0, mustCreateParameters(t, rsassapss.ParametersValues{
+		ModulusSizeBits: 2048,
+		SigHashType:     rsassapss.SHA256,
+		MGF1HashType:    rsassapss.SHA256,
+		PublicExponent:  f4,
+		SaltLengthBytes: 0,
+	}, rsassapss.VariantNoPrefix))
+	privateKey, err := rsassapss.NewPrivateKey(publicKey, privateValues2048)
+	if err != nil {
+		t.Fatalf("rsassapss.NewPrivateKey() err = %v, want nil", err)
+	}
+	_, err = rsassapss.NewSigner(privateKey, internalapi.Token{})
+	if err == nil {
+		t.Fatal("rsassapss.NewSigner() err = nil, want error")
+	}
+}
+
+func TestVerifyWithSaltLengthZeroWorks(t *testing.T) {
+	n2048, _ := rawRsa2048Values(t)
+	publicKey := mustCreatePublicKey(t, n2048, 0, mustCreateParameters(t, rsassapss.ParametersValues{
+		ModulusSizeBits: 2048,
+		SigHashType:     rsassapss.SHA256,
+		MGF1HashType:    rsassapss.SHA256,
+		PublicExponent:  f4,
+		SaltLengthBytes: 0,
+	}, rsassapss.VariantNoPrefix))
+	signature := mustDecodeHex(t, "5bfef53336a5148a2f880e28c92c71fa0523707390d075d7608a8eeab44cff5166946850f5818b00e48769"+
+		"22bf7cc0fedfdc1f8e265200c4c10e41686f62f8a621b8ca2771106deb28fa9b0ec2b2687f106b8f"+
+		"68695dddc0b80dc15bec32e7ad2de73edb2789a8222866521230f2795b6c74de777050f02a031577"+
+		"6855f4bb1e063c93ef8d1c4a91abe393017b0cfa09548f6f5bfd565d02bdce2116ffca232ede6f4e"+
+		"869aac226f703ae0ef739fe926f0f15f916a7fa17b407118d9a54353794835c224fa8c7b92137715"+
+		"26a7acb7575ddbd4ea3aaad6c827a5d1378773a4556763ed1442fddc76e29585c9d1992d42a8b730"+
+		"e744e44f3bfe5ddddc47b5d728")
+	message := mustDecodeHex(t, "aa")
+
+	verifier, err := rsassapss.NewVerifier(publicKey, internalapi.Token{})
+	if err != nil {
+		t.Fatalf("rsassapss.NewVerifier() err = %v, want nil", err)
+	}
+	if err := verifier.Verify(signature, message); err != nil {
+		t.Errorf("Verify() err = %v, want nil", err)
+	}
+}
+
 func rawRsa2048Values(t *testing.T) ([]byte, rsassapss.PrivateKeyValues) {
 	t.Helper()
 	n2048Base64 := "t6Q8PWSi1dkJj9hTP8hNYFlvadM7DflW9mWepOJhJ66w7nyoK1gPNqFMSQRy" +
@@ -354,31 +400,6 @@ func mustCreatePrimitiveTestCases(t *testing.T) []primtiveTesCase {
 			"c1cafcb0853f32bfed7cb9495f073fcaa2d73eab5f9398b07300dbc9b80dbff248106e6c8a52e564"+
 			"fd9de73e0122f576e5fa3c4bdb477663b616372568492b4f00b6261800b132a04a3dc735e44fc4ce"+
 			"9a72e3afaca5a0d50ea77388c9"),
-		message: mustDecodeHex(t, "aa"),
-	})
-	// Test vector 8.
-	testVec8PublicKey := mustCreatePublicKey(t, n2048, 0, mustCreateParameters(t, rsassapss.ParametersValues{
-		ModulusSizeBits: 2048,
-		SigHashType:     rsassapss.SHA256,
-		MGF1HashType:    rsassapss.SHA256,
-		PublicExponent:  f4,
-		SaltLengthBytes: 0,
-	}, rsassapss.VariantNoPrefix))
-	testVec8PrivateKey, err := rsassapss.NewPrivateKey(testVec8PublicKey, privateValues2048)
-	if err != nil {
-		t.Fatalf("rsassapss.NewPrivateKey() err = %v, want nil", err)
-	}
-	testCases = append(testCases, primtiveTesCase{
-		name:       fmt.Sprintf("2048-SHA256-RAW-salt0"),
-		publicKey:  testVec8PublicKey,
-		privateKey: testVec8PrivateKey,
-		signature: mustDecodeHex(t, "5bfef53336a5148a2f880e28c92c71fa0523707390d075d7608a8eeab44cff5166946850f5818b00e48769"+
-			"22bf7cc0fedfdc1f8e265200c4c10e41686f62f8a621b8ca2771106deb28fa9b0ec2b2687f106b8f"+
-			"68695dddc0b80dc15bec32e7ad2de73edb2789a8222866521230f2795b6c74de777050f02a031577"+
-			"6855f4bb1e063c93ef8d1c4a91abe393017b0cfa09548f6f5bfd565d02bdce2116ffca232ede6f4e"+
-			"869aac226f703ae0ef739fe926f0f15f916a7fa17b407118d9a54353794835c224fa8c7b92137715"+
-			"26a7acb7575ddbd4ea3aaad6c827a5d1378773a4556763ed1442fddc76e29585c9d1992d42a8b730"+
-			"e744e44f3bfe5ddddc47b5d728"),
 		message: mustDecodeHex(t, "aa"),
 	})
 	return testCases

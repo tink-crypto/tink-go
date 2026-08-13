@@ -943,6 +943,15 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 
 			// 2048 bits
 			token := insecuresecretdataaccess.Token{}
+			rsa2048PrivateKeyValues := rsassapss.PrivateKeyValues{
+				P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), token),
+				Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), token),
+				D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), token),
+			}
+			rsa2048DP := secretdata.NewBytesFromData(mustDecodeBase64(t, dp2048Base64), token)
+			rsa2048DQ := secretdata.NewBytesFromData(mustDecodeBase64(t, dq2048Base64), token)
+			rsa2048QInv := secretdata.NewBytesFromData(mustDecodeBase64(t, qInv2048Base64), token)
+
 			testCases = append(testCases, privateKeyTestCase{
 				name: fmt.Sprintf("%v-%v-%v-%v", 2048, hashType, hashType, variant),
 				publicKey: mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
@@ -952,14 +961,27 @@ func privateKeyTestCases(t *testing.T) []privateKeyTestCase {
 					PublicExponent:  f4,
 					SaltLengthBytes: 1,
 				}, variant)),
-				privateKeyValues: rsassapss.PrivateKeyValues{
-					P: secretdata.NewBytesFromData(mustDecodeBase64(t, p2048Base64), token),
-					Q: secretdata.NewBytesFromData(mustDecodeBase64(t, q2048Base64), token),
-					D: secretdata.NewBytesFromData(mustDecodeBase64(t, d2048Base64), token),
-				},
-				dp:   secretdata.NewBytesFromData(mustDecodeBase64(t, dp2048Base64), token),
-				dq:   secretdata.NewBytesFromData(mustDecodeBase64(t, dq2048Base64), token),
-				qInv: secretdata.NewBytesFromData(mustDecodeBase64(t, qInv2048Base64), token),
+				privateKeyValues: rsa2048PrivateKeyValues,
+				dp:               rsa2048DP,
+				dq:               rsa2048DQ,
+				qInv:             rsa2048QInv,
+			})
+
+			// 2048 bits with salt length zero. Creating such a private key is possible,
+			// even though creating a signer from it would currently fail.
+			testCases = append(testCases, privateKeyTestCase{
+				name: fmt.Sprintf("%v-%v-%v-%v", 2048, hashType, hashType, variant),
+				publicKey: mustCreatePublicKey(t, mustDecodeBase64(t, n2048Base64), idRequirement, mustCreateParameters(t, rsassapss.ParametersValues{
+					ModulusSizeBits: 2048,
+					SigHashType:     hashType,
+					MGF1HashType:    hashType,
+					PublicExponent:  f4,
+					SaltLengthBytes: 0,
+				}, variant)),
+				privateKeyValues: rsa2048PrivateKeyValues,
+				dp:               rsa2048DP,
+				dq:               rsa2048DQ,
+				qInv:             rsa2048QInv,
 			})
 
 			testCases = append(testCases, privateKeyTestCase{

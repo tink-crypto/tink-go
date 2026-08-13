@@ -72,6 +72,14 @@ func TestRSASSAPSSSignVerify(t *testing.T) {
 	}
 }
 
+func TestCreateSignerWithSaltLengthZeroFails(t *testing.T) {
+	_, privateKey := mustCreateRsa2048KeyPair(t)
+	_, err := signature.New_RSA_SSA_PSS_Signer("SHA256", 0, privateKey)
+	if err == nil {
+		t.Fatal("New_RSA_SSA_PSS_Signer() err = nil, want error")
+	}
+}
+
 func mustCreateRsa2048KeyPair(t *testing.T) (*rsa.PublicKey, *rsa.PrivateKey) {
 	n2048Base64 := "t6Q8PWSi1dkJj9hTP8hNYFlvadM7DflW9mWepOJhJ66w7nyoK1gPNqFMSQRy" +
 		"O125Gp-TEkodhWr0iujjHVx7BcV0llS4w5ACGgPrcAd6ZcSR0-Iqom-QFcNP" +

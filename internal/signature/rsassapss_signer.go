@@ -47,6 +47,9 @@ func New_RSA_SSA_PSS_Signer(hashAlg string, saltLength int, privKey *rsa.Private
 	if saltLength < 0 {
 		return nil, fmt.Errorf("invalid salt length")
 	}
+	if saltLength == 0 {
+		return nil, fmt.Errorf("salt length zero is not supported")
+	}
 	return &RSA_SSA_PSS_Signer{
 		privateKey: privKey,
 		hashFunc:   hashFunc,
