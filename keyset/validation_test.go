@@ -113,6 +113,16 @@ func TestValidate(t *testing.T) {
 	if err = keyset.Validate(testutil.NewKeyset(1, keys)); err == nil {
 		t.Errorf("expect an error when there are keydata other than public")
 	}
+	// `tinkpb.OutputPrefixType_WITH_ID_REQUIREMENT`
+	keys = []*tinkpb.Keyset_Key{
+		testutil.NewDummyKey(1, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_TINK),
+		testutil.NewDummyKey(2, tinkpb.KeyStatusType_ENABLED, tinkpb.OutputPrefixType_WITH_ID_REQUIREMENT),
+		testutil.NewDummyKey(3, tinkpb.KeyStatusType_DISABLED, tinkpb.OutputPrefixType_WITH_ID_REQUIREMENT),
+	}
+	if err = keyset.Validate(testutil.NewKeyset(1, keys)); err != nil {
+		t.Errorf("valid test failed when using OutputPrefixType_WITH_ID_REQUIREMENT: %v", err)
+	}
+
 }
 
 func generateInvalidKeys() []*tinkpb.Keyset_Key {

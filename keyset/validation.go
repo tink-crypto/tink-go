@@ -99,7 +99,8 @@ func validateKey(key *tinkpb.Keyset_Key) error {
 	if key.OutputPrefixType != tinkpb.OutputPrefixType_TINK &&
 		key.OutputPrefixType != tinkpb.OutputPrefixType_LEGACY &&
 		key.OutputPrefixType != tinkpb.OutputPrefixType_RAW &&
-		key.OutputPrefixType != tinkpb.OutputPrefixType_CRUNCHY {
+		key.OutputPrefixType != tinkpb.OutputPrefixType_CRUNCHY &&
+		key.OutputPrefixType != tinkpb.OutputPrefixType_WITH_ID_REQUIREMENT {
 		return fmt.Errorf("key %d has unknown prefix", key.KeyId)
 	}
 	if key.Status != tinkpb.KeyStatusType_ENABLED &&
