@@ -49,6 +49,13 @@ func AES128GCMKeyTemplate() *tinkpb.KeyTemplate {
 	return createAESGCMKeyTemplate(16, tinkpb.OutputPrefixType_TINK)
 }
 
+// AES128GCMNoPrefixKeyTemplate is a KeyTemplate that generates an AES-GCM key with the following parameters:
+//   - Key size: 16 bytes
+//   - Output prefix type: RAW
+func AES128GCMNoPrefixKeyTemplate() *tinkpb.KeyTemplate {
+	return createAESGCMKeyTemplate(16, tinkpb.OutputPrefixType_RAW)
+}
+
 // AES256GCMKeyTemplate is a KeyTemplate that generates an AES-GCM key with the following parameters:
 //   - Key size: 32 bytes
 //   - Output prefix type: TINK

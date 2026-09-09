@@ -37,6 +37,9 @@ func TestKeyTemplates(t *testing.T) {
 			name:     "AES128_GCM",
 			template: aead.AES128GCMKeyTemplate(),
 		}, {
+			name:     "AES128_GCM_NO_PREFIX",
+			template: aead.AES128GCMNoPrefixKeyTemplate(),
+		}, {
 			name:     "AES256_GCM",
 			template: aead.AES256GCMKeyTemplate(),
 		}, {
