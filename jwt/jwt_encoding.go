@@ -134,7 +134,7 @@ func base64Decode(content string) ([]byte, error) {
 			return nil, fmt.Errorf("invalid encoding")
 		}
 	}
-	return base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(content)
+	return base64.URLEncoding.WithPadding(base64.NoPadding).Strict().DecodeString(content)
 }
 
 func isValidURLsafeBase64Char(c rune) bool {

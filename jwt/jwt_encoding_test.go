@@ -418,3 +418,28 @@ func TestDecodeVerifyTokenPaylodWithInvalidEndcoding(t *testing.T) {
 		t.Errorf("decodeUnsignedTokenAndValidateHeader() err = nil, want error")
 	}
 }
+
+// TestNonCanonicalBase64SignatureRejected verifies that splitSignedCompact and base64Decode
+// reject non-canonical base64url signatures having non-zero unused trailing bits per
+// RFC 4648 §3.5.
+func TestNonCanonicalBase64SignatureRejected(t *testing.T) {
+	// Canonical token from RFC 7515 Appendix A.1.1 with signature ending in 'k' (unused bits are 0).
+	canonicalSig := "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+	validToken := "eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ." + canonicalSig
+	if _, _, err := splitSignedCompact(validToken); err != nil {
+		t.Fatalf("splitSignedCompact() err = %v, want nil for valid token", err)
+	}
+	if _, err := base64Decode(canonicalSig); err != nil {
+		t.Errorf("base64Decode() err = %v, want nil for valid signature", err)
+	}
+
+	// Non-canonical token with signature ending in 'l' (unused bits are non-zero).
+	nonCanonicalSig := "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXl"
+	invalidToken := "eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ." + nonCanonicalSig
+	if _, _, err := splitSignedCompact(invalidToken); err == nil {
+		t.Errorf("splitSignedCompact() err = nil, want error for non-canonical base64 signature")
+	}
+	if _, err := base64Decode(nonCanonicalSig); err == nil {
+		t.Errorf("base64Decode() err = nil, want error for non-canonical encoding")
+	}
+}

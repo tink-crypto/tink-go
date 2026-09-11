@@ -17,10 +17,10 @@ package jwk_test
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/tink-crypto/tink-go/v2/internal/jwk"
-	"google.golang.org/protobuf/testing/protocmp"
 	spb "google.golang.org/protobuf/types/known/structpb"
+	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/testing/protocmp"
+	"github.com/tink-crypto/tink-go/v2/internal/jwk"
 )
 
 func TestEd25519KeyConversion(t *testing.T) {
@@ -160,5 +160,43 @@ func TestEd25519KeyConversionNotSupported(t *testing.T) {
 	_, err = jwk.FromPublicKeysetHandle(handle, jwk.Ed25519SupportNone)
 	if err == nil {
 		t.Fatalf("FromPublicKeysetHandle() err = nil, want error")
+	}
+}
+
+// TestNonCanonicalBase64Rejected verifies that a JWK containing a base64url-encoded
+// field with non-zero unused trailing bits is rejected per RFC 4648 §3.5.
+func TestNonCanonicalBase64Rejected(t *testing.T) {
+	// Canonical Ed25519 "x" ends in 'o' (unused bits are 0).
+	validJWKSet := `{
+		"keys":[
+			{
+				"kty":"OKP",
+				"crv":"Ed25519",
+				"x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPmd1Xo",
+				"use":"sig",
+				"alg":"EdDSA",
+				"key_ops":["verify"]
+			}
+		]
+	}`
+	if _, err := jwk.ToPublicKeysetHandle([]byte(validJWKSet), jwk.Ed25519SupportTink); err != nil {
+		t.Fatalf("ToPublicKeysetHandle() err = %v, want nil for valid key", err)
+	}
+
+	// Non-canonical "x" ends in 'p' (unused bits are non-zero).
+	invalidJWKSet := `{
+		"keys":[
+			{
+				"kty":"OKP",
+				"crv":"Ed25519",
+				"x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPmd1Xp",
+				"use":"sig",
+				"alg":"EdDSA",
+				"key_ops":["verify"]
+			}
+		]
+	}`
+	if _, err := jwk.ToPublicKeysetHandle([]byte(invalidJWKSet), jwk.Ed25519SupportTink); err == nil {
+		t.Errorf("ToPublicKeysetHandle() err = nil, want error for non-canonical base64 encoding")
 	}
 }
