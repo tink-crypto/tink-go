@@ -93,6 +93,11 @@ func validateOpts(opts *ParametersOpts) error {
 	if opts.SegmentSizeInBytes < minSegmentSize {
 		return fmt.Errorf("ciphertext segment size must be at least %d, got %d", minSegmentSize, opts.SegmentSizeInBytes)
 	}
+	// Prevent OOM by enforcing a maximum segment size (16MB).
+    const maxSegmentSize = 16 * 1024 * 1024
+    if opts.SegmentSizeInBytes > maxSegmentSize {
+        return fmt.Errorf("ciphertext segment size must be at most %d, got %d", maxSegmentSize, opts.SegmentSizeInBytes)
+    }
 	return nil
 }
 
