@@ -15,18 +15,35 @@
 package signprehash
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/internal/config/signprehashconfig"
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
+const (
+	// prehashStartByte is the first byte of every prehash value. This must agree
+	// with the per-key implementations, for example signprehash/mldsa.
+	prehashStartByte = 0xff
+	// prehashPrefixSize is the size of the Tink framing that precedes the
+	// algorithm specific payload: the start byte, followed by a 4 byte big endian
+	// key ID.
+	prehashPrefixSize = 5
+)
+
 // NewPrehashSignerWithConfig returns a [tink.PrehashSigner] primitive from the given
 // [keyset.Handle] and [keyset.Config].
+//
+// The returned primitive signs a prehash value with the enabled key whose ID the
+// prehash value names, which is not necessarily the primary key. Key selection
+// here mirrors verification rather than signing: the prehashing side picks the
+// key, and this side follows that choice. That is what makes a keyset rotatable,
+// as a newly added key can sign as soon as it is enabled everywhere, and the old
+// key keeps signing prehash values that are still in flight until it is disabled.
 func NewPrehashSignerWithConfig(handle *keyset.Handle, config keyset.Config) (tink.PrehashSigner, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("signprehash.NewPrehashSignerWithConfig: handle cannot be nil")
@@ -34,24 +51,26 @@ func NewPrehashSignerWithConfig(handle *keyset.Handle, config keyset.Config) (ti
 	if handle.Len() == 0 {
 		return nil, fmt.Errorf("signprehash.NewPrehashSignerWithConfig: empty keyset handle")
 	}
-	primaryEntry, err := handle.Primary()
-	if err != nil {
+	// Signing does not single out the primary key, but a keyset without a valid
+	// primary is malformed.
+	if _, err := handle.Primary(); err != nil {
 		return nil, fmt.Errorf("signprehash.NewPrehashSignerWithConfig: failed to get primary entry: %v", err)
 	}
-	// Make sure this access doesn't get logged as key export.
-	primaryEntry = primaryEntry.ToUnmonitoredEntry(internalapi.Token{})
-	primary, _, err := factoryutil.PrimitiveFromKey[tink.PrehashSigner](primaryEntry.Key(), config)
-	if err != nil {
-		return nil, fmt.Errorf("signprehash.NewPrehashSignerWithConfig: failed to get primitive for primary key: %v", err)
+	signers := make(map[uint32]tink.PrehashSigner)
+	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
+		signer, _, err := factoryutil.PrimitiveFromKey[tink.PrehashSigner](entry.Key(), config)
+		if err != nil {
+			return nil, fmt.Errorf("signprehash.NewPrehashSignerWithConfig: failed to get primitive for key with ID %d: %v", entry.KeyID(), err)
+		}
+		signers[entry.KeyID()] = signer
 	}
 	logger, err := createPrehashSignerLogger(handle)
 	if err != nil {
 		return nil, err
 	}
 	return &wrappedPrehashSigner{
-		signer: primary,
-		keyID:  primaryEntry.KeyID(),
-		logger: logger,
+		signers: signers,
+		logger:  logger,
 	}, nil
 }
 
@@ -62,20 +81,33 @@ func NewPrehashSigner(handle *keyset.Handle) (tink.PrehashSigner, error) {
 }
 
 type wrappedPrehashSigner struct {
-	signer tink.PrehashSigner
-	keyID  uint32
-	logger monitoring.Logger
+	signers map[uint32]tink.PrehashSigner
+	logger  monitoring.Logger
 }
 
 var _ tink.PrehashSigner = (*wrappedPrehashSigner)(nil)
 
 func (w *wrappedPrehashSigner) SignPrehash(prehash []byte) ([]byte, error) {
-	sig, err := w.signer.SignPrehash(prehash)
+	if len(prehash) < prehashPrefixSize {
+		w.logger.LogFailure()
+		return nil, fmt.Errorf("signprehash.SignPrehash: prehash must be at least %d bytes, got %d", prehashPrefixSize, len(prehash))
+	}
+	if prehash[0] != prehashStartByte {
+		w.logger.LogFailure()
+		return nil, fmt.Errorf("signprehash.SignPrehash: prehash must start with %#x, got %#x", prehashStartByte, prehash[0])
+	}
+	keyID := binary.BigEndian.Uint32(prehash[1:prehashPrefixSize])
+	signer, ok := w.signers[keyID]
+	if !ok {
+		w.logger.LogFailure()
+		return nil, fmt.Errorf("signprehash.SignPrehash: keyset has no enabled key with key ID %d", keyID)
+	}
+	sig, err := signer.SignPrehash(prehash)
 	if err != nil {
 		w.logger.LogFailure()
 		return nil, err
 	}
-	w.logger.Log(w.keyID, len(prehash))
+	w.logger.Log(keyID, len(prehash))
 	return sig, nil
 }
 
