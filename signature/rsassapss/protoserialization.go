@@ -169,6 +169,9 @@ func parseParameters(protoHashType, protoMGF1HashType commonpb.HashType, outputP
 	if err != nil {
 		return nil, err
 	}
+	if !exponent.IsInt64() {
+		return nil, fmt.Errorf("public exponent cannot be represented as int64")
+	}
 	// Tolerate leading zeros in modulus encoding.
 	return NewParameters(ParametersValues{
 		ModulusSizeBits: modulusSizeBits,
@@ -254,6 +257,9 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 	// Tolerate leading zeros in modulus encoding.
 	modulus := new(big.Int).SetBytes(protoPublicKey.GetN())
 	exponent := new(big.Int).SetBytes(protoPublicKey.GetE())
+	if !exponent.IsInt64() {
+		return nil, fmt.Errorf("public exponent cannot be represented as int64")
+	}
 	saltLength := int(protoPublicKey.GetParams().GetSaltLength())
 	if saltLength == 0 {
 		return nil, fmt.Errorf("salt length zero cannot be parsed")

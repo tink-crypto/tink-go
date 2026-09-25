@@ -170,6 +170,21 @@ func TestParsePublicKeyFails(t *testing.T) {
 				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 			}, tinkpb.OutputPrefixType_TINK, 123),
 		},
+		{
+			name: "public exponent larger than int64",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: verifierTypeURL,
+				Value: mustMarshalProto(t, &rsassapkcs1pb.RsaSsaPkcs1PublicKey{
+					Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+						HashType: commonpb.HashType_SHA256,
+					},
+					N:       mustDecodeBase64(t, n2048Base64),
+					E:       new(big.Int).Add(new(big.Int).Lsh(big.NewInt(1), 64), big.NewInt(f4)).Bytes(),
+					Version: publicKeyProtoVersion,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &publicKeyParser{}
@@ -663,6 +678,30 @@ func TestParsePrivateKeyFails(t *testing.T) {
 						},
 						N:       mustDecodeBase64(t, n2048Base64),
 						E:       new(big.Int).SetUint64(uint64(f4)).Bytes(),
+						Version: publicKeyProtoVersion,
+					},
+					Version: privateKeyProtoVersion,
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
+			name: "public exponent larger than int64",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey",
+				Value: mustMarshalProto(t, &rsassapkcs1pb.RsaSsaPkcs1PrivateKey{
+					D:   mustDecodeBase64(t, d2048Base64),
+					P:   mustDecodeBase64(t, p2048Base64),
+					Q:   mustDecodeBase64(t, q2048Base64),
+					Dp:  mustDecodeBase64(t, dp2048Base64),
+					Dq:  mustDecodeBase64(t, dq2048Base64),
+					Crt: mustDecodeBase64(t, qInv2048Base64),
+					PublicKey: &rsassapkcs1pb.RsaSsaPkcs1PublicKey{
+						Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+							HashType: commonpb.HashType_SHA256,
+						},
+						N:       mustDecodeBase64(t, n2048Base64),
+						E:       new(big.Int).Add(new(big.Int).Lsh(big.NewInt(1), 64), big.NewInt(f4)).Bytes(),
 						Version: publicKeyProtoVersion,
 					},
 					Version: privateKeyProtoVersion,
@@ -1786,6 +1825,20 @@ func TestParseParametersFails(t *testing.T) {
 					},
 					ModulusSizeInBits: 2048,
 					PublicExponent:    new(big.Int).SetUint64(uint64(f4) - 1).Bytes(),
+				}),
+			},
+		},
+		{
+			name: "public exponent larger than int64",
+			keyTemplate: &tinkpb.KeyTemplate{
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.RsaSsaPkcs1PrivateKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				Value: mustMarshalProto(t, &rsassapkcs1pb.RsaSsaPkcs1KeyFormat{
+					Params: &rsassapkcs1pb.RsaSsaPkcs1Params{
+						HashType: commonpb.HashType_SHA256,
+					},
+					ModulusSizeInBits: 2048,
+					PublicExponent:    new(big.Int).Add(new(big.Int).Lsh(big.NewInt(1), 64), big.NewInt(f4)).Bytes(),
 				}),
 			},
 		},
