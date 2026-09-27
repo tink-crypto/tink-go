@@ -544,3 +544,85 @@ func TestDecryptTruncatedCiphertext(t *testing.T) {
 		}
 	}
 }
+func TestReadAfterDecryptionError(t *testing.T) {
+	var (
+		nonceSize                    = 10
+		noncePrefixSize              = 5
+		plaintextSegmentSize         = 20
+		firstCiphertextSegmentOffset = 10
+		plaintextSize                = 100
+	)
+
+	testcases := []struct {
+		name   string
+		modify func(ciphertext []byte) []byte
+	}{
+		{
+			name: "modifiedLastSegment",
+			modify: func(ciphertext []byte) []byte {
+				ciphertext[len(ciphertext)-1] ^= 1
+				return ciphertext
+			},
+		},
+		{
+			name: "truncated",
+			modify: func(ciphertext []byte) []byte {
+				return ciphertext[:len(ciphertext)-1]
+			},
+		},
+		{
+			// testDecrypterWithDst only verifies the tag, so modify the last byte of
+			// the first segment's tag.
+			name: "modifiedFirstSegment",
+			modify: func(ciphertext []byte) []byte {
+				ciphertext[plaintextSegmentSize-firstCiphertextSegmentOffset+nonceSize-1] ^= 1
+				return ciphertext
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			writerParams := noncebased.WriterParams{
+				NonceSize:                    nonceSize,
+				PlaintextSegmentSize:         plaintextSegmentSize,
+				FirstCiphertextSegmentOffset: firstCiphertextSegmentOffset,
+			}
+			_, ciphertext, noncePrefix, err := testEncrypt(plaintextSize, noncePrefixSize, writerParams)
+			if err != nil {
+				t.Fatalf("testEncrypt failed: %v", err)
+			}
+			ciphertext = tc.modify(ciphertext)
+
+			r, err := noncebased.NewReader(noncebased.ReaderParams{
+				R:                            bytes.NewReader(ciphertext),
+				SegmentDecrypter:             testDecrypterWithDst{},
+				NonceSize:                    nonceSize,
+				NoncePrefix:                  noncePrefix,
+				CiphertextSegmentSize:        plaintextSegmentSize + nonceSize,
+				FirstCiphertextSegmentOffset: firstCiphertextSegmentOffset,
+			})
+			if err != nil {
+				t.Fatalf("noncebased.NewReader() = _, err = %v, want nil", err)
+			}
+
+			chunk := make([]byte, plaintextSegmentSize)
+			var readErr error
+			for readErr == nil {
+				_, readErr = r.Read(chunk)
+			}
+			if readErr == io.EOF {
+				t.Fatal("r.Read() returned io.EOF for a modified ciphertext, want error")
+			}
+
+			// Retry more times than there are ciphertext bytes, so that a reader which
+			// consumes more ciphertext on each retry reaches the end of the stream.
+			for i := 0; i < len(ciphertext)+2; i++ {
+				n, err := r.Read(chunk)
+				if n != 0 || err != readErr {
+					t.Fatalf("r.Read() after error, attempt %d = %d, %v, want 0, %v", i, n, err, readErr)
+				}
+			}
+		})
+	}
+}
