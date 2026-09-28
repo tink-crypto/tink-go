@@ -15,6 +15,9 @@
 package jwk_test
 
 import (
+	"encoding/base64"
+	"fmt"
+	"slices"
 	"testing"
 
 	spb "google.golang.org/protobuf/types/known/structpb"
@@ -198,5 +201,101 @@ func TestNonCanonicalBase64Rejected(t *testing.T) {
 	}`
 	if _, err := jwk.ToPublicKeysetHandle([]byte(invalidJWKSet), jwk.Ed25519SupportTink); err == nil {
 		t.Errorf("ToPublicKeysetHandle() err = nil, want error for non-canonical base64 encoding")
+	}
+}
+
+// TestESPublicKeyNonCanonicalCoordinateLengthsRejected verifies that ECDSA JWK
+// imports enforce per-coordinate byte length checks (RFC 7518 §§6.2.1.2-6.2.1.3)
+// rather than only checking the concatenated x||y buffer length in crypto/ecdh.
+func TestESPublicKeyNonCanonicalCoordinateLengthsRejected(t *testing.T) {
+	b64Enc := base64.URLEncoding.WithPadding(base64.NoPadding)
+	mustDecode := func(t *testing.T, s string) []byte {
+		t.Helper()
+		b, err := b64Enc.DecodeString(s)
+		if err != nil {
+			t.Fatalf("DecodeString(%q) err = %v", s, err)
+		}
+		return b
+	}
+
+	curves := []struct {
+		alg     string
+		crv     string
+		coordSz int
+		validX  string
+		validY  string
+	}{
+		{
+			alg:     "ES256",
+			crv:     "P-256",
+			coordSz: 32,
+			validX:  "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY",
+			validY:  "T-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU",
+		},
+		{
+			alg:     "ES384",
+			crv:     "P-384",
+			coordSz: 48,
+			validX:  "AEUCTkKhRDEgJ2pTiyPoSsIOERywrB2xjBDgUH8LLg0Ao9xT2SxKadxLdRFIr8Ll",
+			validY:  "wQcqkI9pV66PJFmJVyZ7BsqvFaqoWT-jAFvYNjsgdvAIpyB3MHWXkxNhlPYcpEIf",
+		},
+		{
+			alg:     "ES512",
+			crv:     "P-521",
+			coordSz: 66,
+			validX:  "AKRFrHHoTaFAO-d4sCOw78KyUlZijBgqfp2rXtkLZ_QQGLtDM2nScAilkryvw3c_4fM39CEygtSunFLI9xyUyE3m",
+			validY:  "ANZK5JjTcNAKtezmXFvDSkrxdxPiuX2uPq6oR3M0pb2wqnfDL-nWeWcKb2nAOxYSyydsrZ98bxBL60lEr20x1Gc_",
+		},
+	}
+
+	makeJWKSet := func(alg, crv, x, y string) []byte {
+		return []byte(fmt.Sprintf(`{
+			"keys":[
+				{
+					"kty":"EC",
+					"crv":%q,
+					"alg":%q,
+					"x":%q,
+					"y":%q,
+					"use":"sig",
+					"key_ops":["verify"]
+				}
+			]
+		}`, crv, alg, x, y))
+	}
+
+	for _, c := range curves {
+		t.Run(c.alg, func(t *testing.T) {
+			rawX := mustDecode(t, c.validX)
+			rawY := mustDecode(t, c.validY)
+			if len(rawX) != c.coordSz || len(rawY) != c.coordSz {
+				t.Fatalf("unexpected test vector sizes: len(x)=%d, len(y)=%d, want %d", len(rawX), len(rawY), c.coordSz)
+			}
+
+			// Baseline: canonical coordinate lengths must be accepted.
+			if _, err := jwk.ToPublicKeysetHandle(makeJWKSet(c.alg, c.crv, c.validX, c.validY), jwk.Ed25519SupportNone); err != nil {
+				t.Fatalf("ToPublicKeysetHandle() err = %v, want nil for canonical %s key", err, c.alg)
+			}
+
+			// Shifted splits of the valid point bytes (len(x) + len(y) == 2*coordSz, but len(x) != coordSz).
+			xy := slices.Concat(rawX, rawY)
+			for _, split := range []int{0, 1, c.coordSz - 1, c.coordSz + 1, 2*c.coordSz - 1, 2 * c.coordSz} {
+				badX := b64Enc.EncodeToString(xy[:split])
+				badY := b64Enc.EncodeToString(xy[split:])
+				if _, err := jwk.ToPublicKeysetHandle(makeJWKSet(c.alg, c.crv, badX, badY), jwk.Ed25519SupportNone); err == nil {
+					t.Errorf("ToPublicKeysetHandle() with split (%d, %d) err = nil, want error", split, 2*c.coordSz-split)
+				}
+			}
+
+			// Extra leading zero byte on x or y.
+			paddedX := b64Enc.EncodeToString(slices.Concat([]byte{0x00}, rawX))
+			if _, err := jwk.ToPublicKeysetHandle(makeJWKSet(c.alg, c.crv, paddedX, c.validY), jwk.Ed25519SupportNone); err == nil {
+				t.Errorf("ToPublicKeysetHandle() with oversized x err = nil, want error")
+			}
+			paddedY := b64Enc.EncodeToString(slices.Concat([]byte{0x00}, rawY))
+			if _, err := jwk.ToPublicKeysetHandle(makeJWKSet(c.alg, c.crv, c.validX, paddedY), jwk.Ed25519SupportNone); err == nil {
+				t.Errorf("ToPublicKeysetHandle() with oversized y err = nil, want error")
+			}
+		})
 	}
 }

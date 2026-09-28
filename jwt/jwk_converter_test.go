@@ -911,6 +911,50 @@ func TestJWKSetToPublicKeysetInvalidRS256JWKSet(t *testing.T) {
 				"kid":"EhuduQ"
 			}`,
 		},
+		{
+			tag: "ES256 shifted x and y split (31 and 33 bytes)",
+			jwkSet: `{
+				"keys":[{
+				"kty":"EC",
+				"crv":"P-256",
+				"x":"axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwg",
+				"y":"lk_jQuL-Gn-bjufrSnwPnhYrzjNXazFezsu2QGg3v1H1",
+				"use":"sig","alg":"ES256","key_ops":["verify"]}]
+			}`,
+		},
+		{
+			tag: "ES256 shifted x and y split (33 and 31 bytes)",
+			jwkSet: `{
+				"keys":[{
+				"kty":"EC",
+				"crv":"P-256",
+				"x":"axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP",
+				"y":"40Li_hp_m47n60p8D54WK84zV2sxXs7LtkBoN79R9Q",
+				"use":"sig","alg":"ES256","key_ops":["verify"]}]
+			}`,
+		},
+		{
+			tag: "ES256 empty x and 64-byte y",
+			jwkSet: `{
+				"keys":[{
+				"kty":"EC",
+				"crv":"P-256",
+				"x":"",
+				"y":"axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li_hp_m47n60p8D54WK84zV2sxXs7LtkBoN79R9Q",
+				"use":"sig","alg":"ES256","key_ops":["verify"]}]
+			}`,
+		},
+		{
+			tag: "ES256 64-byte x and empty y",
+			jwkSet: `{
+				"keys":[{
+				"kty":"EC",
+				"crv":"P-256",
+				"x":"axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li_hp_m47n60p8D54WK84zV2sxXs7LtkBoN79R9Q",
+				"y":"",
+				"use":"sig","alg":"ES256","key_ops":["verify"]}]
+			}`,
+		},
 	} {
 		t.Run(tc.tag, func(t *testing.T) {
 			if _, err := jwt.JWKSetToPublicKeysetHandle([]byte(tc.jwkSet)); err == nil {

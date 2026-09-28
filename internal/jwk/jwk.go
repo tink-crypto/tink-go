@@ -303,12 +303,16 @@ func esPublicKeyDataFromStruct(keyStruct *spb.Struct) (key.Key, error) {
 		return nil, err
 	}
 	algorithm := jwtecdsa.UnknownAlgorithm
+	var encLen int
 	if alg == "ES256" && curve == "P-256" {
 		algorithm = jwtecdsa.ES256
+		encLen = 32
 	} else if alg == "ES384" && curve == "P-384" {
 		algorithm = jwtecdsa.ES384
+		encLen = 48
 	} else if alg == "ES512" && curve == "P-521" {
 		algorithm = jwtecdsa.ES512
+		encLen = 66
 	} else {
 		return nil, fmt.Errorf("invalid algorithm %q and curve %q", alg, curve)
 	}
@@ -329,9 +333,17 @@ func esPublicKeyDataFromStruct(keyStruct *spb.Struct) (key.Key, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode x: %v", err)
 	}
+	// RFC 7518 Sections 6.2.1.2 and 6.2.1.3 require the x and y coordinates to
+	// be encoded as the full-size octets of the curve's field element.
+	if len(x) != encLen {
+		return nil, fmt.Errorf("invalid x coordinate length; got %d, want %d", len(x), encLen)
+	}
 	y, err := decodeItem(keyStruct, "y")
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode y: %v", err)
+	}
+	if len(y) != encLen {
+		return nil, fmt.Errorf("invalid y coordinate length; got %d, want %d", len(y), encLen)
 	}
 	customKID := ""
 	hasCustomKID := false
