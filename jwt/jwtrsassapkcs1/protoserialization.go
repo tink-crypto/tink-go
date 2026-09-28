@@ -203,12 +203,15 @@ func publicKeyFromProto(protoPublicKey *jwtrsapb.JwtRsaSsaPkcs1PublicKey, output
 
 	modulusSizeInBits := new(big.Int).SetBytes(protoPublicKey.GetN()).BitLen()
 
-	exponent := new(big.Int).SetBytes(protoPublicKey.GetE()).Int64()
+	publicExponent := new(big.Int).SetBytes(protoPublicKey.GetE())
+	if !publicExponent.IsInt64() {
+		return nil, fmt.Errorf("public exponent cannot be represented as int64")
+	}
 	params, err := NewParameters(ParametersOpts{
 		KidStrategy:       kidStrategy,
 		Algorithm:         algorithmFromProto(protoPublicKey.GetAlgorithm()),
 		ModulusSizeInBits: modulusSizeInBits,
-		PublicExponent:    int(exponent),
+		PublicExponent:    int(publicExponent.Int64()),
 	})
 	if err != nil {
 		return nil, err

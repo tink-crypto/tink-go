@@ -574,6 +574,19 @@ func TestPublicKeyParser_Errors(t *testing.T) {
 			}, tinkpb.OutputPrefixType_TINK, 12345),
 		},
 		{
+			name: "exponent_too_large_to_fit_in_int64",
+			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+					Version:   0,
+					Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS256,
+					N:         mustBase64Decode(t, n2048Base64),
+					E:         new(big.Int).Add(new(big.Int).Lsh(big.NewInt(1), 64), big.NewInt(f4)).Bytes(),
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
+		{
 			name: "invalid_version",
 			publicKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
 				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PublicKey",
@@ -948,6 +961,28 @@ func TestPrivateKeyParser_Errors(t *testing.T) {
 						E:         e,
 					},
 					D:   mustBase64Decode(t, d3072Base64),
+					P:   mustBase64Decode(t, p2048Base64),
+					Q:   mustBase64Decode(t, q2048Base64),
+					Dp:  mustBase64Decode(t, dp2048Base64),
+					Dq:  mustBase64Decode(t, dq2048Base64),
+					Crt: mustBase64Decode(t, qInv2048Base64),
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+			}, tinkpb.OutputPrefixType_TINK, 123),
+		},
+		{
+			name: "exponent_too_large_to_fit_in_int64",
+			privateKeySerialization: mustNewKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.JwtRsaSsaPkcs1PrivateKey",
+				Value: mustMarshal(t, &jwtrsapb.JwtRsaSsaPkcs1PrivateKey{
+					Version: 0,
+					PublicKey: &jwtrsapb.JwtRsaSsaPkcs1PublicKey{
+						Version:   0,
+						Algorithm: jwtrsapb.JwtRsaSsaPkcs1Algorithm_RS256,
+						N:         mustBase64Decode(t, n2048Base64),
+						E:         new(big.Int).Add(new(big.Int).Lsh(big.NewInt(1), 64), big.NewInt(f4)).Bytes(),
+					},
+					D:   mustBase64Decode(t, d2048Base64),
 					P:   mustBase64Decode(t, p2048Base64),
 					Q:   mustBase64Decode(t, q2048Base64),
 					Dp:  mustBase64Decode(t, dp2048Base64),
