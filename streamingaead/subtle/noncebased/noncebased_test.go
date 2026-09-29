@@ -544,6 +544,7 @@ func TestDecryptTruncatedCiphertext(t *testing.T) {
 		}
 	}
 }
+
 func TestReadAfterDecryptionError(t *testing.T) {
 	var (
 		nonceSize                    = 10
