@@ -17,7 +17,6 @@ package aead
 import (
 	"fmt"
 
-	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/internal/tinkerror"
 	ctrpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_go_proto"
 	ctrhmacpb "github.com/tink-crypto/tink-go/v2/proto/aes_ctr_hmac_aead_go_proto"
@@ -28,6 +27,7 @@ import (
 	kmsenvpb "github.com/tink-crypto/tink-go/v2/proto/kms_envelope_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	xaesgcmpb "github.com/tink-crypto/tink-go/v2/proto/x_aes_gcm_go_proto"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
