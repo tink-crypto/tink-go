@@ -316,6 +316,66 @@ func TestSignDeterministicVerifyKat(t *testing.T) {
 	}
 }
 
+// TestSignDeterministicVerifyNISTTestVectors checks deterministic signing and
+// verification against the NIST ACVP signature generation test vectors from
+// slhdsa_nist_vectors_test.go.
+func TestSignDeterministicVerifyNISTTestVectors(t *testing.T) {
+	for _, tc := range nistSigGenTestVectors(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			skBytes := mustHexDecode(t, tc.sk)
+			pkBytes := mustHexDecode(t, tc.pk)
+			msgBytes := mustHexDecode(t, tc.msg)
+			ctxBytes := mustHexDecode(t, tc.ctx)
+			wantSigBytes := mustHexDecode(t, tc.wantSig)
+			sk, err := tc.par.DecodeSecretKey(skBytes)
+			if err != nil {
+				t.Fatalf("par.DecodeSecretKey() err = %v, want nil", err)
+			}
+			pk, err := tc.par.DecodePublicKey(pkBytes)
+			if err != nil {
+				t.Fatalf("par.DecodePublicKey() err = %v, want nil", err)
+			}
+			if got := sk.PublicKey().Encode(); !slices.Equal(got, pkBytes) {
+				t.Errorf("sk.PublicKey().Encode() = %x, want %x", got, pkBytes)
+			}
+			sig, err := sk.SignDeterministic(msgBytes, ctxBytes)
+			if err != nil {
+				t.Fatalf("sk.SignDeterministic() err = %v, want nil", err)
+			}
+			if !slices.Equal(sig, wantSigBytes) {
+				t.Fatalf("sk.SignDeterministic() = %x, want %x", sig, wantSigBytes)
+			}
+			if err := pk.Verify(msgBytes, wantSigBytes, ctxBytes); err != nil {
+				t.Errorf("pk.Verify() err = %v, want nil", err)
+			}
+		})
+	}
+}
+
+// TestVerifyNISTTestVectors checks verification against the NIST ACVP signature
+// verification test vectors from slhdsa_nist_vectors_test.go.
+func TestVerifyNISTTestVectors(t *testing.T) {
+	for _, tc := range nistSigVerTestVectors(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			pkBytes := mustHexDecode(t, tc.pk)
+			msgBytes := mustHexDecode(t, tc.msg)
+			ctxBytes := mustHexDecode(t, tc.ctx)
+			sigBytes := mustHexDecode(t, tc.sig)
+			pk, err := tc.par.DecodePublicKey(pkBytes)
+			if err != nil {
+				t.Fatalf("par.DecodePublicKey() err = %v, want nil", err)
+			}
+			err = pk.Verify(msgBytes, sigBytes, ctxBytes)
+			if tc.wantValid && err != nil {
+				t.Errorf("pk.Verify() err = %v, want nil", err)
+			}
+			if !tc.wantValid && err == nil {
+				t.Errorf("pk.Verify() err = nil, want error")
+			}
+		})
+	}
+}
+
 func TestSignVerify(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -350,52 +410,6 @@ func TestSignVerify(t *testing.T) {
 			}
 			if slices.Equal(signature, signature2) {
 				t.Fatal("sk.Sign() == sk.Sign(), want sk.Sign() != sk.Sign()")
-			}
-			if err := pk.Verify(m[:], signature, ctx[:]); err != nil {
-				t.Fatalf("pk.Verify() err = %v, want nil", err)
-			}
-			signature[0] ^= 1 // Corrupt the signature.
-			if err := pk.Verify(m[:], signature, ctx[:]); err == nil {
-				t.Errorf("pk.Verify() = nil, want err")
-			}
-		})
-	}
-}
-
-func TestSignDeterministicVerify(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		par  *params
-	}{
-		{"SLH-DSA-SHA2-128s", SLH_DSA_SHA2_128s},
-		{"SLH-DSA-SHAKE-128s", SLH_DSA_SHAKE_128s},
-		{"SLH-DSA-SHA2-128f", SLH_DSA_SHA2_128f},
-		{"SLH-DSA-SHAKE-128f", SLH_DSA_SHAKE_128f},
-		{"SLH-DSA-SHA2-192s", SLH_DSA_SHA2_192s},
-		{"SLH-DSA-SHAKE-192s", SLH_DSA_SHAKE_192s},
-		{"SLH-DSA-SHA2-192f", SLH_DSA_SHA2_192f},
-		{"SLH-DSA-SHAKE-192f", SLH_DSA_SHAKE_192f},
-		{"SLH-DSA-SHA2-256s", SLH_DSA_SHA2_256s},
-		{"SLH-DSA-SHAKE-256s", SLH_DSA_SHAKE_256s},
-		{"SLH-DSA-SHA2-256f", SLH_DSA_SHA2_256f},
-		{"SLH-DSA-SHAKE-256f", SLH_DSA_SHAKE_256f},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			sk, pk := tc.par.KeyGen()
-			var m [32]byte
-			rand.Read(m[:])
-			var ctx [32]byte
-			rand.Read(ctx[:])
-			signature, err := sk.SignDeterministic(m[:], ctx[:])
-			if err != nil {
-				t.Fatalf("sk.Sign() err = %v, want nil", err)
-			}
-			signature2, err := sk.SignDeterministic(m[:], ctx[:])
-			if err != nil {
-				t.Fatalf("sk.Sign() err = %v, want nil", err)
-			}
-			if !slices.Equal(signature, signature2) {
-				t.Fatal("sk.SignDeterministic() != sk.SignDeterministic(), want sk.SignDeterministic() == sk.SignDeterministic()")
 			}
 			if err := pk.Verify(m[:], signature, ctx[:]); err != nil {
 				t.Fatalf("pk.Verify() err = %v, want nil", err)
