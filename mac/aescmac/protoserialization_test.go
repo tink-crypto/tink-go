@@ -122,6 +122,14 @@ func TestParseKeyFails(t *testing.T) {
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 			}, tinkpb.OutputPrefixType_UNKNOWN_PREFIX, 12345),
 		},
+		{
+			name: "invalid key material type",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl:         "type.googleapis.com/google.crypto.tink.AesCmacKey",
+				Value:           serializedKey,
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_TINK, 12345),
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := protoserialization.ParseKey(tc.keySerialization); err == nil {

@@ -132,6 +132,20 @@ func TestParseKeyFails(t *testing.T) {
 				KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
 			}, tinkpb.OutputPrefixType_RAW, 0),
 		},
+		{
+			name: "invalid key material type",
+			keySerialization: mustCreateKeySerialization(t, &tinkpb.KeyData{
+				TypeUrl: "type.googleapis.com/google.crypto.tink.HmacPrfKey",
+				Value: mustMarshal(t, &hmacprfpb.HmacPrfKey{
+					Version:  0,
+					KeyValue: []byte("1234567890123456"),
+					Params: &hmacprfpb.HmacPrfParams{
+						Hash: commonpb.HashType_SHA256,
+					},
+				}),
+				KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+			}, tinkpb.OutputPrefixType_RAW, 0),
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := protoserialization.ParseKey(tc.keySerialization); err == nil {
