@@ -22,7 +22,6 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"hash"
-	"math/big"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	internalecdsa "github.com/tink-crypto/tink-go/v2/internal/signature/ecdsa"
@@ -81,13 +80,12 @@ func NewVerifier(publicKey *PublicKey, _ internalapi.Token) (tink.Verifier, erro
 	if err != nil {
 		return nil, err
 	}
-	publicPoint := publicKey.PublicPoint()
-	xy := publicPoint[1:]
-	ecdsaPublicKey := &ecdsa.PublicKey{
-		Curve: curve,
-		X:     new(big.Int).SetBytes(xy[:len(xy)/2]),
-		Y:     new(big.Int).SetBytes(xy[len(xy)/2:]),
+
+	ecdsaPublicKey, err := ecdsa.ParseUncompressedPublicKey(curve, publicKey.PublicPoint())
+	if err != nil {
+		return nil, fmt.Errorf("ecdsa_verifier: invalid public key: %s", err)
 	}
+
 	return &verifier{
 		key:        ecdsaPublicKey,
 		prefix:     publicKey.OutputPrefix(),

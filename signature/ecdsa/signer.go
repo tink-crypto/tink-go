@@ -19,7 +19,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"hash"
-	"math/big"
 	"slices"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
@@ -56,16 +55,11 @@ func NewSigner(k *PrivateKey, _ internalapi.Token) (tink.Signer, error) {
 		return nil, err
 	}
 
-	publicPoint := k.publicKey.PublicPoint()
-	// The point is guaranteed to be encoded as per SEC 1 v2.0, Section 2.3.3
-	// https://www.secg.org/sec1-v2.pdf#page=17.08.
-	xy := publicPoint[1:]
-	ecdsaPrivateKey := new(ecdsa.PrivateKey)
-	ecdsaPrivateKey.PublicKey.Curve = curve
-	ecdsaPrivateKey.PublicKey.X = new(big.Int).SetBytes(xy[:len(xy)/2])
-	ecdsaPrivateKey.PublicKey.Y = new(big.Int).SetBytes(xy[len(xy)/2:])
-
-	ecdsaPrivateKey.D = new(big.Int).SetBytes(k.PrivateKeyValue().Data(insecuresecretdataaccess.Token{}))
+	ecdsaPrivateKey, err := ecdsa.ParseRawPrivateKey(
+		curve, k.PrivateKeyValue().Data(insecuresecretdataaccess.Token{}))
+	if err != nil {
+		return nil, fmt.Errorf("ecdsa_signer: invalid private key: %s", err)
+	}
 
 	return &signer{
 		key:        ecdsaPrivateKey,
