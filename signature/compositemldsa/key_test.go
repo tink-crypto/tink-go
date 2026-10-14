@@ -64,6 +64,13 @@ func TestNewParametersUnsupported(t *testing.T) {
 		{compositemldsa.UnknownAlgorithm, compositemldsa.MLDSA65, compositemldsa.VariantTink},
 		{compositemldsa.Ed25519, compositemldsa.UnknownInstance, compositemldsa.VariantTink},
 		{compositemldsa.Ed25519, compositemldsa.MLDSA65, compositemldsa.VariantUnknown},
+		// MLDSA44 unsupported
+		{compositemldsa.ECDSAP384, compositemldsa.MLDSA44, compositemldsa.VariantTink},
+		{compositemldsa.ECDSAP521, compositemldsa.MLDSA44, compositemldsa.VariantTink},
+		{compositemldsa.RSA3072PSS, compositemldsa.MLDSA44, compositemldsa.VariantTink},
+		{compositemldsa.RSA4096PSS, compositemldsa.MLDSA44, compositemldsa.VariantTink},
+		{compositemldsa.RSA3072PKCS1, compositemldsa.MLDSA44, compositemldsa.VariantTink},
+		{compositemldsa.RSA4096PKCS1, compositemldsa.MLDSA44, compositemldsa.VariantTink},
 		// MLDSA65 unsupported
 		{compositemldsa.ECDSAP521, compositemldsa.MLDSA65, compositemldsa.VariantTink},
 		// MLDSA87 unsupported

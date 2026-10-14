@@ -30,6 +30,7 @@ import (
 )
 
 const (
+	mlDsa44SignatureLength = 2420
 	mlDsa65SignatureLength = 3309
 	mlDsa87SignatureLength = 4627
 )
@@ -48,6 +49,8 @@ var _ tink.Verifier = (*verifier)(nil)
 func mlDsaPublicKeyFromPublicKey(publicKey *PublicKey) (*internalmldsa.PublicKey, error) {
 	mlDsaPubKeyBytes := publicKey.MLDSAPublicKey().KeyBytes()
 	switch publicKey.Parameters().(*Parameters).MLDSAInstance() {
+	case MLDSA44:
+		return internalmldsa.MLDSA44.DecodePublicKey(mlDsaPubKeyBytes)
 	case MLDSA65:
 		return internalmldsa.MLDSA65.DecodePublicKey(mlDsaPubKeyBytes)
 	case MLDSA87:
@@ -123,6 +126,8 @@ func (v *verifier) Verify(signature, data []byte) error {
 
 	var mlDsaSigLen int
 	switch v.mlDSAInstance {
+	case MLDSA44:
+		mlDsaSigLen = mlDsa44SignatureLength
 	case MLDSA65:
 		mlDsaSigLen = mlDsa65SignatureLength
 	case MLDSA87:

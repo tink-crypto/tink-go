@@ -16,9 +16,11 @@
 package compositemldsa
 
 import (
+	"crypto/sha256"
 	"crypto/sha512"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/signature/ecdsa"
@@ -34,6 +36,8 @@ type MLDSAInstance int
 const (
 	// UnknownInstance is the default value of MLDSAInstance.
 	UnknownInstance MLDSAInstance = iota
+	// MLDSA44 yields ML-DSA-44 parameters.
+	MLDSA44
 	// MLDSA65 yields ML-DSA-65 parameters.
 	MLDSA65
 	// MLDSA87 yields ML-DSA-87 parameters.
@@ -80,6 +84,8 @@ const (
 func ComputeLabel(mlDSAInstance MLDSAInstance, classicalAlgorithm ClassicalAlgorithm) (string, error) {
 	label := "COMPSIG-"
 	switch mlDSAInstance {
+	case MLDSA44:
+		label += "MLDSA44"
 	case MLDSA65:
 		label += "MLDSA65"
 	case MLDSA87:
@@ -108,8 +114,12 @@ func ComputeLabel(mlDSAInstance MLDSAInstance, classicalAlgorithm ClassicalAlgor
 	default:
 		return "", fmt.Errorf("classical algorithm is not supported: %v", classicalAlgorithm)
 	}
-	// All of the currently supported classical algorithms use SHA512 as pre-hash.
-	label += "-SHA512"
+	if mlDSAInstance == MLDSA44 && classicalAlgorithm == ECDSAP256 {
+		label += "-SHA256"
+	} else {
+		// All of the other currently supported classical algorithms use SHA512 as pre-hash.
+		label += "-SHA512"
+	}
 	return label, nil
 }
 
@@ -118,6 +128,10 @@ func ComputeMessagePrime(label string, message []byte) []byte {
 	// Context is fixed at \x00.
 	// M' = Prefix || Label || len(ctx) || ctx || PH( M )
 	prefix := []byte("CompositeAlgorithmSignatures2025")
+	if strings.HasSuffix(label, "SHA256") {
+		hash := sha256.Sum256(message)
+		return slices.Concat(prefix, []byte(label), []byte{byte(0)}, hash[:])
+	}
 	hash := sha512.Sum512(message)
 	return slices.Concat(prefix, []byte(label), []byte{byte(0)}, hash[:])
 }
@@ -165,6 +179,8 @@ func ParametersForClassicalAlgorithm(classicalAlgorithm ClassicalAlgorithm) (key
 // ParametersForMLDSA returns the parameters for the given ML-DSA instance.
 func ParametersForMLDSA(mlDSAInstance MLDSAInstance) (*mldsa.Parameters, error) {
 	switch mlDSAInstance {
+	case MLDSA44:
+		return mldsa.NewParameters(mldsa.MLDSA44, mldsa.VariantNoPrefix)
 	case MLDSA65:
 		return mldsa.NewParameters(mldsa.MLDSA65, mldsa.VariantNoPrefix)
 	case MLDSA87:

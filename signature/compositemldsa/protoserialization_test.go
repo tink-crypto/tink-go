@@ -173,6 +173,8 @@ func mustCreateCompositePrivateKey(t *testing.T, mlDSAPrivKey *mldsa.PrivateKey,
 
 func protoInstanceEnum(instance MLDSAInstance) mldsapb.MlDsaInstance {
 	switch instance {
+	case MLDSA44:
+		return mldsapb.MlDsaInstance_ML_DSA_44
 	case MLDSA65:
 		return mldsapb.MlDsaInstance_ML_DSA_65
 	case MLDSA87:

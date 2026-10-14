@@ -53,6 +53,8 @@ type MLDSAInstance int
 const (
 	// UnknownInstance is the default value of MLDSAInstance.
 	UnknownInstance MLDSAInstance = iota
+	// MLDSA44 yields ML-DSA-44 parameters.
+	MLDSA44
 	// MLDSA65 yields ML-DSA-65 parameters.
 	MLDSA65
 	// MLDSA87 yields ML-DSA-87 parameters.
@@ -104,6 +106,9 @@ type mlDSAAndClassicalInstance struct {
 // supportedParameterSets is a set of supported parameter set combinations.
 // Supported combinations are defined at https://datatracker.ietf.org/doc/html/draft-ietf-lamps-pq-composite-sigs-15#name-algorithm-identifiers-and-p.
 var supportedParameterSets = map[mlDSAAndClassicalInstance]struct{}{
+	// MLDSA44
+	{Ed25519, MLDSA44}:   struct{}{},
+	{ECDSAP256, MLDSA44}: struct{}{},
 	// MLDSA65
 	{Ed25519, MLDSA65}:      struct{}{},
 	{ECDSAP256, MLDSA65}:    struct{}{},
@@ -219,6 +224,8 @@ func calculateOutputPrefix(variant Variant, keyID uint32) ([]byte, error) {
 
 func instanceFromMlDsaInstance(mlDSAInstance mldsa.Instance) (MLDSAInstance, error) {
 	switch mlDSAInstance {
+	case mldsa.MLDSA44:
+		return MLDSA44, nil
 	case mldsa.MLDSA65:
 		return MLDSA65, nil
 	case mldsa.MLDSA87:

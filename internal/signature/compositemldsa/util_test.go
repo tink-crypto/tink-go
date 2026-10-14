@@ -30,6 +30,18 @@ func TestCompositeMLDSALabel(t *testing.T) {
 		expectedLabel      string
 	}{
 		{
+			desc:               "MLDSA44-Ed25519",
+			mlDSAInstance:      internal.MLDSA44,
+			classicalAlgorithm: internal.Ed25519,
+			expectedLabel:      "COMPSIG-MLDSA44-Ed25519-SHA512",
+		},
+		{
+			desc:               "MLDSA44-ECDSAP256",
+			mlDSAInstance:      internal.MLDSA44,
+			classicalAlgorithm: internal.ECDSAP256,
+			expectedLabel:      "COMPSIG-MLDSA44-ECDSA-P256-SHA256",
+		},
+		{
 			desc:               "MLDSA65-Ed25519",
 			mlDSAInstance:      internal.MLDSA65,
 			classicalAlgorithm: internal.Ed25519,
@@ -82,24 +94,36 @@ func TestComputeCompositeMLDSAMessagePrime(t *testing.T) {
 	// prime as the C++ test vector.
 
 	message, _ := hex.DecodeString("00010203040506070809")
-	label := "COMPSIG-MLDSA65-ECDSA-P256-SHA512"
-
-	// C++ expected value (with len(ctx)=0):
-	// 436f6d706f73697465416c676f726974686d5369676e61747572657332303235 + // Prefix
-	// 434f4d505349472d4d4c44534136352d45434453412d503235362d534841353132 + // Label
-	// 00 + // len(ctx)=0
-	// 0f89ee1fcb7b0a4f7809d1267a029719004c5a5e5ec323a7c3523a20974f9a3f202f56fadba4cd9e8d654ab9f2e96dc5c795ea176fa20ede8d854c342f903533 // hash
-
-	// Go expected value:
-	expectedGoHex := "436f6d706f73697465416c676f726974686d5369676e61747572657332303235" + // Prefix
-		"434f4d505349472d4d4c44534136352d45434453412d503235362d534841353132" + // Label
-		"00" + // null byte
-		"0f89ee1fcb7b0a4f7809d1267a029719004c5a5e5ec323a7c3523a20974f9a3f202f56fadba4cd9e8d654ab9f2e96dc5c795ea176fa20ede8d854c342f903533" // hash
-
-	expected, _ := hex.DecodeString(expectedGoHex)
-
-	got := internal.ComputeMessagePrime(label, message)
-	if !bytes.Equal(got, expected) {
-		t.Errorf("ComputeCompositeMLDSAMessagePrime(%v, %v) = %x, want %x", label, message, got, expected)
+	for _, tc := range []struct {
+		label       string
+		expectedHex string
+	}{
+		{
+			label: "COMPSIG-MLDSA65-ECDSA-P256-SHA512",
+			// C++ expected value (with len(ctx)=0):
+			// 436f6d706f73697465416c676f726974686d5369676e61747572657332303235 + // Prefix
+			// 434f4d505349472d4d4c44534136352d45434453412d503235362d534841353132 + // Label
+			// 00 + // len(ctx)=0
+			// 0f89ee1fcb7b0a4f7809d1267a029719004c5a5e5ec323a7c3523a20974f9a3f202f56fadba4cd9e8d654ab9f2e96dc5c795ea176fa20ede8d854c342f903533 // hash
+			expectedHex: "436f6d706f73697465416c676f726974686d5369676e61747572657332303235" + // Prefix
+				"434f4d505349472d4d4c44534136352d45434453412d503235362d534841353132" + // Label
+				"00" + // null byte
+				"0f89ee1fcb7b0a4f7809d1267a029719004c5a5e5ec323a7c3523a20974f9a3f202f56fadba4cd9e8d654ab9f2e96dc5c795ea176fa20ede8d854c342f903533", // hash
+		},
+		{
+			label: "COMPSIG-MLDSA44-ECDSA-P256-SHA256",
+			expectedHex: "436f6d706f73697465416c676f726974686d5369676e61747572657332303235" + // Prefix
+				"434f4d505349472d4d4c44534134342d45434453412d503235362d534841323536" + // Label
+				"00" + // null byte
+				"1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab3", // hash
+		},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			expected, _ := hex.DecodeString(tc.expectedHex)
+			got := internal.ComputeMessagePrime(tc.label, message)
+			if !bytes.Equal(got, expected) {
+				t.Errorf("ComputeCompositeMLDSAMessagePrime(%v, %v) = %x, want %x", tc.label, message, got, expected)
+			}
+		})
 	}
 }

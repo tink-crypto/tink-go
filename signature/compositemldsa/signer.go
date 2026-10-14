@@ -52,6 +52,9 @@ func mldsaSecretKeyFromPrivateKey(privateKey *mldsa.PrivateKey) (*internalmldsa.
 	}
 
 	switch params.Instance() {
+	case mldsa.MLDSA44:
+		_, mldsaSecretKey := internalmldsa.MLDSA44.KeyGenFromSeed(seedBytes)
+		return mldsaSecretKey, nil
 	case mldsa.MLDSA65:
 		_, mldsaSecretKey := internalmldsa.MLDSA65.KeyGenFromSeed(seedBytes)
 		return mldsaSecretKey, nil
@@ -146,6 +149,8 @@ func signerConstructor(key key.Key) (any, error) {
 
 func toInternalMLDSAInstance(instance MLDSAInstance) (internalcompmldsa.MLDSAInstance, error) {
 	switch instance {
+	case MLDSA44:
+		return internalcompmldsa.MLDSA44, nil
 	case MLDSA65:
 		return internalcompmldsa.MLDSA65, nil
 	case MLDSA87:
