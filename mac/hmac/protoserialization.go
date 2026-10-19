@@ -157,8 +157,9 @@ func (s *keyParser) ParseKey(keySerialization *protoserialization.KeySerializati
 	if keyData.GetTypeUrl() != typeURL {
 		return nil, fmt.Errorf("invalid type URL: got %q, want %q", keyData.GetTypeUrl(), typeURL)
 	}
-	// Do not check key material type for compatibility with other Tink implementations.
-	// TODO - b/403459737: Consider adding the check.
+	if keyData.GetKeyMaterialType() != tinkpb.KeyData_SYMMETRIC {
+		return nil, fmt.Errorf("invalid key material type: %v", keyData.GetKeyMaterialType())
+	}
 	protoKey := new(hmacpb.HmacKey)
 	if err := proto.Unmarshal(keyData.GetValue(), protoKey); err != nil {
 		return nil, err

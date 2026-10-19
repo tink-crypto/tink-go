@@ -119,8 +119,9 @@ func (s *keyParser) ParseKey(keySerialization *protoserialization.KeySerializati
 	if keySerialization.OutputPrefixType() != tinkpb.OutputPrefixType_RAW {
 		return nil, fmt.Errorf("unsupported output prefix type: %v", keySerialization.OutputPrefixType())
 	}
-	// Do not check key material type for compatibility with other Tink implementations.
-	// TODO - b/403459737: Consider adding the check.
+	if keyData.GetKeyMaterialType() != tinkpb.KeyData_SYMMETRIC {
+		return nil, fmt.Errorf("invalid key material type: %v", keyData.GetKeyMaterialType())
+	}
 	protoKey := new(hkdfprfpb.HkdfPrfKey)
 	if err := proto.Unmarshal(keyData.GetValue(), protoKey); err != nil {
 		return nil, err
