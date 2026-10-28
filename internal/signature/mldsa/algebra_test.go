@@ -209,6 +209,106 @@ func TestInfinityNormMax(t *testing.T) {
 	}
 }
 
+func TestVectorInfinityNorm(t *testing.T) {
+	polyWithCoeffs := func(coeffs ...rZq) *poly {
+		p := &poly{}
+		copy(p[:], coeffs)
+		return p
+	}
+
+	tests := []struct {
+		name string
+		vec  vector
+		want uint32
+	}{
+		{
+			name: "empty_vector",
+			vec:  vector{},
+			want: 0,
+		},
+		{
+			name: "zero_vector",
+			vec:  makeZeroVector(4),
+			want: 0,
+		},
+		{
+			name: "max_in_first_poly",
+			vec: vector{
+				polyWithCoeffs(400),
+				polyWithCoeffs(300),
+				polyWithCoeffs(200),
+				polyWithCoeffs(100),
+			},
+			want: 400,
+		},
+		{
+			name: "max_in_middle_poly",
+			vec: vector{
+				polyWithCoeffs(100),
+				polyWithCoeffs(500),
+				polyWithCoeffs(300),
+				polyWithCoeffs(200),
+			},
+			want: 500,
+		},
+		{
+			name: "max_in_last_poly",
+			vec: vector{
+				polyWithCoeffs(100),
+				polyWithCoeffs(200),
+				polyWithCoeffs(300),
+				polyWithCoeffs(600),
+			},
+			want: 600,
+		},
+		{
+			name: "negative_centered_representations_and_boundary",
+			vec: vector{
+				polyWithCoeffs(100, q-777),
+				polyWithCoeffs((q + 1) / 2),
+				polyWithCoeffs(776),
+			},
+			want: (q - 1) / 2,
+		},
+		{
+			name: "duplicate_max_norms",
+			vec: vector{
+				polyWithCoeffs(450),
+				polyWithCoeffs(100),
+				polyWithCoeffs(q - 450),
+			},
+			want: 450,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.vec.infinityNorm(); got != tc.want {
+				t.Errorf("tc.vec.infinityNorm() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestVectorInfinityNormRandom(t *testing.T) {
+	const numVectorTests = 100
+	for i := 0; i < numVectorTests; i++ {
+		v := make(vector, 4)
+		want := uint32(0)
+		for j := range v {
+			v[j] = randomPoly()
+			for _, coeff := range v[j] {
+				if abs := coeff.centeredAbs(); abs > want {
+					want = abs
+				}
+			}
+		}
+		if got := v.infinityNorm(); got != want {
+			t.Fatalf("v.infinityNorm() = %v, want %v", got, want)
+		}
+	}
+}
+
 func comparePoly(p, q *poly) bool {
 	if len(p) != len(q) {
 		return false

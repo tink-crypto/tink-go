@@ -499,7 +499,10 @@ func (v vector) infinityNorm() uint32 {
 	res := uint32(0)
 	for i := range v {
 		norm := v[i].infinityNorm()
-		res = max(res, norm)
+		// Constant time version of the following logic:
+		// res = max(res, norm)
+		c := subtle.ConstantTimeLessOrEq(int(res), int(norm))
+		res = uint32(subtle.ConstantTimeSelect(c, int(norm), int(res)))
 	}
 	return res
 }
