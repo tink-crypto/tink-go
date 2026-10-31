@@ -442,9 +442,18 @@ func ToPublicKeysetHandle(jwkSet []byte, ed25519Support Ed25519SupportType) (*ke
 	if err != nil {
 		return nil, err
 	}
+	// maxJWKSetSize is the maximum number of keys allowed in a JWK set
+	// passed to ToPublicKeysetHandle. This prevents unbounded resource
+	// consumption when parsing attacker-controlled JWK sets (e.g. from
+	// a remote JWKS endpoint).
+	const maxJWKSetSize = 1000
+	keyValues := keyList.GetValues()
+	if len(keyValues) > maxJWKSetSize {
+		return nil, fmt.Errorf("jwk: JWK set contains %d keys, maximum allowed is %d", len(keyValues), maxJWKSetSize)
+	}
 	km := keyset.NewManager()
 	var lastKeyID uint32
-	for _, keyStruct := range keyList.GetValues() {
+	for _, keyStruct := range keyValues {
 		key, err := keysetKeyFromStruct(keyStruct, ed25519Support)
 		if err != nil {
 			return nil, err
