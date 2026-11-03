@@ -17,6 +17,11 @@
 # This scripts checks that a given Go workspace has its generated Bazel files up
 # to date.
 
+# Unique hex string of length 20
+echo "================================================================================"
+echo "Tink Script ID: 2b2cb802d41577be7b25 (to quickly find the script from logs)"
+echo "================================================================================"
+
 usage() {
   echo "Usage: $0 [-h] [-c <compat value (default 1.19)>] <go project dir>"
   echo "  -c: Value to pass to `-compat`. Default to 1.19."
