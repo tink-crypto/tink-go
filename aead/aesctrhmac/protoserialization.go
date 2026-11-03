@@ -164,13 +164,13 @@ func (s *keyParser) ParseKey(keySerialization *protoserialization.KeySerializati
 		return nil, err
 	}
 	if protoKey.GetVersion() != 0 {
-		return nil, fmt.Errorf("unsupported aesctrhmacpb.AesCtrHmacAeadKey version: got %q, want %q", protoKey.GetVersion(), 0)
+		return nil, fmt.Errorf("unsupported aesctrhmacpb.AesCtrHmacAeadKey version: got %d, want %d", protoKey.GetVersion(), 0)
 	}
 	if protoKey.GetAesCtrKey().GetVersion() != 0 {
-		return nil, fmt.Errorf("unsupported aesctrpb.AesCtrKey version: got %q, want %q", protoKey.GetAesCtrKey().GetVersion(), 0)
+		return nil, fmt.Errorf("unsupported aesctrpb.AesCtrKey version: got %d, want %d", protoKey.GetAesCtrKey().GetVersion(), 0)
 	}
 	if protoKey.GetHmacKey().GetVersion() != 0 {
-		return nil, fmt.Errorf("unsupported hmacpb.HmacKey version: got %q, want %q", protoKey.GetHmacKey().GetVersion(), 0)
+		return nil, fmt.Errorf("unsupported hmacpb.HmacKey version: got %d, want %d", protoKey.GetHmacKey().GetVersion(), 0)
 	}
 	variant, err := variantFromProto(keySerialization.OutputPrefixType())
 	if err != nil {
@@ -264,7 +264,7 @@ func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameter
 		return nil, err
 	}
 	if format.GetHmacKeyFormat().GetVersion() != 0 {
-		return nil, fmt.Errorf("unsupported hmacpb.HmacKeyFormat version: got %q, want %q", format.GetHmacKeyFormat().GetVersion(), 0)
+		return nil, fmt.Errorf("unsupported hmacpb.HmacKeyFormat version: got %d, want %d", format.GetHmacKeyFormat().GetVersion(), 0)
 	}
 
 	variant, err := variantFromProto(keyTemplate.GetOutputPrefixType())

@@ -124,7 +124,7 @@ func (s *keyParser) ParseKey(keySerialization *protoserialization.KeySerializati
 		return nil, err
 	}
 	if protoKey.GetVersion() != 0 {
-		return nil, fmt.Errorf("unsupported key version: got %q, want %q", protoKey.GetVersion(), 0)
+		return nil, fmt.Errorf("unsupported key version: got %d, want %d", protoKey.GetVersion(), 0)
 	}
 	paramsProto := protoKey.GetParams()
 	hkdfHashType, err := hashTypeFromProto(paramsProto.GetHkdfHashType())

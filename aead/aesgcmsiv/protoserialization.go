@@ -170,7 +170,7 @@ func (s *parametersParser) Parse(keyTemplate *tinkpb.KeyTemplate) (key.Parameter
 		return nil, err
 	}
 	if format.GetVersion() != 0 {
-		return nil, fmt.Errorf("unsupported aesgcmsivpb.AesGcmSivKeyFormat version: got %q, want %q", format.GetVersion(), 0)
+		return nil, fmt.Errorf("unsupported aesgcmsivpb.AesGcmSivKeyFormat version: got %d, want %d", format.GetVersion(), 0)
 	}
 	variant, err := variantFromProto(keyTemplate.GetOutputPrefixType())
 	if err != nil {

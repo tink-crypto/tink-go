@@ -461,7 +461,7 @@ func TestSignerKeyManagerNewKey(t *testing.T) {
 	}
 	n := uint32(new(big.Int).SetBytes(pubKey.GetN()).BitLen())
 	if !cmp.Equal(n, keyFormat.GetModulusSizeInBits()) {
-		t.Errorf("Modulus size in bits = %q, want %q", n, keyFormat.GetModulusSizeInBits())
+		t.Errorf("Modulus size in bits = %d, want %d", n, keyFormat.GetModulusSizeInBits())
 	}
 	if !cmp.Equal(pubKey.GetParams(), keyFormat.GetParams(), protocmp.Transform()) {
 		t.Errorf("GetParams() = %v, want %v", pubKey.GetParams(), keyFormat.GetParams())

@@ -130,7 +130,7 @@ func TestNewPublicKey(t *testing.T) {
 				}
 				idRequirement, hasIDRequirement := got.IDRequirement()
 				if idRequirement != tc.opts.IDRequirement || hasIDRequirement != tc.opts.Parameters.HasIDRequirement() {
-					t.Errorf("got.IDRequirement() = %q, %v, want %q, %v", kid, hasKID, tc.wantKID, tc.wantHasKID)
+					t.Errorf("got.IDRequirement() = %v, %v, want %v, %v", idRequirement, hasIDRequirement, tc.opts.IDRequirement, tc.opts.Parameters.HasIDRequirement())
 				}
 
 				got2, err := jwtecdsa.NewPublicKey(tc.opts)
@@ -441,7 +441,7 @@ func TestNewPrivateKey(t *testing.T) {
 				}
 				idRequirement, hasIDRequirement := got.IDRequirement()
 				if idRequirement != tc.opts.IDRequirement || hasIDRequirement != tc.opts.Parameters.HasIDRequirement() {
-					t.Errorf("got.IDRequirement() = %q, %v, want %q, %v", idRequirement, hasIDRequirement, tc.opts.IDRequirement, tc.opts.Parameters.HasIDRequirement())
+					t.Errorf("got.IDRequirement() = %v, %v, want %v, %v", idRequirement, hasIDRequirement, tc.opts.IDRequirement, tc.opts.Parameters.HasIDRequirement())
 				}
 				if !cmp.Equal(got.Parameters(), publicKey.Parameters()) {
 					t.Errorf("cmp.Equal(got.Parameters(), publicKey.Parameters()) = false, want true")
