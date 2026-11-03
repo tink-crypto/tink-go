@@ -1,8 +1,8 @@
 module github.com/tink-crypto/tink-go/v2
 
-go 1.25.0
+go 1.26.0
 
-toolchain go1.25.11
+toolchain go1.26.10
 
 require (
 	github.com/c2sp/wycheproof v0.0.0-20260105152342-fca0d3ba9f12
