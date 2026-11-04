@@ -515,10 +515,26 @@ func TestWycheproofSign(t *testing.T) {
 
 		for _, group := range suite.TestGroups {
 			for _, test := range group.Tests {
+				internalTestCase := slices.Contains(test.Flags, "Internal")
+				randomized := slices.Contains(test.Flags, "Randomized")
+				expectedDecodeSecretKeyErr := slices.Contains(test.Flags, "IncorrectPrivateKeyLength")
 				expectedSignErr := slices.Contains(test.Flags, "InvalidContext")
 
 				caseName := fmt.Sprintf("%s:Case-%d", v.filename, test.CaseID)
 				t.Run(caseName, func(t *testing.T) {
+					if internalTestCase {
+						t.Skip("skipping 'Internal' test case")
+					}
+					if randomized {
+						t.Skip("skipping 'Randomized' test case")
+					}
+
+					if expectedDecodeSecretKeyErr && len(group.PrivateSeed) != 32 {
+						// API only accepts [32]byte.
+						// End subtest successfully.
+						return
+					}
+
 					_, secretKey := v.params.KeyGenFromSeed([32]byte(group.PrivateSeed))
 
 					got, err := secretKey.SignDeterministic(test.Message, test.Context)
@@ -588,11 +604,20 @@ func TestWycheproofSignNoSeed(t *testing.T) {
 
 		for _, group := range suite.TestGroups {
 			for _, test := range group.Tests {
+				internalTestCase := slices.Contains(test.Flags, "Internal")
+				randomized := slices.Contains(test.Flags, "Randomized")
 				expectedDecodeSecretKeyErr := slices.Contains(test.Flags, "IncorrectPrivateKeyLength")
 				expectedSignErr := slices.Contains(test.Flags, "InvalidContext")
 
 				caseName := fmt.Sprintf("%s:Case-%d", v.filename, test.CaseID)
 				t.Run(caseName, func(t *testing.T) {
+					if internalTestCase {
+						t.Skip("skipping 'Internal' test case")
+					}
+					if randomized {
+						t.Skip("skipping 'Randomized' test case")
+					}
+
 					secretKey, err := v.params.DecodeSecretKey(group.PrivateKey)
 					if expectedDecodeSecretKeyErr {
 						if err == nil {
