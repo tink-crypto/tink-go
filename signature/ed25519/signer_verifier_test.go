@@ -324,6 +324,8 @@ func TestWycheproof(t *testing.T) {
 					if err == nil {
 						t.Fatal("ED25519Verifier.Verify() succeeded in an invalid test case.")
 					}
+				case "acceptable":
+					// TODO: b/379282500 - Inspect flags to appropriately handle.
 				default:
 					t.Fatalf("unsupported test result: %q", test.Result)
 				}
