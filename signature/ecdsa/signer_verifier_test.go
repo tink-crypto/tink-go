@@ -485,10 +485,9 @@ func TestWycheproof(t *testing.T) {
 				// There is no requirement that libraries check the length of P1363 encoded signatures.
 				//
 				// See https://github.com/C2SP/wycheproof/blob/fca0d3ba9f1286c3af57801ace39c633e29a88f1/testvectors_v1/ecdsa_secp256r1_sha256_p1363_test.json#L66-L69
-				//
 				expectedSignatureSizeNilErr := slices.Contains(test.Flags, "SignatureSize") && v.Encoding == "IEEE_P1363"
-				caseName := fmt.Sprintf("%s-%s-%s:Case-%d", group.Type, group.PublicKey.Curve, group.SHA, test.CaseID)
-				t.Run(caseName, func(t *testing.T) {
+
+				t.Run(fmt.Sprintf("%s:Case-%d", v.Filename, test.CaseID), func(t *testing.T) {
 					err := verifier.Verify(test.Signature, test.Message)
 					switch test.Result {
 					case "valid":
