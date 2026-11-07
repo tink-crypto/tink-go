@@ -350,6 +350,34 @@ func (d testDecrypterWithDst) DecryptSegmentWithDst(dst, segment, nonce []byte) 
 	return result, nil
 }
 
+// testNonceRecordingEncrypter does the same as testEncrypter, but also records
+// every nonce it is called with.
+type testNonceRecordingEncrypter struct {
+	nonces *[][]byte
+}
+
+func (e testNonceRecordingEncrypter) EncryptSegment(segment, nonce []byte) ([]byte, error) {
+	*e.nonces = append(*e.nonces, bytes.Clone(nonce))
+	return testEncrypter{}.EncryptSegment(segment, nonce)
+}
+
+// testFailingWriter writes to buf. While fail is set, each Write stores only
+// the first half of p and then returns errTestWrite.
+type testFailingWriter struct {
+	buf  bytes.Buffer
+	fail bool
+}
+
+var errTestWrite = errors.New("test write error")
+
+func (w *testFailingWriter) Write(p []byte) (int, error) {
+	if w.fail {
+		n, _ := w.buf.Write(p[:len(p)/2])
+		return n, errTestWrite
+	}
+	return w.buf.Write(p)
+}
+
 // testEncrypt generates a random plaintext and random noncePrefix, then uses
 // them to instantiate a noncebased.Writer and uses it to produce a ciphertext.
 //
@@ -418,6 +446,151 @@ func testDecrypt(plaintext, ciphertext []byte, chunkSize int, rp noncebased.Read
 		return fmt.Errorf("number of decrypted bytes does not match. Got=%d,want=%d", decrypted, len(plaintext))
 	}
 	return nil
+}
+
+func TestWriterErrorsAreSticky(t *testing.T) {
+	var (
+		nonceSize            = 10
+		noncePrefixSize      = 5
+		plaintextSegmentSize = 20
+	)
+	// The first segment holds plaintextSegmentSize bytes, so a Write of more
+	// than that encrypts and writes a segment, while a shorter Write does not.
+	short := bytes.Repeat([]byte{0x01}, plaintextSegmentSize/2)
+	long := bytes.Repeat([]byte{0x02}, 2*plaintextSegmentSize)
+
+	testcases := []struct {
+		name string
+		// failing is called while the underlying writer fails and must return
+		// the error observed by the caller.
+		failing func(t *testing.T, w *noncebased.Writer) error
+		// after is called once the underlying writer works again and returns
+		// the errors of all calls it makes.
+		after func(w *noncebased.Writer) []error
+	}{
+		{
+			name: "writeFailsThenWrite",
+			failing: func(t *testing.T, w *noncebased.Writer) error {
+				_, err := w.Write(long)
+				return err
+			},
+			after: func(w *noncebased.Writer) []error {
+				_, err1 := w.Write(long)
+				err2 := w.Close()
+				return []error{err1, err2}
+			},
+		},
+		{
+			name: "writeFailsThenClose",
+			failing: func(t *testing.T, w *noncebased.Writer) error {
+				_, err := w.Write(long)
+				return err
+			},
+			after: func(w *noncebased.Writer) []error {
+				return []error{w.Close()}
+			},
+		},
+		{
+			name: "closeFailsThenWrite",
+			failing: func(t *testing.T, w *noncebased.Writer) error {
+				if _, err := w.Write(short); err != nil {
+					t.Fatalf("w.Write() err = %v, want nil", err)
+				}
+				return w.Close()
+			},
+			after: func(w *noncebased.Writer) []error {
+				_, err1 := w.Write(short)
+				err2 := w.Close()
+				return []error{err1, err2}
+			},
+		},
+		{
+			name: "closeFailsThenClose",
+			failing: func(t *testing.T, w *noncebased.Writer) error {
+				if _, err := w.Write(short); err != nil {
+					t.Fatalf("w.Write() err = %v, want nil", err)
+				}
+				return w.Close()
+			},
+			after: func(w *noncebased.Writer) []error {
+				return []error{w.Close()}
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			noncePrefix := make([]byte, noncePrefixSize)
+			if _, err := rand.Read(noncePrefix); err != nil {
+				t.Fatalf("rand.Read() = _, err = %v, want nil", err)
+			}
+			var nonces [][]byte
+			dst := &testFailingWriter{}
+			w, err := noncebased.NewWriter(noncebased.WriterParams{
+				W:                    dst,
+				SegmentEncrypter:     testNonceRecordingEncrypter{nonces: &nonces},
+				NoncePrefix:          noncePrefix,
+				NonceSize:            nonceSize,
+				PlaintextSegmentSize: plaintextSegmentSize,
+			})
+			if err != nil {
+				t.Fatalf("noncebased.NewWriter() = _, err = %v, want nil", err)
+			}
+
+			dst.fail = true
+			if err := tc.failing(t, w); !errors.Is(err, errTestWrite) {
+				t.Fatalf("err = %v, want %v", err, errTestWrite)
+			}
+			dst.fail = false
+			written := dst.buf.Len()
+
+			for i, err := range tc.after(w) {
+				if !errors.Is(err, errTestWrite) {
+					t.Errorf("call %d after the failure: err = %v, want %v", i, err, errTestWrite)
+				}
+			}
+			if got := dst.buf.Len(); got != written {
+				t.Errorf("%d bytes written after the failure, want 0", got-written)
+			}
+			seen := make(map[string]bool)
+			for _, nonce := range nonces {
+				if seen[string(nonce)] {
+					t.Errorf("nonce %x used more than once", nonce)
+				}
+				seen[string(nonce)] = true
+			}
+		})
+	}
+}
+
+func TestWriterCloseAfterSuccessfulClose(t *testing.T) {
+	noncePrefix := make([]byte, 5)
+	if _, err := rand.Read(noncePrefix); err != nil {
+		t.Fatalf("rand.Read() = _, err = %v, want nil", err)
+	}
+	var b bytes.Buffer
+	w, err := noncebased.NewWriter(noncebased.WriterParams{
+		W:                    &b,
+		SegmentEncrypter:     testEncrypterWithDst{},
+		NoncePrefix:          noncePrefix,
+		NonceSize:            10,
+		PlaintextSegmentSize: 20,
+	})
+	if err != nil {
+		t.Fatalf("noncebased.NewWriter() = _, err = %v, want nil", err)
+	}
+	if _, err := w.Write([]byte("plaintext")); err != nil {
+		t.Fatalf("w.Write() err = %v, want nil", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("w.Close() err = %v, want nil", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Errorf("second w.Close() err = %v, want nil", err)
+	}
+	if _, err := w.Write([]byte("more")); err == nil {
+		t.Errorf("w.Write() after w.Close() err = nil, want error")
+	}
 }
 
 // This test uses testDecrypter and testEncrypter, to make sure that the old API is still working.
