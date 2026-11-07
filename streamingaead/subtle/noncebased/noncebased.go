@@ -257,6 +257,7 @@ type Reader struct {
 	ciphertext                   []byte
 	ciphertextPos                int
 	lastSegmentDecrypted         bool
+	err                          error
 }
 
 // ReaderParams contains the options for instantiating a Reader via NewReader().
@@ -308,7 +309,14 @@ func NewReader(params ReaderParams) (*Reader, error) {
 }
 
 // Read decrypts data from underlying reader and passes it to p.
+//
+// If Read returns an error because the ciphertext is invalid (for example, a
+// segment fails authentication), every subsequent call returns the same error.
+// Errors from the underlying reader are not retained.
 func (r *Reader) Read(p []byte) (int, error) {
+	if r.err != nil {
+		return 0, r.err
+	}
 	if r.plaintextPos < len(r.plaintext) {
 		n := copy(p, r.plaintext[r.plaintextPos:])
 		r.plaintextPos += n
@@ -336,7 +344,6 @@ func (r *Reader) Read(p []byte) (int, error) {
 	)
 	if err != nil {
 		lastSegment = true
-		r.lastSegmentDecrypted = true
 		segment = r.ciphertextPos + n
 	} else {
 		segment = r.ciphertextPos + n - 1
@@ -348,6 +355,7 @@ func (r *Reader) Read(p []byte) (int, error) {
 
 	nonce, err := generateSegmentNonce(r.nonceSize, r.noncePrefix, r.decryptedSegmentCnt, lastSegment)
 	if err != nil {
+		r.err = err
 		return 0, err
 	}
 	if r.useSegmentDecrypterWithDst {
@@ -356,8 +364,10 @@ func (r *Reader) Read(p []byte) (int, error) {
 		r.plaintext, err = r.segmentDecrypter.DecryptSegment(r.ciphertext[:segment], nonce)
 	}
 	if err != nil {
+		r.err = err
 		return 0, err
 	}
+	r.lastSegmentDecrypted = lastSegment
 
 	// Copy 1 byte remainder to the beginning of ciphertext.
 	if !lastSegment {
