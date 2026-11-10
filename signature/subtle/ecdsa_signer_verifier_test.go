@@ -161,8 +161,7 @@ func TestECDSAWycheproofCases(t *testing.T) {
 				//
 				expectedSignatureSizeNilErr := slices.Contains(test.Flags, "SignatureSize") && v.Encoding == "IEEE_P1363"
 
-				caseName := fmt.Sprintf("%s-%s:Case-%d", group.Type, group.SHA, test.CaseID)
-				t.Run(caseName, func(t *testing.T) {
+				t.Run(fmt.Sprintf("%s:Case-%d", v.Filename, test.CaseID), func(t *testing.T) {
 					err := verifier.Verify(test.Signature, test.Message)
 					switch test.Result {
 					case "valid":
