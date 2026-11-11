@@ -35,7 +35,10 @@ type hybridEncrypt struct {
 //
 // This is an internal API.
 func NewHybridEncrypt(publicKey *PublicKey, _ internalapi.Token) (tink.HybridEncrypt, error) {
-	params := publicKey.Parameters().(*Parameters)
+	params, ok := publicKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", publicKey.Parameters(), (*Parameters)(nil))
+	}
 	kemID, err := kemIDFromParams(params)
 	if err != nil {
 		return nil, err

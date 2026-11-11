@@ -35,7 +35,10 @@ var _ tink.MAC = (*fullMAC)(nil)
 
 // NewMAC creates a new full HMAC [tink.MAC] primitive.
 func NewMAC(key *Key, _ internalapi.Token) (tink.MAC, error) {
-	params := key.Parameters().(*Parameters)
+	params, ok := key.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("hmac.NewMAC: invalid parameters type: got %T, want %T", key.Parameters(), (*Parameters)(nil))
+	}
 
 	if err := subtle.ValidateHMACParams(params.HashType().String(), uint32(params.KeySizeInBytes()), uint32(params.CryptographicTagSizeInBytes())); err != nil {
 		return nil, fmt.Errorf("hmac.NewMAC: invalid parameters: %v", err)

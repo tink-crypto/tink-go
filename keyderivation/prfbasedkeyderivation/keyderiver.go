@@ -44,7 +44,10 @@ func NewKeyDeriver(key *Key, _ internalapi.Token) (keyderiver.KeyDeriver, error)
 	if !ok {
 		return nil, fmt.Errorf("prfbasedkeyderivation: unsupported PRF key type: got %T, want %T", key.PRFKey(), (*hkdfprf.Key)(nil))
 	}
-	prfKeyParams := prfKey.Parameters().(*hkdfprf.Parameters)
+	prfKeyParams, ok := prfKey.Parameters().(*hkdfprf.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("prfbasedkeyderivation: invalid parameters type: got %T, want %T", prfKey.Parameters(), (*hkdfprf.Parameters)(nil))
+	}
 	prf, err := streamingprf.NewHKDFStreamingPRF(prfKeyParams.HashType().String(), prfKey.KeyBytes().Data(insecuresecretdataaccess.Token{}), prfKeyParams.Salt())
 	if err != nil {
 		return nil, fmt.Errorf("prfbasedkeyderivation: %v", err)
@@ -64,7 +67,11 @@ func (k *keyDeriver) DeriveKey(salt []byte) (key.Key, error) {
 		return nil, fmt.Errorf("prfbasedkeyderivation: compute randomness from PRF failed: %v", err)
 	}
 
-	derivedKeyParameters := k.key.Parameters().(*Parameters).DerivedKeyParameters()
+	params, ok := k.key.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("prfbasedkeyderivation: invalid parameters type: got %T, want %T", k.key.Parameters(), (*Parameters)(nil))
+	}
+	derivedKeyParameters := params.DerivedKeyParameters()
 	idRequirement, _ := k.key.IDRequirement()
 	return keyderivers.DeriveKey(derivedKeyParameters, idRequirement, randomness, insecuresecretdataaccess.Token{})
 }

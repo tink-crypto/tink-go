@@ -154,7 +154,10 @@ func publicKeyToProtoPublicKey(publicKey *PublicKey) (*eciespb.EciesAeadHkdfPubl
 		return nil, fmt.Errorf("public key is nil")
 	}
 
-	eciesParams := publicKey.Parameters().(*Parameters)
+	eciesParams, ok := publicKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", publicKey.Parameters(), (*Parameters)(nil))
+	}
 	// This is nil if PublicKey was created as a struct literal.
 	if eciesParams == nil {
 		return nil, fmt.Errorf("key has nil parameters")
@@ -218,7 +221,11 @@ func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.Key
 		return nil, err
 	}
 
-	outputPrefixType, err := protoOutputPrefixTypeFromVariant(eciesPublicKey.Parameters().(*Parameters).Variant())
+	params, ok := eciesPublicKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", eciesPublicKey.Parameters(), (*Parameters)(nil))
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(params.Variant())
 	if err != nil {
 		return nil, err
 	}
@@ -422,10 +429,14 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 		return nil, err
 	}
 
+	params, ok := eciesPrivateKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", eciesPrivateKey.Parameters(), (*Parameters)(nil))
+	}
 	privateKeyValue := eciesPrivateKey.PrivateKeyBytes().Data(insecuresecretdataaccess.Token{})
-	if eciesPrivateKey.Parameters().(*Parameters).CurveType() != X25519 {
+	if params.CurveType() != X25519 {
 		// This must be padded with at least one leading zero (see b/264525021).
-		coordinateSize, err := coordinateSizeForCurve(eciesPrivateKey.Parameters().(*Parameters).CurveType())
+		coordinateSize, err := coordinateSizeForCurve(params.CurveType())
 		if err != nil {
 			return nil, err
 		}
@@ -445,7 +456,7 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 		return nil, err
 	}
 
-	outputPrefixType, err := protoOutputPrefixTypeFromVariant(eciesPrivateKey.Parameters().(*Parameters).Variant())
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(params.Variant())
 	if err != nil {
 		return nil, err
 	}
@@ -493,7 +504,11 @@ func (s *privateKeyParser) ParseKey(keySerialization *protoserialization.KeySeri
 	privateKeyBytes := protoECIESKey.GetKeyValue()
 	if protoECIESKey.GetPublicKey().GetParams().GetKemParams().GetCurveType() != commonpb.EllipticCurveType_CURVE25519 {
 		// Tolerate arbitrary leading zeros in the private key.
-		coordinateSize, err := coordinateSizeForCurve(publicKey.Parameters().(*Parameters).CurveType())
+		params, ok := publicKey.Parameters().(*Parameters)
+		if !ok {
+			return nil, fmt.Errorf("invalid parameters type: got %T, want %T", publicKey.Parameters(), (*Parameters)(nil))
+		}
+		coordinateSize, err := coordinateSizeForCurve(params.CurveType())
 		if err != nil {
 			return nil, err
 		}

@@ -153,7 +153,11 @@ func newMLKEMPublicKeyFromPrivateKey(privateKeyBytes secretdata.Bytes, kemID KEM
 }
 
 func validateECDHPrivateKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey) error {
-	curve, err := ecdhCurveFromKEMID(pubKey.Parameters().(*Parameters).KEMID())
+	params, ok := pubKey.Parameters().(*Parameters)
+	if !ok {
+		return fmt.Errorf("invalid parameters type: got %T, want %T", pubKey.Parameters(), (*Parameters)(nil))
+	}
+	curve, err := ecdhCurveFromKEMID(params.KEMID())
 	if err != nil {
 		return fmt.Errorf("ecdhCurveFromKEMID failed: %w", err)
 	}
@@ -184,7 +188,11 @@ func validateXWingPrivateKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey
 }
 
 func validateMLKEMPrivateKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey) error {
-	switch pubKey.Parameters().(*Parameters).KEMID() {
+	params, ok := pubKey.Parameters().(*Parameters)
+	if !ok {
+		return fmt.Errorf("invalid parameters type: got %T, want %T", pubKey.Parameters(), (*Parameters)(nil))
+	}
+	switch params.KEMID() {
 	case ML_KEM768:
 		mlKemPrivateKey, err := mlkem.NewDecapsulationKey768(privateKeyBytes.Data(insecuresecretdataaccess.Token{}))
 		if err != nil {
@@ -204,7 +212,7 @@ func validateMLKEMPrivateKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey
 			return fmt.Errorf("invalid private key value")
 		}
 	default:
-		return fmt.Errorf("unsupported KEMID: %v", pubKey.Parameters().(*Parameters).KEMID())
+		return fmt.Errorf("unsupported KEMID: %v", params.KEMID())
 	}
 	return nil
 }
@@ -329,7 +337,11 @@ func NewPrivateKey(privateKeyBytes secretdata.Bytes, idRequirement uint32, param
 //
 // [SEC 1 v2.0, Section 2.3.5]: https://www.secg.org/sec1-v2.pdf#page=17.08
 func NewPrivateKeyFromPublicKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey) (*PrivateKey, error) {
-	switch pubKey.Parameters().(*Parameters).KEMID() {
+	params, ok := pubKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: invalid parameters type: got %T, want %T", pubKey.Parameters(), (*Parameters)(nil))
+	}
+	switch params.KEMID() {
 	case DHKEM_P256_HKDF_SHA256, DHKEM_P384_HKDF_SHA384, DHKEM_P521_HKDF_SHA512, DHKEM_X25519_HKDF_SHA256:
 		if err := validateECDHPrivateKey(privateKeyBytes, pubKey); err != nil {
 			return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: validateECDHPrivateKey failed: %w", err)
@@ -343,7 +355,7 @@ func NewPrivateKeyFromPublicKey(privateKeyBytes secretdata.Bytes, pubKey *Public
 			return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: validateMLKEMPrivateKey failed: %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: unsupported KEMID: %v", pubKey.Parameters().(*Parameters).KEMID())
+		return nil, fmt.Errorf("hpke.NewPrivateKeyFromPublicKey: unsupported KEMID: %v", params.KEMID())
 	}
 	return &PrivateKey{
 		publicKey:       pubKey,

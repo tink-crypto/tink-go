@@ -162,7 +162,11 @@ func NewPrivateKey(privateKeyBytes secretdata.Bytes, idRequirement uint32, param
 //
 // [SEC 1 v2.0, Section 2.3.5]: https://www.secg.org/sec1-v2.pdf#page=17.08
 func NewPrivateKeyFromPublicKey(privateKeyBytes secretdata.Bytes, pubKey *PublicKey) (*PrivateKey, error) {
-	curveType := pubKey.Parameters().(*Parameters).CurveType()
+	params, ok := pubKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("ecies.NewPrivateKey: invalid parameters type: got %T, want %T", pubKey.Parameters(), (*Parameters)(nil))
+	}
+	curveType := params.CurveType()
 	curve, err := ecdhCurveFromCurveType(curveType)
 	if err != nil {
 		return nil, fmt.Errorf("ecies.NewPrivateKey: %v", err)

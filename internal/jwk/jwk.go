@@ -468,7 +468,10 @@ func addStringEntry(s *spb.Struct, key, val string) {
 }
 
 func psPublicKeyToStruct(key *jwtrsassapss.PublicKey) (*spb.Struct, error) {
-	params := key.Parameters().(*jwtrsassapss.Parameters)
+	params, ok := key.Parameters().(*jwtrsassapss.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", key.Parameters(), (*jwtrsassapss.Parameters)(nil))
+	}
 	alg := params.Algorithm().String()
 	outKey := &spb.Struct{
 		Fields: map[string]*spb.Value{},
@@ -493,7 +496,10 @@ func psPublicKeyToStruct(key *jwtrsassapss.PublicKey) (*spb.Struct, error) {
 }
 
 func rsPublicKeyToStruct(key *jwtrsassapkcs1.PublicKey) (*spb.Struct, error) {
-	params := key.Parameters().(*jwtrsassapkcs1.Parameters)
+	params, ok := key.Parameters().(*jwtrsassapkcs1.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", key.Parameters(), (*jwtrsassapkcs1.Parameters)(nil))
+	}
 	alg := params.Algorithm().String()
 	outKey := &spb.Struct{
 		Fields: map[string]*spb.Value{},
@@ -519,7 +525,10 @@ func rsPublicKeyToStruct(key *jwtrsassapkcs1.PublicKey) (*spb.Struct, error) {
 
 // Assumes key is not nil and valid, that is, created via [jwtecdsa.NewPublicKey].
 func esPublicKeyToStruct(key *jwtecdsa.PublicKey) (*spb.Struct, error) {
-	params := key.Parameters().(*jwtecdsa.Parameters)
+	params, ok := key.Parameters().(*jwtecdsa.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", key.Parameters(), (*jwtecdsa.Parameters)(nil))
+	}
 	var algorithm, curve string
 	var encLen int
 	switch params.Algorithm() {

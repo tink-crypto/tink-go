@@ -47,8 +47,12 @@ type verifier struct {
 var _ tink.Verifier = (*verifier)(nil)
 
 func mlDsaPublicKeyFromPublicKey(publicKey *PublicKey) (*internalmldsa.PublicKey, error) {
+	params, ok := publicKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", publicKey.Parameters(), (*Parameters)(nil))
+	}
 	mlDsaPubKeyBytes := publicKey.MLDSAPublicKey().KeyBytes()
-	switch publicKey.Parameters().(*Parameters).MLDSAInstance() {
+	switch params.MLDSAInstance() {
 	case MLDSA44:
 		return internalmldsa.MLDSA44.DecodePublicKey(mlDsaPubKeyBytes)
 	case MLDSA65:

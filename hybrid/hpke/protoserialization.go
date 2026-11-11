@@ -105,7 +105,11 @@ func publicKeyToProto(publicKey *PublicKey) (*hpkepb.HpkePublicKey, error) {
 	if publicKey == nil {
 		return nil, fmt.Errorf("public key is nil")
 	}
-	protoParameters, err := parametersToProto(publicKey.Parameters().(*Parameters))
+	params, ok := publicKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", publicKey.Parameters(), (*Parameters)(nil))
+	}
+	protoParameters, err := parametersToProto(params)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +156,11 @@ func (s *publicKeySerializer) SerializeKey(key key.Key) (*protoserialization.Key
 		Value:           serializedProtoPublicKey,
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 	}
-	outputPrefixType, err := protoOutputPrefixTypeFromVariant(hpkePublicKey.Parameters().(*Parameters).Variant())
+	params, ok := hpkePublicKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", hpkePublicKey.Parameters(), (*Parameters)(nil))
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(params.Variant())
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +325,11 @@ func (s *privateKeySerializer) SerializeKey(key key.Key) (*protoserialization.Ke
 		return nil, err
 	}
 
-	outputPrefixType, err := protoOutputPrefixTypeFromVariant(hpkePrivateKey.Parameters().(*Parameters).Variant())
+	params, ok := hpkePrivateKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", hpkePrivateKey.Parameters(), (*Parameters)(nil))
+	}
+	outputPrefixType, err := protoOutputPrefixTypeFromVariant(params.Variant())
 	if err != nil {
 		return nil, err
 	}

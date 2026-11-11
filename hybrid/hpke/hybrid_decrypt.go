@@ -82,7 +82,10 @@ func aeadIDFromParams(params *Parameters) (internalhpke.AEADID, error) {
 //
 // This is an internal API.
 func NewHybridDecrypt(privateKey *PrivateKey, _ internalapi.Token) (tink.HybridDecrypt, error) {
-	params := privateKey.Parameters().(*Parameters)
+	params, ok := privateKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", privateKey.Parameters(), (*Parameters)(nil))
+	}
 	kemID, err := kemIDFromParams(params)
 	if err != nil {
 		return nil, err

@@ -45,7 +45,10 @@ func createJWTHMAC(key key.Key) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("createJWTHMAC: key is of type %T, want %T", key, (*jwthmac.Key)(nil))
 	}
-	jwtParams := jwthmacKey.Parameters().(*jwthmac.Parameters)
+	jwtParams, ok := jwthmacKey.Parameters().(*jwthmac.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("createJWTHMAC: invalid parameters type: got %T, want %T", jwthmacKey.Parameters(), (*jwthmac.Parameters)(nil))
+	}
 
 	var hashType hmac.HashType
 	var tagSizeInBytes int

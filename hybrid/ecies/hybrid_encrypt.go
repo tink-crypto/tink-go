@@ -40,7 +40,10 @@ func NewHybridEncrypt(publicKey *PublicKey, _ internalapi.Token) (tink.HybridEnc
 	if publicKey == nil {
 		return nil, fmt.Errorf("publicKey is nil")
 	}
-	params := publicKey.Parameters().(*Parameters)
+	params, ok := publicKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", publicKey.Parameters(), (*Parameters)(nil))
+	}
 	curve, err := subtle.GetCurve(params.CurveType().String())
 	if err != nil {
 		return nil, err
@@ -70,7 +73,7 @@ func NewHybridEncrypt(publicKey *PublicKey, _ internalapi.Token) (tink.HybridEnc
 	return &hybridEncrypt{
 		rawHybridEncrypt: rawHybridEncrypt,
 		prefix:           publicKey.OutputPrefix(),
-		variant:          publicKey.Parameters().(*Parameters).Variant(),
+		variant:          params.Variant(),
 	}, nil
 }
 

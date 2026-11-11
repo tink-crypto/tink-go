@@ -54,7 +54,10 @@ func (s *keySerializer) SerializeKey(key key.Key) (*protoserialization.KeySerial
 	if !ok {
 		return nil, fmt.Errorf("invalid key type: got %T, want *xaesgcm.Key", key)
 	}
-	thatParameters := that.Parameters().(*Parameters)
+	thatParameters, ok := that.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", that.Parameters(), (*Parameters)(nil))
+	}
 	outputPrefixType, err := protoOutputPrefixTypeFromVariant(thatParameters.Variant())
 	if err != nil {
 		return nil, err

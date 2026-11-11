@@ -53,8 +53,11 @@ func NewHybridDecrypt(privateKey *PrivateKey, _ internalapi.Token) (tink.HybridD
 	if privateKey == nil {
 		return nil, fmt.Errorf("privateKey is nil")
 	}
-	params := privateKey.Parameters().(*Parameters)
-	curve, err := subtle.GetCurve(privateKey.Parameters().(*Parameters).CurveType().String())
+	params, ok := privateKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", privateKey.Parameters(), (*Parameters)(nil))
+	}
+	curve, err := subtle.GetCurve(params.CurveType().String())
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +76,7 @@ func NewHybridDecrypt(privateKey *PrivateKey, _ internalapi.Token) (tink.HybridD
 	return &hybridDecrypt{
 		rawHybridDecrypt: rawHybridDecrypt,
 		prefix:           privateKey.OutputPrefix(),
-		variant:          privateKey.Parameters().(*Parameters).Variant(),
+		variant:          params.Variant(),
 	}, nil
 }
 

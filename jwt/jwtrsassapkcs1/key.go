@@ -154,10 +154,14 @@ func NewPrivateKey(opts PrivateKeyOpts) (*PrivateKey, error) {
 	if opts.PublicKey == nil {
 		return nil, fmt.Errorf("jwtrsassapkcs1.NewPrivateKey: public key cannot be nil")
 	}
+	params, ok := opts.PublicKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("jwtrsassapkcs1.NewPrivateKey: invalid parameters type: got %T, want %T", opts.PublicKey.Parameters(), (*Parameters)(nil))
+	}
 	privateKey := rsa.PrivateKey{
 		PublicKey: rsa.PublicKey{
 			N: new(big.Int).SetBytes(opts.PublicKey.Modulus()),
-			E: opts.PublicKey.Parameters().(*Parameters).PublicExponent(),
+			E: params.PublicExponent(),
 		},
 		D: new(big.Int).SetBytes(opts.D.Data(insecuresecretdataaccess.Token{})),
 		Primes: []*big.Int{

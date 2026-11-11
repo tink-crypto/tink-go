@@ -76,7 +76,10 @@ func primitiveConstructor(k key.Key) (any, error) {
 		return nil, fmt.Errorf("invalid key size: %v", err)
 	}
 
-	params := k.Parameters().(*Parameters)
+	params, ok := that.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", that.Parameters(), (*Parameters)(nil))
+	}
 	return subtle.NewAESGCMHKDF(
 		that.keyBytes.Data(insecuresecretdataaccess.Token{}),
 		params.HKDFHashType().String(),

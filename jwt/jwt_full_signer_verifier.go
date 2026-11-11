@@ -98,7 +98,10 @@ func createJWTECDSASigner(key key.Key) (any, error) {
 		return nil, err
 	}
 	jwtPublicKey := publicKey.(*jwtecdsa.PublicKey)
-	jwtParams := privateKey.Parameters().(*jwtecdsa.Parameters)
+	jwtParams, ok := privateKey.Parameters().(*jwtecdsa.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", privateKey.Parameters(), (*jwtecdsa.Parameters)(nil))
+	}
 	curveType, hashType, err := ecdsaCurveAndHashFromJWTAlgorithm(jwtParams.Algorithm())
 	if err != nil {
 		return nil, err
@@ -143,7 +146,10 @@ func createJWTRSASSAPKCS1Signer(key key.Key) (any, error) {
 		return nil, err
 	}
 	jwtPublicKey := publicKey.(*jwtrsassapkcs1.PublicKey)
-	jwtParams := privateKey.Parameters().(*jwtrsassapkcs1.Parameters)
+	jwtParams, ok := privateKey.Parameters().(*jwtrsassapkcs1.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", privateKey.Parameters(), (*jwtrsassapkcs1.Parameters)(nil))
+	}
 
 	hashType, err := hashTypeFromJWTRSAlgorithm(jwtParams.Algorithm())
 	if err != nil {
@@ -198,7 +204,10 @@ func createJWTRSASSAPSSSigner(key key.Key) (any, error) {
 		return nil, err
 	}
 	jwtPublicKey := publicKey.(*jwtrsassapss.PublicKey)
-	jwtParams := privateKey.Parameters().(*jwtrsassapss.Parameters)
+	jwtParams, ok := privateKey.Parameters().(*jwtrsassapss.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", privateKey.Parameters(), (*jwtrsassapss.Parameters)(nil))
+	}
 
 	hashType, saltLen, err := hashTypeAndSaltLengthFromJWTPSAlgorithm(jwtParams.Algorithm())
 	if err != nil {
@@ -259,7 +268,10 @@ func createJWTMLDSASigner(k key.Key) (any, error) {
 		return nil, err
 	}
 	jwtPublicKey := publicKey.(*jwtmldsa.PublicKey)
-	jwtParams := privateKey.Parameters().(*jwtmldsa.Parameters)
+	jwtParams, ok := privateKey.Parameters().(*jwtmldsa.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", privateKey.Parameters(), (*jwtmldsa.Parameters)(nil))
+	}
 
 	instance, err := mldsaInstanceFromJWTAlgorithm(jwtParams.Algorithm())
 	if err != nil {
@@ -333,7 +345,10 @@ func createJWTECDSAVerifier(key key.Key) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("expected %T, got %T", (*jwtecdsa.PublicKey)(nil), key)
 	}
-	jwtParams := jwtPublicKey.Parameters().(*jwtecdsa.Parameters)
+	jwtParams, ok := jwtPublicKey.Parameters().(*jwtecdsa.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", jwtPublicKey.Parameters(), (*jwtecdsa.Parameters)(nil))
+	}
 	curveType, hashType, err := ecdsaCurveAndHashFromJWTAlgorithm(jwtParams.Algorithm())
 	if err != nil {
 		return nil, err
@@ -359,7 +374,10 @@ func createJWTRSASSAPKCS1Verifier(key key.Key) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("expected %T, got %T", (*jwtrsassapkcs1.PublicKey)(nil), key)
 	}
-	jwtParams := jwtPublicKey.Parameters().(*jwtrsassapkcs1.Parameters)
+	jwtParams, ok := jwtPublicKey.Parameters().(*jwtrsassapkcs1.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", jwtPublicKey.Parameters(), (*jwtrsassapkcs1.Parameters)(nil))
+	}
 
 	hashType, err := hashTypeFromJWTRSAlgorithm(jwtParams.Algorithm())
 	if err != nil {
@@ -388,7 +406,10 @@ func createJWTRSASSAPSSVerifier(key key.Key) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("expected %T, got %T", (*jwtrsassapss.PublicKey)(nil), key)
 	}
-	jwtParams := jwtPublicKey.Parameters().(*jwtrsassapss.Parameters)
+	jwtParams, ok := jwtPublicKey.Parameters().(*jwtrsassapss.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", jwtPublicKey.Parameters(), (*jwtrsassapss.Parameters)(nil))
+	}
 
 	hashType, saltLen, err := hashTypeAndSaltLengthFromJWTPSAlgorithm(jwtParams.Algorithm())
 	if err != nil {
@@ -423,7 +444,10 @@ func createJWTMLDSAVerifier(k key.Key) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("expected %T, got %T", (*jwtmldsa.PublicKey)(nil), k)
 	}
-	jwtParams := jwtPublicKey.Parameters().(*jwtmldsa.Parameters)
+	jwtParams, ok := jwtPublicKey.Parameters().(*jwtmldsa.Parameters)
+	if !ok {
+		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", jwtPublicKey.Parameters(), (*jwtmldsa.Parameters)(nil))
+	}
 
 	instance, err := mldsaInstanceFromJWTAlgorithm(jwtParams.Algorithm())
 	if err != nil {

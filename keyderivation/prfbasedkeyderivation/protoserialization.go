@@ -41,7 +41,11 @@ func (s *keySerializer) SerializeKey(k key.Key) (*protoserialization.KeySerializ
 		return nil, fmt.Errorf("prfbasedkeyderivation: unexpected key type: got %T, want %T", k, (*Key)(nil))
 	}
 
-	derivedKeyTemplate, err := protoserialization.SerializeParameters(pbdKey.Parameters().(*Parameters).DerivedKeyParameters())
+	params, ok := pbdKey.Parameters().(*Parameters)
+	if !ok {
+		return nil, fmt.Errorf("prfbasedkeyderivation: invalid parameters type: got %T, want %T", pbdKey.Parameters(), (*Parameters)(nil))
+	}
+	derivedKeyTemplate, err := protoserialization.SerializeParameters(params.DerivedKeyParameters())
 	if err != nil {
 		return nil, fmt.Errorf("prfbasedkeyderivation: failed to serialize parameters: %w", err)
 	}
