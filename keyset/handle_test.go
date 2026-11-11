@@ -679,9 +679,65 @@ func TestWriteAndReadWithNoSecrets(t *testing.T) {
 	}
 }
 
-func TestNewHandleWithNoSecretsReturnsErrorIfInputIsNil(t *testing.T) {
-	if _, err := keyset.NewHandleWithNoSecrets(nil); err == nil {
-		t.Fatal("keyset.NewHandleWithNoSecrets(nil) err = nil, want error")
+func TestNewHandleWithNoSecretsFailsWithInvalidKeyset(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		keyset *tinkpb.Keyset
+	}{
+		{
+			name:   "nil keyset",
+			keyset: nil,
+		},
+		{
+			name:   "empty keyset",
+			keyset: &tinkpb.Keyset{},
+		},
+		{
+			name: "keyset with destroyed key",
+			keyset: &tinkpb.Keyset{
+				Key: []*tinkpb.Keyset_Key{{
+					Status: tinkpb.KeyStatusType_DESTROYED,
+					KeyId:  7,
+				}},
+			},
+		},
+		{
+			name: "keyset with no primary key",
+			keyset: &tinkpb.Keyset{
+				Key: []*tinkpb.Keyset_Key{{
+					KeyData: &tinkpb.KeyData{
+						TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPublicKey",
+						Value:           []byte("x"),
+						KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+					},
+					Status:           tinkpb.KeyStatusType_ENABLED,
+					KeyId:            123,
+					OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				}},
+			},
+		},
+		{
+			name: "keyset with primary key not enabled",
+			keyset: &tinkpb.Keyset{
+				Key: []*tinkpb.Keyset_Key{{
+					KeyData: &tinkpb.KeyData{
+						TypeUrl:         "type.googleapis.com/google.crypto.tink.EcdsaPublicKey",
+						Value:           []byte("x"),
+						KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+					},
+					Status:           tinkpb.KeyStatusType_DISABLED,
+					KeyId:            123,
+					OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				}},
+				PrimaryKeyId: 123,
+			},
+		},
+	} {
+		t.Run(fmt.Sprintf("keyset=%v", tc.name), func(t *testing.T) {
+			if _, err := keyset.NewHandleWithNoSecrets(tc.keyset); err == nil {
+				t.Errorf("keyset.NewHandleWithNoSecrets(tc.keyset) err = nil, want error")
+			}
+		})
 	}
 }
 
