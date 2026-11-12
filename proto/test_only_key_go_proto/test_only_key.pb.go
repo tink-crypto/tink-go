@@ -253,6 +253,62 @@ func (x *TestOnlyPrivateKey) GetKeyValue() []byte {
 	return nil
 }
 
+// key_type: type.googleapis.com/google.crypto.tink.TestOnlyLegacyKey
+//
+// Never has a registered proto serialization, for tests of keys parsed as
+// `LegacyProtoKey`s.
+type TestOnlyLegacyKey struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Version       uint32                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	KeyValue      []byte                 `protobuf:"bytes,2,opt,name=key_value,json=keyValue,proto3" json:"key_value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestOnlyLegacyKey) Reset() {
+	*x = TestOnlyLegacyKey{}
+	mi := &file_test_only_key_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestOnlyLegacyKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestOnlyLegacyKey) ProtoMessage() {}
+
+func (x *TestOnlyLegacyKey) ProtoReflect() protoreflect.Message {
+	mi := &file_test_only_key_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestOnlyLegacyKey.ProtoReflect.Descriptor instead.
+func (*TestOnlyLegacyKey) Descriptor() ([]byte, []int) {
+	return file_test_only_key_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *TestOnlyLegacyKey) GetVersion() uint32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *TestOnlyLegacyKey) GetKeyValue() []byte {
+	if x != nil {
+		return x.KeyValue
+	}
+	return nil
+}
+
 var File_test_only_key_proto protoreflect.FileDescriptor
 
 const file_test_only_key_proto_rawDesc = "" +
@@ -270,7 +326,10 @@ const file_test_only_key_proto_rawDesc = "" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12D\n" +
 	"\n" +
 	"public_key\x18\x02 \x01(\v2%.google.crypto.tink.TestOnlyPublicKeyR\tpublicKey\x12\x1b\n" +
-	"\tkey_value\x18\x03 \x01(\fR\bkeyValueB`\n" +
+	"\tkey_value\x18\x03 \x01(\fR\bkeyValue\"J\n" +
+	"\x11TestOnlyLegacyKey\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\rR\aversion\x12\x1b\n" +
+	"\tkey_value\x18\x02 \x01(\fR\bkeyValueB`\n" +
 	"\x1ccom.google.crypto.tink.protoP\x01Z>github.com/tink-crypto/tink-go/v2/proto/test_only_key_go_protob\x06proto3"
 
 var (
@@ -285,12 +344,13 @@ func file_test_only_key_proto_rawDescGZIP() []byte {
 	return file_test_only_key_proto_rawDescData
 }
 
-var file_test_only_key_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_test_only_key_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_test_only_key_proto_goTypes = []any{
 	(*TestOnlyKeyFormat)(nil),  // 0: google.crypto.tink.TestOnlyKeyFormat
 	(*TestOnlyKey)(nil),        // 1: google.crypto.tink.TestOnlyKey
 	(*TestOnlyPublicKey)(nil),  // 2: google.crypto.tink.TestOnlyPublicKey
 	(*TestOnlyPrivateKey)(nil), // 3: google.crypto.tink.TestOnlyPrivateKey
+	(*TestOnlyLegacyKey)(nil),  // 4: google.crypto.tink.TestOnlyLegacyKey
 }
 var file_test_only_key_proto_depIdxs = []int32{
 	2, // 0: google.crypto.tink.TestOnlyPrivateKey.public_key:type_name -> google.crypto.tink.TestOnlyPublicKey
@@ -312,7 +372,7 @@ func file_test_only_key_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_test_only_key_proto_rawDesc), len(file_test_only_key_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
