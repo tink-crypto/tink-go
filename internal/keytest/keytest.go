@@ -23,6 +23,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 )
 
 // RegisterPrimitiveConstructor accepts a config object and registers the
@@ -36,6 +37,18 @@ func init() {
 		panic(fmt.Sprintf("keytest.init() failed: %v", err))
 	}
 	if err := primitiveregistry.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*Key](&keySerializer{}); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(typeURL, &keyParser{}); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersSerializer[*Parameters](&parametersSerializer{}); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(typeURL, &parametersParser{}); err != nil {
 		panic(fmt.Sprintf("keytest.init() failed: %v", err))
 	}
 }
