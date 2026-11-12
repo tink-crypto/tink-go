@@ -17,12 +17,25 @@ package keytest
 
 import (
 	"fmt"
+	"reflect"
 
+	"github.com/tink-crypto/tink-go/v2/internal/config"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 )
+
+// RegisterPrimitiveConstructor accepts a config object and registers the
+// keytest primitive constructor to the provided config.
+func RegisterPrimitiveConstructor(b *config.Builder, t internalapi.Token) error {
+	return b.RegisterPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
+}
 
 func init() {
 	if err := keygenregistry.RegisterKeyCreator[*Parameters](createKey); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("keytest.init() failed: %v", err))
 	}
 }
