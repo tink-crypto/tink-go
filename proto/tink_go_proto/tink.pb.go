@@ -300,7 +300,7 @@ type KeyData struct {
 	TypeUrl string `protobuf:"bytes,1,opt,name=type_url,json=typeUrl,proto3" json:"type_url,omitempty"` // In format type.googleapis.com/packagename.messagename
 	// Required.
 	// Contains specific serialized *Key proto
-	Value []byte `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"` // Placeholder for ctype and debug_redact.
+	Value []byte `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"` // Placeholder for ctype, debug_redact and bytes_field_type.
 	// Required.
 	KeyMaterialType KeyData_KeyMaterialType `protobuf:"varint,3,opt,name=key_material_type,json=keyMaterialType,proto3,enum=google.crypto.tink.KeyData_KeyMaterialType" json:"key_material_type,omitempty"`
 	unknownFields   protoimpl.UnknownFields

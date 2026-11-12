@@ -349,7 +349,7 @@ type HpkePrivateKey struct {
 	//
 	// For X_WING, the KEM-encoding of the private key is described in
 	// https://www.ietf.org/archive/id/draft-connolly-cfrg-xwing-kem-09.html#name-use-in-hpke.
-	PrivateKey    []byte `protobuf:"bytes,3,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"` // Placeholder for debug_redact.
+	PrivateKey    []byte `protobuf:"bytes,3,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"` // Placeholder for debug_redact and bytes_field_type.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

@@ -23,7 +23,7 @@
 // 	protoc        v3.21.12
 // source: ml_dsa.proto
 
-package ml_dsa_proto
+package ml_dsa_go_proto
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -344,8 +344,8 @@ const file_ml_dsa_proto_rawDesc = "" +
 	"\x17ML_DSA_UNKNOWN_INSTANCE\x10\x00\x12\r\n" +
 	"\tML_DSA_65\x10\x01\x12\r\n" +
 	"\tML_DSA_87\x10\x02\x12\r\n" +
-	"\tML_DSA_44\x10\x03BV\n" +
-	"\x1ccom.google.crypto.tink.protoP\x01Z4github.com/tink-crypto/tink-go/v2/proto/ml_dsa_protob\x06proto3"
+	"\tML_DSA_44\x10\x03BY\n" +
+	"\x1ccom.google.crypto.tink.protoP\x01Z7github.com/tink-crypto/tink-go/v2/proto/ml_dsa_go_protob\x06proto3"
 
 var (
 	file_ml_dsa_proto_rawDescOnce sync.Once

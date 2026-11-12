@@ -27,7 +27,7 @@
 package composite_ml_dsa_go_proto
 
 import (
-	ml_dsa_proto "github.com/tink-crypto/tink-go/v2/proto/ml_dsa_go_proto"
+	ml_dsa_go_proto "github.com/tink-crypto/tink-go/v2/proto/ml_dsa_go_proto"
 	tink_go_proto "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -171,7 +171,7 @@ func (x *CompositeMlDsaKeyFormat) GetParams() *CompositeMlDsaParams {
 type CompositeMlDsaParams struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required.
-	MlDsaInstance ml_dsa_proto.MlDsaInstance `protobuf:"varint,1,opt,name=ml_dsa_instance,json=mlDsaInstance,proto3,enum=google.crypto.tink.MlDsaInstance" json:"ml_dsa_instance,omitempty"`
+	MlDsaInstance ml_dsa_go_proto.MlDsaInstance `protobuf:"varint,1,opt,name=ml_dsa_instance,json=mlDsaInstance,proto3,enum=google.crypto.tink.MlDsaInstance" json:"ml_dsa_instance,omitempty"`
 	// Required.
 	ClassicalAlgorithm CompositeMlDsaClassicalAlgorithm `protobuf:"varint,2,opt,name=classical_algorithm,json=classicalAlgorithm,proto3,enum=google.crypto.tink.CompositeMlDsaClassicalAlgorithm" json:"classical_algorithm,omitempty"`
 	unknownFields      protoimpl.UnknownFields
@@ -208,11 +208,11 @@ func (*CompositeMlDsaParams) Descriptor() ([]byte, []int) {
 	return file_composite_ml_dsa_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *CompositeMlDsaParams) GetMlDsaInstance() ml_dsa_proto.MlDsaInstance {
+func (x *CompositeMlDsaParams) GetMlDsaInstance() ml_dsa_go_proto.MlDsaInstance {
 	if x != nil {
 		return x.MlDsaInstance
 	}
-	return ml_dsa_proto.MlDsaInstance(0)
+	return ml_dsa_go_proto.MlDsaInstance(0)
 }
 
 func (x *CompositeMlDsaParams) GetClassicalAlgorithm() CompositeMlDsaClassicalAlgorithm {
@@ -423,7 +423,7 @@ var file_composite_ml_dsa_proto_goTypes = []any{
 	(*CompositeMlDsaParams)(nil),          // 2: google.crypto.tink.CompositeMlDsaParams
 	(*CompositeMlDsaPublicKey)(nil),       // 3: google.crypto.tink.CompositeMlDsaPublicKey
 	(*CompositeMlDsaPrivateKey)(nil),      // 4: google.crypto.tink.CompositeMlDsaPrivateKey
-	(ml_dsa_proto.MlDsaInstance)(0),       // 5: google.crypto.tink.MlDsaInstance
+	(ml_dsa_go_proto.MlDsaInstance)(0),    // 5: google.crypto.tink.MlDsaInstance
 	(*tink_go_proto.KeyData)(nil),         // 6: google.crypto.tink.KeyData
 }
 var file_composite_ml_dsa_proto_depIdxs = []int32{

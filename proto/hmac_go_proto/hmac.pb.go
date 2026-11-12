@@ -95,7 +95,7 @@ type HmacKey struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Version       uint32                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
 	Params        *HmacParams            `protobuf:"bytes,2,opt,name=params,proto3" json:"params,omitempty"`
-	KeyValue      []byte                 `protobuf:"bytes,3,opt,name=key_value,json=keyValue,proto3" json:"key_value,omitempty"` // Placeholder for ctype and debug_redact.
+	KeyValue      []byte                 `protobuf:"bytes,3,opt,name=key_value,json=keyValue,proto3" json:"key_value,omitempty"` // Placeholder for ctype, debug_redact and bytes_field_type.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
