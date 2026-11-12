@@ -21,12 +21,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"github.com/tink-crypto/tink-go/v2/aead"
-	"github.com/tink-crypto/tink-go/v2/hybrid"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/keytest"
 	"github.com/tink-crypto/tink-go/v2/keyset"
-	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -42,6 +41,27 @@ func (m *NilKeysetReader) Read() (*tinkpb.Keyset, error) {
 
 func (m *NilKeysetReader) ReadEncrypted() (*tinkpb.EncryptedKeyset, error) {
 	return nil, nil
+}
+
+func mustCreateTestKeysetHandle(t *testing.T) *keyset.Handle {
+	t.Helper()
+	km := keyset.NewManager()
+	p, err := keytest.NewParameters(keytest.VariantTink)
+	if err != nil {
+		t.Fatalf("keytest.NewParameters(keytest.VariantTink) err = %v, want nil", err)
+	}
+	keyID, err := km.AddNewKeyFromParameters(p)
+	if err != nil {
+		t.Fatalf("km.AddNewKeyFromParameters(%v) err = %v, want nil", p, err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary(%d) err = %v, want nil", keyID, err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	return handle
 }
 
 func TestReadWithNilKeysetFails(t *testing.T) {
@@ -64,23 +84,16 @@ func TestWriteWithNilHandleFails(t *testing.T) {
 }
 
 func TestWriteWithNilWriterFails(t *testing.T) {
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
-	if err != nil {
-		t.Fatalf("keyset.NewHandle(aead.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
-	}
+	handle := mustCreateTestKeysetHandle(t)
 	if err := insecurecleartextkeyset.Write(handle, nil); err == nil {
 		t.Error("insecurecleartextkeyset.Write(_, nil) err = nil, want error")
 	}
 }
 
 func TestWriteAndReadInBinary(t *testing.T) {
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
-	if err != nil {
-		t.Fatalf("keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
-	}
-
+	handle := mustCreateTestKeysetHandle(t)
 	buff := &bytes.Buffer{}
-	err = insecurecleartextkeyset.Write(handle, keyset.NewBinaryWriter(buff))
+	err := insecurecleartextkeyset.Write(handle, keyset.NewBinaryWriter(buff))
 	if err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
 	}
@@ -99,13 +112,10 @@ func TestWriteAndReadInBinary(t *testing.T) {
 }
 
 func TestWriteAndReadInJson(t *testing.T) {
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
-	if err != nil {
-		t.Fatalf("keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
-	}
+	handle := mustCreateTestKeysetHandle(t)
 
 	buff := &bytes.Buffer{}
-	err = insecurecleartextkeyset.Write(handle, keyset.NewJSONWriter(buff))
+	err := insecurecleartextkeyset.Write(handle, keyset.NewJSONWriter(buff))
 	if err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
 	}
@@ -124,10 +134,7 @@ func TestWriteAndReadInJson(t *testing.T) {
 }
 
 func TestLegacyKeysetHandle(t *testing.T) {
-	handle, err := keyset.NewHandle(hybrid.DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_AES_128_GCM_Key_Template())
-	if err != nil {
-		t.Fatalf(" keyset.NewHandle(hybrid.DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_AES_128_GCM_Key_Template()) err = %v, want nil", err)
-	}
+	handle := mustCreateTestKeysetHandle(t)
 	ks := insecurecleartextkeyset.KeysetMaterial(handle)
 	gotHandle1 := insecurecleartextkeyset.KeysetHandle(ks)
 	if !cmp.Equal(gotHandle1.KeysetInfo(), handle.KeysetInfo(), protocmp.Transform()) {
@@ -159,10 +166,7 @@ func TestHandleFromReaderWithAnnotationsGetsMonitored(t *testing.T) {
 	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
 		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 	}
-	handle, err := keyset.NewHandle(aead.AES256GCMKeyTemplate())
-	if err != nil {
-		t.Fatalf(" keyset.NewHandle(aead.AES256GCMKeyTemplate()) err = %v, want nil", err)
-	}
+	handle := mustCreateTestKeysetHandle(t)
 	buff := &bytes.Buffer{}
 	if err := insecurecleartextkeyset.Write(handle, keyset.NewBinaryWriter(buff)); err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
@@ -172,14 +176,23 @@ func TestHandleFromReaderWithAnnotationsGetsMonitored(t *testing.T) {
 	if err != nil {
 		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
 	}
-	p, err := aead.New(annotatedHandle)
+	primary, err := annotatedHandle.Primary()
 	if err != nil {
-		t.Fatalf("aead.New() err = %v, want nil", err)
+		t.Fatalf("annotatedHandle.Primary() err = %v, want nil", err)
 	}
-	if _, err := p.Encrypt([]byte("some_data"), nil); err != nil {
-		t.Fatalf("Encrypt() err = %v, want nil", err)
+	factory, err := factoryutil.NewLoggerFactory(annotatedHandle)
+	if err != nil {
+		t.Fatalf("factoryutil.NewLoggerFactory() err = %v, want nil", err)
 	}
+	logger, err := factory.CreateFor("test_primitive", "test_function")
+	if err != nil {
+		t.Fatalf("factory.CreateFor() err = %v, want nil", err)
+	}
+	logger.Log(primary.KeyID(), len("some_data"))
 	events := client.Events()
+	if len(events) != 1 {
+		t.Fatalf("len(client.Events()) = %d, want 1", len(events))
+	}
 	gotAnnotations := events[0].Context.KeysetInfo.Annotations
 	if !cmp.Equal(gotAnnotations, wantAnnotations) {
 		t.Errorf("Annotations = %v, want %v", gotAnnotations, wantAnnotations)
@@ -187,10 +200,7 @@ func TestHandleFromReaderWithAnnotationsGetsMonitored(t *testing.T) {
 }
 
 func TestHandleFromReaderWithAnnotationsTwiceFails(t *testing.T) {
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
-	if err != nil {
-		t.Fatalf(" keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
-	}
+	handle := mustCreateTestKeysetHandle(t)
 	buff := &bytes.Buffer{}
 	if err := insecurecleartextkeyset.Write(handle, keyset.NewBinaryWriter(buff)); err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
@@ -210,10 +220,7 @@ func TestHandleFromReaderWithoutAnnotationsDoesNotGetMonitored(t *testing.T) {
 	if err := internalregistry.RegisterMonitoringClient(client); err != nil {
 		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 	}
-	handle, err := keyset.NewHandle(aead.AES256GCMKeyTemplate())
-	if err != nil {
-		t.Fatalf(" keyset.NewHandle(aead.AES256GCMKeyTemplate()) err = %v, want nil", err)
-	}
+	handle := mustCreateTestKeysetHandle(t)
 	buff := &bytes.Buffer{}
 	if err := insecurecleartextkeyset.Write(handle, keyset.NewBinaryWriter(buff)); err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
@@ -222,13 +229,19 @@ func TestHandleFromReaderWithoutAnnotationsDoesNotGetMonitored(t *testing.T) {
 	if err != nil {
 		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
 	}
-	p, err := aead.New(unannotatedHandle)
+	primary, err := unannotatedHandle.Primary()
 	if err != nil {
-		t.Fatalf("aead.New() err = %v, want nil", err)
+		t.Fatalf("unannotatedHandle.Primary() err = %v, want nil", err)
 	}
-	if _, err := p.Encrypt([]byte("some_data"), nil); err != nil {
-		t.Fatalf("Encrypt() err = %v, want nil", err)
+	factory, err := factoryutil.NewLoggerFactory(unannotatedHandle)
+	if err != nil {
+		t.Fatalf("factoryutil.NewLoggerFactory() err = %v, want nil", err)
 	}
+	logger, err := factory.CreateFor("test_primitive", "test_function")
+	if err != nil {
+		t.Fatalf("factory.CreateFor() err = %v, want nil", err)
+	}
+	logger.Log(primary.KeyID(), len("some_data"))
 	if len(client.Events()) != 0 {
 		t.Errorf("len(client.Events()) = %d, want 0", len(client.Events()))
 	}
