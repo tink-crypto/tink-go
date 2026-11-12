@@ -24,7 +24,7 @@
 // 	protoc        v3.21.12
 // source: test_only_key.proto
 
-package test_proto_go_proto
+package test_only_key_go_proto
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -270,8 +270,8 @@ const file_test_only_key_proto_rawDesc = "" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12D\n" +
 	"\n" +
 	"public_key\x18\x02 \x01(\v2%.google.crypto.tink.TestOnlyPublicKeyR\tpublicKey\x12\x1b\n" +
-	"\tkey_value\x18\x03 \x01(\fR\bkeyValueB]\n" +
-	"\x1ccom.google.crypto.tink.protoP\x01Z;github.com/tink-crypto/tink-go/v2/proto/test_proto_go_protob\x06proto3"
+	"\tkey_value\x18\x03 \x01(\fR\bkeyValueB`\n" +
+	"\x1ccom.google.crypto.tink.protoP\x01Z>github.com/tink-crypto/tink-go/v2/proto/test_only_key_go_protob\x06proto3"
 
 var (
 	file_test_only_key_proto_rawDescOnce sync.Once
