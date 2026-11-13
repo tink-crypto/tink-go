@@ -17,9 +17,85 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
+	"io/fs"
+	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
+
+// mustListPbGoFiles returns the files dir/*/*.pb.go as sorted paths relative to
+// dir.
+func mustListPbGoFiles(t *testing.T, dir string) []string {
+	t.Helper()
+	paths, err := filepath.Glob(filepath.Join(dir, "*", "*.pb.go")) // Sorted.
+	if err != nil {
+		t.Fatalf("filepath.Glob() failed: %v", err)
+	}
+	for i, path := range paths {
+		paths[i] = path[len(dir)+1:]
+	}
+	return paths
+}
+
+// TestGeneratedProtosAreUpToDate regenerates the Go protocol buffer files into
+// a temporary directory and compares them with the files in proto/. It is also
+// the end-to-end test of this tool.
+//
+// It downloads protoc and runs the go command in the tink-go module, so it
+// only runs if TINK_GO_CHECK_GENERATED_PROTOS is set, as
+// kokoro/gcp_ubuntu/gomod/run_tests.sh does.
+func TestGeneratedProtosAreUpToDate(t *testing.T) {
+	if os.Getenv("TINK_GO_CHECK_GENERATED_PROTOS") == "" {
+		t.Skip("skipping: needs network access and the tink-go module; set TINK_GO_CHECK_GENERATED_PROTOS=1 to run")
+	}
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skipf("skipping: the generator only runs on linux/amd64, this is %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	t.Chdir(filepath.Join("..", "..")) // The root of the tink-go module.
+	goMod, err := os.ReadFile("go.mod")
+	if err != nil {
+		t.Fatalf("os.ReadFile(go.mod) failed: %v", err)
+	}
+	toolchain, err := parseToolchain(goMod)
+	if err != nil {
+		t.Fatalf("parseToolchain() failed: %v", err)
+	}
+	outDir := t.TempDir()
+	if err := generate(t.Context(), t.TempDir(), toolchain, outDir); err != nil {
+		t.Fatalf("generate() failed: %v", err)
+	}
+
+	checkedIn, generated := mustListPbGoFiles(t, "proto"), mustListPbGoFiles(t, outDir)
+	if diff := cmp.Diff(checkedIn, generated); diff != "" {
+		t.Errorf("the set of *.pb.go files in proto/ is not up to date; \"-\" files have no .proto file, "+
+			"\"+\" files are missing (-checked in +generated):\n%s", diff)
+	}
+	for _, name := range generated {
+		got, err := os.ReadFile(filepath.Join("proto", name))
+		if errors.Is(err, fs.ErrNotExist) {
+			continue // Reported above as missing.
+		}
+		if err != nil {
+			t.Fatalf("reading the checked-in file failed: %v", err)
+		}
+		want, err := os.ReadFile(filepath.Join(outDir, name))
+		if err != nil {
+			t.Fatalf("reading the generated file failed: %v", err)
+		}
+		if diff := cmp.Diff(strings.Split(string(want), "\n"), strings.Split(string(got), "\n")); diff != "" {
+			t.Errorf("proto/%s is not up to date (lines, -want +got):\n%s", name, diff)
+		}
+	}
+	if t.Failed() {
+		t.Log("To update the generated files, run \"go run ./scripts/generate_go_protos\" from the root of the repository " +
+			"and remove the generated files that have no .proto file. Googlers: use third_party/tink/tools/gen_go_pb.sh instead.")
+	}
+}
 
 func TestVerifyChecksum(t *testing.T) {
 	// SHA256 of "abc", from FIPS 180-2.

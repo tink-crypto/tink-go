@@ -59,6 +59,8 @@ set -euo pipefail
 
 set -x
 go build -v ./...
+# Makes TestGeneratedProtosAreUpToDate check the generated proto/**/*.pb.go.
+export TINK_GO_CHECK_GENERATED_PROTOS=1
 go test -v ./...
 EOF
 
