@@ -17,21 +17,37 @@ package registryconfig_test
 import (
 	"testing"
 
-	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
+	"github.com/tink-crypto/tink-go/v2/internal/keytest"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/tink"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func TestPrimitiveFromKey(t *testing.T) {
-	keyset, err := keyset.NewHandle(aead.AES256GCMKeyTemplate())
+func mustCreateTestKeysetHandle(t *testing.T) *keyset.Handle {
+	t.Helper()
+	km := keyset.NewManager()
+	p, err := keytest.NewParameters(keytest.VariantTink)
 	if err != nil {
-		t.Fatalf("keyset.NewHandle() err = %v, want nil", err)
+		t.Fatalf("keytest.NewParameters(keytest.VariantTink) err = %v, want nil", err)
 	}
+	keyID, err := km.AddNewKeyFromParameters(p)
+	if err != nil {
+		t.Fatalf("km.AddNewKeyFromParameters(%v) err = %v, want nil", p, err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary(%d) err = %v, want nil", keyID, err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	return handle
+}
+
+func TestPrimitiveFromKey(t *testing.T) {
+	keyset := mustCreateTestKeysetHandle(t)
 	entry, err := keyset.Entry(0)
 	if err != nil {
 		t.Fatalf("keyset.Entry() err = %v, want nil", err)
@@ -69,15 +85,6 @@ func TestPrimitiveFromKeyErrors(t *testing.T) {
 		})
 	}
 }
-
-type stubPrimitive struct{}
-type stubKeyManager struct{}
-
-func (km *stubKeyManager) Primitive(_ []byte) (any, error)              { return &stubPrimitive{}, nil }
-func (km *stubKeyManager) NewKey(_ []byte) (proto.Message, error)       { return nil, nil }
-func (km *stubKeyManager) DoesSupport(typeURL string) bool              { return typeURL == "stubKeyManager" }
-func (km *stubKeyManager) TypeURL() string                              { return "stubKeyManager" }
-func (km *stubKeyManager) NewKeyData(_ []byte) (*tinkpb.KeyData, error) { return nil, nil }
 
 type stubKey struct{}
 
