@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/keygenregistry"
@@ -49,6 +50,9 @@ func init() {
 		panic(fmt.Sprintf("keytest.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterParametersParser(typeURL, &parametersParser{}); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
+	if err := registry.RegisterKeyManager(&legacyKeyManager{}); err != nil {
 		panic(fmt.Sprintf("keytest.init() failed: %v", err))
 	}
 }
