@@ -299,3 +299,48 @@ func TestESPublicKeyNonCanonicalCoordinateLengthsRejected(t *testing.T) {
 		})
 	}
 }
+
+// TestToPublicKeysetHandle_KeyCountLimit verifies that ToPublicKeysetHandle
+// rejects JWK sets that exceed the maximum allowed key count.
+//
+// Without this limit, a caller processing an attacker-controlled JWK set
+// (e.g. from a remote JWKS endpoint) would perform unbounded cryptographic
+// allocations proportional to the number of keys in the set.
+func TestToPublicKeysetHandle_KeyCountLimit(t *testing.T) {
+	// Single valid RS256 key — repeated to build large sets.
+	const singleKey = `{"kty":"RSA","alg":"RS256","use":"sig","n":"` + n2048Base64 + `","e":"AQAB"}`
+
+	t.Run("exactly_1000_keys_accepted", func(t *testing.T) {
+		keys := make([]string, 1000)
+		for i := range keys {
+			keys[i] = singleKey
+		}
+		jwkSet := `{"keys":[` + joinStrings(keys) + `]}`
+		if _, err := jwk.ToPublicKeysetHandle([]byte(jwkSet), jwk.Ed25519SupportNone); err != nil {
+			t.Errorf("ToPublicKeysetHandle() with 1000 keys err = %v, want nil", err)
+		}
+	})
+
+	t.Run("1001_keys_rejected", func(t *testing.T) {
+		keys := make([]string, 1001)
+		for i := range keys {
+			keys[i] = singleKey
+		}
+		jwkSet := `{"keys":[` + joinStrings(keys) + `]}`
+		if _, err := jwk.ToPublicKeysetHandle([]byte(jwkSet), jwk.Ed25519SupportNone); err == nil {
+			t.Error("ToPublicKeysetHandle() with 1001 keys err = nil, want error")
+		}
+	})
+}
+
+// joinStrings joins a slice of strings with commas.
+func joinStrings(ss []string) string {
+	result := ""
+	for i, s := range ss {
+		if i > 0 {
+			result += ","
+		}
+		result += s
+	}
+	return result
+}
