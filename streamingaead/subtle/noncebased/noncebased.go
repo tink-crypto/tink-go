@@ -100,6 +100,9 @@ type Writer struct {
 	plaintextPos                 int
 	ciphertext                   []byte
 	closed                       bool
+	// err is the first error encountered while encrypting or writing a
+	// segment. Once set, all further calls to Write and Close return it.
+	err error
 }
 
 // WriterParams contains the options for instantiating a Writer via NewWriter().
@@ -155,6 +158,9 @@ func (w *Writer) Write(p []byte) (int, error) {
 	if w.closed {
 		return 0, errors.New("write on closed writer")
 	}
+	if w.err != nil {
+		return 0, w.err
+	}
 
 	pos := 0
 	for {
@@ -171,23 +177,28 @@ func (w *Writer) Write(p []byte) (int, error) {
 
 		nonce, err := generateSegmentNonce(w.nonceSize, w.noncePrefix, w.encryptedSegmentCnt, false)
 		if err != nil {
+			w.err = err
 			return pos, err
 		}
+		// Advance the counter before using the nonce, so that it is never used
+		// again, even if encrypting or writing this segment fails.
+		w.encryptedSegmentCnt++
 		if w.useSegmentEncrypterWithDst {
 			w.ciphertext, err = w.segmentEncrypterWithDst.EncryptSegmentWithDst(w.ciphertext[:0], w.plaintext[:ptLim], nonce)
 		} else {
 			w.ciphertext, err = w.segmentEncrypter.EncryptSegment(w.plaintext[:ptLim], nonce)
 		}
 		if err != nil {
+			w.err = err
 			return pos, err
 		}
 
 		if _, err := w.w.Write(w.ciphertext); err != nil {
+			w.err = err
 			return pos, err
 		}
 
 		w.plaintextPos = 0
-		w.encryptedSegmentCnt++
 	}
 	return pos, nil
 }
@@ -198,26 +209,34 @@ func (w *Writer) Close() error {
 	if w.closed {
 		return nil
 	}
+	if w.err != nil {
+		return w.err
+	}
 
 	nonce, err := generateSegmentNonce(w.nonceSize, w.noncePrefix, w.encryptedSegmentCnt, true)
 	if err != nil {
+		w.err = err
 		return err
 	}
+	// Advance the counter before using the nonce, so that it is never used
+	// again, even if encrypting or writing the last segment fails.
+	w.encryptedSegmentCnt++
 	if w.useSegmentEncrypterWithDst {
 		w.ciphertext, err = w.segmentEncrypterWithDst.EncryptSegmentWithDst(w.ciphertext[:0], w.plaintext[:w.plaintextPos], nonce)
 	} else {
 		w.ciphertext, err = w.segmentEncrypter.EncryptSegment(w.plaintext[:w.plaintextPos], nonce)
 	}
 	if err != nil {
+		w.err = err
 		return err
 	}
 
 	if _, err := w.w.Write(w.ciphertext); err != nil {
+		w.err = err
 		return err
 	}
 
 	w.plaintextPos = 0
-	w.encryptedSegmentCnt++
 	w.closed = true
 	return nil
 }
