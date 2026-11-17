@@ -116,6 +116,24 @@ func (e *Entry) KeyStatus() KeyStatus {
 	return e.status
 }
 
+// Equal returns whether this entry is equal to other.
+//
+// Two entries are equal if they have the same key ID, the same status, the
+// same primary flag and equal keys, as defined by key.Key's Equal.
+//
+// It returns false if either entry is nil or has no key, as is the case for a
+// zero value Entry. Comparing entries does not count as a key export.
+func (e *Entry) Equal(other *Entry) bool {
+	if e == nil || other == nil || e.key == nil || other.key == nil {
+		return false
+	}
+	// NOTE: Purposely not using Key() here to avoid logging a key export.
+	return e.keyID == other.keyID &&
+		e.status == other.status &&
+		e.isPrimary == other.isPrimary &&
+		e.key.Equal(other.key)
+}
+
 // ToUnmonitoredEntry returns a copy of the entry that is not monitored.
 //
 // This is an internal API.
@@ -419,6 +437,26 @@ func (h *Handle) Len() int {
 		return 0
 	}
 	return len(h.entries)
+}
+
+// Equal returns whether this handle is equal to other.
+//
+// Two handles are equal if they have the same number of entries and the
+// entries at each index are equal, as defined by Entry.Equal. Monitoring
+// annotations are ignored.
+//
+// It returns false if either handle is nil or has no entries. Comparing
+// handles does not count as a key export.
+func (h *Handle) Equal(other *Handle) bool {
+	if h.Len() == 0 || h.Len() != other.Len() {
+		return false
+	}
+	for i, entry := range h.entries {
+		if !entry.Equal(other.entries[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 func entriesToKeysetInfo(entries []*Entry) (*tinkpb.KeysetInfo, error) {
