@@ -37,6 +37,9 @@ func init() {
 	if err := keygenregistry.RegisterKeyCreator[*Parameters](createKey); err != nil {
 		panic(fmt.Sprintf("keytest.init() failed: %v", err))
 	}
+	if err := keygenregistry.RegisterKeyCreator[*AsymmetricParameters](createPrivateKey); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
 	if err := primitiveregistry.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("keytest.init() failed: %v", err))
 	}
