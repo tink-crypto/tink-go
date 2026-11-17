@@ -27,9 +27,12 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/keytest"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -1633,5 +1636,511 @@ func TestWriteGeneratesNoKeyExport(t *testing.T) {
 
 	if fakeClient.KeyExportsLogs() != nil {
 		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
+	}
+}
+
+var (
+	equalTestKeyBytes1 = []byte("0123456789abcdef")
+	equalTestKeyBytes2 = []byte("fedcba9876543210")
+)
+
+// equalTestEntry describes a keyset entry holding a keytest key.
+type equalTestEntry struct {
+	keyBytes []byte
+	variant  keytest.Variant
+	// id is the ID of the entry in the keyset. If variant has an ID requirement,
+	// this is also the ID requirement of the key.
+	id        uint32
+	status    keyset.KeyStatus
+	isPrimary bool
+}
+
+func mustCreateEqualTestHandle(t *testing.T, entries []equalTestEntry, annotations map[string]string) *keyset.Handle {
+	t.Helper()
+	km := keyset.NewManager()
+	for _, e := range entries {
+		params, err := keytest.NewParameters(e.variant)
+		if err != nil {
+			t.Fatalf("keytest.NewParameters(%v) err = %v, want nil", e.variant, err)
+		}
+		idRequirement := e.id
+		if !params.HasIDRequirement() {
+			idRequirement = 0
+		}
+		key, err := keytest.NewKey(secretdata.NewBytesFromData(e.keyBytes, insecuresecretdataaccess.Token{}), idRequirement, params)
+		if err != nil {
+			t.Fatalf("keytest.NewKey() err = %v, want nil", err)
+		}
+		opts := []keyset.KeyOpts{keyset.WithFixedID(e.id), keyset.WithStatus(e.status)}
+		if e.isPrimary {
+			opts = append(opts, keyset.AsPrimary())
+		}
+		if _, err := km.AddKeyWithOpts(key, internalapi.Token{}, opts...); err != nil {
+			t.Fatalf("km.AddKeyWithOpts() err = %v, want nil", err)
+		}
+	}
+	if annotations != nil {
+		if err := km.SetAnnotations(annotations); err != nil {
+			t.Fatalf("km.SetAnnotations() err = %v, want nil", err)
+		}
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	return handle
+}
+
+// equalTestEntries returns the entries of a keyset with a primary key and a
+// disabled key.
+func equalTestEntries() []equalTestEntry {
+	return []equalTestEntry{
+		{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 1, status: keyset.Enabled, isPrimary: true},
+		{keyBytes: equalTestKeyBytes2, variant: keytest.VariantNoPrefix, id: 2, status: keyset.Disabled},
+	}
+}
+
+func mustSerializeHandle(t *testing.T, handle *keyset.Handle) []byte {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	if err := insecurecleartextkeyset.Write(handle, keyset.NewBinaryWriter(buf)); err != nil {
+		t.Fatalf("insecurecleartextkeyset.Write() err = %v, want nil", err)
+	}
+	return buf.Bytes()
+}
+
+func TestHandleEqual_SameEntries(t *testing.T) {
+	handle1 := mustCreateEqualTestHandle(t, equalTestEntries(), nil)
+	handle2 := mustCreateEqualTestHandle(t, equalTestEntries(), nil)
+	if got, want := handle1.Equal(handle1), true; got != want {
+		t.Errorf("handle1.Equal(handle1) = %v, want %v", got, want)
+	}
+	if got, want := handle1.Equal(handle2), true; got != want {
+		t.Errorf("handle1.Equal(handle2) = %v, want %v", got, want)
+	}
+	if got, want := handle2.Equal(handle1), true; got != want {
+		t.Errorf("handle2.Equal(handle1) = %v, want %v", got, want)
+	}
+}
+
+func TestHandleEqual_SerializedAndParsed(t *testing.T) {
+	handle := mustCreateEqualTestHandle(t, equalTestEntries(), nil)
+	serialized := mustSerializeHandle(t, handle)
+
+	parsed, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(bytes.NewReader(serialized)))
+	if err != nil {
+		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
+	}
+	if got, want := handle.Equal(parsed), true; got != want {
+		t.Errorf("handle.Equal(parsed) = %v, want %v", got, want)
+	}
+	if got, want := parsed.Equal(handle), true; got != want {
+		t.Errorf("parsed.Equal(handle) = %v, want %v", got, want)
+	}
+}
+
+func TestHandleEqual_IgnoresAnnotations(t *testing.T) {
+	handle := mustCreateEqualTestHandle(t, equalTestEntries(), nil)
+	serialized := mustSerializeHandle(t, handle)
+
+	annotated, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(bytes.NewReader(serialized)), keyset.WithAnnotations(map[string]string{"foo": "bar"}))
+	if err != nil {
+		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
+	}
+	otherAnnotated, err := insecurecleartextkeyset.Read(keyset.NewBinaryReader(bytes.NewReader(serialized)), keyset.WithAnnotations(map[string]string{"baz": "qux"}))
+	if err != nil {
+		t.Fatalf("insecurecleartextkeyset.Read() err = %v, want nil", err)
+	}
+	if got, want := handle.Equal(annotated), true; got != want {
+		t.Errorf("handle.Equal(annotated) = %v, want %v", got, want)
+	}
+	if got, want := annotated.Equal(handle), true; got != want {
+		t.Errorf("annotated.Equal(handle) = %v, want %v", got, want)
+	}
+	if got, want := annotated.Equal(otherAnnotated), true; got != want {
+		t.Errorf("annotated.Equal(otherAnnotated) = %v, want %v", got, want)
+	}
+}
+
+// notEqualTestCases returns pairs of keysets that differ in exactly one
+// aspect.
+func notEqualTestCases() []struct {
+	name     string
+	entries1 []equalTestEntry
+	entries2 []equalTestEntry
+} {
+	return []struct {
+		name     string
+		entries1 []equalTestEntry
+		entries2 []equalTestEntry
+	}{
+		{
+			name: "different_key_bytes",
+			entries1: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 1, status: keyset.Enabled, isPrimary: true},
+			},
+			entries2: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes2, variant: keytest.VariantTink, id: 1, status: keyset.Enabled, isPrimary: true},
+			},
+		},
+		{
+			// The keys have no ID requirement, so they are equal and only the IDs of
+			// the entries differ.
+			name: "different_key_id",
+			entries1: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantNoPrefix, id: 1, status: keyset.Enabled, isPrimary: true},
+			},
+			entries2: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantNoPrefix, id: 2, status: keyset.Enabled, isPrimary: true},
+			},
+		},
+		{
+			name: "different_variant",
+			entries1: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 1, status: keyset.Enabled, isPrimary: true},
+			},
+			entries2: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantCrunchy, id: 1, status: keyset.Enabled, isPrimary: true},
+			},
+		},
+		{
+			name: "different_status",
+			entries1: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 1, status: keyset.Enabled, isPrimary: true},
+				{keyBytes: equalTestKeyBytes2, variant: keytest.VariantTink, id: 2, status: keyset.Enabled},
+			},
+			entries2: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 1, status: keyset.Enabled, isPrimary: true},
+				{keyBytes: equalTestKeyBytes2, variant: keytest.VariantTink, id: 2, status: keyset.Disabled},
+			},
+		},
+		{
+			name: "different_primary",
+			entries1: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 1, status: keyset.Enabled, isPrimary: true},
+				{keyBytes: equalTestKeyBytes2, variant: keytest.VariantTink, id: 2, status: keyset.Enabled},
+			},
+			entries2: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 1, status: keyset.Enabled},
+				{keyBytes: equalTestKeyBytes2, variant: keytest.VariantTink, id: 2, status: keyset.Enabled, isPrimary: true},
+			},
+		},
+		{
+			name: "different_number_of_entries",
+			entries1: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 1, status: keyset.Enabled, isPrimary: true},
+			},
+			entries2: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 1, status: keyset.Enabled, isPrimary: true},
+				{keyBytes: equalTestKeyBytes2, variant: keytest.VariantTink, id: 2, status: keyset.Enabled},
+			},
+		},
+		{
+			name: "same_entries_in_different_order",
+			entries1: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 1, status: keyset.Enabled, isPrimary: true},
+				{keyBytes: equalTestKeyBytes2, variant: keytest.VariantTink, id: 2, status: keyset.Enabled},
+			},
+			entries2: []equalTestEntry{
+				{keyBytes: equalTestKeyBytes2, variant: keytest.VariantTink, id: 2, status: keyset.Enabled},
+				{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 1, status: keyset.Enabled, isPrimary: true},
+			},
+		},
+	}
+}
+
+func TestHandleEqual_DifferentEntries(t *testing.T) {
+	for _, tc := range notEqualTestCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			handle1 := mustCreateEqualTestHandle(t, tc.entries1, nil)
+			handle2 := mustCreateEqualTestHandle(t, tc.entries2, nil)
+			if got, want := handle1.Equal(handle2), false; got != want {
+				t.Errorf("handle1.Equal(handle2) = %v, want %v", got, want)
+			}
+			if got, want := handle2.Equal(handle1), false; got != want {
+				t.Errorf("handle2.Equal(handle1) = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestHandleEqual_NilAndEmptyHandles(t *testing.T) {
+	handle := mustCreateEqualTestHandle(t, equalTestEntries(), nil)
+	var nilHandle *keyset.Handle
+	if got, want := handle.Equal(nil), false; got != want {
+		t.Errorf("handle.Equal(nil) = %v, want %v", got, want)
+	}
+	if got, want := nilHandle.Equal(handle), false; got != want {
+		t.Errorf("nilHandle.Equal(handle) = %v, want %v", got, want)
+	}
+	if got, want := nilHandle.Equal(nil), true; got != want {
+		t.Errorf("nilHandle.Equal(nil) = %v, want %v", got, want)
+	}
+	// A zero value handle has no entries.
+	emptyHandle := &keyset.Handle{}
+	if got, want := emptyHandle.Equal(nil), false; got != want {
+		t.Errorf("emptyHandle.Equal(nil) = %v, want %v", got, want)
+	}
+	if got, want := nilHandle.Equal(emptyHandle), false; got != want {
+		t.Errorf("nilHandle.Equal(emptyHandle) = %v, want %v", got, want)
+	}
+	if got, want := emptyHandle.Equal(handle), false; got != want {
+		t.Errorf("emptyHandle.Equal(handle) = %v, want %v", got, want)
+	}
+	if got, want := handle.Equal(emptyHandle), false; got != want {
+		t.Errorf("handle.Equal(emptyHandle) = %v, want %v", got, want)
+	}
+	if got, want := emptyHandle.Equal(emptyHandle), false; got != want {
+		t.Errorf("emptyHandle.Equal(emptyHandle) = %v, want %v", got, want)
+	}
+	if got, want := emptyHandle.Equal(&keyset.Handle{}), false; got != want {
+		t.Errorf("emptyHandle.Equal(&keyset.Handle{}) = %v, want %v", got, want)
+	}
+}
+
+func mustCreateFallbackKeyHandle(t *testing.T, keyValue []byte) *keyset.Handle {
+	t.Helper()
+	handle, err := testkeyset.NewHandle(&tinkpb.Keyset{
+		PrimaryKeyId: 1,
+		Key: []*tinkpb.Keyset_Key{
+			{
+				KeyId:            1,
+				Status:           tinkpb.KeyStatusType_ENABLED,
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
+				KeyData:          testutil.NewKeyData("some type url", keyValue, tinkpb.KeyData_SYMMETRIC),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("testkeyset.NewHandle() err = %v, want nil", err)
+	}
+	entry, err := handle.Entry(0)
+	if err != nil {
+		t.Fatalf("handle.Entry(0) err = %v, want nil", err)
+	}
+	if _, ok := entry.Key().(*protoserialization.FallbackProtoKey); !ok {
+		t.Fatalf("entry.Key() is of type %T, want *protoserialization.FallbackProtoKey", entry.Key())
+	}
+	return handle
+}
+
+func TestHandleEqual_FallbackProtoKeys(t *testing.T) {
+	handle1 := mustCreateFallbackKeyHandle(t, []byte{0})
+	handle2 := mustCreateFallbackKeyHandle(t, []byte{0})
+	handleWithDifferentValue := mustCreateFallbackKeyHandle(t, []byte{1})
+	if got, want := handle1.Equal(handle2), true; got != want {
+		t.Errorf("handle1.Equal(handle2) = %v, want %v", got, want)
+	}
+	if got, want := handle1.Equal(handleWithDifferentValue), false; got != want {
+		t.Errorf("handle1.Equal(handleWithDifferentValue) = %v, want %v", got, want)
+	}
+}
+
+func TestEntryEqual(t *testing.T) {
+	handle1 := mustCreateEqualTestHandle(t, equalTestEntries(), nil)
+	handle2 := mustCreateEqualTestHandle(t, equalTestEntries(), nil)
+	for i := 0; i < handle1.Len(); i++ {
+		entry1, err := handle1.Entry(i)
+		if err != nil {
+			t.Fatalf("handle1.Entry(%d) err = %v, want nil", i, err)
+		}
+		entry2, err := handle2.Entry(i)
+		if err != nil {
+			t.Fatalf("handle2.Entry(%d) err = %v, want nil", i, err)
+		}
+		if got, want := entry1.Equal(entry1), true; got != want {
+			t.Errorf("entry1.Equal(entry1) = %v, want %v (index %d)", got, want, i)
+		}
+		if got, want := entry1.Equal(entry2), true; got != want {
+			t.Errorf("entry1.Equal(entry2) = %v, want %v (index %d)", got, want, i)
+		}
+		if got, want := entry2.Equal(entry1), true; got != want {
+			t.Errorf("entry2.Equal(entry1) = %v, want %v (index %d)", got, want, i)
+		}
+	}
+
+	primary1, err := handle1.Primary()
+	if err != nil {
+		t.Fatalf("handle1.Primary() err = %v, want nil", err)
+	}
+	primary2, err := handle2.Primary()
+	if err != nil {
+		t.Fatalf("handle2.Primary() err = %v, want nil", err)
+	}
+	if got, want := primary1.Equal(primary2), true; got != want {
+		t.Errorf("primary1.Equal(primary2) = %v, want %v", got, want)
+	}
+	nonPrimary, err := handle1.Entry(1)
+	if err != nil {
+		t.Fatalf("handle1.Entry(1) err = %v, want nil", err)
+	}
+	if got, want := primary1.Equal(nonPrimary), false; got != want {
+		t.Errorf("primary1.Equal(nonPrimary) = %v, want %v", got, want)
+	}
+}
+
+func TestEntryEqual_DifferentEntries(t *testing.T) {
+	for _, tc := range notEqualTestCases() {
+		if len(tc.entries1) != len(tc.entries2) {
+			continue
+		}
+		t.Run(tc.name, func(t *testing.T) {
+			handle1 := mustCreateEqualTestHandle(t, tc.entries1, nil)
+			handle2 := mustCreateEqualTestHandle(t, tc.entries2, nil)
+			// In all these test cases, the last entries of the two keysets differ.
+			i := handle1.Len() - 1
+			entry1, err := handle1.Entry(i)
+			if err != nil {
+				t.Fatalf("handle1.Entry(%d) err = %v, want nil", i, err)
+			}
+			entry2, err := handle2.Entry(i)
+			if err != nil {
+				t.Fatalf("handle2.Entry(%d) err = %v, want nil", i, err)
+			}
+			if got, want := entry1.Equal(entry2), false; got != want {
+				t.Errorf("entry1.Equal(entry2) = %v, want %v", got, want)
+			}
+			if got, want := entry2.Equal(entry1), false; got != want {
+				t.Errorf("entry2.Equal(entry1) = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestEntryEqual_NilAndZeroValueEntries(t *testing.T) {
+	handle := mustCreateEqualTestHandle(t, equalTestEntries(), nil)
+	entry, err := handle.Primary()
+	if err != nil {
+		t.Fatalf("handle.Primary() err = %v, want nil", err)
+	}
+	var nilEntry *keyset.Entry
+	if got, want := entry.Equal(nil), false; got != want {
+		t.Errorf("entry.Equal(nil) = %v, want %v", got, want)
+	}
+	if got, want := nilEntry.Equal(entry), false; got != want {
+		t.Errorf("nilEntry.Equal(entry) = %v, want %v", got, want)
+	}
+	if got, want := nilEntry.Equal(nil), true; got != want {
+		t.Errorf("nilEntry.Equal(nil) = %v, want %v", got, want)
+	}
+	// A zero value entry has no key.
+	zeroEntry := &keyset.Entry{}
+	if got, want := zeroEntry.Equal(nil), false; got != want {
+		t.Errorf("zeroEntry.Equal(nil) = %v, want %v", got, want)
+	}
+	if got, want := nilEntry.Equal(zeroEntry), false; got != want {
+		t.Errorf("nilEntry.Equal(zeroEntry) = %v, want %v", got, want)
+	}
+	if got, want := zeroEntry.Equal(entry), false; got != want {
+		t.Errorf("zeroEntry.Equal(entry) = %v, want %v", got, want)
+	}
+	if got, want := entry.Equal(zeroEntry), false; got != want {
+		t.Errorf("entry.Equal(zeroEntry) = %v, want %v", got, want)
+	}
+	if got, want := zeroEntry.Equal(&keyset.Entry{}), false; got != want {
+		t.Errorf("zeroEntry.Equal(&keyset.Entry{}) = %v, want %v", got, want)
+	}
+}
+
+func TestEqualGeneratesNoKeyExport(t *testing.T) {
+	defer internalregistry.ClearMonitoringClient()
+	fakeClient := fakemonitoring.NewClient("fake_client")
+	if err := internalregistry.RegisterMonitoringClient(fakeClient); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+	annotations := map[string]string{"foo": "bar"}
+	handle1 := mustCreateEqualTestHandle(t, equalTestEntries(), annotations)
+	handle2 := mustCreateEqualTestHandle(t, equalTestEntries(), annotations)
+	entry1, err := handle1.Primary()
+	if err != nil {
+		t.Fatalf("handle1.Primary() err = %v, want nil", err)
+	}
+	entry2, err := handle2.Primary()
+	if err != nil {
+		t.Fatalf("handle2.Primary() err = %v, want nil", err)
+	}
+
+	if got, want := handle1.Equal(handle2), true; got != want {
+		t.Errorf("handle1.Equal(handle2) = %v, want %v", got, want)
+	}
+	if got, want := entry1.Equal(entry2), true; got != want {
+		t.Errorf("entry1.Equal(entry2) = %v, want %v", got, want)
+	}
+	if got, want := len(fakeClient.KeyExportsLogs()), 0; got != want {
+		t.Errorf("len(fakeClient.KeyExportsLogs()) = %d, want %d", got, want)
+	}
+
+	// Make sure key exports are monitored for these handles.
+	_ = entry1.Key()
+	if got, want := len(fakeClient.KeyExportsLogs()), 1; got != want {
+		t.Errorf("len(fakeClient.KeyExportsLogs()) = %d, want %d", got, want)
+	}
+}
+
+// structWithHandle and nestedStructWithHandle mirror how keyset handles are
+// held by structs that tests compare with go-cmp, which uses the Equal method
+// of the fields that have one.
+type structWithHandle struct {
+	Name   string
+	Handle *keyset.Handle
+}
+
+type nestedStructWithHandle struct {
+	Name  string
+	Inner *structWithHandle
+}
+
+type structWithEntry struct {
+	Name  string
+	Entry *keyset.Entry
+}
+
+func TestHandleEqual_WorksWithCmp(t *testing.T) {
+	handle1 := mustCreateEqualTestHandle(t, equalTestEntries(), nil)
+	handle2 := mustCreateEqualTestHandle(t, equalTestEntries(), nil)
+
+	nilWant := &nestedStructWithHandle{Name: "name", Inner: &structWithHandle{Name: "inner"}}
+	nilGot := &nestedStructWithHandle{Name: "name", Inner: &structWithHandle{Name: "inner"}}
+	if diff := cmp.Diff(nilWant, nilGot); diff != "" {
+		t.Errorf("cmp.Diff() of structs with nil handles returned unexpected diff (-want +got):\n%s", diff)
+	}
+
+	want := &nestedStructWithHandle{Name: "name", Inner: &structWithHandle{Name: "inner", Handle: handle1}}
+	got := &nestedStructWithHandle{Name: "name", Inner: &structWithHandle{Name: "inner", Handle: handle2}}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("cmp.Diff() of structs with equal handles returned unexpected diff (-want +got):\n%s", diff)
+	}
+
+	if got, want := cmp.Equal(nilWant, want), false; got != want {
+		t.Errorf("cmp.Equal() of structs with a nil and a non-nil handle = %v, want %v", got, want)
+	}
+}
+
+func TestEntryEqual_WorksWithCmp(t *testing.T) {
+	handle1 := mustCreateEqualTestHandle(t, equalTestEntries(), nil)
+	handle2 := mustCreateEqualTestHandle(t, equalTestEntries(), nil)
+	entry1, err := handle1.Primary()
+	if err != nil {
+		t.Fatalf("handle1.Primary() err = %v, want nil", err)
+	}
+	entry2, err := handle2.Primary()
+	if err != nil {
+		t.Fatalf("handle2.Primary() err = %v, want nil", err)
+	}
+
+	nilWant := structWithEntry{Name: "name"}
+	nilGot := structWithEntry{Name: "name"}
+	if diff := cmp.Diff(nilWant, nilGot); diff != "" {
+		t.Errorf("cmp.Diff() of structs with nil entries returned unexpected diff (-want +got):\n%s", diff)
+	}
+
+	want := structWithEntry{Name: "name", Entry: entry1}
+	got := structWithEntry{Name: "name", Entry: entry2}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("cmp.Diff() of structs with equal entries returned unexpected diff (-want +got):\n%s", diff)
+	}
+
+	if got, want := cmp.Equal(nilWant, want), false; got != want {
+		t.Errorf("cmp.Equal() of structs with a nil and a non-nil entry = %v, want %v", got, want)
 	}
 }
