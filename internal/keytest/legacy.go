@@ -119,3 +119,12 @@ func LegacyKeyTemplate(outputPrefixType tinkpb.OutputPrefixType) *tinkpb.KeyTemp
 		OutputPrefixType: outputPrefixType,
 	}
 }
+
+// TinkLegacyKeyTemplate returns a key template for test-only legacy keys with
+// the TINK output prefix type.
+//
+// There are no parameters for test-only legacy keys, so this template is the
+// only way to generate them.
+func TinkLegacyKeyTemplate() *tinkpb.KeyTemplate {
+	return LegacyKeyTemplate(tinkpb.OutputPrefixType_TINK)
+}

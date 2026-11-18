@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/internal/keytest"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
@@ -32,24 +32,36 @@ func TestMonitoringKeysetInfoFromKeysetInfo_Nil(t *testing.T) {
 
 func TestMonitoringKeysetInfoFromKeysetInfo(t *testing.T) {
 	km := keyset.NewManager()
-	keyID1, err := km.Add(aead.AES256GCMKeyTemplate())
+
+	p, err := keytest.NewParameters(keytest.VariantTink)
+	if err != nil {
+		t.Fatalf("keytest.NewParameters(%v) err = %v, want nil", keytest.VariantTink, err)
+	}
+	keyID1, err := km.AddNewKeyFromParameters(p)
 	if err != nil {
 		t.Fatalf("km.Add() err = %v, want nil", err)
 	}
 	if err := km.SetPrimary(keyID1); err != nil {
 		t.Fatalf("km.SetPrimary() err = %v, want nil", err)
 	}
-	keyID2, err := km.Add(aead.AES128CTRHMACSHA256KeyTemplate())
+
+	keyID2, err := km.Add(keytest.TinkLegacyKeyTemplate())
 	if err != nil {
 		t.Fatalf("km.Add() err = %v, want nil", err)
 	}
 	if err := km.Disable(keyID2); err != nil {
 		t.Fatalf("km.Disable() err = %v, want nil", err)
 	}
-	keyID3, err := km.Add(aead.XAES256GCM192BitNonceNoPrefixKeyTemplate())
+
+	noPrefixParams, err := keytest.NewParameters(keytest.VariantNoPrefix)
+	if err != nil {
+		t.Fatalf("keytest.NewParameters(%v) err = %v, want nil", keytest.VariantNoPrefix, err)
+	}
+	keyID3, err := km.AddNewKeyFromParameters(noPrefixParams)
 	if err != nil {
 		t.Fatalf("km.Add() err = %v, want nil", err)
 	}
+
 	h, err := km.Handle()
 	if err != nil {
 		t.Fatalf("km.Handle() err = %v, want nil", err)
@@ -75,19 +87,19 @@ func TestMonitoringKeysetInfoFromKeysetInfo(t *testing.T) {
 			{
 				KeyID:     keyID1,
 				Status:    monitoring.Enabled,
-				KeyType:   "tink.AesGcmKey",
+				KeyType:   "tink.TestOnlyKey",
 				KeyPrefix: "TINK",
 			},
 			{
 				KeyID:     keyID2,
 				Status:    monitoring.Disabled,
-				KeyType:   "tink.AesCtrHmacAeadKey",
+				KeyType:   "tink.TestOnlyLegacyKey",
 				KeyPrefix: "TINK",
 			},
 			{
 				KeyID:     keyID3,
 				Status:    monitoring.Enabled,
-				KeyType:   "tink.XAesGcmKey",
+				KeyType:   "tink.TestOnlyKey",
 				KeyPrefix: "RAW",
 			},
 		},
