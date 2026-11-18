@@ -55,6 +55,24 @@ func init() {
 	if err := protoserialization.RegisterParametersParser(typeURL, &parametersParser{}); err != nil {
 		panic(fmt.Sprintf("keytest.init() failed: %v", err))
 	}
+	if err := protoserialization.RegisterKeySerializer[*PublicKey](&publicKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(publicKeyTypeURL, &publicKeyParser{}); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeySerializer[*PrivateKey](&privateKeySerializer{}); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterKeyParser(privateKeyTypeURL, &privateKeyParser{}); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersSerializer[*AsymmetricParameters](&asymmetricParametersSerializer{}); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
+	if err := protoserialization.RegisterParametersParser(privateKeyTypeURL, &asymmetricParametersParser{}); err != nil {
+		panic(fmt.Sprintf("keytest.init() failed: %v", err))
+	}
 	if err := registry.RegisterKeyManager(&legacyKeyManager{}); err != nil {
 		panic(fmt.Sprintf("keytest.init() failed: %v", err))
 	}
