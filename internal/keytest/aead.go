@@ -33,13 +33,24 @@ type aead struct {
 
 var _ tink.AEAD = (*aead)(nil)
 
-// newAEAD creates a new [tink.AEAD] from a [keytest.Key].
-func newAEAD(k *Key) (tink.AEAD, error) {
+// NewAEAD returns the test-only [tink.AEAD] for the given key.
+//
+// The returned primitive prepends the output prefix of the key to a dummy
+// ciphertext. It provides no security at all and must only be used in tests.
+//
+// It returns an error if k is nil or was not created with [NewKey].
+func NewAEAD(k *Key) (tink.AEAD, error) {
+	if k == nil {
+		return nil, fmt.Errorf("keytest.NewAEAD: key is nil")
+	}
+	if k.KeyBytes().Len() != keySizeInBytes {
+		return nil, fmt.Errorf("keytest.NewAEAD: invalid key: key size is %d bytes, want %d", k.KeyBytes().Len(), keySizeInBytes)
+	}
 	keyBytes := k.KeyBytes().Data(insecuresecretdataaccess.Token{})
-	base64Key := hex.EncodeToString(keyBytes)
+	hexKey := hex.EncodeToString(keyBytes)
 	return &aead{
 		prefix:    k.OutputPrefix(),
-		dummyAEAD: &testutil.DummyAEAD{Name: base64Key},
+		dummyAEAD: &testutil.DummyAEAD{Name: hexKey},
 	}, nil
 }
 
@@ -70,5 +81,5 @@ func primitiveConstructor(k key.Key) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("key is of type %T; needed *keytest.Key", k)
 	}
-	return newAEAD(that)
+	return NewAEAD(that)
 }

@@ -140,6 +140,72 @@ func TestPrimitiveEncryptDecrypt(t *testing.T) {
 	}
 }
 
+func TestNewAEAD(t *testing.T) {
+	plaintext := []byte("plaintext")
+	associatedData := []byte("associatedData")
+	for _, tc := range keyTestCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			k := mustCreateKey(t, tc.variant, tc.keyID, tc.keyBytes)
+			a, err := keytest.NewAEAD(k)
+			if err != nil {
+				t.Fatalf("keytest.NewAEAD(%v) err = %v, want nil", k, err)
+			}
+
+			ciphertext, err := a.Encrypt(plaintext, associatedData)
+			if err != nil {
+				t.Fatalf("a.Encrypt(%x, %x) err = %v, want nil", plaintext, associatedData, err)
+			}
+			if prefix := k.OutputPrefix(); !bytes.HasPrefix(ciphertext, prefix) {
+				t.Errorf("a.Encrypt(%x, %x) = %x, want prefix %x", plaintext, associatedData, ciphertext, prefix)
+			}
+			got, err := a.Decrypt(ciphertext, associatedData)
+			if err != nil {
+				t.Fatalf("a.Decrypt(%x, %x) err = %v, want nil", ciphertext, associatedData, err)
+			}
+			if !bytes.Equal(got, plaintext) {
+				t.Errorf("a.Decrypt(%x, %x) = %x, want %x", ciphertext, associatedData, got, plaintext)
+			}
+
+			// The primitive from the registry must interoperate with a.
+			registryAEAD := mustCreateAEAD(t, k)
+			got, err = registryAEAD.Decrypt(ciphertext, associatedData)
+			if err != nil {
+				t.Fatalf("registryAEAD.Decrypt(%x, %x) err = %v, want nil", ciphertext, associatedData, err)
+			}
+			if !bytes.Equal(got, plaintext) {
+				t.Errorf("registryAEAD.Decrypt(%x, %x) = %x, want %x", ciphertext, associatedData, got, plaintext)
+			}
+			registryCiphertext, err := registryAEAD.Encrypt(plaintext, associatedData)
+			if err != nil {
+				t.Fatalf("registryAEAD.Encrypt(%x, %x) err = %v, want nil", plaintext, associatedData, err)
+			}
+			got, err = a.Decrypt(registryCiphertext, associatedData)
+			if err != nil {
+				t.Fatalf("a.Decrypt(%x, %x) err = %v, want nil", registryCiphertext, associatedData, err)
+			}
+			if !bytes.Equal(got, plaintext) {
+				t.Errorf("a.Decrypt(%x, %x) = %x, want %x", registryCiphertext, associatedData, got, plaintext)
+			}
+		})
+	}
+}
+
+func TestNewAEADFailsWithInvalidKey(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		key  *keytest.Key
+	}{
+		{name: "nil_key", key: nil},
+		{name: "zero_value_key", key: &keytest.Key{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := keytest.NewAEAD(tc.key); err == nil {
+				t.Errorf("keytest.NewAEAD(%v) err = nil, want error", tc.key)
+			}
+		})
+	}
+}
+
 func TestRegisterPrimitiveConstructor(t *testing.T) {
 	plaintext := []byte("plaintext")
 	associatedData := []byte("associatedData")
