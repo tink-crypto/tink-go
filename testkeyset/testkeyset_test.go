@@ -17,49 +17,44 @@ package testkeyset_test
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
+	"github.com/tink-crypto/tink-go/v2/internal/keytest"
 	"github.com/tink-crypto/tink-go/v2/keyset"
-	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func makeKeyset(template *tinkpb.KeyTemplate) (*tinkpb.Keyset, error) {
-	h, err := keyset.NewHandle(template)
+func mustCreateTestKeysetHandle(t *testing.T) *keyset.Handle {
+	t.Helper()
+	km := keyset.NewManager()
+	p, err := keytest.NewParameters(keytest.VariantTink)
 	if err != nil {
-		return nil, err
+		t.Fatalf("keytest.NewParameters(keytest.VariantTink) err = %v, want nil", err)
 	}
-	return insecurecleartextkeyset.KeysetMaterial(h), nil
+	keyID, err := km.AddNewKeyFromParameters(p)
+	if err != nil {
+		t.Fatalf("km.AddNewKeyFromParameters(%v) err = %v, want nil", p, err)
+	}
+	if err := km.SetPrimary(keyID); err != nil {
+		t.Fatalf("km.SetPrimary(%d) err = %v, want nil", keyID, err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	return handle
 }
 
 func TestNewHandleCallsAreConsistent(t *testing.T) {
-	ks, err := makeKeyset(mac.HMACSHA256Tag128KeyTemplate())
-	if err != nil {
-		t.Fatalf("makeKeyset(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
-	}
+	ks := insecurecleartextkeyset.KeysetMaterial(mustCreateTestKeysetHandle(t))
 	handle1, err := testkeyset.NewHandle(ks)
 	if err != nil {
 		t.Fatalf("testkeyset.NewHandle() err = %v, want nil", err)
 	}
-	p1, err := mac.New(handle1)
-	if err != nil {
-		t.Fatalf("mac.New(handle1) err = %v, want nil", err)
+	handle2 := testkeyset.KeysetHandle(ks)
+	if handle2 == nil {
+		t.Fatal("testkeyset.KeysetHandle() = nil, want non-nil")
 	}
-	p2, err := mac.New(testkeyset.KeysetHandle(ks))
-	if err != nil {
-		t.Fatalf("mac.New(testkeyset.KeysetHandle(ks)) err = %v, want nil", err)
-	}
-	data := []byte("data")
-	m1, err := p1.ComputeMAC(data)
-	if err != nil {
-		t.Fatalf("p1.ComputeMAC(data) err = %v, want nil", err)
-	}
-	m2, err := p2.ComputeMAC(data)
-	if err != nil {
-		t.Fatalf("p2.ComputeMAC(data) err = %v, want nil", err)
-	}
-	if !cmp.Equal(m1, m2) {
-		t.Errorf("MAC mistmatch, got = %v, want %v", m1, m2)
+	if !handle1.Equal(handle2) {
+		t.Error("testkeyset.NewHandle(ks).Equal(testkeyset.KeysetHandle(ks)) = false, want true")
 	}
 }
