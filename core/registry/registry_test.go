@@ -18,239 +18,262 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
-	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
-	"github.com/tink-crypto/tink-go/v2/mac"
+	"github.com/tink-crypto/tink-go/v2/internal/keytest"
 	"github.com/tink-crypto/tink-go/v2/testing/fakekms"
 	"github.com/tink-crypto/tink-go/v2/testutil"
 	"github.com/tink-crypto/tink-go/v2/tink"
-	gcmpb "github.com/tink-crypto/tink-go/v2/proto/aes_gcm_go_proto"
-	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
-	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_go_proto"
+	testonlypb "github.com/tink-crypto/tink-go/v2/proto/test_only_key_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+
+	// Registers the AES-GCM key manager, which is used as a second registered
+	// key type that doesn't match the test-only legacy keys.
+	_ "github.com/tink-crypto/tink-go/v2/aead"
 )
 
-func TestRegisterKeyManager(t *testing.T) {
-	// get HMACKeyManager
-	_, err := registry.GetKeyManager(testutil.HMACTypeURL)
+// collidingKeyManager is a key manager with the same type URL as the test-only
+// legacy key manager registered by the keytest package.
+type collidingKeyManager struct {
+	testutil.DummyAEADKeyManager
+}
+
+func (km *collidingKeyManager) DoesSupport(typeURL string) bool {
+	return typeURL == keytest.LegacyKeyTypeURL
+}
+
+func (km *collidingKeyManager) TypeURL() string { return keytest.LegacyKeyTypeURL }
+
+func mustMarshalLegacyKey(t *testing.T) []byte {
+	t.Helper()
+	serializedKey, err := proto.Marshal(&testonlypb.TestOnlyLegacyKey{
+		Version:  0,
+		KeyValue: []byte("0123456789abcdef"),
+	})
 	if err != nil {
-		t.Errorf("unexpected error: %s", err)
+		t.Fatalf("proto.Marshal() err = %s, want nil", err)
 	}
-	// get AESGCMKeyManager
-	_, err = registry.GetKeyManager(testutil.AESGCMTypeURL)
+	return serializedKey
+}
+
+func TestRegisterKeyManager(t *testing.T) {
+	// get the test-only legacy key manager
+	_, err := registry.GetKeyManager(keytest.LegacyKeyTypeURL)
 	if err != nil {
-		t.Errorf("unexpected error: %s", err)
+		t.Errorf("registry.GetKeyManager(%q) err = %s, want nil", keytest.LegacyKeyTypeURL, err)
 	}
 	// some random typeurl
 	if _, err = registry.GetKeyManager("some url"); err == nil {
-		t.Errorf("expect an error when a type url doesn't exist in the registry")
+		t.Errorf("registry.GetKeyManager(\"some url\") succeeded, want error")
 	}
 }
 
 func TestRegisterKeyManagerWithCollision(t *testing.T) {
-	// dummyKeyManager's typeURL is equal to that of AESGCM
-	var dummyKeyManager = new(testutil.DummyAEADKeyManager)
+	// dummyKeyManager's typeURL is equal to that of the test-only legacy key manager
+	dummyKeyManager := new(collidingKeyManager)
 	// This should fail because overwriting is disallowed.
 	err := registry.RegisterKeyManager(dummyKeyManager)
 	if err == nil {
-		t.Errorf("%s shouldn't be registered again", testutil.AESGCMTypeURL)
+		t.Errorf("registry.RegisterKeyManager(dummyKeyManager) succeeded, want error")
 	}
 
-	km, err := registry.GetKeyManager(testutil.AESGCMTypeURL)
+	km, err := registry.GetKeyManager(keytest.LegacyKeyTypeURL)
 	if err != nil {
-		t.Errorf("unexpected error: %s", err)
+		t.Errorf("registry.GetKeyManager(%q) err = %s, want nil", keytest.LegacyKeyTypeURL, err)
 	}
 	// This should fail because overwriting is disallowed, even with the same key manager.
 	err = registry.RegisterKeyManager(km)
 	if err == nil {
-		t.Errorf("%s shouldn't be registered again", testutil.AESGCMTypeURL)
+		t.Errorf("registry.RegisterKeyManager(km) succeeded, want error")
 	}
 }
 
 func TestNewKeyData(t *testing.T) {
-	// new Keydata from a Hmac KeyTemplate
-	keyData, err := registry.NewKeyData(mac.HMACSHA256Tag128KeyTemplate())
+	// new Keydata from a test-only legacy KeyTemplate
+	keyData, err := registry.NewKeyData(keytest.TinkLegacyKeyTemplate())
 	if err != nil {
-		t.Errorf("unexpected error: %s", err)
+		t.Fatalf("registry.NewKeyData(keytest.TinkLegacyKeyTemplate()) err = %s, want nil", err)
 	}
-	if keyData.TypeUrl != testutil.HMACTypeURL {
-		t.Errorf("invalid key data")
+	if keyData.TypeUrl != keytest.LegacyKeyTypeURL {
+		t.Errorf("keyData.TypeUrl = %q, want %q", keyData.TypeUrl, keytest.LegacyKeyTypeURL)
 	}
-	key := new(hmacpb.HmacKey)
+	key := new(testonlypb.TestOnlyLegacyKey)
 	if err := proto.Unmarshal(keyData.Value, key); err != nil {
-		t.Errorf("unexpected error when unmarshal HmacKey: %s", err)
+		t.Errorf("proto.Unmarshal() err = %s, want nil", err)
 	}
 	// nil
 	if _, err := registry.NewKeyData(nil); err == nil {
-		t.Errorf("expect an error when key template is nil")
+		t.Errorf("registry.NewKeyData(nil) succeeded, want error")
 	}
 	// unregistered type url
 	template := &tinkpb.KeyTemplate{TypeUrl: "some url", Value: []byte{0}}
 	if _, err := registry.NewKeyData(template); err == nil {
-		t.Errorf("expect an error when key template contains unregistered typeURL")
+		t.Errorf("registry.NewKeyData(%v) succeeded, want error", template)
 	}
 }
 
 func TestNewKey(t *testing.T) {
-	// aead template
-	aesGcmTemplate := aead.AES128GCMKeyTemplate()
-	key, err := registry.NewKey(aesGcmTemplate)
+	// test-only legacy template
+	legacyTemplate := keytest.TinkLegacyKeyTemplate()
+	key, err := registry.NewKey(legacyTemplate)
 	if err != nil {
-		t.Errorf("unexpected error: %s", err)
+		t.Fatalf("registry.NewKey(%v) err = %s, want nil", legacyTemplate, err)
 	}
-	var aesGcmKey = key.(*gcmpb.AesGcmKey)
-	aesGcmFormat := new(gcmpb.AesGcmKeyFormat)
-	if err := proto.Unmarshal(aesGcmTemplate.Value, aesGcmFormat); err != nil {
-		t.Errorf("unexpected error: %s", err)
+	legacyKey, ok := key.(*testonlypb.TestOnlyLegacyKey)
+	if !ok {
+		t.Fatalf("registry.NewKey(%v) = %T, want *testonlypb.TestOnlyLegacyKey", legacyTemplate, key)
 	}
-	if aesGcmFormat.KeySize != uint32(len(aesGcmKey.KeyValue)) {
-		t.Errorf("key doesn't match template")
+	legacyFormat := new(testonlypb.TestOnlyKeyFormat)
+	if err := proto.Unmarshal(legacyTemplate.Value, legacyFormat); err != nil {
+		t.Errorf("proto.Unmarshal() err = %s, want nil", err)
 	}
-	//nil
+	if legacyFormat.KeySize != uint32(len(legacyKey.KeyValue)) {
+		t.Errorf("len(legacyKey.KeyValue) = %d, want %d", len(legacyKey.KeyValue), legacyFormat.KeySize)
+	}
+	// nil
 	if _, err := registry.NewKey(nil); err == nil {
-		t.Errorf("expect an error when key template is nil")
+		t.Errorf("registry.NewKey(nil) succeeded, want error")
 	}
 	// unregistered type url
 	template := &tinkpb.KeyTemplate{TypeUrl: "some url", Value: []byte{0}}
 	if _, err := registry.NewKey(template); err == nil {
-		t.Errorf("expect an error when key template is not registered")
+		t.Errorf("registry.NewKey(%v) succeeded, want error", template)
 	}
 }
 
 func TestPrimitiveFromKeyData(t *testing.T) {
-	// hmac keydata
-	keyData := testutil.NewHMACKeyData(commonpb.HashType_SHA256, 16)
+	// test-only legacy keydata
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         keytest.LegacyKeyTypeURL,
+		Value:           mustMarshalLegacyKey(t),
+		KeyMaterialType: tinkpb.KeyData_SYMMETRIC,
+	}
 	p, err := registry.PrimitiveFromKeyData(keyData)
 	if err != nil {
-		t.Errorf("unexpected error: %s", err)
+		t.Errorf("registry.PrimitiveFromKeyData(keyData) err = %s, want nil", err)
 	}
-	if _, ok := p.(tink.MAC); !ok {
-		t.Errorf("registry.PrimitiveFromKeyData() e, _ = %T, want tink.MAC", p)
+	if _, ok := p.(tink.AEAD); !ok {
+		t.Errorf("registry.PrimitiveFromKeyData(keyData) = %T, want tink.AEAD", p)
 	}
 	// unregistered url
 	keyData.TypeUrl = "some url"
 	if _, err := registry.PrimitiveFromKeyData(keyData); err == nil {
-		t.Errorf("expect an error when typeURL has not been registered")
+		t.Errorf("registry.PrimitiveFromKeyData(keyData) with TypeUrl = %q succeeded, want error", keyData.TypeUrl)
 	}
 	// unmatched url
 	keyData.TypeUrl = testutil.AESGCMTypeURL
 	if _, err := registry.PrimitiveFromKeyData(keyData); err == nil {
-		t.Errorf("expect an error when typeURL doesn't match key")
+		t.Errorf("registry.PrimitiveFromKeyData(keyData) with TypeUrl = %q succeeded, want error", keyData.TypeUrl)
 	}
 	// nil
 	if _, err := registry.PrimitiveFromKeyData(nil); err == nil {
-		t.Errorf("expect an error when key data is nil")
+		t.Errorf("registry.PrimitiveFromKeyData(nil) succeeded, want error")
 	}
 }
 
 func TestPrimitive(t *testing.T) {
-	// hmac key
-	key := testutil.NewHMACKey(commonpb.HashType_SHA256, 16)
-	serializedKey, err := proto.Marshal(key)
+	// test-only legacy key
+	serializedKey := mustMarshalLegacyKey(t)
+	p, err := registry.Primitive(keytest.LegacyKeyTypeURL, serializedKey)
 	if err != nil {
-		t.Fatalf("proto.Marshal() err = %s, want nil", err)
+		t.Fatalf("registry.Primitive(%q, serializedKey) err = %s, want nil", keytest.LegacyKeyTypeURL, err)
 	}
-	p, err := registry.Primitive(testutil.HMACTypeURL, serializedKey)
-	if err != nil {
-		t.Fatalf("registry.Primitive() err = %s, want nil", err)
-	}
-	if _, ok := p.(tink.MAC); !ok {
-		t.Errorf("registry.Primitive() e, _ = %T, want tink.MAC", p)
+	if _, ok := p.(tink.AEAD); !ok {
+		t.Errorf("registry.Primitive(%q, serializedKey) = %T, want tink.AEAD", keytest.LegacyKeyTypeURL, p)
 	}
 	// unregistered url
 	if _, err := registry.Primitive("some url", serializedKey); err == nil {
-		t.Errorf("expect an error when typeURL has not been registered")
+		t.Errorf("registry.Primitive(\"some url\", serializedKey) succeeded, want error")
 	}
 	// unmatched url
 	if _, err := registry.Primitive(testutil.AESGCMTypeURL, serializedKey); err == nil {
-		t.Errorf("expect an error when typeURL doesn't match key")
+		t.Errorf("registry.Primitive(%q, serializedKey) succeeded, want error", testutil.AESGCMTypeURL)
 	}
 	// void key
-	if _, err := registry.Primitive(testutil.AESGCMTypeURL, nil); err == nil {
-		t.Errorf("expect an error when key is nil")
+	if _, err := registry.Primitive(keytest.LegacyKeyTypeURL, nil); err == nil {
+		t.Errorf("registry.Primitive(%q, nil) succeeded, want error", keytest.LegacyKeyTypeURL)
 	}
-	if _, err := registry.Primitive(testutil.AESGCMTypeURL, []byte{}); err == nil {
-		t.Errorf("expect an error when key is nil")
+	if _, err := registry.Primitive(keytest.LegacyKeyTypeURL, []byte{}); err == nil {
+		t.Errorf("registry.Primitive(%q, []byte{}) succeeded, want error", keytest.LegacyKeyTypeURL)
 	}
-	if _, err := registry.Primitive(testutil.AESGCMTypeURL, []byte{0}); err == nil {
-		t.Errorf("expect an error when key is nil")
+	if _, err := registry.Primitive(keytest.LegacyKeyTypeURL, []byte{0}); err == nil {
+		t.Errorf("registry.Primitive(%q, []byte{0}) succeeded, want error", keytest.LegacyKeyTypeURL)
 	}
 }
 
 func TestRegisterKmsClient(t *testing.T) {
 	client1, err := fakekms.NewClient("fake-kms://prefix1")
 	if err != nil {
-		t.Fatalf("fakekms.NewClient('fake-kms://prefix1') failed: %v", err)
+		t.Fatalf("fakekms.NewClient(\"fake-kms://prefix1\") err = %s, want nil", err)
 	}
 	client2, err := fakekms.NewClient("fake-kms://prefix2")
 	if err != nil {
-		t.Fatalf("fakekms.NewClient('fake-kms://prefix2') failed: %v", err)
+		t.Fatalf("fakekms.NewClient(\"fake-kms://prefix2\") err = %s, want nil", err)
 	}
 	registry.RegisterKMSClient(client1)
 	registry.RegisterKMSClient(client2)
 	output1, err := registry.GetKMSClient("fake-kms://prefix1-postfix")
 	if err != nil {
-		t.Errorf("registry.GetKMSClient('fake-kms://prefix1-postfix') failed: %v", err)
+		t.Errorf("registry.GetKMSClient(\"fake-kms://prefix1-postfix\") err = %s, want nil", err)
 	}
 	if output1 != client1 {
-		t.Errorf("registry.GetKMSClient('fake-kms://prefix1-postfix') did not return client1")
+		t.Errorf("registry.GetKMSClient(\"fake-kms://prefix1-postfix\") = %v, want client1", output1)
 	}
 	output2, err := registry.GetKMSClient("fake-kms://prefix2-postfix")
 	if err != nil {
-		t.Errorf("registry.GetKMSClient('fake-kms://prefix2-postfix') failed: %v", err)
+		t.Errorf("registry.GetKMSClient(\"fake-kms://prefix2-postfix\") err = %s, want nil", err)
 	}
 	if output2 != client2 {
-		t.Errorf("registry.GetKMSClient('fake-kms://prefix2-postfix') did not return client2")
+		t.Errorf("registry.GetKMSClient(\"fake-kms://prefix2-postfix\") = %v, want client2", output2)
 	}
 	_, err = registry.GetKMSClient("fake-kms://unknown-prefix")
 	if err == nil {
-		t.Errorf("registry.GetKMSClient('fake-kms://unknown-prefix') succeeded, want fail")
+		t.Errorf("registry.GetKMSClient(\"fake-kms://unknown-prefix\") succeeded, want error")
 	}
 	_, err = registry.GetKMSClient("bad-kms://unknown-prefix")
 	if err == nil {
-		t.Errorf("registry.GetKMSClient('bad-kms://unknown-prefix') succeeded, want fail")
+		t.Errorf("registry.GetKMSClient(\"bad-kms://unknown-prefix\") succeeded, want error")
 	}
 }
 
 func TestRegisterTwoKmsClientsForSameUri_firstGetsReturned(t *testing.T) {
 	abcClient, err := fakekms.NewClient("fake-kms://abc")
 	if err != nil {
-		t.Fatalf("fakekms.NewClient(\"fake-kms://abc\") err = %q, want nil", err)
+		t.Fatalf("fakekms.NewClient(\"fake-kms://abc\") err = %s, want nil", err)
 	}
 	registry.RegisterKMSClient(abcClient)
 
 	abc123Client, err := fakekms.NewClient("fake-kms://abc123")
 	if err != nil {
-		t.Fatalf("fakekms.NewClient(\"fake-kms://abc123\") err = %q, want nil", err)
+		t.Fatalf("fakekms.NewClient(\"fake-kms://abc123\") err = %s, want nil", err)
 	}
 	registry.RegisterKMSClient(abc123Client)
 
 	// Both clients support "fake-kms://abc123". But abcClient was registered first.
 	got, err := registry.GetKMSClient("fake-kms://abc123")
 	if err != nil {
-		t.Fatalf("registry.GetKMSClient(\"fake-kms://abc123\") err = %q, want nil", err)
+		t.Fatalf("registry.GetKMSClient(\"fake-kms://abc123\") err = %s, want nil", err)
 	}
 	if got != abcClient {
-		t.Errorf("registry.GetKMSClient(\"fake-kms://abc123\") = %q, want abcClient", got)
+		t.Errorf("registry.GetKMSClient(\"fake-kms://abc123\") = %v, want abcClient", got)
 	}
 }
 
 func TestClearKMSClients(t *testing.T) {
 	client, err := fakekms.NewClient("fake-kms://xyz")
 	if err != nil {
-		t.Fatalf("fakekms.NewClient('fake-kms://xyz') failed: %v", err)
+		t.Fatalf("fakekms.NewClient(\"fake-kms://xyz\") err = %s, want nil", err)
 	}
 	registry.RegisterKMSClient(client)
 
 	_, err = registry.GetKMSClient("fake-kms://xyz-123")
 	if err != nil {
-		t.Errorf("registry.GetKMSClient('fake-kms://xyz-123') failed: %v", err)
+		t.Errorf("registry.GetKMSClient(\"fake-kms://xyz-123\") err = %s, want nil", err)
 	}
 
 	registry.ClearKMSClients()
 
 	_, err = registry.GetKMSClient("fake-kms://xyz-123")
 	if err == nil {
-		t.Errorf("registry.GetKMSClient('fake-kms://xyz-123') succeeded, want fail")
+		t.Errorf("registry.GetKMSClient(\"fake-kms://xyz-123\") succeeded, want error")
 	}
 }
