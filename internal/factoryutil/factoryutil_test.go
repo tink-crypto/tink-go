@@ -15,6 +15,7 @@
 package factoryutil_test
 
 import (
+	"bytes"
 	"reflect"
 	"strings"
 	"testing"
@@ -25,37 +26,49 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/factoryutil"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
+	"github.com/tink-crypto/tink-go/v2/internal/keytest"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
-	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
-	"github.com/tink-crypto/tink-go/v2/mac/hmac"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
 	"github.com/tink-crypto/tink-go/v2/tink"
+	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-func mustCreateHMACKey(variant hmac.Variant, idRequirement uint32) key.Key {
-	hmacParams, err := hmac.NewParameters(hmac.ParametersOpts{
-		KeySizeInBytes: 32,
-		TagSizeInBytes: 16,
-		HashType:       hmac.SHA256,
-		Variant:        variant,
-	})
+func mustCreateKey(t *testing.T, variant keytest.Variant, idRequirement uint32) key.Key {
+	t.Helper()
+	params, err := keytest.NewParameters(variant)
 	if err != nil {
-		panic(err)
+		t.Fatalf("keytest.NewParameters(%v) err = %v, want nil", variant, err)
 	}
-	keyBytes, err := secretdata.NewBytesFromRand(32)
+	keyBytes, err := secretdata.NewBytesFromRand(16)
 	if err != nil {
-		panic(err)
+		t.Fatalf("secretdata.NewBytesFromRand(16) err = %v, want nil", err)
 	}
-	hmacKey, err := hmac.NewKey(keyBytes, hmacParams, idRequirement)
+	k, err := keytest.NewKey(keyBytes, idRequirement, params)
 	if err != nil {
-		panic(err)
+		t.Fatalf("keytest.NewKey(keyBytes, %v, %v) err = %v, want nil", idRequirement, params, err)
 	}
-	return hmacKey
+	return k
+}
+
+// mustCreateLegacyKey returns a key whose primitive can only be created by a
+// legacy key manager registered in the global registry.
+func mustCreateLegacyKey(t *testing.T) key.Key {
+	t.Helper()
+	template := keytest.LegacyKeyTemplate(tinkpb.OutputPrefixType_TINK)
+	handle, err := keyset.NewHandle(template)
+	if err != nil {
+		t.Fatalf("keyset.NewHandle(%v) err = %v, want nil", template, err)
+	}
+	entry, err := handle.Primary()
+	if err != nil {
+		t.Fatalf("handle.Primary() err = %v, want nil", err)
+	}
+	return entry.Key()
 }
 
 func TestLoggerBuilder_CreatesLoggerWithContext(t *testing.T) {
@@ -68,15 +81,15 @@ func TestLoggerBuilder_CreatesLoggerWithContext(t *testing.T) {
 
 	annotations := map[string]string{"foo": "bar"}
 	manager := keyset.NewManager()
-	_, err := manager.AddKeyWithOpts(mustCreateHMACKey(hmac.VariantTink, 1), internalapi.Token{}, keyset.AsPrimary())
+	_, err := manager.AddKeyWithOpts(mustCreateKey(t, keytest.VariantTink, 1), internalapi.Token{}, keyset.AsPrimary())
 	if err != nil {
 		t.Fatalf("AddKeyWithOpts() err = %v, want nil", err)
 	}
-	_, err = manager.AddKeyWithOpts(mustCreateHMACKey(hmac.VariantTink, 2), internalapi.Token{}, keyset.WithStatus(keyset.Disabled))
+	_, err = manager.AddKeyWithOpts(mustCreateKey(t, keytest.VariantTink, 2), internalapi.Token{}, keyset.WithStatus(keyset.Disabled))
 	if err != nil {
 		t.Fatalf("AddKeyWithOpts() err = %v, want nil", err)
 	}
-	keyID, err := manager.AddKey(mustCreateHMACKey(hmac.VariantNoPrefix, 0))
+	keyID, err := manager.AddKey(mustCreateKey(t, keytest.VariantNoPrefix, 0))
 	if err != nil {
 		t.Fatalf("AddKey() err = %v, want nil", err)
 	}
@@ -114,13 +127,13 @@ func TestLoggerBuilder_CreatesLoggerWithContext(t *testing.T) {
 				{
 					Status:    monitoring.Enabled,
 					KeyID:     1,
-					KeyType:   "tink.HmacKey",
+					KeyType:   "tink.TestOnlyKey",
 					KeyPrefix: "TINK",
 				},
 				{
 					Status:    monitoring.Enabled,
 					KeyID:     keyID,
-					KeyType:   "tink.HmacKey",
+					KeyType:   "tink.TestOnlyKey",
 					KeyPrefix: "RAW",
 				},
 			},
@@ -141,15 +154,15 @@ func TestLoggerBuilder_WithoutAnnotations(t *testing.T) {
 	defer internalregistry.ClearMonitoringClient()
 
 	manager := keyset.NewManager()
-	_, err := manager.AddKeyWithOpts(mustCreateHMACKey(hmac.VariantTink, 1), internalapi.Token{}, keyset.AsPrimary())
+	_, err := manager.AddKeyWithOpts(mustCreateKey(t, keytest.VariantTink, 1), internalapi.Token{}, keyset.AsPrimary())
 	if err != nil {
 		t.Fatalf("AddKeyWithOpts() err = %v, want nil", err)
 	}
-	_, err = manager.AddKeyWithOpts(mustCreateHMACKey(hmac.VariantTink, 2), internalapi.Token{}, keyset.WithStatus(keyset.Disabled))
+	_, err = manager.AddKeyWithOpts(mustCreateKey(t, keytest.VariantTink, 2), internalapi.Token{}, keyset.WithStatus(keyset.Disabled))
 	if err != nil {
 		t.Fatalf("AddKeyWithOpts() err = %v, want nil", err)
 	}
-	_, err = manager.AddKey(mustCreateHMACKey(hmac.VariantNoPrefix, 0))
+	_, err = manager.AddKey(mustCreateKey(t, keytest.VariantNoPrefix, 0))
 	if err != nil {
 		t.Fatalf("AddKey() err = %v, want nil", err)
 	}
@@ -178,15 +191,15 @@ func TestLoggerBuilder_NoClientReturnsDoNothingLogger(t *testing.T) {
 
 	annotations := map[string]string{"foo": "bar"}
 	manager := keyset.NewManager()
-	_, err := manager.AddKeyWithOpts(mustCreateHMACKey(hmac.VariantTink, 1), internalapi.Token{}, keyset.AsPrimary())
+	_, err := manager.AddKeyWithOpts(mustCreateKey(t, keytest.VariantTink, 1), internalapi.Token{}, keyset.AsPrimary())
 	if err != nil {
 		t.Fatalf("AddKeyWithOpts() err = %v, want nil", err)
 	}
-	_, err = manager.AddKeyWithOpts(mustCreateHMACKey(hmac.VariantTink, 2), internalapi.Token{}, keyset.WithStatus(keyset.Disabled))
+	_, err = manager.AddKeyWithOpts(mustCreateKey(t, keytest.VariantTink, 2), internalapi.Token{}, keyset.WithStatus(keyset.Disabled))
 	if err != nil {
 		t.Fatalf("AddKeyWithOpts() err = %v, want nil", err)
 	}
-	_, err = manager.AddKey(mustCreateHMACKey(hmac.VariantNoPrefix, 0))
+	_, err = manager.AddKey(mustCreateKey(t, keytest.VariantNoPrefix, 0))
 	if err != nil {
 		t.Fatalf("AddKey() err = %v, want nil", err)
 	}
@@ -222,15 +235,15 @@ func TestEnabledUnmonitoredEntries(t *testing.T) {
 	defer internalregistry.ClearMonitoringClient()
 
 	manager := keyset.NewManager()
-	_, err := manager.AddKeyWithOpts(mustCreateHMACKey(hmac.VariantTink, 1), internalapi.Token{}, keyset.AsPrimary())
+	_, err := manager.AddKeyWithOpts(mustCreateKey(t, keytest.VariantTink, 1), internalapi.Token{}, keyset.AsPrimary())
 	if err != nil {
 		t.Fatalf("AddKeyWithOpts() err = %v, want nil", err)
 	}
-	_, err = manager.AddKeyWithOpts(mustCreateHMACKey(hmac.VariantTink, 2), internalapi.Token{}, keyset.WithStatus(keyset.Disabled))
+	_, err = manager.AddKeyWithOpts(mustCreateKey(t, keytest.VariantTink, 2), internalapi.Token{}, keyset.WithStatus(keyset.Disabled))
 	if err != nil {
 		t.Fatalf("AddKeyWithOpts() err = %v, want nil", err)
 	}
-	_, err = manager.AddKeyWithOpts(mustCreateHMACKey(hmac.VariantNoPrefix, 0), internalapi.Token{}, keyset.WithFixedID(1234))
+	_, err = manager.AddKeyWithOpts(mustCreateKey(t, keytest.VariantNoPrefix, 0), internalapi.Token{}, keyset.WithFixedID(1234))
 	if err != nil {
 		t.Fatalf("AddKey() err = %v, want nil", err)
 	}
@@ -268,13 +281,13 @@ func TestEnabledUnmonitoredEntries_Empty(t *testing.T) {
 func TestPrimitiveFromKey_Full(t *testing.T) {
 	primitive := "primitive"
 	cb := config.NewBuilder()
-	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*hmac.Key](), func(key key.Key) (any, error) {
+	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*keytest.Key](), func(key key.Key) (any, error) {
 		return primitive, nil
 	}, internalapi.Token{}); err != nil {
 		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 	config := cb.Build()
-	key := mustCreateHMACKey(hmac.VariantTink, 1)
+	key := mustCreateKey(t, keytest.VariantTink, 1)
 	got, isLegacy, err := factoryutil.PrimitiveFromKey[string](key, &config)
 	if err != nil {
 		t.Fatalf("PrimitiveFromKey() err = %v, want nil", err)
@@ -288,13 +301,13 @@ func TestPrimitiveFromKey_Full(t *testing.T) {
 func TestPrimitiveFromKey_WrongType(t *testing.T) {
 	primitive := "primitive"
 	cb := config.NewBuilder()
-	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*hmac.Key](), func(key key.Key) (any, error) {
+	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*keytest.Key](), func(key key.Key) (any, error) {
 		return primitive, nil
 	}, internalapi.Token{}); err != nil {
 		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 	config := cb.Build()
-	key := mustCreateHMACKey(hmac.VariantTink, 1)
+	key := mustCreateKey(t, keytest.VariantTink, 1)
 
 	_, isLegacy, err := factoryutil.PrimitiveFromKey[int](key, &config)
 	if err == nil {
@@ -325,11 +338,9 @@ func TestPrimitiveFromKey_Legacy(t *testing.T) {
 	// RegistryConfig is the only config that can create legacy primitives.
 	config := registryconfig.RegistryConfig{}
 
-	// Artificially unregister the primitive constructor to force the legacy path.
-	primitiveregistry.UnregisterPrimitiveConstructor[*hmac.Key]()
-
-	key := mustCreateHMACKey(hmac.VariantTink, 1)
-	m, isLegacy, err := factoryutil.PrimitiveFromKey[tink.MAC](key, &config)
+	// Legacy keys have no primitive constructor, which forces the legacy path.
+	key := mustCreateLegacyKey(t)
+	a, isLegacy, err := factoryutil.PrimitiveFromKey[tink.AEAD](key, &config)
 	if err != nil {
 		t.Fatalf("PrimitiveFromKey() err = %v, want nil", err)
 	}
@@ -337,22 +348,26 @@ func TestPrimitiveFromKey_Legacy(t *testing.T) {
 		t.Errorf("PrimitiveFromKey() isLegacy = false, want true")
 	}
 
-	d, err := m.ComputeMAC([]byte("data"))
+	plaintext := []byte("plaintext")
+	associatedData := []byte("associatedData")
+	ciphertext, err := a.Encrypt(plaintext, associatedData)
 	if err != nil {
-		t.Fatalf("ComputeMAC() err = %v, want nil", err)
+		t.Fatalf("Encrypt() err = %v, want nil", err)
 	}
-	if err := m.VerifyMAC(d, []byte("data")); err != nil {
-		t.Errorf("VerifyMAC() err = %v, want nil", err)
+	got, err := a.Decrypt(ciphertext, associatedData)
+	if err != nil {
+		t.Fatalf("Decrypt() err = %v, want nil", err)
+	}
+	if !bytes.Equal(got, plaintext) {
+		t.Errorf("Decrypt() = %q, want %q", got, plaintext)
 	}
 }
 
 func TestPrimitiveFromKey_LegacyWrongType(t *testing.T) {
 	config := registryconfig.RegistryConfig{}
 
-	// Artificially unregister the primitive constructor to force the legacy path.
-	primitiveregistry.UnregisterPrimitiveConstructor[*hmac.Key]()
-
-	key := mustCreateHMACKey(hmac.VariantTink, 1)
+	// Legacy keys have no primitive constructor, which forces the legacy path.
+	key := mustCreateLegacyKey(t)
 	_, isLegacy, err := factoryutil.PrimitiveFromKey[int](key, &config)
 	if err == nil {
 		t.Fatalf("PrimitiveFromKey() err = nil, want error")
@@ -365,11 +380,11 @@ func TestPrimitiveFromKey_LegacyWrongType(t *testing.T) {
 		t.Errorf("PrimitiveFromKey() isLegacy = false, want true")
 	}
 
-	_, isLegacy, err = factoryutil.PrimitiveFromKey[tink.AEAD](key, &config)
+	_, isLegacy, err = factoryutil.PrimitiveFromKey[tink.MAC](key, &config)
 	if err == nil {
 		t.Fatalf("PrimitiveFromKey() err = nil, want error")
 	}
-	if wantStr := "tink.AEAD"; !strings.HasSuffix(err.Error(), wantStr) {
+	if wantStr := "tink.MAC"; !strings.HasSuffix(err.Error(), wantStr) {
 		t.Errorf("PrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
 	}
 	if !isLegacy {
@@ -378,7 +393,7 @@ func TestPrimitiveFromKey_LegacyWrongType(t *testing.T) {
 }
 
 func TestOutputPrefix(t *testing.T) {
-	key := mustCreateHMACKey(hmac.VariantTink, 1)
+	key := mustCreateKey(t, keytest.VariantTink, 1)
 	got, err := factoryutil.OutputPrefix(key)
 	if err != nil {
 		t.Fatalf("OutputPrefix() err = %v, want nil", err)
@@ -389,7 +404,7 @@ func TestOutputPrefix(t *testing.T) {
 }
 
 func TestOutputPrefix_NoPrefix(t *testing.T) {
-	key := mustCreateHMACKey(hmac.VariantNoPrefix, 0)
+	key := mustCreateKey(t, keytest.VariantNoPrefix, 0)
 	got, err := factoryutil.OutputPrefix(key)
 	if err != nil {
 		t.Fatalf("OutputPrefix() err = %v, want nil", err)
