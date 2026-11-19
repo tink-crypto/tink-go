@@ -128,3 +128,21 @@ func LegacyKeyTemplate(outputPrefixType tinkpb.OutputPrefixType) *tinkpb.KeyTemp
 func TinkLegacyKeyTemplate() *tinkpb.KeyTemplate {
 	return LegacyKeyTemplate(tinkpb.OutputPrefixType_TINK)
 }
+
+// CrunchyLegacyKeyTemplate returns a key template for test-only legacy keys
+// with the CRUNCHY output prefix type.
+//
+// There are no parameters for test-only legacy keys, so this template is the
+// only way to generate them.
+func CrunchyLegacyKeyTemplate() *tinkpb.KeyTemplate {
+	return LegacyKeyTemplate(tinkpb.OutputPrefixType_CRUNCHY)
+}
+
+// NoPrefixLegacyKeyTemplate returns a key template for test-only legacy keys
+// with the RAW output prefix type.
+//
+// There are no parameters for test-only legacy keys, so this template is the
+// only way to generate them.
+func NoPrefixLegacyKeyTemplate() *tinkpb.KeyTemplate {
+	return LegacyKeyTemplate(tinkpb.OutputPrefixType_RAW)
+}

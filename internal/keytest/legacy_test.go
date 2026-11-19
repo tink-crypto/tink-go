@@ -101,6 +101,38 @@ func TestLegacyKeyTemplate(t *testing.T) {
 	}
 }
 
+func TestLegacyKeyTemplateWithFixedOutputPrefixType(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		template         func() *tinkpb.KeyTemplate
+		outputPrefixType tinkpb.OutputPrefixType
+	}{
+		{
+			name:             "TinkLegacyKeyTemplate",
+			template:         keytest.TinkLegacyKeyTemplate,
+			outputPrefixType: tinkpb.OutputPrefixType_TINK,
+		},
+		{
+			name:             "CrunchyLegacyKeyTemplate",
+			template:         keytest.CrunchyLegacyKeyTemplate,
+			outputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
+		},
+		{
+			name:             "NoPrefixLegacyKeyTemplate",
+			template:         keytest.NoPrefixLegacyKeyTemplate,
+			outputPrefixType: tinkpb.OutputPrefixType_RAW,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.template()
+			want := keytest.LegacyKeyTemplate(tc.outputPrefixType)
+			if diff := cmp.Diff(want, got, protocmp.Transform()); diff != "" {
+				t.Errorf("keytest.%s() returned unexpected diff (-want +got):\n%s", tc.name, diff)
+			}
+		})
+	}
+}
+
 func TestLegacyKeyManagerNewKeyData(t *testing.T) {
 	km := mustGetLegacyKeyManager(t)
 	serializedFormat := keytest.LegacyKeyTemplate(tinkpb.OutputPrefixType_TINK).GetValue()
