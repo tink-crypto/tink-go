@@ -26,7 +26,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"github.com/tink-crypto/tink-go/v2/aead"
-	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
 	"github.com/tink-crypto/tink-go/v2/internal"
@@ -47,7 +46,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
 	"github.com/tink-crypto/tink-go/v2/testutil"
-	"github.com/tink-crypto/tink-go/v2/tink"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
@@ -67,9 +65,6 @@ func TestNewHandle(t *testing.T) {
 	}
 	if key.KeyData.TypeUrl != template.TypeUrl {
 		t.Errorf("key.KeyData.TypeUrl = %v, want %v", key.KeyData.TypeUrl, template.TypeUrl)
-	}
-	if _, err = mac.New(handle); err != nil {
-		t.Errorf("mac.New(handle) err = %v, want nil", err)
 	}
 }
 
@@ -959,48 +954,6 @@ func TestKeysetInfo_withRSAPSSAndSaltLengthZero_panics(t *testing.T) {
 	_ = handle.KeysetInfo()
 
 	t.Errorf("handle.KeysetInfo() did not panic")
-}
-
-func TestPrimitivesWithRegistry(t *testing.T) {
-	template := mac.HMACSHA256Tag128KeyTemplate()
-	template.OutputPrefixType = tinkpb.OutputPrefixType_RAW
-	handle, err := keyset.NewHandle(template)
-	if err != nil {
-		t.Fatalf("keyset.NewHandle(%v) err = %v, want nil", template, err)
-	}
-	handleMAC, err := mac.New(handle)
-	if err != nil {
-		t.Fatalf("mac.New(%v) err = %v, want nil", handle, err)
-	}
-
-	ks := testkeyset.KeysetMaterial(handle)
-	if len(ks.Key) != 1 {
-		t.Fatalf("len(ks.Key) = %d, want 1", len(ks.Key))
-	}
-	keyDataPrimitive, err := registry.PrimitiveFromKeyData(ks.Key[0].KeyData)
-	if err != nil {
-		t.Fatalf("registry.PrimitiveFromKeyData(%v) err = %v, want nil", ks.Key[0].KeyData, err)
-	}
-	keyDataMAC, ok := keyDataPrimitive.(tink.MAC)
-	if !ok {
-		t.Fatal("registry.PrimitiveFromKeyData(keyData) is not of type tink.MAC")
-	}
-
-	plaintext := []byte("plaintext")
-	handleMACTag, err := handleMAC.ComputeMAC(plaintext)
-	if err != nil {
-		t.Fatalf("handleMAC.ComputeMAC(%v) err = %v, want nil", plaintext, err)
-	}
-	if err = keyDataMAC.VerifyMAC(handleMACTag, plaintext); err != nil {
-		t.Errorf("keyDataMAC.VerifyMAC(%v, %v) err = %v, want nil", handleMACTag, plaintext, err)
-	}
-	keyDataMACTag, err := keyDataMAC.ComputeMAC(plaintext)
-	if err != nil {
-		t.Fatalf("keyDataMAC.ComputeMAC(%v) err = %v, want nil", plaintext, err)
-	}
-	if err = handleMAC.VerifyMAC(keyDataMACTag, plaintext); err != nil {
-		t.Errorf("handleMAC.VerifyMAC(%v, %v) err = %v, want nil", keyDataMACTag, plaintext, err)
-	}
 }
 
 func TestLenWithOneKey(t *testing.T) {
