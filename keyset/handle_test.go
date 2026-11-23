@@ -35,13 +35,9 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/keyset"
-	"github.com/tink-crypto/tink-go/v2/mac/aescmac"
-	"github.com/tink-crypto/tink-go/v2/mac/hmac"
-	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
-	"github.com/tink-crypto/tink-go/v2/signature"
 	"github.com/tink-crypto/tink-go/v2/testing/fakekms"
 	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
@@ -50,7 +46,7 @@ import (
 )
 
 func TestNewHandle(t *testing.T) {
-	template := mac.HMACSHA256Tag128KeyTemplate()
+	template := keytest.TinkLegacyKeyTemplate()
 	handle, err := keyset.NewHandle(template)
 	if err != nil {
 		t.Errorf("keyset.NewHandle(template) = %v, want nil", err)
@@ -142,7 +138,7 @@ func TestNewHandleExistingKeyset(t *testing.T) {
 
 func TestNewHandleWithInvalidTypeURLFails(t *testing.T) {
 	// template with unknown TypeURL
-	invalidTemplate := mac.HMACSHA256Tag128KeyTemplate()
+	invalidTemplate := keytest.TinkLegacyKeyTemplate()
 	invalidTemplate.TypeUrl = "some unknown TypeURL"
 	if _, err := keyset.NewHandle(invalidTemplate); err == nil {
 		t.Errorf("keyset.NewHandle(invalidTemplate) err = nil, want error")
@@ -165,9 +161,9 @@ func TestWriteAndReadInBinary(t *testing.T) {
 		t.Errorf("aead.New(keysetEncryptionHandle) err = %v, want nil", err)
 	}
 
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	handle, err := keyset.NewHandle(keytest.TinkLegacyKeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(keytest.TinkLegacyKeyTemplate()) err = %v, want nil", err)
 	}
 
 	buff := &bytes.Buffer{}
@@ -197,9 +193,9 @@ func TestWriteAndReadInJSON(t *testing.T) {
 		t.Errorf("aead.New(keysetEncryptionHandle) err = %v, want nil", err)
 	}
 
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	handle, err := keyset.NewHandle(keytest.TinkLegacyKeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(keytest.TinkLegacyKeyTemplate()) err = %v, want nil", err)
 	}
 
 	buff := &bytes.Buffer{}
@@ -227,9 +223,9 @@ func TestWriteAndReadWithAssociatedData(t *testing.T) {
 		t.Fatalf("fakekms.NewAEAD(fakeKeyURI) err = %v, want nil", err)
 	}
 
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	handle, err := keyset.NewHandle(keytest.TinkLegacyKeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(keytest.TinkLegacyKeyTemplate()) err = %v, want nil", err)
 	}
 	associatedData := []byte{0x01, 0x02}
 
@@ -274,9 +270,9 @@ func TestReadWithMismatchedAssociatedData(t *testing.T) {
 		t.Errorf("aead.New(keysetEncryptionHandle) err = %v, want nil", err)
 	}
 
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	handle, err := keyset.NewHandle(keytest.TinkLegacyKeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(keytest.TinkLegacyKeyTemplate()) err = %v, want nil", err)
 	}
 	associatedData := []byte{0x01, 0x02}
 
@@ -300,9 +296,9 @@ func TestWriteAndReadWithContext(t *testing.T) {
 		t.Fatalf("fakekms.NewAEADWithContext(fakeKeyURI) err = %v, want nil", err)
 	}
 
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	handle, err := keyset.NewHandle(keytest.TinkLegacyKeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(keytest.TinkLegacyKeyTemplate()) err = %v, want nil", err)
 	}
 	associatedData := []byte{0x01, 0x02}
 
@@ -349,9 +345,9 @@ func TestWriteWithContextDoesNotIgnoreContext(t *testing.T) {
 		t.Fatalf("fakekms.NewAEADWithContext(fakeKeyURI) err = %v, want nil", err)
 	}
 
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	handle, err := keyset.NewHandle(keytest.TinkLegacyKeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(keytest.TinkLegacyKeyTemplate()) err = %v, want nil", err)
 	}
 	associatedData := []byte{0x01, 0x02}
 
@@ -372,9 +368,9 @@ func TestReadWithContextDoesNotIgnoreContext(t *testing.T) {
 		t.Fatalf("fakekms.NewAEADWithContext(fakeKeyURI) err = %v, want nil", err)
 	}
 
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	handle, err := keyset.NewHandle(keytest.TinkLegacyKeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(keytest.TinkLegacyKeyTemplate()) err = %v, want nil", err)
 	}
 	associatedData := []byte{0x01, 0x02}
 
@@ -633,21 +629,40 @@ func TestWriteWithNoSecretsReturnsError(t *testing.T) {
 	}
 }
 
-func TestWriteAndReadWithNoSecrets(t *testing.T) {
-	// Create a keyset that contains a public key.
-	privateHandle, err := keyset.NewHandle(signature.ECDSAP256KeyTemplate())
+func mustCreatePublicPrivateKeysets(t *testing.T) (*keyset.Handle, *keyset.Handle) {
+	t.Helper()
+	km := keyset.NewManager()
+	params, err := keytest.NewAsymmetricParameters(keytest.VariantTink)
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(signature.ECDSAP256KeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keytest.NewAsymmetricParameters(keytest.VariantTink) err = %v, want nil", err)
 	}
-	handle, err := privateHandle.Public()
+	id, err := km.AddNewKeyFromParameters(params)
+	if err != nil {
+		t.Fatalf("km.AddNewKeyFromParameters(params) err = %v, want nil", err)
+	}
+	err = km.SetPrimary(id)
+	if err != nil {
+		t.Fatalf("km.SetPrimary(id) err = %v, want nil", err)
+	}
+	privateHandle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	publicHandle, err := privateHandle.Public()
 	if err != nil {
 		t.Fatalf("privateHandle.Public() err = %v, want nil", err)
 	}
+	return privateHandle, publicHandle
+}
+
+func TestWriteAndReadWithNoSecrets(t *testing.T) {
+	// Create a keyset that contains a public key.
+	_, publicHandle := mustCreatePublicPrivateKeysets(t)
 
 	buff := &bytes.Buffer{}
-	err = handle.WriteWithNoSecrets(keyset.NewBinaryWriter(buff))
+	err := publicHandle.WriteWithNoSecrets(keyset.NewBinaryWriter(buff))
 	if err != nil {
-		t.Fatalf("handle.WriteWithAssociatedData(keyset.NewBinaryWriter(buff), masterKey, associatedData) err = %v, want nil", err)
+		t.Fatalf("publicHandle.WriteWithNoSecrets() err = %v, want nil", err)
 	}
 	serialized := buff.Bytes()
 
@@ -657,8 +672,8 @@ func TestWriteAndReadWithNoSecrets(t *testing.T) {
 		t.Fatalf("keyset.ReadWithNoSecrets() err = %v, want nil", err)
 	}
 
-	if !proto.Equal(testkeyset.KeysetMaterial(handle), testkeyset.KeysetMaterial(handle2)) {
-		t.Fatalf("keyset.ReadWithNoSecrets() = %v, want %v", handle2, handle)
+	if diff := cmp.Diff(publicHandle, handle2); diff != "" {
+		t.Fatalf("keyset.ReadWithNoSecrets() diff (-want +got): %v", diff)
 	}
 
 	// Using Read() and then NewHandleWithNoSecrets.
@@ -672,8 +687,8 @@ func TestWriteAndReadWithNoSecrets(t *testing.T) {
 		t.Fatalf("keyset.NewHandleWithNoSecrets() err = %v, want nil", err)
 	}
 
-	if !proto.Equal(testkeyset.KeysetMaterial(handle), testkeyset.KeysetMaterial(handle3)) {
-		t.Fatalf("keyset.NewHandleWithNoSecrets() = %v, want %v", handle3, handle)
+	if diff := cmp.Diff(publicHandle, handle3); diff != "" {
+		t.Errorf("keyset.NewHandleWithNoSecrets() diff (-want +got): %v", diff)
 	}
 }
 
@@ -741,9 +756,9 @@ func TestNewHandleWithNoSecretsFailsWithInvalidKeyset(t *testing.T) {
 
 func TestWriteWithNoSecretsFailsWithSymmetricSecretKey(t *testing.T) {
 	// Create a keyset that contains a symmetric secret key.
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	handle, err := keyset.NewHandle(keytest.TinkLegacyKeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(aead.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(keytest.TinkLegacyKeyTemplate()) err = %v, want nil", err)
 	}
 
 	buff := &bytes.Buffer{}
@@ -755,9 +770,9 @@ func TestWriteWithNoSecretsFailsWithSymmetricSecretKey(t *testing.T) {
 
 func TestReadWithNoSecretsFailsWithSymmetricSecretKey(t *testing.T) {
 	// Create a keyset that contains a symmetric secret key.
-	handle, err := keyset.NewHandle(mac.HMACSHA256Tag128KeyTemplate())
+	handle, err := keyset.NewHandle(keytest.TinkLegacyKeyTemplate())
 	if err != nil {
-		t.Fatalf("keyset.NewHandle(aead.HMACSHA256Tag128KeyTemplate()) err = %v, want nil", err)
+		t.Fatalf("keyset.NewHandle(keytest.TinkLegacyKeyTemplate()) err = %v, want nil", err)
 	}
 	buff := &bytes.Buffer{}
 	err = testkeyset.Write(handle, keyset.NewBinaryWriter(buff))
@@ -774,25 +789,19 @@ func TestReadWithNoSecretsFailsWithSymmetricSecretKey(t *testing.T) {
 
 func TestWriteWithNoSecretsFailsWithPrivateKey(t *testing.T) {
 	// Create a keyset that contains a private key.
-	handle, err := keyset.NewHandle(signature.ECDSAP256KeyTemplate())
-	if err != nil {
-		t.Fatalf("keyset.NewHandle(signature.ECDSAP256KeyTemplate()) err = %v, want nil", err)
-	}
+	privateHandle, _ := mustCreatePublicPrivateKeysets(t)
 
 	buff := &bytes.Buffer{}
-	if err := handle.WriteWithNoSecrets(keyset.NewBinaryWriter(buff)); err == nil {
+	if err := privateHandle.WriteWithNoSecrets(keyset.NewBinaryWriter(buff)); err == nil {
 		t.Error("handle.WriteWithNoSecrets() = nil, want error")
 	}
 }
 
 func TestReadWithNoSecretsFailsWithPrivateKey(t *testing.T) {
 	// Create a keyset that contains a private key.
-	handle, err := keyset.NewHandle(signature.ECDSAP256KeyTemplate())
-	if err != nil {
-		t.Fatalf("keyset.NewHandle(signature.ECDSAP256KeyTemplate()) err = %v, want nil", err)
-	}
+	privateHandle, _ := mustCreatePublicPrivateKeysets(t)
 	buff := &bytes.Buffer{}
-	err = testkeyset.Write(handle, keyset.NewBinaryWriter(buff))
+	err := testkeyset.Write(privateHandle, keyset.NewBinaryWriter(buff))
 	if err != nil {
 		t.Fatalf("insecurecleartextkeyset.Write(handle, keyset.NewBinaryWriter(buff)) err = %v, want nil", err)
 	}
@@ -831,57 +840,37 @@ func TestWriteAndReadWithNoSecretsFailsWithUnknownKeyMaterial(t *testing.T) {
 }
 
 func TestKeysetInfo(t *testing.T) {
-	params, err := hmac.NewParameters(hmac.ParametersOpts{
-		KeySizeInBytes: 16,
-		TagSizeInBytes: 16,
-		HashType:       hmac.SHA256,
-		Variant:        hmac.VariantTink,
-	})
+	param1, err := keytest.NewParameters(keytest.VariantTink)
 	if err != nil {
-		t.Fatalf("NewParameters() err = %v, want nil", err)
+		t.Fatalf("keytest.NewParameters(%v) err = %v, want nil", keytest.VariantTink, err)
 	}
-	hmacKey, err := hmac.NewKey(
-		secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}),
-		params,
-		1234)
+	key1, err := keytest.NewKey(secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}), 1234, param1)
 	if err != nil {
-		t.Errorf("hmac.NewKey() err = %v, want nil", err)
+		t.Fatalf("keytest.NewKey() err = %v, want nil", err)
 	}
-	aescmacParams, err := aescmac.NewParameters(aescmac.ParametersOpts{
-		KeySizeInBytes: 16,
-		TagSizeInBytes: 16,
-		Variant:        aescmac.VariantCrunchy,
-	})
+	param2, err := keytest.NewParameters(keytest.VariantCrunchy)
 	if err != nil {
-		t.Fatalf("aescmac.NewParameters() err = %v, want nil", err)
+		t.Fatalf("keytest.NewParameters(%v) err = %v, want nil", keytest.VariantCrunchy, err)
 	}
-	aescmacKey, err := aescmac.NewKey(
-		secretdata.NewBytesFromData([]byte("0123456789012345"), insecuresecretdataaccess.Token{}),
-		aescmacParams,
-		4567)
+	key2, err := keytest.NewKey(secretdata.NewBytesFromData([]byte("5678901234562233"), insecuresecretdataaccess.Token{}), 4567, param2)
 	if err != nil {
-		t.Errorf("aescmac.NewKey() err = nil, want error")
+		t.Fatalf("keytest.NewKey() err = %v, want nil", err)
 	}
 
 	manager := keyset.NewManager()
+	_, err = manager.AddKeyWithOpts(key1, internalapi.Token{}, keyset.WithStatus(keyset.Disabled))
 	if err != nil {
-		t.Fatalf("keyset.NewManager() err = %v, want nil", err)
+		t.Fatalf("manager.AddKeyWithOpts() err = %v, want nil", err)
 	}
-	id0, err := manager.AddKey(hmacKey)
+	_, err = manager.AddKeyWithOpts(key2, internalapi.Token{}, keyset.AsPrimary())
 	if err != nil {
-		t.Fatalf("manager.Add(kt) err = %v, want nil", err)
+		t.Fatalf("manager.AddKeyWithOpts() err = %v, want nil", err)
 	}
-	err = manager.Disable(id0)
+	legacyKeyID, err := manager.Add(keytest.TinkLegacyKeyTemplate())
 	if err != nil {
-		t.Fatalf("manager.Disable(id0) err = %v, want nil", err)
+		t.Fatalf("manager.Add(%v) err = %v, want nil", keytest.TinkLegacyKeyTemplate(), err)
 	}
-	id, err := manager.AddKey(aescmacKey)
-	if err != nil {
-		t.Fatalf("manager.Add(kt) err = %v, want nil", err)
-	}
-	if err := manager.SetPrimary(id); err != nil {
-		t.Fatalf("manager.SetPrimary(id) err = %v, want nil", err)
-	}
+
 	handle, err := manager.Handle()
 
 	if err != nil {
@@ -895,14 +884,20 @@ func TestKeysetInfo(t *testing.T) {
 			&tinkpb.KeysetInfo_KeyInfo{
 				KeyId:            1234,
 				Status:           tinkpb.KeyStatusType_DISABLED,
-				TypeUrl:          "type.googleapis.com/google.crypto.tink.HmacKey",
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.TestOnlyKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
 			&tinkpb.KeysetInfo_KeyInfo{
 				KeyId:            4567,
 				Status:           tinkpb.KeyStatusType_ENABLED,
-				TypeUrl:          "type.googleapis.com/google.crypto.tink.AesCmacKey",
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.TestOnlyKey",
 				OutputPrefixType: tinkpb.OutputPrefixType_CRUNCHY,
+			},
+			&tinkpb.KeysetInfo_KeyInfo{
+				KeyId:            legacyKeyID,
+				Status:           tinkpb.KeyStatusType_ENABLED,
+				TypeUrl:          "type.googleapis.com/google.crypto.tink.TestOnlyLegacyKey",
+				OutputPrefixType: tinkpb.OutputPrefixType_TINK,
 			},
 		},
 	}
@@ -957,7 +952,7 @@ func TestKeysetInfo_withRSAPSSAndSaltLengthZero_panics(t *testing.T) {
 }
 
 func TestLenWithOneKey(t *testing.T) {
-	template := mac.HMACSHA256Tag128KeyTemplate()
+	template := keytest.TinkLegacyKeyTemplate()
 	handle, err := keyset.NewHandle(template)
 	if err != nil {
 		t.Fatalf("keyset.NewHandle(%v) err = %v, want nil", template, err)
@@ -1095,23 +1090,32 @@ func TestPrimaryReturnsPrimaryKey(t *testing.T) {
 	}
 }
 
-func TestPrimaryIsThreadSafe(t *testing.T) {
-	template := signature.ECDSAP256KeyTemplate()
+func mustCreatePrivateKeysetForThreadSafetyTests(t *testing.T) *keyset.Handle {
+	t.Helper()
+	params, err := keytest.NewAsymmetricParameters(keytest.VariantTink)
+	if err != nil {
+		t.Fatalf("keytest.NewAsymmetricParameters() err = %v, want nil", err)
+	}
 	manager := keyset.NewManager()
 	// Add 10 keys. Last one is the primary.
 	for i := 0; i < 10; i++ {
-		keyID, err := manager.Add(template)
+		keyID, err := manager.AddNewKeyFromParameters(params)
 		if err != nil {
-			t.Fatalf("manager.Add(template) err = %v, want nil", err)
+			t.Fatalf("manager.AddNewKeyFromParameters(params) err = %v, want nil", err)
 		}
 		if err = manager.SetPrimary(keyID); err != nil {
 			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
 		}
 	}
-	handle, err := manager.Handle()
+	h, err := manager.Handle()
 	if err != nil {
 		t.Fatalf("manager.Handle() err = %v, want nil", err)
 	}
+	return h
+}
+
+func TestPrimaryIsThreadSafe(t *testing.T) {
+	handle := mustCreatePrivateKeysetForThreadSafetyTests(t)
 	for i := 0; i < 50; i++ {
 		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
 			t.Parallel()
@@ -1124,22 +1128,7 @@ func TestPrimaryIsThreadSafe(t *testing.T) {
 }
 
 func TestEntryIsThreadSafe(t *testing.T) {
-	template := signature.ECDSAP256KeyTemplate()
-	manager := keyset.NewManager()
-	// Add 10 keys. Last one is the primary.
-	for i := 0; i < 10; i++ {
-		keyID, err := manager.Add(template)
-		if err != nil {
-			t.Fatalf("manager.Add(template) err = %v, want nil", err)
-		}
-		if err = manager.SetPrimary(keyID); err != nil {
-			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
-		}
-	}
-	handle, err := manager.Handle()
-	if err != nil {
-		t.Fatalf("manager.Handle() err = %v, want nil", err)
-	}
+	handle := mustCreatePrivateKeysetForThreadSafetyTests(t)
 	for i := 0; i < 50; i++ {
 		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
 			t.Parallel()
@@ -1152,22 +1141,7 @@ func TestEntryIsThreadSafe(t *testing.T) {
 }
 
 func TestKeysetInfoIsThreadSafe(t *testing.T) {
-	template := signature.ECDSAP256KeyTemplate()
-	manager := keyset.NewManager()
-	// Add 10 keys. Last one is the primary.
-	for i := 0; i < 10; i++ {
-		keyID, err := manager.Add(template)
-		if err != nil {
-			t.Fatalf("manager.Add(template) err = %v, want nil", err)
-		}
-		if err = manager.SetPrimary(keyID); err != nil {
-			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
-		}
-	}
-	handle, err := manager.Handle()
-	if err != nil {
-		t.Fatalf("manager.Handle() err = %v, want nil", err)
-	}
+	handle := mustCreatePrivateKeysetForThreadSafetyTests(t)
 	for i := 0; i < 50; i++ {
 		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
 			t.Parallel()
@@ -1179,22 +1153,7 @@ func TestKeysetInfoIsThreadSafe(t *testing.T) {
 }
 
 func TestPublicKeysetHasPrimaryKey(t *testing.T) {
-	template := signature.ECDSAP256KeyTemplate()
-	manager := keyset.NewManager()
-	// Add 10 keys. Last one is the primary.
-	for i := 0; i < 10; i++ {
-		keyID, err := manager.Add(template)
-		if err != nil {
-			t.Fatalf("manager.Add(template) err = %v, want nil", err)
-		}
-		if err = manager.SetPrimary(keyID); err != nil {
-			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
-		}
-	}
-	handle, err := manager.Handle()
-	if err != nil {
-		t.Fatalf("manager.Handle() err = %v, want nil", err)
-	}
+	handle := mustCreatePrivateKeysetForThreadSafetyTests(t)
 	publicHandle, err := handle.Public()
 	if err != nil {
 		t.Fatalf("handle.Public() err = %v, want nil", err)
@@ -1205,22 +1164,7 @@ func TestPublicKeysetHasPrimaryKey(t *testing.T) {
 }
 
 func TestPublicIsThreadSafe(t *testing.T) {
-	template := signature.ECDSAP256KeyTemplate()
-	manager := keyset.NewManager()
-	// Add 10 keys. Last one is the primary.
-	for i := 0; i < 10; i++ {
-		keyID, err := manager.Add(template)
-		if err != nil {
-			t.Fatalf("manager.Add(template) err = %v, want nil", err)
-		}
-		if err = manager.SetPrimary(keyID); err != nil {
-			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
-		}
-	}
-	handle, err := manager.Handle()
-	if err != nil {
-		t.Fatalf("manager.Handle() err = %v, want nil", err)
-	}
+	handle := mustCreatePrivateKeysetForThreadSafetyTests(t)
 	for i := 0; i < 50; i++ {
 		t.Run(fmt.Sprintf("entry %d", i), func(t *testing.T) {
 			t.Parallel()
@@ -1233,22 +1177,7 @@ func TestPublicIsThreadSafe(t *testing.T) {
 }
 
 func TestWriteIsThreadSafe(t *testing.T) {
-	template := signature.ECDSAP256KeyTemplate()
-	manager := keyset.NewManager()
-	// Add 10 keys. Last one is the primary.
-	for i := 0; i < 10; i++ {
-		keyID, err := manager.Add(template)
-		if err != nil {
-			t.Fatalf("manager.Add(template) err = %v, want nil", err)
-		}
-		if err = manager.SetPrimary(keyID); err != nil {
-			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
-		}
-	}
-	handle, err := manager.Handle()
-	if err != nil {
-		t.Fatalf("manager.Handle() err = %v, want nil", err)
-	}
+	handle := mustCreatePrivateKeysetForThreadSafetyTests(t)
 	keysetEncryptionHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
 	if err != nil {
 		t.Errorf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
@@ -1270,23 +1199,7 @@ func TestWriteIsThreadSafe(t *testing.T) {
 }
 
 func TestWriteWithAssociatedDataIsThreadSafe(t *testing.T) {
-	template := signature.ECDSAP256KeyTemplate()
-	manager := keyset.NewManager()
-	// Add 10 keys. Last one is the primary.
-	for i := 0; i < 10; i++ {
-		keyID, err := manager.Add(template)
-		if err != nil {
-			t.Fatalf("manager.Add(template) err = %v, want nil", err)
-		}
-		if err = manager.SetPrimary(keyID); err != nil {
-			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
-		}
-	}
-	handle, err := manager.Handle()
-	if err != nil {
-		t.Fatalf("manager.Handle() err = %v, want nil", err)
-	}
-
+	handle := mustCreatePrivateKeysetForThreadSafetyTests(t)
 	keysetEncryptionHandle, err := keyset.NewHandle(aead.AES128GCMKeyTemplate())
 	if err != nil {
 		t.Errorf("keyset.NewHandle(aead.AES128GCMKeyTemplate()) err = %v, want nil", err)
@@ -1308,22 +1221,7 @@ func TestWriteWithAssociatedDataIsThreadSafe(t *testing.T) {
 }
 
 func TestWriteWithNoSecretsIsThreadSafe(t *testing.T) {
-	template := signature.ECDSAP256KeyTemplate()
-	manager := keyset.NewManager()
-	// Add 10 keys. Last one is the primary.
-	for i := 0; i < 10; i++ {
-		keyID, err := manager.Add(template)
-		if err != nil {
-			t.Fatalf("manager.Add(template) err = %v, want nil", err)
-		}
-		if err = manager.SetPrimary(keyID); err != nil {
-			t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
-		}
-	}
-	handle, err := manager.Handle()
-	if err != nil {
-		t.Fatalf("manager.Handle() err = %v, want nil", err)
-	}
+	handle := mustCreatePrivateKeysetForThreadSafetyTests(t)
 	publicHandle, err := handle.Public()
 	if err != nil {
 		t.Fatalf("manager.Public() err = %v, want nil", err)
@@ -1339,34 +1237,41 @@ func TestWriteWithNoSecretsIsThreadSafe(t *testing.T) {
 	}
 }
 
+func mustCreateKeysetHandleForMonitoringTests(t *testing.T, annotations map[string]string) (*keyset.Handle, uint32, uint32) {
+	t.Helper()
+	km := keyset.NewManager()
+	params, err := keytest.NewAsymmetricParameters(keytest.VariantTink)
+	if err != nil {
+		t.Fatalf("keytest.NewAsymmetricParameters() err = %v, want nil", err)
+	}
+	keyID1, err := km.AddNewKeyFromParameters(params)
+	if err != nil {
+		t.Fatalf("km.AddNewKeyFromParameters(%v) err = %v, want nil", params, err)
+	}
+	keyID2, err := km.AddNewKeyFromParameters(params)
+	if err != nil {
+		t.Fatalf("km.AddNewKeyFromParameters(%v) err = %v, want nil", params, err)
+	}
+	if err = km.SetPrimary(keyID1); err != nil {
+		t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID1, err)
+	}
+	if err := km.SetAnnotations(annotations); err != nil {
+		t.Fatalf("km.SetAnnotations() err = %v, want nil", err)
+	}
+	h, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+	return h, keyID1, keyID2
+}
+
 func TestKeyExportMonitoring(t *testing.T) {
 	defer internalregistry.ClearMonitoringClient()
 	fakeClient := fakemonitoring.NewClient("fake_client")
 	if err := internalregistry.RegisterMonitoringClient(fakeClient); err != nil {
 		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 	}
-
-	km := keyset.NewManager()
-	keyID1, err := km.Add(signature.ECDSAP256KeyTemplate())
-	if err != nil {
-		t.Fatalf("km.Add(template) err = %v, want nil", err)
-	}
-	keyID2, err := km.Add(signature.ECDSAP256KeyTemplate())
-	if err != nil {
-		t.Fatalf("km.Add(template) err = %v, want nil", err)
-	}
-	if err = km.SetPrimary(keyID1); err != nil {
-		t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID1, err)
-	}
-	if err := km.SetAnnotations(map[string]string{"foo": "bar"}); err != nil {
-		t.Fatalf("km.SetAnnotations() err = %v, want nil", err)
-	}
-
-	handle, err := km.Handle()
-	if err != nil {
-		t.Fatalf("km.Handle() err = %v, want nil", err)
-	}
-
+	handle, keyID1, keyID2 := mustCreateKeysetHandleForMonitoringTests(t, map[string]string{"foo": "bar"})
 	// Export all keys.
 	if got, want := len(fakeClient.Events()), 0; got != want {
 		t.Errorf("len(fakeClient.Events()) = %d, want %d", got, want)
@@ -1423,26 +1328,7 @@ func TestKeyExportMonitoring_keysetMaterial(t *testing.T) {
 		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 	}
 
-	km := keyset.NewManager()
-	keyID1, err := km.Add(signature.ECDSAP256KeyTemplate())
-	if err != nil {
-		t.Fatalf("km.Add(template) err = %v, want nil", err)
-	}
-	keyID2, err := km.Add(signature.ECDSAP256KeyTemplate())
-	if err != nil {
-		t.Fatalf("km.Add(template) err = %v, want nil", err)
-	}
-	if err = km.SetPrimary(keyID1); err != nil {
-		t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID1, err)
-	}
-	if err := km.SetAnnotations(map[string]string{"foo": "bar"}); err != nil {
-		t.Fatalf("km.SetAnnotations() err = %v, want nil", err)
-	}
-
-	handle, err := km.Handle()
-	if err != nil {
-		t.Fatalf("km.Handle() err = %v, want nil", err)
-	}
+	handle, keyID1, keyID2 := mustCreateKeysetHandleForMonitoringTests(t, map[string]string{"foo": "bar"})
 
 	if got, want := len(fakeClient.Events()), 0; got != want {
 		t.Errorf("len(fakeClient.Events()) = %d, want %d", got, want)
@@ -1493,21 +1379,7 @@ func TestKeyExportNotMonitored(t *testing.T) {
 		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 	}
 
-	km := keyset.NewManager()
-	keyID1, err := km.Add(signature.ECDSAP256KeyTemplate())
-	if err != nil {
-		t.Fatalf("km.Add(template) err = %v, want nil", err)
-	}
-	if _, err = km.Add(signature.ECDSAP256KeyTemplate()); err != nil {
-		t.Fatalf("km.Add(template) err = %v, want nil", err)
-	}
-	if err = km.SetPrimary(keyID1); err != nil {
-		t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID1, err)
-	}
-	handle, err := km.Handle()
-	if err != nil {
-		t.Fatalf("km.Handle() err = %v, want nil", err)
-	}
+	handle, _, _ := mustCreateKeysetHandleForMonitoringTests(t, nil)
 
 	// Export all keys.
 	if got, want := len(fakeClient.KeyExportsLogs()), 0; got != want {
@@ -1536,24 +1408,7 @@ func TestWriteGeneratesNoKeyExport(t *testing.T) {
 		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
 	}
 
-	km := keyset.NewManager()
-	keyID1, err := km.Add(signature.ECDSAP256KeyTemplate())
-	if err != nil {
-		t.Fatalf("km.Add(template) err = %v, want nil", err)
-	}
-	if _, err = km.Add(signature.ECDSAP256KeyTemplate()); err != nil {
-		t.Fatalf("km.Add(template) err = %v, want nil", err)
-	}
-	if err = km.SetPrimary(keyID1); err != nil {
-		t.Fatalf("km.SetPrimary(%v) err = %v, want nil", keyID1, err)
-	}
-	if err := km.SetAnnotations(map[string]string{"foo": "bar"}); err != nil {
-		t.Fatalf("km.SetAnnotations() err = %v, want nil", err)
-	}
-	handle, err := km.Handle()
-	if err != nil {
-		t.Fatalf("km.Handle() err = %v, want nil", err)
-	}
+	handle, _, _ := mustCreateKeysetHandleForMonitoringTests(t, map[string]string{"foo": "bar"})
 
 	if fakeClient.KeyExportsLogs() != nil {
 		t.Errorf("fakeClient.KeyExportsLogs() = %v, want nil", fakeClient.KeyExportsLogs())
