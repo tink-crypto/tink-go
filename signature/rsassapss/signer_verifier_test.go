@@ -86,6 +86,19 @@ func TestCreateSignerWithSaltLengthZeroFails(t *testing.T) {
 	}
 }
 
+// Signature of saltLengthZeroMessageHex with salt length 0, SHA256 and the
+// 2048-bit key returned by rawRsa2048Values.
+const (
+	saltLengthZeroSignatureHex = "5bfef53336a5148a2f880e28c92c71fa0523707390d075d7608a8eeab44cff5166946850f5818b00e48769" +
+		"22bf7cc0fedfdc1f8e265200c4c10e41686f62f8a621b8ca2771106deb28fa9b0ec2b2687f106b8f" +
+		"68695dddc0b80dc15bec32e7ad2de73edb2789a8222866521230f2795b6c74de777050f02a031577" +
+		"6855f4bb1e063c93ef8d1c4a91abe393017b0cfa09548f6f5bfd565d02bdce2116ffca232ede6f4e" +
+		"869aac226f703ae0ef739fe926f0f15f916a7fa17b407118d9a54353794835c224fa8c7b92137715" +
+		"26a7acb7575ddbd4ea3aaad6c827a5d1378773a4556763ed1442fddc76e29585c9d1992d42a8b730" +
+		"e744e44f3bfe5ddddc47b5d728"
+	saltLengthZeroMessageHex = "aa"
+)
+
 func TestVerifyWithSaltLengthZeroWorks(t *testing.T) {
 	n2048, _ := rawRsa2048Values(t)
 	publicKey := mustCreatePublicKey(t, n2048, 0, mustCreateParameters(t, rsassapss.ParametersValues{
@@ -95,14 +108,8 @@ func TestVerifyWithSaltLengthZeroWorks(t *testing.T) {
 		PublicExponent:  f4,
 		SaltLengthBytes: 0,
 	}, rsassapss.VariantNoPrefix))
-	signature := mustDecodeHex(t, "5bfef53336a5148a2f880e28c92c71fa0523707390d075d7608a8eeab44cff5166946850f5818b00e48769"+
-		"22bf7cc0fedfdc1f8e265200c4c10e41686f62f8a621b8ca2771106deb28fa9b0ec2b2687f106b8f"+
-		"68695dddc0b80dc15bec32e7ad2de73edb2789a8222866521230f2795b6c74de777050f02a031577"+
-		"6855f4bb1e063c93ef8d1c4a91abe393017b0cfa09548f6f5bfd565d02bdce2116ffca232ede6f4e"+
-		"869aac226f703ae0ef739fe926f0f15f916a7fa17b407118d9a54353794835c224fa8c7b92137715"+
-		"26a7acb7575ddbd4ea3aaad6c827a5d1378773a4556763ed1442fddc76e29585c9d1992d42a8b730"+
-		"e744e44f3bfe5ddddc47b5d728")
-	message := mustDecodeHex(t, "aa")
+	signature := mustDecodeHex(t, saltLengthZeroSignatureHex)
+	message := mustDecodeHex(t, saltLengthZeroMessageHex)
 
 	verifier, err := rsassapss.NewVerifier(publicKey, internalapi.Token{})
 	if err != nil {

@@ -17,7 +17,6 @@ package keyset_test
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"testing"
@@ -37,7 +36,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
-	"github.com/tink-crypto/tink-go/v2/signature/rsassapss"
 	"github.com/tink-crypto/tink-go/v2/testing/fakekms"
 	"github.com/tink-crypto/tink-go/v2/testing/fakemonitoring"
 	"github.com/tink-crypto/tink-go/v2/testkeyset"
@@ -904,51 +902,6 @@ func TestKeysetInfo(t *testing.T) {
 	if diff := cmp.Diff(wantInfo, gotInfo, protocmp.Transform()); diff != "" {
 		t.Errorf("handle.KeysetInfo() returned unexpected diff (-want +got):\n%s", diff)
 	}
-}
-
-// RSA-SSA-PSS keys with salt length is 0 are different in tink-go than in other Tink
-// implementations. For backwards compatibility, we continue to allow these keys in
-// tink-go, but we don't want to allow them to be serialized anymore. This also means
-// that you cannot use KeysetInfo() with these keys.
-func TestKeysetInfo_withRSAPSSAndSaltLengthZero_panics(t *testing.T) {
-	n2048Base64 := "s1EKK81M5kTFtZSuUFnhKy8FS2WNXaWVmi_fGHG4CLw98-Yo0nkuUarVwSS0O9pFPcpc3kvPKOe9Tv-6DLS3Qru21aATy2PRqjqJ4CYn71OYtSwM_ZfSCKvrjXybzgu-sBmobdtYm-sppbdL-GEHXGd8gdQw8DDCZSR6-dPJFAzLZTCdB-Ctwe_RXPF-ewVdfaOGjkZIzDoYDw7n-OHnsYCYozkbTOcWHpjVevipR-IBpGPi1rvKgFnlcG6d_tj0hWRl_6cS7RqhjoiNEtxqoJzpXs_Kg8xbCxXbCchkf11STA8udiCjQWuWI8rcDwl69XMmHJjIQAqhKvOOQ8rYTQ"
-	n2048, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(n2048Base64)
-	if err != nil {
-		t.Fatalf("base64 decoding failed: %v", err)
-	}
-	paramsValues := rsassapss.ParametersValues{
-		ModulusSizeBits: 2048,
-		SigHashType:     rsassapss.SHA256,
-		MGF1HashType:    rsassapss.SHA256,
-		PublicExponent:  65537,
-		SaltLengthBytes: 0,
-	}
-	params, err := rsassapss.NewParameters(paramsValues, rsassapss.VariantTink)
-	if err != nil {
-		t.Fatalf("NewParameters(%v, %v) = %v, want nil", paramsValues, rsassapss.VariantTink, err)
-	}
-	publicKey, err := rsassapss.NewPublicKey(n2048, 1234, params)
-	if err != nil {
-		t.Fatalf("rsassapss.NewPublicKey() err = %v, want nil", err)
-	}
-	km := keyset.NewManager()
-	id, err := km.AddKey(publicKey)
-	if err != nil {
-		t.Fatalf("km.AddKey(publicKey) err = %v, want nil", err)
-	}
-	if err := km.SetPrimary(id); err != nil {
-		t.Fatalf("km.SetPrimary(id) err = %v, want nil", err)
-	}
-	handle, err := km.Handle()
-	if err != nil {
-		t.Fatalf("km.Handle() err = %v, want nil", err)
-	}
-
-	defer func() { recover() }()
-
-	_ = handle.KeysetInfo()
-
-	t.Errorf("handle.KeysetInfo() did not panic")
 }
 
 func TestLenWithOneKey(t *testing.T) {

@@ -124,3 +124,48 @@ func TestCreateKeysetHandleFromParameters(t *testing.T) {
 		t.Fatalf("anotherVerifier.Verify(%v, %v) err = nil, want error", signatureBytes, message)
 	}
 }
+
+// RSA-SSA-PSS keys with salt length 0 are different in tink-go than in other
+// Tink implementations. For backwards compatibility, we continue to allow these
+// keys in tink-go keyset handles and to verify with them, but we don't allow
+// them to be serialized anymore. This also means that KeysetInfo() panics for
+// keyset handles containing such keys.
+func TestKeysetHandleWithSaltLengthZero(t *testing.T) {
+	n2048, _ := rawRsa2048Values(t)
+	publicKey := mustCreatePublicKey(t, n2048, 0, mustCreateParameters(t, rsassapss.ParametersValues{
+		ModulusSizeBits: 2048,
+		SigHashType:     rsassapss.SHA256,
+		MGF1HashType:    rsassapss.SHA256,
+		PublicExponent:  f4,
+		SaltLengthBytes: 0,
+	}, rsassapss.VariantNoPrefix))
+	km := keyset.NewManager()
+	id, err := km.AddKey(publicKey)
+	if err != nil {
+		t.Fatalf("km.AddKey(publicKey) err = %v, want nil", err)
+	}
+	if err := km.SetPrimary(id); err != nil {
+		t.Fatalf("km.SetPrimary(%v) err = %v, want nil", id, err)
+	}
+	handle, err := km.Handle()
+	if err != nil {
+		t.Fatalf("km.Handle() err = %v, want nil", err)
+	}
+
+	verifier, err := signature.NewVerifier(handle)
+	if err != nil {
+		t.Fatalf("signature.NewVerifier(handle) err = %v, want nil", err)
+	}
+	signatureBytes := mustDecodeHex(t, saltLengthZeroSignatureHex)
+	message := mustDecodeHex(t, saltLengthZeroMessageHex)
+	if err := verifier.Verify(signatureBytes, message); err != nil {
+		t.Errorf("verifier.Verify() err = %v, want nil", err)
+	}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("handle.KeysetInfo() did not panic")
+		}
+	}()
+	_ = handle.KeysetInfo()
+}
