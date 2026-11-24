@@ -1233,7 +1233,7 @@ func TestKeysetManagerAddNewKeyFromParametersFailsIfSerializerFails(t *testing.T
 	if err := protoserialization.RegisterParametersSerializer[*testParams](&alwaysFailingParametersSerializer{}); err != nil {
 		t.Fatalf("protoserialization.RegisterParametersSerializer[*testParams](&alwaysFailingParametersSerializer{}) err = %q, want nil", err)
 	}
-	defer protoserialization.ClearParametersSerializers()
+	defer protoserialization.UnregisterParametersSerializer[*testParams]()
 
 	manager := keyset.NewManager()
 	params := &testParams{hasIDRequirement: true}
@@ -1254,7 +1254,7 @@ func TestKeysetManagerAddNewKeyFromParametersWorks(t *testing.T) {
 	if err := protoserialization.RegisterParametersSerializer[*testParams](&testParametersSerializer{}); err != nil {
 		t.Fatalf("protoserialization.RegisterParametersSerializer[*testParams](&testParametersSerializer{}) err = %q, want nil", err)
 	}
-	defer protoserialization.ClearParametersSerializers()
+	defer protoserialization.UnregisterParametersSerializer[*testParams]()
 	manager := keyset.NewManager()
 	params := &testParams{hasIDRequirement: true}
 	keyID, err := manager.AddNewKeyFromParameters(params)

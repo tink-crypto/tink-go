@@ -379,10 +379,15 @@ func UnregisterKeySerializer[K key.Key]() {
 	keySerializers.Delete(keyType)
 }
 
-// ClearParametersSerializers clears the global parameters serializers registry.
+// UnregisterParametersSerializer removes the parameters serializer for the
+// given parameters type from the global registry. If no serializer is
+// registered for the given type, this function does nothing.
 //
 // This function is intended to be used in tests only.
-func ClearParametersSerializers() { parameterSerializers.Clear() }
+func UnregisterParametersSerializer[P key.Parameters]() {
+	parameterType := reflect.TypeFor[P]()
+	parameterSerializers.Delete(parameterType)
+}
 
 // UnregisterParametersParser removes the parameters parser for the given type
 // URL from the global registry.
