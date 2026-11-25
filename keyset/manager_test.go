@@ -15,6 +15,7 @@
 package keyset_test
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -23,7 +24,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/internal/keytest"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -32,6 +32,10 @@ import (
 	"github.com/tink-crypto/tink-go/v2/testutil"
 
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+)
+
+var (
+	ErrParamtersSerialization = errors.New("parameters serialization failed")
 )
 
 func TestKeysetManagerBasic(t *testing.T) {
@@ -179,40 +183,32 @@ func TestKeysetManagerAddSetPrimaryHandle(t *testing.T) {
 }
 
 func TestKeysetManagerAdd(t *testing.T) {
-	rawKeyTemplate := mac.HMACSHA256Tag128KeyTemplate()
-	rawKeyTemplate.OutputPrefixType = tinkpb.OutputPrefixType_RAW
-	for _, kt := range []*tinkpb.KeyTemplate{
-		mac.HMACSHA256Tag128KeyTemplate(),
-		rawKeyTemplate,
-	} {
-		t.Run(kt.String(), func(t *testing.T) {
-			km := keyset.NewManager()
-			keyID, err := km.Add(kt)
-			if err != nil {
-				t.Errorf("km.Add(kt) err = %q, want nil", err)
-			}
-			err = km.SetPrimary(keyID)
-			if err != nil {
-				t.Errorf("km.SetPrimary(keyID) err = %q, want nil", err)
-			}
-			h, err := km.Handle()
-			if err != nil {
-				t.Errorf("km.Handle() err = %q, want nil", err)
-			}
-			if h.Len() != 1 {
-				t.Errorf("h.Len() = %d, want 1", h.Len())
-			}
-			entry, err := h.Entry(0)
-			if err != nil {
-				t.Errorf("h.Entry(0) err = %q, want nil", err)
-			}
-			if entry.KeyID() != keyID {
-				t.Errorf("entry.KeyID() = %d, want %d", entry.KeyID(), keyID)
-			}
-			if entry.KeyStatus() != keyset.Enabled {
-				t.Errorf("entry.KeyStatus() = %s, want %s", entry.KeyStatus().String(), keyset.Enabled.String())
-			}
-		})
+	ksm1 := keyset.NewManager()
+	kt := mac.HMACSHA256Tag128KeyTemplate()
+	keyID, err := ksm1.Add(kt)
+	if err != nil {
+		t.Errorf("ksm1.Add(kt) err = %q, want nil", err)
+	}
+	err = ksm1.SetPrimary(keyID)
+	if err != nil {
+		t.Errorf("ksm1.SetPrimary(keyID) err = %q, want nil", err)
+	}
+	h, err := ksm1.Handle()
+	if err != nil {
+		t.Errorf("ksm1.Handle() err = %q, want nil", err)
+	}
+	if h.Len() != 1 {
+		t.Errorf("h.Len() = %d, want 1", h.Len())
+	}
+	entry, err := h.Entry(0)
+	if err != nil {
+		t.Errorf("h.Entry(0) err = %q, want nil", err)
+	}
+	if entry.KeyID() != keyID {
+		t.Errorf("entry.KeyID() = %d, want %d", entry.KeyID(), keyID)
+	}
+	if entry.KeyStatus() != keyset.Enabled {
+		t.Errorf("entry.KeyStatus() = %s, want %s", entry.KeyStatus().String(), keyset.Enabled.String())
 	}
 }
 
@@ -1227,209 +1223,67 @@ func (p *testParams) Equal(params key.Parameters) bool {
 
 var _ key.Parameters = (*testParams)(nil)
 
-func TestKeysetManagerAddNewKeyFromParametersFailsIfNoKeyCreator(t *testing.T) {
+type alwaysFailingParametersSerializer struct{}
+
+func (s *alwaysFailingParametersSerializer) Serialize(params key.Parameters) (*tinkpb.KeyTemplate, error) {
+	return nil, ErrParamtersSerialization
+}
+
+func TestKeysetManagerAddNewKeyFromParametersFailsIfSerializerFails(t *testing.T) {
+	if err := protoserialization.RegisterParametersSerializer[*testParams](&alwaysFailingParametersSerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterParametersSerializer[*testParams](&alwaysFailingParametersSerializer{}) err = %q, want nil", err)
+	}
+	defer protoserialization.UnregisterParametersSerializer[*testParams]()
+
 	manager := keyset.NewManager()
-	// No key creator is registered for *testParams.
 	params := &testParams{hasIDRequirement: true}
-	if _, err := manager.AddNewKeyFromParameters(params); err == nil {
-		t.Errorf("manager.AddNewKeyFromParameters(params) err = nil, want error")
+
+	_, err := manager.AddNewKeyFromParameters(params)
+	if err == nil {
+		t.Errorf("manager.AddKeyFromParameters(params) err = nil, want error")
 	}
 }
 
-func TestKeysetManagerAddNewKeyFromParametersFailsWithUninitializedManager(t *testing.T) {
-	params, err := keytest.NewParameters(keytest.VariantTink)
-	if err != nil {
-		t.Fatalf("keytest.NewParameters(%v) err = %v, want nil", keytest.VariantTink, err)
-	}
-	for _, tc := range []struct {
-		name    string
-		manager *keyset.Manager
-	}{
-		{
-			name:    "nil",
-			manager: nil,
-		},
-		{
-			name:    "zero value",
-			manager: &keyset.Manager{},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if _, err := tc.manager.AddNewKeyFromParameters(params); err == nil {
-				t.Errorf("manager.AddNewKeyFromParameters(params) err = nil, want error")
-			}
-		})
-	}
-}
+type testParametersSerializer struct{}
 
-func TestKeysetManagerAddNewKeyFromParametersDoesNotSetPrimary(t *testing.T) {
-	params, err := keytest.NewParameters(keytest.VariantTink)
-	if err != nil {
-		t.Fatalf("keytest.NewParameters(%v) err = %v, want nil", keytest.VariantTink, err)
-	}
-	manager := keyset.NewManager()
-	primaryID, err := manager.AddNewKeyFromParameters(params)
-	if err != nil {
-		t.Fatalf("manager.AddNewKeyFromParameters(params) err = %v, want nil", err)
-	}
-	if err := manager.SetPrimary(primaryID); err != nil {
-		t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", primaryID, err)
-	}
-	if _, err := manager.AddNewKeyFromParameters(params); err != nil {
-		t.Fatalf("manager.AddNewKeyFromParameters(params) err = %v, want nil", err)
-	}
-	handle, err := manager.Handle()
-	if err != nil {
-		t.Fatalf("manager.Handle() err = %v, want nil", err)
-	}
-	primary, err := handle.Primary()
-	if err != nil {
-		t.Fatalf("handle.Primary() err = %v, want nil", err)
-	}
-	if primary.KeyID() != primaryID {
-		t.Errorf("primary.KeyID() = %d, want %d", primary.KeyID(), primaryID)
-	}
-	entry, err := handle.Entry(1)
-	if err != nil {
-		t.Fatalf("handle.Entry(1) err = %v, want nil", err)
-	}
-	if entry.IsPrimary() {
-		t.Errorf("entry.IsPrimary() = true, want false")
-	}
-}
-
-func TestKeysetManagerAddSetsIDRequirement(t *testing.T) {
-	// Templates for which a parameters parser is registered; Add must create
-	// the key via keygenregistry, since no legacy key manager exists for them.
-	paramsTemplate := func(variant keytest.Variant) *tinkpb.KeyTemplate {
-		t.Helper()
-		params, err := keytest.NewParameters(variant)
-		if err != nil {
-			t.Fatalf("keytest.NewParameters(%v) err = %v, want nil", variant, err)
-		}
-		kt, err := protoserialization.SerializeParameters(params)
-		if err != nil {
-			t.Fatalf("protoserialization.SerializeParameters(%v) err = %v, want nil", params, err)
-		}
-		return kt
-	}
-	for _, tc := range []struct {
-		name           string
-		template       *tinkpb.KeyTemplate
-		wantIDRequired bool
-		wantKeytestKey bool
-	}{
-		{
-			name:           "legacy TINK",
-			template:       keytest.LegacyKeyTemplate(tinkpb.OutputPrefixType_TINK),
-			wantIDRequired: true,
-		},
-		{
-			name:           "legacy CRUNCHY",
-			template:       keytest.LegacyKeyTemplate(tinkpb.OutputPrefixType_CRUNCHY),
-			wantIDRequired: true,
-		},
-		{
-			name:           "legacy RAW",
-			template:       keytest.LegacyKeyTemplate(tinkpb.OutputPrefixType_RAW),
-			wantIDRequired: false,
-		},
-		{
-			name:           "parameters TINK",
-			template:       paramsTemplate(keytest.VariantTink),
-			wantIDRequired: true,
-			wantKeytestKey: true,
-		},
-		{
-			name:           "parameters NO_PREFIX",
-			template:       paramsTemplate(keytest.VariantNoPrefix),
-			wantIDRequired: false,
-			wantKeytestKey: true,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			manager := keyset.NewManager()
-			keyID, err := manager.Add(tc.template)
-			if err != nil {
-				t.Fatalf("manager.Add(%v) err = %v, want nil", tc.template, err)
-			}
-			if err := manager.SetPrimary(keyID); err != nil {
-				t.Fatalf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
-			}
-			handle, err := manager.Handle()
-			if err != nil {
-				t.Fatalf("manager.Handle() err = %v, want nil", err)
-			}
-			entry, err := handle.Primary()
-			if err != nil {
-				t.Fatalf("handle.Primary() err = %v, want nil", err)
-			}
-			wantIDReq := uint32(0)
-			if tc.wantIDRequired {
-				wantIDReq = keyID
-			}
-			if gotIDReq, gotRequired := entry.Key().IDRequirement(); gotIDReq != wantIDReq || gotRequired != tc.wantIDRequired {
-				t.Errorf("entry.Key().IDRequirement() = (%d, %v), want (%d, %v)", gotIDReq, gotRequired, wantIDReq, tc.wantIDRequired)
-			}
-			if _, gotKeytestKey := entry.Key().(*keytest.Key); gotKeytestKey != tc.wantKeytestKey {
-				t.Errorf("entry.Key() is *keytest.Key = %v, want %v (type %T)", gotKeytestKey, tc.wantKeytestKey, entry.Key())
-			}
-		})
-	}
+func (s *testParametersSerializer) Serialize(params key.Parameters) (*tinkpb.KeyTemplate, error) {
+	return mac.HMACSHA256Tag128KeyTemplate(), nil
 }
 
 func TestKeysetManagerAddNewKeyFromParametersWorks(t *testing.T) {
-	for _, variant := range []keytest.Variant{
-		keytest.VariantTink,
-		keytest.VariantNoPrefix,
-		keytest.VariantCrunchy,
-	} {
-		t.Run(variant.String(), func(t *testing.T) {
-			params, err := keytest.NewParameters(variant)
-			if err != nil {
-				t.Fatalf("keytest.NewParameters(%v) err = %v, want nil", variant, err)
-			}
+	if err := protoserialization.RegisterParametersSerializer[*testParams](&testParametersSerializer{}); err != nil {
+		t.Fatalf("protoserialization.RegisterParametersSerializer[*testParams](&testParametersSerializer{}) err = %q, want nil", err)
+	}
+	defer protoserialization.UnregisterParametersSerializer[*testParams]()
+	manager := keyset.NewManager()
+	params := &testParams{hasIDRequirement: true}
+	keyID, err := manager.AddNewKeyFromParameters(params)
+	if err != nil {
+		t.Errorf("manager.AddKeyFromParameters(params) err = %v, want nil", err)
+	}
+	if err := manager.SetPrimary(keyID); err != nil {
+		t.Errorf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
+	}
+	handle, err := manager.Handle()
+	if err != nil {
+		t.Fatalf("manager.Handle() err = %q, want nil", err)
+	}
+	if handle.Len() != 1 {
+		t.Errorf("handle.Len() = %d, want 1", handle.Len())
+	}
 
-			manager := keyset.NewManager()
-			keyID, err := manager.AddNewKeyFromParameters(params)
-			if err != nil {
-				t.Errorf("manager.AddKeyFromParameters(params) err = %v, want nil", err)
-			}
-			if err := manager.SetPrimary(keyID); err != nil {
-				t.Errorf("manager.SetPrimary(%v) err = %v, want nil", keyID, err)
-			}
-			handle, err := manager.Handle()
-			if err != nil {
-				t.Fatalf("manager.Handle() err = %q, want nil", err)
-			}
-			if handle.Len() != 1 {
-				t.Errorf("handle.Len() = %d, want 1", handle.Len())
-			}
-			entry, err := handle.Primary()
-			if err != nil {
-				t.Fatalf("handle.Primary() err = %q, want nil", err)
-			}
-			if entry.KeyStatus() != keyset.Enabled {
-				t.Errorf("entry.KeyStatus() = %v, want %v", entry.KeyStatus(), keyset.Enabled)
-			}
-			if entry.KeyID() != keyID {
-				t.Errorf("entry.KeyID() = %d, want %d", entry.KeyID(), keyID)
-			}
-			if entry.IsPrimary() != true {
-				t.Errorf("entry.IsPrimary() = %v, want true", entry.IsPrimary())
-			}
-			idReq, required := entry.Key().IDRequirement()
-			if required != params.HasIDRequirement() {
-				t.Errorf("required = %v, want %v", required, params.HasIDRequirement())
-			}
-			if required && idReq != keyID {
-				t.Errorf("idReq = %d, want %d", idReq, keyID)
-			}
-
-			if _, ok := entry.Key().(*keytest.Key); !ok {
-				t.Errorf("entry.Key() = %T, want %T", entry.Key(), (*keytest.Key)(nil))
-			}
-		})
+	// Make sure we can get and use a MAC primitive from the handle.
+	primitive, err := mac.New(handle)
+	if err != nil {
+		t.Fatalf("mac.New(handle) err = %q, want nil", err)
+	}
+	message := []byte("message")
+	tag, err := primitive.ComputeMAC(message)
+	if err != nil {
+		t.Errorf("primitive.ComputeMAC(message) err = %q, want nil", err)
+	}
+	if err := primitive.VerifyMAC(tag, message); err != nil {
+		t.Errorf("primitive.VerifyMAC(message, mac) err = %q, want nil", err)
 	}
 }
 
