@@ -97,25 +97,16 @@ func (km *Manager) Add(kt *tinkpb.KeyTemplate) (uint32, error) {
 		return 0, errors.New("keyset.Manager: cannot add key to nil keyset")
 	}
 
+	// Create the key from parameters if proto serialization succeeds.
+	if params, err := protoserialization.ParseParameters(kt); err == nil {
+		return km.AddNewKeyFromParameters(params)
+	}
+
+	// Fallback to legacy generation.
 	keyID := km.newRandomKeyID()
 	idRequirement := uint32(0)
 	if kt.GetOutputPrefixType() != tinkpb.OutputPrefixType_RAW {
 		idRequirement = keyID
-	}
-
-	// Try using the new registry first.
-	if params, err := protoserialization.ParseParameters(kt); err == nil {
-		key, err := keygenregistry.CreateKey(params, idRequirement)
-		if err != nil {
-			return 0, fmt.Errorf("keyset.Manager: cannot create key: %w", err)
-		}
-		km.entries = append(km.entries, &entry{
-			key:       key,
-			isPrimary: false,
-			fixedID:   keyID,
-			status:    Enabled,
-		})
-		return keyID, nil
 	}
 
 	// Fallback to legacy registry.
@@ -248,11 +239,28 @@ func (km *Manager) AddKey(key key.Key) (uint32, error) {
 // AddNewKeyFromParameters generates a new key from parameters, adds the key to
 // the keyset, and returns the key ID.
 func (km *Manager) AddNewKeyFromParameters(parameters key.Parameters) (uint32, error) {
-	keyTemplate, err := protoserialization.SerializeParameters(parameters)
-	if err != nil {
-		return 0, fmt.Errorf("keyset.Manager: %v", err)
+	if parameters == nil {
+		return 0, errors.New("keyset.Manager: parameters is nil")
 	}
-	return km.Add(keyTemplate)
+	if km == nil || km.entries == nil {
+		return 0, errors.New("keyset.Manager: cannot add key to nil manager or entries")
+	}
+	keyID := km.newRandomKeyID()
+	idRequirement := uint32(0)
+	if parameters.HasIDRequirement() {
+		idRequirement = keyID
+	}
+	key, err := keygenregistry.CreateKey(parameters, idRequirement)
+	if err != nil {
+		return 0, fmt.Errorf("keyset.Manager: cannot create key: %w", err)
+	}
+	km.entries = append(km.entries, &entry{
+		key:       key,
+		isPrimary: false,
+		fixedID:   keyID,
+		status:    Enabled,
+	})
+	return keyID, nil
 }
 
 func findEntry(entries []*entry, keyID uint32) (*entry, int, error) {
