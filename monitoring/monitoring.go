@@ -16,6 +16,10 @@
 // This package isn't yet production ready and might go through various changes.
 package monitoring
 
+import (
+	"github.com/tink-crypto/tink-go/v2/key"
+)
+
 // KeyStatus represents KeyStatusType in tink/proto/tink.proto.
 type KeyStatus int
 
@@ -45,10 +49,27 @@ func (status KeyStatus) String() string {
 
 // Entry represents each entry inside a Keyset.
 type Entry struct {
-	Status    KeyStatus
-	KeyID     uint32
-	KeyType   string
+	Status KeyStatus
+	KeyID  uint32
+	// KeyType is the key type URL without the "type.googleapis.com/google.crypto."
+	// prefix, for example "tink.AesGcmKey".
+	//
+	// Deprecated: Use Key instead.
+	KeyType string
+	// KeyPrefix is the name of the output prefix type of the key, for example
+	// "TINK" or "RAW".
+	//
+	// Deprecated: Use Key instead.
 	KeyPrefix string
+	// Key is the key of this entry. Monitoring clients can use it to identify
+	// the key type and its parameters without relying on proto serialization.
+	//
+	// The key is unmonitored, that is, accessing it does not log a key export.
+	// Secret key material can only be accessed with an
+	// insecuresecretdataaccess.Token. Clients should extract what they need (for
+	// example, the key type) when creating a logger and should not retain the
+	// key.
+	Key key.Key
 }
 
 // KeysetInfo represents a keyset in a certain point in time for the

@@ -221,6 +221,15 @@ func setEntryMonitoringIfNeeded(h *Handle) error {
 	if err != nil {
 		return err
 	}
+	// h.KeysetInfo() lists the keys in the same order as h.entries.
+	for i, entry := range h.entries {
+		// NOTE: Purposely not using Key() here to avoid logging a key export.
+		k := entry.key
+		if k == nil {
+			return fmt.Errorf("entry %d has no key; this should not happen", i)
+		}
+		monitoringKeysetInfo.Entries[i].Key = k
+	}
 	for _, entry := range h.entries {
 		l, err := h.monitoringClient.NewLogger(&monitoring.Context{
 			Primitive:   "keyset_handle",

@@ -81,7 +81,8 @@ func TestLoggerBuilder_CreatesLoggerWithContext(t *testing.T) {
 
 	annotations := map[string]string{"foo": "bar"}
 	manager := keyset.NewManager()
-	_, err := manager.AddKeyWithOpts(mustCreateKey(t, keytest.VariantTink, 1), internalapi.Token{}, keyset.AsPrimary())
+	primaryKey := mustCreateKey(t, keytest.VariantTink, 1)
+	_, err := manager.AddKeyWithOpts(primaryKey, internalapi.Token{}, keyset.AsPrimary())
 	if err != nil {
 		t.Fatalf("AddKeyWithOpts() err = %v, want nil", err)
 	}
@@ -89,7 +90,8 @@ func TestLoggerBuilder_CreatesLoggerWithContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddKeyWithOpts() err = %v, want nil", err)
 	}
-	keyID, err := manager.AddKey(mustCreateKey(t, keytest.VariantNoPrefix, 0))
+	noPrefixKey := mustCreateKey(t, keytest.VariantNoPrefix, 0)
+	keyID, err := manager.AddKey(noPrefixKey)
 	if err != nil {
 		t.Fatalf("AddKey() err = %v, want nil", err)
 	}
@@ -129,12 +131,14 @@ func TestLoggerBuilder_CreatesLoggerWithContext(t *testing.T) {
 					KeyID:     1,
 					KeyType:   "tink.TestOnlyKey",
 					KeyPrefix: "TINK",
+					Key:       primaryKey,
 				},
 				{
 					Status:    monitoring.Enabled,
 					KeyID:     keyID,
 					KeyType:   "tink.TestOnlyKey",
 					KeyPrefix: "RAW",
+					Key:       noPrefixKey,
 				},
 			},
 		},

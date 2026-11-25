@@ -1250,6 +1250,13 @@ func TestKeyExportMonitoring(t *testing.T) {
 	if err != nil {
 		t.Fatalf("monitoringutil.MonitoringKeysetInfoFromKeysetInfo() err = %v, want nil", err)
 	}
+	for i, e := range info.Entries {
+		entry, err := handle.Entry(i)
+		if err != nil {
+			t.Fatalf("handle.Entry(%d) err = %v, want nil", i, err)
+		}
+		e.Key = entry.ToUnmonitoredEntry(internalapi.Token{}).Key()
+	}
 
 	want := []*fakemonitoring.LogKeyExport{
 		&fakemonitoring.LogKeyExport{
@@ -1299,6 +1306,13 @@ func TestKeyExportMonitoring_keysetMaterial(t *testing.T) {
 	info, err := monitoringutil.MonitoringKeysetInfoFromKeysetInfo(handle.KeysetInfo(), map[string]string{"foo": "bar"})
 	if err != nil {
 		t.Fatalf("monitoringutil.MonitoringKeysetInfoFromKeysetInfo() err = %v, want nil", err)
+	}
+	for i, e := range info.Entries {
+		entry, err := handle.Entry(i)
+		if err != nil {
+			t.Fatalf("handle.Entry(%d) err = %v, want nil", i, err)
+		}
+		e.Key = entry.ToUnmonitoredEntry(internalapi.Token{}).Key()
 	}
 
 	want := []*fakemonitoring.LogKeyExport{

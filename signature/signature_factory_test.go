@@ -305,6 +305,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogSignVerify(t *testing.T) {
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.Ed25519PublicKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -317,6 +318,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogSignVerify(t *testing.T) {
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.Ed25519PrivateKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -404,6 +406,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsSignFailureIsLogged(t *testing
 							Status:    monitoring.Enabled,
 							KeyType:   typeURL,
 							KeyPrefix: "LEGACY",
+							Key:       mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -463,6 +466,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsVerifyFailureIsLogged(t *testi
 							Status:    monitoring.Enabled,
 							KeyType:   "tink.Ed25519PublicKey",
 							KeyPrefix: "TINK",
+							Key:       mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -933,4 +937,25 @@ func TestNewWithConfig(t *testing.T) {
 	if err := verifier.Verify(sig, data); err != nil {
 		t.Errorf("verifier.Verify() err = %v, want nil", err)
 	}
+}
+
+// mustKey returns the key with ID keyID in kh, without logging a key export.
+// It fails the test if the key is not found or is nil.
+func mustKey(t *testing.T, kh *keyset.Handle, keyID uint32) key.Key {
+	t.Helper()
+	for i := 0; i < kh.Len(); i++ {
+		entry, err := kh.Entry(i)
+		if err != nil {
+			t.Fatalf("kh.Entry(%d) err = %v, want nil", i, err)
+		}
+		if entry.KeyID() == keyID {
+			k := entry.ToUnmonitoredEntry(internalapi.Token{}).Key()
+			if k == nil {
+				t.Fatalf("key with ID %d is nil", keyID)
+			}
+			return k
+		}
+	}
+	t.Fatalf("key with ID %d not found in keyset handle", keyID)
+	return nil
 }

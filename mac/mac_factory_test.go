@@ -355,18 +355,21 @@ func TestFactoryWithMonitoringPrimitiveWithMultipleKeysLogsComputeVerify(t *test
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HmacKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 			},
 			{
 				KeyID:     keyIDs[2],
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HmacKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, kh, keyIDs[2]),
 			},
 			{
 				KeyID:     keyIDs[3],
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.AesCmacKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, kh, keyIDs[3]),
 			},
 		},
 	}
@@ -460,6 +463,7 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsComputeFailureIsLogged(t *test
 							Status:    monitoring.Enabled,
 							KeyType:   typeURL,
 							KeyPrefix: "LEGACY",
+							Key:       mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -513,6 +517,7 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsVerifyFailureIsLogged(t *testi
 							Status:    monitoring.Enabled,
 							KeyType:   "tink.HmacKey",
 							KeyPrefix: "TINK",
+							Key:       mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -575,6 +580,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsMultiplePrimitivesLogOperation
 							Status:    monitoring.Enabled,
 							KeyType:   "tink.HmacKey",
 							KeyPrefix: "TINK",
+							Key:       mustKey(t, handles[0], handles[0].KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -595,6 +601,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsMultiplePrimitivesLogOperation
 							Status:    monitoring.Enabled,
 							KeyType:   "tink.AesCmacKey",
 							KeyPrefix: "TINK",
+							Key:       mustKey(t, handles[1], handles[1].KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -648,6 +655,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsComputeVerifyLogs(t *testing.T
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HmacKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	)
@@ -952,4 +960,25 @@ func TestNewWithConfig(t *testing.T) {
 	if !bytes.HasPrefix(m, wantPrefix) {
 		t.Errorf("m = %q, want prefix: %q", m, wantPrefix)
 	}
+}
+
+// mustKey returns the key with ID keyID in kh, without logging a key export.
+// It fails the test if the key is not found or is nil.
+func mustKey(t *testing.T, kh *keyset.Handle, keyID uint32) key.Key {
+	t.Helper()
+	for i := 0; i < kh.Len(); i++ {
+		entry, err := kh.Entry(i)
+		if err != nil {
+			t.Fatalf("kh.Entry(%d) err = %v, want nil", i, err)
+		}
+		if entry.KeyID() == keyID {
+			k := entry.ToUnmonitoredEntry(internalapi.Token{}).Key()
+			if k == nil {
+				t.Fatalf("key with ID %d is nil", keyID)
+			}
+			return k
+		}
+	}
+	t.Fatalf("key with ID %d not found in keyset handle", keyID)
+	return nil
 }

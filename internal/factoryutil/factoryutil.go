@@ -95,6 +95,7 @@ func keysetInfo(kh *keyset.Handle) (*monitoring.KeysetInfo, error) {
 			KeyID:     entry.KeyID(),
 			KeyType:   stripTypeURLPrefix(protoSerialization.KeyData().GetTypeUrl()),
 			KeyPrefix: protoSerialization.OutputPrefixType().String(),
+			Key:       entry.Key(),
 		})
 	}
 	return &monitoring.KeysetInfo{

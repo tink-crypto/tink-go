@@ -271,6 +271,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogsEncryptAndDecryptWithPrefi
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HpkePublicKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -283,6 +284,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogsEncryptAndDecryptWithPrefi
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HpkePrivateKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -361,6 +363,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogsEncryptAndDecryptWithoutPr
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HpkePublicKey",
 				KeyPrefix: "RAW",
+				Key:       mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -373,6 +376,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogsEncryptAndDecryptWithoutPr
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HpkePrivateKey",
 				KeyPrefix: "RAW",
+				Key:       mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -476,18 +480,21 @@ func TestPrimitiveFactoryWithMonitoringWithMultipleKeysLogsEncryptionDecryption(
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HpkePublicKey",
 				KeyPrefix: "RAW",
+				Key:       mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 			{
 				KeyID:     keyIDs[2],
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HpkePublicKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, pubHandle, keyIDs[2]),
 			},
 			{
 				KeyID:     keyIDs[3],
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.EciesAeadHkdfPublicKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, pubHandle, keyIDs[3]),
 			},
 		},
 	}
@@ -500,18 +507,21 @@ func TestPrimitiveFactoryWithMonitoringWithMultipleKeysLogsEncryptionDecryption(
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HpkePrivateKey",
 				KeyPrefix: "RAW",
+				Key:       mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 			{
 				KeyID:     keyIDs[2],
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HpkePrivateKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, privHandle, keyIDs[2]),
 			},
 			{
 				KeyID:     keyIDs[3],
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.EciesAeadHkdfPrivateKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, privHandle, keyIDs[3]),
 			},
 		},
 	}
@@ -603,6 +613,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsEncryptFailureIsLogged(t *test
 							Status:    monitoring.Enabled,
 							KeyType:   "tink.HpkePrivateKey",
 							KeyPrefix: "TINK",
+							Key:       mustKey(t, privHandle, primaryKeyID),
 						},
 					},
 				),
@@ -655,6 +666,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsDecryptFailureIsLogged(t *test
 							Status:    monitoring.Enabled,
 							KeyType:   "tink.HpkePrivateKey",
 							KeyPrefix: "TINK",
+							Key:       mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -1190,4 +1202,25 @@ func TestNewWithConfig(t *testing.T) {
 	if !bytes.Equal(pt, []byte("message")) {
 		t.Errorf("pt = %q, want: %q", pt, []byte("message"))
 	}
+}
+
+// mustKey returns the key with ID keyID in kh, without logging a key export.
+// It fails the test if the key is not found or is nil.
+func mustKey(t *testing.T, kh *keyset.Handle, keyID uint32) key.Key {
+	t.Helper()
+	for i := 0; i < kh.Len(); i++ {
+		entry, err := kh.Entry(i)
+		if err != nil {
+			t.Fatalf("kh.Entry(%d) err = %v, want nil", i, err)
+		}
+		if entry.KeyID() == keyID {
+			k := entry.ToUnmonitoredEntry(internalapi.Token{}).Key()
+			if k == nil {
+				t.Fatalf("key with ID %d is nil", keyID)
+			}
+			return k
+		}
+	}
+	t.Fatalf("key with ID %d not found in keyset handle", keyID)
+	return nil
 }

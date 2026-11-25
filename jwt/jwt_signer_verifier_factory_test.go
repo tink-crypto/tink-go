@@ -492,6 +492,7 @@ func TestFactorySignWithAnnotationsEmitsMonitoringSuccess(t *testing.T) {
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.JwtEcdsaPrivateKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -570,6 +571,7 @@ func TestFactoryVerifyWithAnnotationsEmitsMonitoringSuccess(t *testing.T) {
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.JwtEcdsaPublicKey",
 				KeyPrefix: "TINK",
+				Key:       mustKey(t, pubHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}

@@ -284,6 +284,7 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsComputePRFFailureIsLogged(t *t
 							Status:    monitoring.Enabled,
 							KeyType:   "tink.HmacPrfKey",
 							KeyPrefix: "RAW",
+							Key:       mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 					PrimaryKeyID: kh.KeysetInfo().GetPrimaryKeyId(),
@@ -347,18 +348,21 @@ func TestPrimitiveFactoryIndividualPrfWithAnnotatonsLogsCompute(t *testing.T) {
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HmacPrfKey",
 				KeyPrefix: "RAW",
+				Key:       mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 			},
 			{
 				KeyID:     hmac512KeyID,
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HmacPrfKey",
 				KeyPrefix: "RAW",
+				Key:       mustKey(t, kh, hmac512KeyID),
 			},
 			{
 				KeyID:     aesKeyID,
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.AesCmacPrfKey",
 				KeyPrefix: "RAW",
+				Key:       mustKey(t, kh, aesKeyID),
 			},
 		},
 		Annotations: annotations,
@@ -425,6 +429,7 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsComputePRF(t *testing.T) {
 				Status:    monitoring.Enabled,
 				KeyType:   "tink.HmacPrfKey",
 				KeyPrefix: "RAW",
+				Key:       mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 		Annotations: annotations,
@@ -536,4 +541,25 @@ func TestNewWithConfig(t *testing.T) {
 	if !bytes.HasPrefix(out, []byte("full_primitive")) {
 		t.Errorf("out = %q, want prefix: %q", out, []byte("full_primitive"))
 	}
+}
+
+// mustKey returns the key with ID keyID in kh, without logging a key export.
+// It fails the test if the key is not found or is nil.
+func mustKey(t *testing.T, kh *keyset.Handle, keyID uint32) key.Key {
+	t.Helper()
+	for i := 0; i < kh.Len(); i++ {
+		entry, err := kh.Entry(i)
+		if err != nil {
+			t.Fatalf("kh.Entry(%d) err = %v, want nil", i, err)
+		}
+		if entry.KeyID() == keyID {
+			k := entry.ToUnmonitoredEntry(internalapi.Token{}).Key()
+			if k == nil {
+				t.Fatalf("key with ID %d is nil", keyID)
+			}
+			return k
+		}
+	}
+	t.Fatalf("key with ID %d not found in keyset handle", keyID)
+	return nil
 }
