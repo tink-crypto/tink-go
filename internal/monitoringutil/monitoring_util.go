@@ -69,10 +69,9 @@ func MonitoringKeysetInfoFromKeysetInfo(keysetInfo *tpb.KeysetInfo, annotations 
 			return nil, err
 		}
 		keysetInfoEntries[i] = &monitoring.Entry{
-			KeyID:     keyInfo.GetKeyId(),
-			Status:    status,
-			KeyType:   parseKeyTypeURL(keyInfo.GetTypeUrl()),
-			KeyPrefix: keyInfo.GetOutputPrefixType().String(),
+			KeyID:   keyInfo.GetKeyId(),
+			Status:  status,
+			KeyType: parseKeyTypeURL(keyInfo.GetTypeUrl()),
 		}
 	}
 	return &monitoring.KeysetInfo{

@@ -515,11 +515,10 @@ func TestComputeAndVerifyWithAnnotationsEmitsMonitoring(t *testing.T) {
 		kh.KeysetInfo().GetPrimaryKeyId(),
 		[]*monitoring.Entry{
 			{
-				KeyID:     kh.KeysetInfo().GetPrimaryKeyId(),
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.JwtHmacKey",
-				KeyPrefix: "TINK",
-				Key:       mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:   kh.KeysetInfo().GetPrimaryKeyId(),
+				Status:  monitoring.Enabled,
+				KeyType: "tink.JwtHmacKey",
+				Key:     mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	)

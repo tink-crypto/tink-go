@@ -301,11 +301,10 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogSignVerify(t *testing.T) {
 		PrimaryKeyID: pubHandle.KeysetInfo().GetPrimaryKeyId(),
 		Entries: []*monitoring.Entry{
 			{
-				KeyID:     pubHandle.KeysetInfo().GetPrimaryKeyId(),
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.Ed25519PublicKey",
-				KeyPrefix: "TINK",
-				Key:       mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:   pubHandle.KeysetInfo().GetPrimaryKeyId(),
+				Status:  monitoring.Enabled,
+				KeyType: "tink.Ed25519PublicKey",
+				Key:     mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -314,11 +313,10 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogSignVerify(t *testing.T) {
 		PrimaryKeyID: privHandle.KeysetInfo().GetPrimaryKeyId(),
 		Entries: []*monitoring.Entry{
 			{
-				KeyID:     privHandle.KeysetInfo().GetPrimaryKeyId(),
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.Ed25519PrivateKey",
-				KeyPrefix: "TINK",
-				Key:       mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:   privHandle.KeysetInfo().GetPrimaryKeyId(),
+				Status:  monitoring.Enabled,
+				KeyType: "tink.Ed25519PrivateKey",
+				Key:     mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -402,11 +400,10 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsSignFailureIsLogged(t *testing
 					kh.KeysetInfo().GetPrimaryKeyId(),
 					[]*monitoring.Entry{
 						{
-							KeyID:     kh.KeysetInfo().GetPrimaryKeyId(),
-							Status:    monitoring.Enabled,
-							KeyType:   typeURL,
-							KeyPrefix: "LEGACY",
-							Key:       mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
+							KeyID:   kh.KeysetInfo().GetPrimaryKeyId(),
+							Status:  monitoring.Enabled,
+							KeyType: typeURL,
+							Key:     mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -462,11 +459,10 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsVerifyFailureIsLogged(t *testi
 					pubHandle.KeysetInfo().GetPrimaryKeyId(),
 					[]*monitoring.Entry{
 						{
-							KeyID:     pubHandle.KeysetInfo().GetPrimaryKeyId(),
-							Status:    monitoring.Enabled,
-							KeyType:   "tink.Ed25519PublicKey",
-							KeyPrefix: "TINK",
-							Key:       mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
+							KeyID:   pubHandle.KeysetInfo().GetPrimaryKeyId(),
+							Status:  monitoring.Enabled,
+							KeyType: "tink.Ed25519PublicKey",
+							Key:     mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),

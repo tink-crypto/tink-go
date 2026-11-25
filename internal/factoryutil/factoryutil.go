@@ -91,11 +91,10 @@ func keysetInfo(kh *keyset.Handle) (*monitoring.KeysetInfo, error) {
 			return nil, err
 		}
 		entries = append(entries, &monitoring.Entry{
-			Status:    monitoringKeyStatusFromKeysetStatus(entry.KeyStatus()),
-			KeyID:     entry.KeyID(),
-			KeyType:   stripTypeURLPrefix(protoSerialization.KeyData().GetTypeUrl()),
-			KeyPrefix: protoSerialization.OutputPrefixType().String(),
-			Key:       entry.Key(),
+			Status:  monitoringKeyStatusFromKeysetStatus(entry.KeyStatus()),
+			KeyID:   entry.KeyID(),
+			KeyType: stripTypeURLPrefix(protoSerialization.KeyData().GetTypeUrl()),
+			Key:     entry.Key(),
 		})
 	}
 	return &monitoring.KeysetInfo{

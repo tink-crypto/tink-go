@@ -56,11 +56,6 @@ type Entry struct {
 	//
 	// Deprecated: Use Key instead.
 	KeyType string
-	// KeyPrefix is the name of the output prefix type of the key, for example
-	// "TINK" or "RAW".
-	//
-	// Deprecated: Use Key instead.
-	KeyPrefix string
 	// Key is the key of this entry. Monitoring clients can use it to identify
 	// the key type and its parameters without relying on proto serialization.
 	//

@@ -267,11 +267,10 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogsEncryptAndDecryptWithPrefi
 		PrimaryKeyID: privHandle.KeysetInfo().GetPrimaryKeyId(),
 		Entries: []*monitoring.Entry{
 			{
-				KeyID:     pubHandle.KeysetInfo().GetPrimaryKeyId(),
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.HpkePublicKey",
-				KeyPrefix: "TINK",
-				Key:       mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:   pubHandle.KeysetInfo().GetPrimaryKeyId(),
+				Status:  monitoring.Enabled,
+				KeyType: "tink.HpkePublicKey",
+				Key:     mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -280,11 +279,10 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogsEncryptAndDecryptWithPrefi
 		PrimaryKeyID: privHandle.KeysetInfo().GetPrimaryKeyId(),
 		Entries: []*monitoring.Entry{
 			{
-				KeyID:     privHandle.KeysetInfo().GetPrimaryKeyId(),
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.HpkePrivateKey",
-				KeyPrefix: "TINK",
-				Key:       mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:   privHandle.KeysetInfo().GetPrimaryKeyId(),
+				Status:  monitoring.Enabled,
+				KeyType: "tink.HpkePrivateKey",
+				Key:     mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -359,11 +357,10 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogsEncryptAndDecryptWithoutPr
 		PrimaryKeyID: privHandle.KeysetInfo().GetPrimaryKeyId(),
 		Entries: []*monitoring.Entry{
 			{
-				KeyID:     pubHandle.KeysetInfo().GetPrimaryKeyId(),
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.HpkePublicKey",
-				KeyPrefix: "RAW",
-				Key:       mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:   pubHandle.KeysetInfo().GetPrimaryKeyId(),
+				Status:  monitoring.Enabled,
+				KeyType: "tink.HpkePublicKey",
+				Key:     mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -372,11 +369,10 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsLogsEncryptAndDecryptWithoutPr
 		PrimaryKeyID: privHandle.KeysetInfo().GetPrimaryKeyId(),
 		Entries: []*monitoring.Entry{
 			{
-				KeyID:     privHandle.KeysetInfo().GetPrimaryKeyId(),
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.HpkePrivateKey",
-				KeyPrefix: "RAW",
-				Key:       mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:   privHandle.KeysetInfo().GetPrimaryKeyId(),
+				Status:  monitoring.Enabled,
+				KeyType: "tink.HpkePrivateKey",
+				Key:     mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -476,25 +472,22 @@ func TestPrimitiveFactoryWithMonitoringWithMultipleKeysLogsEncryptionDecryption(
 		PrimaryKeyID: privHandle.KeysetInfo().GetPrimaryKeyId(),
 		Entries: []*monitoring.Entry{
 			{
-				KeyID:     pubHandle.KeysetInfo().GetPrimaryKeyId(),
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.HpkePublicKey",
-				KeyPrefix: "RAW",
-				Key:       mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:   pubHandle.KeysetInfo().GetPrimaryKeyId(),
+				Status:  monitoring.Enabled,
+				KeyType: "tink.HpkePublicKey",
+				Key:     mustKey(t, pubHandle, pubHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 			{
-				KeyID:     keyIDs[2],
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.HpkePublicKey",
-				KeyPrefix: "TINK",
-				Key:       mustKey(t, pubHandle, keyIDs[2]),
+				KeyID:   keyIDs[2],
+				Status:  monitoring.Enabled,
+				KeyType: "tink.HpkePublicKey",
+				Key:     mustKey(t, pubHandle, keyIDs[2]),
 			},
 			{
-				KeyID:     keyIDs[3],
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.EciesAeadHkdfPublicKey",
-				KeyPrefix: "TINK",
-				Key:       mustKey(t, pubHandle, keyIDs[3]),
+				KeyID:   keyIDs[3],
+				Status:  monitoring.Enabled,
+				KeyType: "tink.EciesAeadHkdfPublicKey",
+				Key:     mustKey(t, pubHandle, keyIDs[3]),
 			},
 		},
 	}
@@ -503,25 +496,22 @@ func TestPrimitiveFactoryWithMonitoringWithMultipleKeysLogsEncryptionDecryption(
 		PrimaryKeyID: privHandle.KeysetInfo().GetPrimaryKeyId(),
 		Entries: []*monitoring.Entry{
 			{
-				KeyID:     privHandle.KeysetInfo().GetPrimaryKeyId(),
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.HpkePrivateKey",
-				KeyPrefix: "RAW",
-				Key:       mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:   privHandle.KeysetInfo().GetPrimaryKeyId(),
+				Status:  monitoring.Enabled,
+				KeyType: "tink.HpkePrivateKey",
+				Key:     mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 			{
-				KeyID:     keyIDs[2],
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.HpkePrivateKey",
-				KeyPrefix: "TINK",
-				Key:       mustKey(t, privHandle, keyIDs[2]),
+				KeyID:   keyIDs[2],
+				Status:  monitoring.Enabled,
+				KeyType: "tink.HpkePrivateKey",
+				Key:     mustKey(t, privHandle, keyIDs[2]),
 			},
 			{
-				KeyID:     keyIDs[3],
-				Status:    monitoring.Enabled,
-				KeyType:   "tink.EciesAeadHkdfPrivateKey",
-				KeyPrefix: "TINK",
-				Key:       mustKey(t, privHandle, keyIDs[3]),
+				KeyID:   keyIDs[3],
+				Status:  monitoring.Enabled,
+				KeyType: "tink.EciesAeadHkdfPrivateKey",
+				Key:     mustKey(t, privHandle, keyIDs[3]),
 			},
 		},
 	}
@@ -609,11 +599,10 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsEncryptFailureIsLogged(t *test
 					primaryKeyID,
 					[]*monitoring.Entry{
 						{
-							KeyID:     primaryKeyID,
-							Status:    monitoring.Enabled,
-							KeyType:   "tink.HpkePrivateKey",
-							KeyPrefix: "TINK",
-							Key:       mustKey(t, privHandle, primaryKeyID),
+							KeyID:   primaryKeyID,
+							Status:  monitoring.Enabled,
+							KeyType: "tink.HpkePrivateKey",
+							Key:     mustKey(t, privHandle, primaryKeyID),
 						},
 					},
 				),
@@ -662,11 +651,10 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsDecryptFailureIsLogged(t *test
 					privHandle.KeysetInfo().GetPrimaryKeyId(),
 					[]*monitoring.Entry{
 						{
-							KeyID:     privHandle.KeysetInfo().GetPrimaryKeyId(),
-							Status:    monitoring.Enabled,
-							KeyType:   "tink.HpkePrivateKey",
-							KeyPrefix: "TINK",
-							Key:       mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
+							KeyID:   privHandle.KeysetInfo().GetPrimaryKeyId(),
+							Status:  monitoring.Enabled,
+							KeyType: "tink.HpkePrivateKey",
+							Key:     mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
