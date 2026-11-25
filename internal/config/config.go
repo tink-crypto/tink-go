@@ -20,7 +20,6 @@ import (
 	"maps"
 	"reflect"
 
-	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/key"
 )
@@ -29,7 +28,6 @@ import (
 // [key.Key].
 type Config struct {
 	primitiveConstructors map[reflect.Type]func(key key.Key) (any, error)
-	keysetManagers        map[string]registry.KeyManager
 }
 
 // PrimitiveFromKey creates a primitive from the given [key.Key]. Returns an
@@ -70,7 +68,6 @@ func (b *Builder) RegisterPrimitiveConstructor(keyType reflect.Type, constructor
 func (b *Builder) Build() Config {
 	c := Config{
 		primitiveConstructors: maps.Clone(b.config.primitiveConstructors),
-		keysetManagers:        maps.Clone(b.config.keysetManagers),
 	}
 	return c
 }
@@ -80,7 +77,6 @@ func NewBuilder() *Builder {
 	return &Builder{
 		config: Config{
 			primitiveConstructors: map[reflect.Type]func(key key.Key) (any, error){},
-			keysetManagers:        map[string]registry.KeyManager{},
 		},
 	}
 }
