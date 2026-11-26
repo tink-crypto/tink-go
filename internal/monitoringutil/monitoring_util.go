@@ -16,10 +16,7 @@
 package monitoringutil
 
 import (
-	"fmt"
-
 	"github.com/tink-crypto/tink-go/v2/monitoring"
-	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
 // DoNothingLogger is a Logger that does nothing when invoked.
@@ -35,40 +32,3 @@ func (l *DoNothingLogger) LogFailure() {}
 
 // LogKeyExport drops a key export call.
 func (l *DoNothingLogger) LogKeyExport(keyID uint32) {}
-
-func keyStatusFromProto(status tpb.KeyStatusType) (monitoring.KeyStatus, error) {
-	var keyStatus monitoring.KeyStatus = 55
-	switch status {
-	case tpb.KeyStatusType_ENABLED:
-		keyStatus = monitoring.Enabled
-	case tpb.KeyStatusType_DISABLED:
-		keyStatus = monitoring.Disabled
-	case tpb.KeyStatusType_DESTROYED:
-		keyStatus = monitoring.Destroyed
-	default:
-		return keyStatus, fmt.Errorf("unknown key status: %q", status)
-	}
-	return keyStatus, nil
-
-}
-
-// MonitoringKeysetInfoFromKeysetInfo creates a [monitoring.KeysetInfo] from a
-// [tpb.KeysetInfo] with annotations.
-func MonitoringKeysetInfoFromKeysetInfo(keysetInfo *tpb.KeysetInfo, annotations map[string]string) (*monitoring.KeysetInfo, error) {
-	keysetInfoEntries := make([]*monitoring.Entry, len(keysetInfo.GetKeyInfo()))
-	for i, keyInfo := range keysetInfo.GetKeyInfo() {
-		status, err := keyStatusFromProto(keyInfo.GetStatus())
-		if err != nil {
-			return nil, err
-		}
-		keysetInfoEntries[i] = &monitoring.Entry{
-			KeyID:  keyInfo.GetKeyId(),
-			Status: status,
-		}
-	}
-	return &monitoring.KeysetInfo{
-		Annotations:  annotations,
-		PrimaryKeyID: keysetInfo.GetPrimaryKeyId(),
-		Entries:      keysetInfoEntries,
-	}, nil
-}

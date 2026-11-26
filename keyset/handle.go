@@ -213,11 +213,47 @@ func entriesToProtoKeyset(entries []*Entry, shouldLogKeyExport bool) (*tinkpb.Ke
 	return protoKeyset, nil
 }
 
+func monitoringKeyStatusFromProto(status tinkpb.KeyStatusType) (monitoring.KeyStatus, error) {
+	var keyStatus monitoring.KeyStatus = 55
+	switch status {
+	case tinkpb.KeyStatusType_ENABLED:
+		keyStatus = monitoring.Enabled
+	case tinkpb.KeyStatusType_DISABLED:
+		keyStatus = monitoring.Disabled
+	case tinkpb.KeyStatusType_DESTROYED:
+		keyStatus = monitoring.Destroyed
+	default:
+		return keyStatus, fmt.Errorf("unknown key status: %q", status)
+	}
+	return keyStatus, nil
+}
+
+// monitoringKeysetInfoFromKeysetInfo creates a [monitoring.KeysetInfo] from a
+// [tinkpb.KeysetInfo] with annotations.
+func monitoringKeysetInfoFromKeysetInfo(keysetInfo *tinkpb.KeysetInfo, annotations map[string]string) (*monitoring.KeysetInfo, error) {
+	keysetInfoEntries := make([]*monitoring.Entry, len(keysetInfo.GetKeyInfo()))
+	for i, keyInfo := range keysetInfo.GetKeyInfo() {
+		status, err := monitoringKeyStatusFromProto(keyInfo.GetStatus())
+		if err != nil {
+			return nil, err
+		}
+		keysetInfoEntries[i] = &monitoring.Entry{
+			KeyID:  keyInfo.GetKeyId(),
+			Status: status,
+		}
+	}
+	return &monitoring.KeysetInfo{
+		Annotations:  annotations,
+		PrimaryKeyID: keysetInfo.GetPrimaryKeyId(),
+		Entries:      keysetInfoEntries,
+	}, nil
+}
+
 func setEntryMonitoringIfNeeded(h *Handle) error {
 	if len(h.annotations) == 0 {
 		return nil
 	}
-	monitoringKeysetInfo, err := monitoringutil.MonitoringKeysetInfoFromKeysetInfo(h.KeysetInfo(), h.annotations)
+	monitoringKeysetInfo, err := monitoringKeysetInfoFromKeysetInfo(h.KeysetInfo(), h.annotations)
 	if err != nil {
 		return err
 	}

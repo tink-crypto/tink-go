@@ -31,8 +31,8 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/keytest"
-	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
 	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
+	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -1218,6 +1218,31 @@ func mustCreateKeysetHandleForMonitoringTests(t *testing.T, annotations map[stri
 	return h, keyID1, keyID2
 }
 
+// wantKeyExportKeysetInfo returns the monitoring keyset info expected for
+// handles created by mustCreateKeysetHandleForMonitoringTests.
+func wantKeyExportKeysetInfo(t *testing.T, handle *keyset.Handle, keyID1, keyID2 uint32) *monitoring.KeysetInfo {
+	t.Helper()
+	var keys []key.Key
+	for i := 0; i < handle.Len(); i++ {
+		entry, err := handle.Entry(i)
+		if err != nil {
+			t.Fatalf("handle.Entry(%d) err = %v, want nil", i, err)
+		}
+		keys = append(keys, entry.ToUnmonitoredEntry(internalapi.Token{}).Key())
+	}
+	if len(keys) != 2 {
+		t.Fatalf("handle.Len() = %d, want 2", len(keys))
+	}
+	return &monitoring.KeysetInfo{
+		Annotations:  map[string]string{"foo": "bar"},
+		PrimaryKeyID: keyID1,
+		Entries: []*monitoring.Entry{
+			{Status: monitoring.Enabled, KeyID: keyID1, Key: keys[0]},
+			{Status: monitoring.Enabled, KeyID: keyID2, Key: keys[1]},
+		},
+	}
+}
+
 func TestKeyExportMonitoring(t *testing.T) {
 	defer internalregistry.ClearMonitoringClient()
 	fakeClient := fakemonitoring.NewClient("fake_client")
@@ -1246,17 +1271,7 @@ func TestKeyExportMonitoring(t *testing.T) {
 		}
 	}
 
-	info, err := monitoringutil.MonitoringKeysetInfoFromKeysetInfo(handle.KeysetInfo(), map[string]string{"foo": "bar"})
-	if err != nil {
-		t.Fatalf("monitoringutil.MonitoringKeysetInfoFromKeysetInfo() err = %v, want nil", err)
-	}
-	for i, e := range info.Entries {
-		entry, err := handle.Entry(i)
-		if err != nil {
-			t.Fatalf("handle.Entry(%d) err = %v, want nil", i, err)
-		}
-		e.Key = entry.ToUnmonitoredEntry(internalapi.Token{}).Key()
-	}
+	info := wantKeyExportKeysetInfo(t, handle, keyID1, keyID2)
 
 	want := []*fakemonitoring.LogKeyExport{
 		&fakemonitoring.LogKeyExport{
@@ -1303,17 +1318,7 @@ func TestKeyExportMonitoring_keysetMaterial(t *testing.T) {
 	// Export all keys.
 	_ = internal.KeysetMaterial.(func(h *keyset.Handle) *tinkpb.Keyset)(handle)
 
-	info, err := monitoringutil.MonitoringKeysetInfoFromKeysetInfo(handle.KeysetInfo(), map[string]string{"foo": "bar"})
-	if err != nil {
-		t.Fatalf("monitoringutil.MonitoringKeysetInfoFromKeysetInfo() err = %v, want nil", err)
-	}
-	for i, e := range info.Entries {
-		entry, err := handle.Entry(i)
-		if err != nil {
-			t.Fatalf("handle.Entry(%d) err = %v, want nil", i, err)
-		}
-		e.Key = entry.ToUnmonitoredEntry(internalapi.Token{}).Key()
-	}
+	info := wantKeyExportKeysetInfo(t, handle, keyID1, keyID2)
 
 	want := []*fakemonitoring.LogKeyExport{
 		&fakemonitoring.LogKeyExport{
@@ -1332,6 +1337,48 @@ func TestKeyExportMonitoring_keysetMaterial(t *testing.T) {
 				KeysetInfo:  info,
 			},
 		},
+	}
+	if diff := cmp.Diff(want, fakeClient.KeyExportsLogs(), protocmp.Transform()); diff != "" {
+		t.Errorf("fakeClient.KeyExportsLogs() returned unexpected diff (-want +got):\n%s", diff)
+	}
+}
+
+func TestKeyExportMonitoring_StatusesAndNonFirstPrimary(t *testing.T) {
+	defer internalregistry.ClearMonitoringClient()
+	fakeClient := fakemonitoring.NewClient("fake_client")
+	if err := internalregistry.RegisterMonitoringClient(fakeClient); err != nil {
+		t.Fatalf("internalregistry.RegisterMonitoringClient() err = %v, want nil", err)
+	}
+
+	annotations := map[string]string{"foo": "bar", "zoo": "far"}
+	handle := mustCreateEqualTestHandle(t, []equalTestEntry{
+		{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 111, status: keyset.Disabled},
+		{keyBytes: equalTestKeyBytes2, variant: keytest.VariantNoPrefix, id: 222, status: keyset.Enabled, isPrimary: true},
+		{keyBytes: equalTestKeyBytes1, variant: keytest.VariantTink, id: 333, status: keyset.Destroyed},
+	}, annotations)
+
+	var keys []key.Key
+	for i := 0; i < handle.Len(); i++ {
+		entry, err := handle.Entry(i)
+		if err != nil {
+			t.Fatalf("handle.Entry(%d) err = %v, want nil", i, err)
+		}
+		keys = append(keys, entry.Key())
+	}
+
+	wantInfo := &monitoring.KeysetInfo{
+		Annotations:  annotations,
+		PrimaryKeyID: 222,
+		Entries: []*monitoring.Entry{
+			{Status: monitoring.Disabled, KeyID: 111, Key: keys[0]},
+			{Status: monitoring.Enabled, KeyID: 222, Key: keys[1]},
+			{Status: monitoring.Destroyed, KeyID: 333, Key: keys[2]},
+		},
+	}
+	want := []*fakemonitoring.LogKeyExport{
+		{KeyID: 111, Context: &monitoring.Context{Primitive: "keyset_handle", APIFunction: "get_key", KeysetInfo: wantInfo}},
+		{KeyID: 222, Context: &monitoring.Context{Primitive: "keyset_handle", APIFunction: "get_key", KeysetInfo: wantInfo}},
+		{KeyID: 333, Context: &monitoring.Context{Primitive: "keyset_handle", APIFunction: "get_key", KeysetInfo: wantInfo}},
 	}
 	if diff := cmp.Diff(want, fakeClient.KeyExportsLogs(), protocmp.Transform()); diff != "" {
 		t.Errorf("fakeClient.KeyExportsLogs() returned unexpected diff (-want +got):\n%s", diff)
