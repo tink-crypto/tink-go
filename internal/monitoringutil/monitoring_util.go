@@ -17,13 +17,10 @@ package monitoringutil
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/tink-crypto/tink-go/v2/monitoring"
 	tpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
-
-const keytypeURLPrefix = "type.googleapis.com/google.crypto."
 
 // DoNothingLogger is a Logger that does nothing when invoked.
 type DoNothingLogger struct{}
@@ -55,10 +52,6 @@ func keyStatusFromProto(status tpb.KeyStatusType) (monitoring.KeyStatus, error) 
 
 }
 
-func parseKeyTypeURL(ktu string) string {
-	return strings.TrimPrefix(ktu, keytypeURLPrefix)
-}
-
 // MonitoringKeysetInfoFromKeysetInfo creates a [monitoring.KeysetInfo] from a
 // [tpb.KeysetInfo] with annotations.
 func MonitoringKeysetInfoFromKeysetInfo(keysetInfo *tpb.KeysetInfo, annotations map[string]string) (*monitoring.KeysetInfo, error) {
@@ -69,9 +62,8 @@ func MonitoringKeysetInfoFromKeysetInfo(keysetInfo *tpb.KeysetInfo, annotations 
 			return nil, err
 		}
 		keysetInfoEntries[i] = &monitoring.Entry{
-			KeyID:   keyInfo.GetKeyId(),
-			Status:  status,
-			KeyType: parseKeyTypeURL(keyInfo.GetTypeUrl()),
+			KeyID:  keyInfo.GetKeyId(),
+			Status: status,
 		}
 	}
 	return &monitoring.KeysetInfo{

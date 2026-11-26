@@ -488,10 +488,9 @@ func TestFactorySignWithAnnotationsEmitsMonitoringSuccess(t *testing.T) {
 		PrimaryKeyID: privHandle.KeysetInfo().GetPrimaryKeyId(),
 		Entries: []*monitoring.Entry{
 			{
-				KeyID:   privHandle.KeysetInfo().GetPrimaryKeyId(),
-				Status:  monitoring.Enabled,
-				KeyType: "tink.JwtEcdsaPrivateKey",
-				Key:     mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:  privHandle.KeysetInfo().GetPrimaryKeyId(),
+				Status: monitoring.Enabled,
+				Key:    mustKey(t, privHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}
@@ -566,10 +565,9 @@ func TestFactoryVerifyWithAnnotationsEmitsMonitoringSuccess(t *testing.T) {
 		PrimaryKeyID: privHandle.KeysetInfo().GetPrimaryKeyId(),
 		Entries: []*monitoring.Entry{
 			{
-				KeyID:   privHandle.KeysetInfo().GetPrimaryKeyId(),
-				Status:  monitoring.Enabled,
-				KeyType: "tink.JwtEcdsaPublicKey",
-				Key:     mustKey(t, pubHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:  privHandle.KeysetInfo().GetPrimaryKeyId(),
+				Status: monitoring.Enabled,
+				Key:    mustKey(t, pubHandle, privHandle.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	}

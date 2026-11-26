@@ -85,19 +85,16 @@ func TestMonitoringKeysetInfoFromKeysetInfo(t *testing.T) {
 		},
 		Entries: []*monitoring.Entry{
 			{
-				KeyID:   keyID1,
-				Status:  monitoring.Enabled,
-				KeyType: "tink.TestOnlyKey",
+				KeyID:  keyID1,
+				Status: monitoring.Enabled,
 			},
 			{
-				KeyID:   keyID2,
-				Status:  monitoring.Disabled,
-				KeyType: "tink.TestOnlyLegacyKey",
+				KeyID:  keyID2,
+				Status: monitoring.Disabled,
 			},
 			{
-				KeyID:   keyID3,
-				Status:  monitoring.Enabled,
-				KeyType: "tink.TestOnlyKey",
+				KeyID:  keyID3,
+				Status: monitoring.Enabled,
 			},
 		},
 	}

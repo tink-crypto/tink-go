@@ -19,12 +19,10 @@ import (
 	"fmt"
 	"iter"
 	"reflect"
-	"strings"
 
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/internal/internalregistry"
 	"github.com/tink-crypto/tink-go/v2/internal/monitoringutil"
-	"github.com/tink-crypto/tink-go/v2/internal/protoserialization"
 	"github.com/tink-crypto/tink-go/v2/internal/registryconfig/legacyprimitive"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -42,10 +40,6 @@ func monitoringKeyStatusFromKeysetStatus(status keyset.KeyStatus) monitoring.Key
 	default:
 		return monitoring.DoNotUse
 	}
-}
-
-func stripTypeURLPrefix(s string) string {
-	return strings.TrimPrefix(s, "type.googleapis.com/google.crypto.")
 }
 
 // EnabledUnmonitoredEntries returns an iterator over the enabled entries in a
@@ -73,11 +67,11 @@ func EnabledUnmonitoredEntries(kh *keyset.Handle) iter.Seq[*keyset.Entry] {
 }
 
 // keysetInfo returns the monitoring info for the given keyset handle.
-func keysetInfo(kh *keyset.Handle) (*monitoring.KeysetInfo, error) {
+func keysetInfo(kh *keyset.Handle) *monitoring.KeysetInfo {
 	annotations := kh.Annotations(internalapi.Token{})
 	if len(annotations) == 0 {
 		// No annotations, so no monitoring info.
-		return nil, nil
+		return nil
 	}
 
 	primaryKeyID := uint32(0)
@@ -86,22 +80,17 @@ func keysetInfo(kh *keyset.Handle) (*monitoring.KeysetInfo, error) {
 		if entry.IsPrimary() {
 			primaryKeyID = entry.KeyID()
 		}
-		protoSerialization, err := protoserialization.SerializeKey(entry.Key())
-		if err != nil {
-			return nil, err
-		}
 		entries = append(entries, &monitoring.Entry{
-			Status:  monitoringKeyStatusFromKeysetStatus(entry.KeyStatus()),
-			KeyID:   entry.KeyID(),
-			KeyType: stripTypeURLPrefix(protoSerialization.KeyData().GetTypeUrl()),
-			Key:     entry.Key(),
+			Status: monitoringKeyStatusFromKeysetStatus(entry.KeyStatus()),
+			KeyID:  entry.KeyID(),
+			Key:    entry.Key(),
 		})
 	}
 	return &monitoring.KeysetInfo{
 		Annotations:  annotations,
 		PrimaryKeyID: primaryKeyID,
 		Entries:      entries,
-	}, nil
+	}
 }
 
 // LoggerFactory is a factory for creating [monitoring.Loggers] for a
@@ -113,13 +102,9 @@ type LoggerFactory struct {
 
 // NewLoggerFactory creates a new [LoggerFactory] for the given [keyset.Handle].
 func NewLoggerFactory(kh *keyset.Handle) (*LoggerFactory, error) {
-	info, err := keysetInfo(kh)
-	if err != nil {
-		return nil, err
-	}
 	return &LoggerFactory{
 		client: internalregistry.GetMonitoringClient(),
-		info:   info,
+		info:   keysetInfo(kh),
 	}, nil
 }
 

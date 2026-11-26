@@ -345,10 +345,9 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsEncryptionDecryptionWithPr
 		kh.KeysetInfo().GetPrimaryKeyId(),
 		[]*monitoring.Entry{
 			{
-				KeyID:   kh.KeysetInfo().GetPrimaryKeyId(),
-				Status:  monitoring.Enabled,
-				KeyType: "tink.AesGcmKey",
-				Key:     mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:  kh.KeysetInfo().GetPrimaryKeyId(),
+				Status: monitoring.Enabled,
+				Key:    mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	)
@@ -399,10 +398,9 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsLogsEncryptionDecryptionWithou
 		kh.KeysetInfo().GetPrimaryKeyId(),
 		[]*monitoring.Entry{
 			{
-				KeyID:   kh.KeysetInfo().GetPrimaryKeyId(),
-				Status:  monitoring.Enabled,
-				KeyType: "tink.AesGcmKey",
-				Key:     mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:  kh.KeysetInfo().GetPrimaryKeyId(),
+				Status: monitoring.Enabled,
+				Key:    mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	)
@@ -477,22 +475,19 @@ func TestPrimitiveFactoryMonitoringWithAnnotatiosMultipleKeysLogsEncryptionDecry
 	got := client.Events()
 	wantKeysetInfo := monitoring.NewKeysetInfo(annotations, keyIDs[1], []*monitoring.Entry{
 		{
-			KeyID:   keyIDs[1],
-			Status:  monitoring.Enabled,
-			KeyType: "tink.AesGcmKey",
-			Key:     mustKey(t, kh, keyIDs[1]),
+			KeyID:  keyIDs[1],
+			Status: monitoring.Enabled,
+			Key:    mustKey(t, kh, keyIDs[1]),
 		},
 		{
-			KeyID:   keyIDs[2],
-			Status:  monitoring.Enabled,
-			KeyType: "tink.AesCtrHmacAeadKey",
-			Key:     mustKey(t, kh, keyIDs[2]),
+			KeyID:  keyIDs[2],
+			Status: monitoring.Enabled,
+			Key:    mustKey(t, kh, keyIDs[2]),
 		},
 		{
-			KeyID:   keyIDs[3],
-			Status:  monitoring.Enabled,
-			KeyType: "tink.XChaCha20Poly1305Key",
-			Key:     mustKey(t, kh, keyIDs[3]),
+			KeyID:  keyIDs[3],
+			Status: monitoring.Enabled,
+			Key:    mustKey(t, kh, keyIDs[3]),
 		},
 	})
 	want := []*fakemonitoring.LogEvent{
@@ -568,10 +563,9 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsEncryptionFailureIsLogged(t *t
 					kh.KeysetInfo().GetPrimaryKeyId(),
 					[]*monitoring.Entry{
 						{
-							KeyID:   kh.KeysetInfo().GetPrimaryKeyId(),
-							Status:  monitoring.Enabled,
-							KeyType: typeURL,
-							Key:     mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
+							KeyID:  kh.KeysetInfo().GetPrimaryKeyId(),
+							Status: monitoring.Enabled,
+							Key:    mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -609,10 +603,9 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsDecryptionFailureIsLogged(t *t
 					kh.KeysetInfo().GetPrimaryKeyId(),
 					[]*monitoring.Entry{
 						{
-							KeyID:   kh.KeysetInfo().GetPrimaryKeyId(),
-							Status:  monitoring.Enabled,
-							KeyType: "tink.AesGcmKey",
-							Key:     mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
+							KeyID:  kh.KeysetInfo().GetPrimaryKeyId(),
+							Status: monitoring.Enabled,
+							Key:    mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -688,10 +681,9 @@ func TestFactoryWithMonitoringMultiplePrimitivesLogOperations(t *testing.T) {
 					kh1.KeysetInfo().GetPrimaryKeyId(),
 					[]*monitoring.Entry{
 						{
-							KeyID:   kh1.KeysetInfo().GetPrimaryKeyId(),
-							Status:  monitoring.Enabled,
-							KeyType: "tink.AesGcmKey",
-							Key:     mustKey(t, kh1, kh1.KeysetInfo().GetPrimaryKeyId()),
+							KeyID:  kh1.KeysetInfo().GetPrimaryKeyId(),
+							Status: monitoring.Enabled,
+							Key:    mustKey(t, kh1, kh1.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -708,10 +700,9 @@ func TestFactoryWithMonitoringMultiplePrimitivesLogOperations(t *testing.T) {
 					kh2.KeysetInfo().GetPrimaryKeyId(),
 					[]*monitoring.Entry{
 						{
-							KeyID:   kh2.KeysetInfo().GetPrimaryKeyId(),
-							Status:  monitoring.Enabled,
-							KeyType: "tink.AesCtrHmacAeadKey",
-							Key:     mustKey(t, kh2, kh2.KeysetInfo().GetPrimaryKeyId()),
+							KeyID:  kh2.KeysetInfo().GetPrimaryKeyId(),
+							Status: monitoring.Enabled,
+							Key:    mustKey(t, kh2, kh2.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -823,10 +814,9 @@ func TestPrimitiveFactoryDecryptionWithDisabledKeyFailsAndLogsFailure(t *testing
 		keyID1,
 		[]*monitoring.Entry{
 			{
-				KeyID:   keyID1,
-				Status:  monitoring.Enabled,
-				KeyType: "tink.AesGcmKey",
-				Key:     mustKey(t, khDisabled, keyID1),
+				KeyID:  keyID1,
+				Status: monitoring.Enabled,
+				Key:    mustKey(t, khDisabled, keyID1),
 			},
 		},
 	)

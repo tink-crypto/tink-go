@@ -351,22 +351,19 @@ func TestFactoryWithMonitoringPrimitiveWithMultipleKeysLogsComputeVerify(t *test
 		PrimaryKeyID: kh.KeysetInfo().GetPrimaryKeyId(),
 		Entries: []*monitoring.Entry{
 			{
-				KeyID:   kh.KeysetInfo().GetPrimaryKeyId(),
-				Status:  monitoring.Enabled,
-				KeyType: "tink.HmacKey",
-				Key:     mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:  kh.KeysetInfo().GetPrimaryKeyId(),
+				Status: monitoring.Enabled,
+				Key:    mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 			},
 			{
-				KeyID:   keyIDs[2],
-				Status:  monitoring.Enabled,
-				KeyType: "tink.HmacKey",
-				Key:     mustKey(t, kh, keyIDs[2]),
+				KeyID:  keyIDs[2],
+				Status: monitoring.Enabled,
+				Key:    mustKey(t, kh, keyIDs[2]),
 			},
 			{
-				KeyID:   keyIDs[3],
-				Status:  monitoring.Enabled,
-				KeyType: "tink.AesCmacKey",
-				Key:     mustKey(t, kh, keyIDs[3]),
+				KeyID:  keyIDs[3],
+				Status: monitoring.Enabled,
+				Key:    mustKey(t, kh, keyIDs[3]),
 			},
 		},
 	}
@@ -456,10 +453,9 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsComputeFailureIsLogged(t *test
 					kh.KeysetInfo().GetPrimaryKeyId(),
 					[]*monitoring.Entry{
 						{
-							KeyID:   kh.KeysetInfo().GetPrimaryKeyId(),
-							Status:  monitoring.Enabled,
-							KeyType: typeURL,
-							Key:     mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
+							KeyID:  kh.KeysetInfo().GetPrimaryKeyId(),
+							Status: monitoring.Enabled,
+							Key:    mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -509,10 +505,9 @@ func TestPrimitiveFactoryWithMonitoringAnnotationsVerifyFailureIsLogged(t *testi
 					kh.KeysetInfo().GetPrimaryKeyId(),
 					[]*monitoring.Entry{
 						{
-							KeyID:   kh.KeysetInfo().GetPrimaryKeyId(),
-							Status:  monitoring.Enabled,
-							KeyType: "tink.HmacKey",
-							Key:     mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
+							KeyID:  kh.KeysetInfo().GetPrimaryKeyId(),
+							Status: monitoring.Enabled,
+							Key:    mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -571,10 +566,9 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsMultiplePrimitivesLogOperation
 					handles[0].KeysetInfo().GetPrimaryKeyId(),
 					[]*monitoring.Entry{
 						{
-							KeyID:   handles[0].KeysetInfo().GetPrimaryKeyId(),
-							Status:  monitoring.Enabled,
-							KeyType: "tink.HmacKey",
-							Key:     mustKey(t, handles[0], handles[0].KeysetInfo().GetPrimaryKeyId()),
+							KeyID:  handles[0].KeysetInfo().GetPrimaryKeyId(),
+							Status: monitoring.Enabled,
+							Key:    mustKey(t, handles[0], handles[0].KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -591,10 +585,9 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsMultiplePrimitivesLogOperation
 					handles[1].KeysetInfo().GetPrimaryKeyId(),
 					[]*monitoring.Entry{
 						{
-							KeyID:   handles[1].KeysetInfo().GetPrimaryKeyId(),
-							Status:  monitoring.Enabled,
-							KeyType: "tink.AesCmacKey",
-							Key:     mustKey(t, handles[1], handles[1].KeysetInfo().GetPrimaryKeyId()),
+							KeyID:  handles[1].KeysetInfo().GetPrimaryKeyId(),
+							Status: monitoring.Enabled,
+							Key:    mustKey(t, handles[1], handles[1].KeysetInfo().GetPrimaryKeyId()),
 						},
 					},
 				),
@@ -644,10 +637,9 @@ func TestPrimitiveFactoryMonitoringWithAnnotationsComputeVerifyLogs(t *testing.T
 		kh.KeysetInfo().GetPrimaryKeyId(),
 		[]*monitoring.Entry{
 			{
-				KeyID:   kh.KeysetInfo().GetPrimaryKeyId(),
-				Status:  monitoring.Enabled,
-				KeyType: "tink.HmacKey",
-				Key:     mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
+				KeyID:  kh.KeysetInfo().GetPrimaryKeyId(),
+				Status: monitoring.Enabled,
+				Key:    mustKey(t, kh, kh.KeysetInfo().GetPrimaryKeyId()),
 			},
 		},
 	)

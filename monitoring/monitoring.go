@@ -51,11 +51,6 @@ func (status KeyStatus) String() string {
 type Entry struct {
 	Status KeyStatus
 	KeyID  uint32
-	// KeyType is the key type URL without the "type.googleapis.com/google.crypto."
-	// prefix, for example "tink.AesGcmKey".
-	//
-	// Deprecated: Use Key instead.
-	KeyType string
 	// Key is the key of this entry. Monitoring clients can use it to identify
 	// the key type and its parameters without relying on proto serialization.
 	//

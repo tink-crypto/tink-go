@@ -127,16 +127,14 @@ func TestLoggerBuilder_CreatesLoggerWithContext(t *testing.T) {
 			PrimaryKeyID: 1,
 			Entries: []*monitoring.Entry{
 				{
-					Status:  monitoring.Enabled,
-					KeyID:   1,
-					KeyType: "tink.TestOnlyKey",
-					Key:     primaryKey,
+					Status: monitoring.Enabled,
+					KeyID:  1,
+					Key:    primaryKey,
 				},
 				{
-					Status:  monitoring.Enabled,
-					KeyID:   keyID,
-					KeyType: "tink.TestOnlyKey",
-					Key:     noPrefixKey,
+					Status: monitoring.Enabled,
+					KeyID:  keyID,
+					Key:    noPrefixKey,
 				},
 			},
 		},
