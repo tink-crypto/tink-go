@@ -413,6 +413,25 @@ func TestNewPublicKey(t *testing.T) {
 	}
 }
 
+func TestPublicKeyBytesReturnsCopy(t *testing.T) {
+	testCases := mustCreateKeyTestCases(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			key, err := ecies.NewPublicKey(tc.publicKeyBytes, tc.idRequirement, tc.params)
+			if err != nil {
+				t.Fatalf("ecies.NewPublicKey(%v, %v, %v) err = %v, want nil", tc.publicKeyBytes, tc.idRequirement, tc.params, err)
+			}
+			got := key.PublicKeyBytes()
+			for i := range got {
+				got[i] ^= 0xff
+			}
+			if got, want := key.PublicKeyBytes(), tc.publicKeyBytes; !bytes.Equal(got, want) {
+				t.Errorf("key.PublicKeyBytes() after modifying a previous result = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
 func TestPublicKeyNotEqual(t *testing.T) {
 	aesGCMDEMParams, err := aesgcm.NewParameters(aesgcm.ParametersOpts{
 		KeySizeInBytes: 32,
