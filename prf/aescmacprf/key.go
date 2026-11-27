@@ -17,7 +17,7 @@ package aescmacprf
 import (
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/subtle"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -63,10 +63,7 @@ func primitiveConstructor(key key.Key) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid key type: got %T, want %T", key, (*Key)(nil))
 	}
-	if err := subtle.ValidateAESCMACPRFParams(uint32(actualKey.KeyBytes().Len())); err != nil {
-		return nil, err
-	}
-	return subtle.NewAESCMACPRF(actualKey.KeyBytes().Data(insecuresecretdataaccess.Token{}))
+	return NewPRF(actualKey, internalapi.Token{})
 }
 
 func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
