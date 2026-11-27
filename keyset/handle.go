@@ -213,39 +213,42 @@ func entriesToProtoKeyset(entries []*Entry, shouldLogKeyExport bool) (*tinkpb.Ke
 	return protoKeyset, nil
 }
 
-func monitoringKeyStatusFromProto(status tinkpb.KeyStatusType) (monitoring.KeyStatus, error) {
-	var keyStatus monitoring.KeyStatus = 55
+func monitoringKeyStatus(status KeyStatus) (monitoring.KeyStatus, error) {
 	switch status {
-	case tinkpb.KeyStatusType_ENABLED:
-		keyStatus = monitoring.Enabled
-	case tinkpb.KeyStatusType_DISABLED:
-		keyStatus = monitoring.Disabled
-	case tinkpb.KeyStatusType_DESTROYED:
-		keyStatus = monitoring.Destroyed
+	case Enabled:
+		return monitoring.Enabled, nil
+	case Disabled:
+		return monitoring.Disabled, nil
+	case Destroyed:
+		return monitoring.Destroyed, nil
 	default:
-		return keyStatus, fmt.Errorf("unknown key status: %q", status)
+		return monitoring.DoNotUse, fmt.Errorf("unknown key status: %v", status)
 	}
-	return keyStatus, nil
 }
 
-// monitoringKeysetInfoFromKeysetInfo creates a [monitoring.KeysetInfo] from a
-// [tinkpb.KeysetInfo] with annotations.
-func monitoringKeysetInfoFromKeysetInfo(keysetInfo *tinkpb.KeysetInfo, annotations map[string]string) (*monitoring.KeysetInfo, error) {
-	keysetInfoEntries := make([]*monitoring.Entry, len(keysetInfo.GetKeyInfo()))
-	for i, keyInfo := range keysetInfo.GetKeyInfo() {
-		status, err := monitoringKeyStatusFromProto(keyInfo.GetStatus())
+// monitoringKeysetInfo returns the monitoring info for the keys in h.
+func monitoringKeysetInfo(h *Handle) (*monitoring.KeysetInfo, error) {
+	entries := make([]*monitoring.Entry, len(h.entries))
+	for i, entry := range h.entries {
+		status, err := monitoringKeyStatus(entry.status)
 		if err != nil {
 			return nil, err
 		}
-		keysetInfoEntries[i] = &monitoring.Entry{
-			KeyID:  keyInfo.GetKeyId(),
+		// NOTE: Purposely not using Key() here to avoid logging a key export.
+		k := entry.key
+		if k == nil {
+			return nil, fmt.Errorf("entry %d has no key; this should not happen", i)
+		}
+		entries[i] = &monitoring.Entry{
+			KeyID:  entry.keyID,
 			Status: status,
+			Key:    k,
 		}
 	}
 	return &monitoring.KeysetInfo{
-		Annotations:  annotations,
-		PrimaryKeyID: keysetInfo.GetPrimaryKeyId(),
-		Entries:      keysetInfoEntries,
+		Annotations:  h.annotations,
+		PrimaryKeyID: h.primaryKeyEntry.keyID,
+		Entries:      entries,
 	}, nil
 }
 
@@ -253,24 +256,15 @@ func setEntryMonitoringIfNeeded(h *Handle) error {
 	if len(h.annotations) == 0 {
 		return nil
 	}
-	monitoringKeysetInfo, err := monitoringKeysetInfoFromKeysetInfo(h.KeysetInfo(), h.annotations)
+	info, err := monitoringKeysetInfo(h)
 	if err != nil {
 		return err
-	}
-	// h.KeysetInfo() lists the keys in the same order as h.entries.
-	for i, entry := range h.entries {
-		// NOTE: Purposely not using Key() here to avoid logging a key export.
-		k := entry.key
-		if k == nil {
-			return fmt.Errorf("entry %d has no key; this should not happen", i)
-		}
-		monitoringKeysetInfo.Entries[i].Key = k
 	}
 	for _, entry := range h.entries {
 		l, err := h.monitoringClient.NewLogger(&monitoring.Context{
 			Primitive:   "keyset_handle",
 			APIFunction: "get_key",
-			KeysetInfo:  monitoringKeysetInfo,
+			KeysetInfo:  info,
 		})
 		if err != nil {
 			return err
