@@ -17,7 +17,7 @@ package hkdfprf
 import (
 	"fmt"
 
-	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
+	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/subtle"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
@@ -63,14 +63,7 @@ func primitiveConstructor(key key.Key) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid key type: got %T, want %T", key, (*Key)(nil))
 	}
-	params, ok := actualKey.Parameters().(*Parameters)
-	if !ok {
-		return nil, fmt.Errorf("invalid parameters type: got %T, want %T", actualKey.Parameters(), (*Parameters)(nil))
-	}
-	if err := subtle.ValidateHKDFPRFParams(params.HashType().String(), uint32(params.KeySizeInBytes()), params.Salt()); err != nil {
-		return nil, err
-	}
-	return subtle.NewHKDFPRF(params.HashType().String(), actualKey.KeyBytes().Data(insecuresecretdataaccess.Token{}), params.Salt())
+	return NewPRF(actualKey, internalapi.Token{})
 }
 
 func createKey(p key.Parameters, idRequirement uint32) (key.Key, error) {
