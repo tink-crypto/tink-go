@@ -26,6 +26,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
+	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
 	"github.com/tink-crypto/tink-go/v2/secretdata"
 )
@@ -58,6 +59,11 @@ const (
 		"da3275600c2f09b8367793a9aca3db71" +
 		"cc30c58179ec3e87c14c01d5c1f3434f" +
 		"1d87"
+
+	// https://github.com/C2SP/wycheproof/blob/3bfb67fca7c7a2ef436e263da53cdabe0fa1dd36/testvectors/hmac_sha256_test.json#L31
+	hmacSHA256KeyHex        = "8159fd15133cd964c9a6964c94f0ea269a806fd9f43f0da58b6cd1b33d189b2a"
+	hmacSHA256WantOutputHex = "dfc5105d5eecf7ae7b8b8de3930e7659e84c4172f2555142f1e568fc1872ad93"
+	hmacSHA256DataHex       = "77"
 )
 
 func mustBuildConfig(t *testing.T, register ...func(*config.Builder, internalapi.Token) error) config.Config {
@@ -75,17 +81,28 @@ func TestRegisterPrimitiveConstructors(t *testing.T) {
 	aesCMACPRFKeyBytes := mustHexDecode(t, aesCMACPRFKeyHex)
 	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData(aesCMACPRFKeyBytes, insecuresecretdataaccess.Token{}))
 	if err != nil {
-		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
+		t.Fatalf("aescmacprf.NewKey(%x) err = %v, want nil", aesCMACPRFKeyBytes, err)
 	}
 
 	hkdfKeyBytes := mustHexDecode(t, hkdfKeyHex)
-	hkdfParams, err := hkdfprf.NewParameters(len(hkdfKeyBytes), hkdfprf.SHA256, mustHexDecode(t, hkdfSaltHex))
+	hkdfSalt := mustHexDecode(t, hkdfSaltHex)
+	hkdfParams, err := hkdfprf.NewParameters(len(hkdfKeyBytes), hkdfprf.SHA256, hkdfSalt)
 	if err != nil {
-		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
+		t.Fatalf("hkdfprf.NewParameters(%d, %v, %x) err = %v, want nil", len(hkdfKeyBytes), hkdfprf.SHA256, hkdfSalt, err)
 	}
 	hkdfKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData(hkdfKeyBytes, insecuresecretdataaccess.Token{}), hkdfParams)
 	if err != nil {
-		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
+		t.Fatalf("hkdfprf.NewKey(%x, %v) err = %v, want nil", hkdfKeyBytes, hkdfParams, err)
+	}
+
+	hmacSHA256KeyBytes := mustHexDecode(t, hmacSHA256KeyHex)
+	hmacSHA256Params, err := hmacprf.NewParameters(len(hmacSHA256KeyBytes), hmacprf.SHA256)
+	if err != nil {
+		t.Fatalf("hmacprf.NewParameters(%d, %v) err = %v, want nil", len(hmacSHA256KeyBytes), hmacprf.SHA256, err)
+	}
+	hmacSHA256Key, err := hmacprf.NewKey(secretdata.NewBytesFromData(hmacSHA256KeyBytes, insecuresecretdataaccess.Token{}), hmacSHA256Params)
+	if err != nil {
+		t.Fatalf("hmacprf.NewKey(%x, %v) err = %v, want nil", hmacSHA256KeyBytes, hmacSHA256Params, err)
 	}
 
 	tests := []struct {
@@ -108,6 +125,13 @@ func TestRegisterPrimitiveConstructors(t *testing.T) {
 			key:      hkdfKey,
 			data:     mustHexDecode(t, hkdfDataHex),
 			want:     mustHexDecode(t, hkdfWantOutputHex),
+		},
+		{
+			name:     "HMACPRF",
+			register: prf.RegisterHMACPRFPrimitiveConstructor,
+			key:      hmacSHA256Key,
+			data:     mustHexDecode(t, hmacSHA256DataHex),
+			want:     mustHexDecode(t, hmacSHA256WantOutputHex),
 		},
 	}
 
@@ -141,17 +165,28 @@ func TestRegisterPrimitiveConstructorPrimitivesFromGlobalRegistry(t *testing.T) 
 	aesCMACPRFKeyBytes := mustHexDecode(t, aesCMACPRFKeyHex)
 	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData(aesCMACPRFKeyBytes, insecuresecretdataaccess.Token{}))
 	if err != nil {
-		t.Fatalf("aescmacprf.NewKey() err = %v, want nil", err)
+		t.Fatalf("aescmacprf.NewKey(%x) err = %v, want nil", aesCMACPRFKeyBytes, err)
 	}
 
 	hkdfKeyBytes := mustHexDecode(t, hkdfKeyHex)
-	hkdfParams, err := hkdfprf.NewParameters(len(hkdfKeyBytes), hkdfprf.SHA256, mustHexDecode(t, hkdfSaltHex))
+	hkdfSalt := mustHexDecode(t, hkdfSaltHex)
+	hkdfParams, err := hkdfprf.NewParameters(len(hkdfKeyBytes), hkdfprf.SHA256, hkdfSalt)
 	if err != nil {
-		t.Fatalf("hkdfprf.NewParameters() err = %v, want nil", err)
+		t.Fatalf("hkdfprf.NewParameters(%d, %v, %x) err = %v, want nil", len(hkdfKeyBytes), hkdfprf.SHA256, hkdfSalt, err)
 	}
 	hkdfKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData(hkdfKeyBytes, insecuresecretdataaccess.Token{}), hkdfParams)
 	if err != nil {
-		t.Fatalf("hkdfprf.NewKey() err = %v, want nil", err)
+		t.Fatalf("hkdfprf.NewKey(%x, %v) err = %v, want nil", hkdfKeyBytes, hkdfParams, err)
+	}
+
+	hmacSHA256KeyBytes := mustHexDecode(t, hmacSHA256KeyHex)
+	hmacSHA256Params, err := hmacprf.NewParameters(len(hmacSHA256KeyBytes), hmacprf.SHA256)
+	if err != nil {
+		t.Fatalf("hmacprf.NewParameters(%d, %v) err = %v, want nil", len(hmacSHA256KeyBytes), hmacprf.SHA256, err)
+	}
+	hmacSHA256Key, err := hmacprf.NewKey(secretdata.NewBytesFromData(hmacSHA256KeyBytes, insecuresecretdataaccess.Token{}), hmacSHA256Params)
+	if err != nil {
+		t.Fatalf("hmacprf.NewKey(%x, %v) err = %v, want nil", hmacSHA256KeyBytes, hmacSHA256Params, err)
 	}
 
 	tests := []struct {
@@ -171,6 +206,12 @@ func TestRegisterPrimitiveConstructorPrimitivesFromGlobalRegistry(t *testing.T) 
 			key:  hkdfKey,
 			data: mustHexDecode(t, hkdfDataHex),
 			want: mustHexDecode(t, hkdfWantOutputHex),
+		},
+		{
+			name: "HMACPRF",
+			key:  hmacSHA256Key,
+			data: mustHexDecode(t, hmacSHA256DataHex),
+			want: mustHexDecode(t, hmacSHA256WantOutputHex),
 		},
 	}
 	for _, tc := range tests {

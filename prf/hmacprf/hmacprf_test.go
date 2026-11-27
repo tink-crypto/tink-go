@@ -17,12 +17,9 @@ package hmacprf_test
 import (
 	"bytes"
 	"encoding/hex"
-	"reflect"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
-	"github.com/tink-crypto/tink-go/v2/internal/config"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
@@ -114,47 +111,5 @@ func TestKeysetGenerationFromKey(t *testing.T) {
 	}
 	if got, want := gotPRFOutput, wantPRFOutput[:]; !bytes.Equal(got, want) {
 		t.Errorf("gotPRFOutput = %x, want %x", got, want)
-	}
-}
-
-func TestRegisterPrimitiveConstructor(t *testing.T) {
-	hmacSHA256KeyBytes := mustHexDecode(t, hmacSHA256KeyHex)
-	hmacSHA256PRFParams, err := hmacprf.NewParameters(len(hmacSHA256KeyBytes), hmacprf.SHA256)
-	if err != nil {
-		t.Fatalf("hmacprf.NewParameters() err = %v, want nil", err)
-	}
-	hmacSHA256PRFKey, err := hmacprf.NewKey(secretdata.NewBytesFromData(hmacSHA256KeyBytes, insecuresecretdataaccess.Token{}), hmacSHA256PRFParams)
-	if err != nil {
-		t.Fatalf("hmacprf.NewKey() err = %v, want nil", err)
-	}
-
-	b := config.NewBuilder()
-	configWithoutHMACSHA256PRF := b.Build()
-
-	// Should fail because hmacprf.RegisterPrimitiveConstructor() was not called.
-	if _, err := configWithoutHMACSHA256PRF.PrimitiveFromKey(hmacSHA256PRFKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutHMACSHA256PRF.PrimitiveFromKey() err = nil, want error")
-	}
-
-	// Register hmacprf.RegisterPrimitiveConstructor() and check that it now works.
-	if err := hmacprf.RegisterPrimitiveConstructor(b, internalapi.Token{}); err != nil {
-		t.Fatalf("hmacprf.RegisterPrimitiveConstructor() err = %v, want nil", err)
-	}
-	configWithHMACSHA256PRF := b.Build()
-	primitive, err := configWithHMACSHA256PRF.PrimitiveFromKey(hmacSHA256PRFKey, internalapi.Token{})
-	if err != nil {
-		t.Fatalf(" configWithHMACSHA256PRF.PrimitiveFromKey() err = %v, want nil", err)
-	}
-	p, ok := primitive.(prf.PRF)
-	if !ok {
-		t.Fatalf("p was of type %v, want prf.PRF", reflect.TypeOf(p))
-	}
-	want := mustHexDecode(t, hmacSHA256WantOutputHex)
-	got, err := p.ComputePRF(mustHexDecode(t, hmacSHA256DataHex), uint32(len(want)))
-	if err != nil {
-		t.Fatalf("d.ComputePRF() err = %v, want nil", err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Errorf("d.ComputePRF() = %x, want %x", got, want)
 	}
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf" // Also registers the AES-CMAC PRF key serialization.
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"       // Also registers the HKDF PRF key serialization.
+	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"       // Also registers the HMAC PRF key serialization.
 )
 
 func aesCMACPRFPrimitiveConstructor(key key.Key) (any, error) {
@@ -42,6 +43,14 @@ func hkdfPRFPrimitiveConstructor(key key.Key) (any, error) {
 	return hkdfprf.NewPRF(actualKey, internalapi.Token{})
 }
 
+func hmacPRFPrimitiveConstructor(key key.Key) (any, error) {
+	actualKey, ok := key.(*hmacprf.Key)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type: got %T, want %T", key, (*hmacprf.Key)(nil))
+	}
+	return hmacprf.NewPRF(actualKey, internalapi.Token{})
+}
+
 // RegisterAESCMACPRFPrimitiveConstructor registers the AES-CMAC PRF primitive constructor
 // to the provided config.
 //
@@ -58,11 +67,22 @@ func RegisterHKDFPRFPrimitiveConstructor(c *config.Builder, t internalapi.Token)
 	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*hkdfprf.Key](), hkdfPRFPrimitiveConstructor, t)
 }
 
+// RegisterHMACPRFPrimitiveConstructor registers the HMAC PRF primitive constructor
+// to the provided config.
+//
+// It is *NOT* part of the public API.
+func RegisterHMACPRFPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
+	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*hmacprf.Key](), hmacPRFPrimitiveConstructor, t)
+}
+
 func init() {
 	if err := primitiveregistry.RegisterPrimitiveConstructor[*aescmacprf.Key](aesCMACPRFPrimitiveConstructor); err != nil {
 		panic(fmt.Sprintf("prf.init() failed: %v", err))
 	}
 	if err := primitiveregistry.RegisterPrimitiveConstructor[*hkdfprf.Key](hkdfPRFPrimitiveConstructor); err != nil {
+		panic(fmt.Sprintf("prf.init() failed: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*hmacprf.Key](hmacPRFPrimitiveConstructor); err != nil {
 		panic(fmt.Sprintf("prf.init() failed: %v", err))
 	}
 }
