@@ -30,7 +30,7 @@ import (
 // RegisterPrimitiveConstructor accepts a config object and registers the
 // keytest primitive constructor to the provided config.
 func RegisterPrimitiveConstructor(b *config.Builder, t internalapi.Token) error {
-	return b.RegisterPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
+	return b.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
 }
 
 func init() {
@@ -40,7 +40,7 @@ func init() {
 	if err := keygenregistry.RegisterKeyCreator[*AsymmetricParameters](createPrivateKey); err != nil {
 		panic(fmt.Sprintf("keytest.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("keytest.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterKeySerializer[*Key](&keySerializer{}); err != nil {

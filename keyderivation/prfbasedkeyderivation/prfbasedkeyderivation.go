@@ -32,7 +32,7 @@ import (
 //
 // It is *NOT* part of the public API.
 func RegisterPrimitiveConstructor(b *config.Builder, t internalapi.Token) error {
-	return b.RegisterPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
+	return b.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
 }
 
 func init() {
@@ -42,7 +42,7 @@ func init() {
 	if err := protoserialization.RegisterKeySerializer[*Key](new(keySerializer)); err != nil {
 		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("prfbasedkeyderivation.init() failed: %v", err))
 	}
 	if err := protoserialization.RegisterParametersSerializer[*Parameters](new(parametersSerializer)); err != nil {

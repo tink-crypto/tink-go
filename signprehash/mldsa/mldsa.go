@@ -26,14 +26,14 @@ import (
 // RegisterPrimitiveConstructor registers primitive constructors for ML-DSA
 // prehash signing primitives.
 func RegisterPrimitiveConstructor(c *config.Builder, token internalapi.Token) error {
-	if err := c.RegisterPrimitiveConstructor(
+	if err := c.RegisterLegacyPrimitiveConstructor(
 		reflect.TypeFor[*tinkmldsa.PrivateKey](),
 		prehashSignerConstructor,
 		token,
 	); err != nil {
 		return err
 	}
-	return c.RegisterPrimitiveConstructor(
+	return c.RegisterLegacyPrimitiveConstructor(
 		reflect.TypeFor[*tinkmldsa.PublicKey](),
 		prehashConstructor,
 		token,

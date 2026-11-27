@@ -188,35 +188,35 @@ func init() {
 	}
 
 	// MAC primitive constructors.
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwthmac.Key](createJWTHMAC); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*jwthmac.Key](createJWTHMAC); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT HMAC primitive constructor: %v", err))
 	}
 
 	// Signer primitive constructors.
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtecdsa.PrivateKey](createJWTECDSASigner); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*jwtecdsa.PrivateKey](createJWTECDSASigner); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT ECDSA signer primitive constructor: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapkcs1.PrivateKey](createJWTRSASSAPKCS1Signer); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*jwtrsassapkcs1.PrivateKey](createJWTRSASSAPKCS1Signer); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PKCS1 signer primitive constructor: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapss.PrivateKey](createJWTRSASSAPSSSigner); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*jwtrsassapss.PrivateKey](createJWTRSASSAPSSSigner); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PSS signer primitive constructor: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtmldsa.PrivateKey](createJWTMLDSASigner); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*jwtmldsa.PrivateKey](createJWTMLDSASigner); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT ML-DSA signer primitive constructor: %v", err))
 	}
 
 	// Verifier primitive constructors.
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtecdsa.PublicKey](createJWTECDSAVerifier); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*jwtecdsa.PublicKey](createJWTECDSAVerifier); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT ECDSA verifier primitive constructor: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapkcs1.PublicKey](createJWTRSASSAPKCS1Verifier); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*jwtrsassapkcs1.PublicKey](createJWTRSASSAPKCS1Verifier); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PKCS1 verifier primitive constructor: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtrsassapss.PublicKey](createJWTRSASSAPSSVerifier); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*jwtrsassapss.PublicKey](createJWTRSASSAPSSVerifier); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT RSA SSA PSS verifier primitive constructor: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*jwtmldsa.PublicKey](createJWTMLDSAVerifier); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*jwtmldsa.PublicKey](createJWTMLDSAVerifier); err != nil {
 		panic(fmt.Sprintf("jwt.init() failed registering JWT ML-DSA verifier primitive constructor: %v", err))
 	}
 }

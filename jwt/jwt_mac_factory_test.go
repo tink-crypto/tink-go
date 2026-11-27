@@ -418,13 +418,13 @@ func TestMACPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 	}
 
 	// Register primitive constructor to make sure that the factory uses full primitives.
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubKey]()
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*stubKey]()
 	macConstructor := func(key key.Key) (any, error) {
 		kid := "AQIDBA" // for 0x01020304
 		return &stubFullMAC{&kid}, nil
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubKey](macConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*stubKey](macConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	km := keyset.NewManager()
@@ -559,11 +559,11 @@ func TestComputeFailureEmitsMonitoring(t *testing.T) {
 	}
 
 	// Register primitive constructor to make sure that the factory uses full primitives.
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubKey]()
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubKey](func(key key.Key) (any, error) {
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*stubKey]()
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*stubKey](func(key key.Key) (any, error) {
 		return &alwaysFailingStubMAC{}, nil
 	}); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	defer internalregistry.ClearMonitoringClient()
 	client := &fakemonitoring.Client{Name: ""}
@@ -704,18 +704,18 @@ func TestNewMACWithConfig(t *testing.T) {
 	}
 
 	// Register primitive constructor to make sure that the factory uses full primitives.
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubKey]()
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*stubKey]()
 	macConstructor := func(key key.Key) (any, error) {
 		kid := "AQIDBA" // for 0x01020304
 		return &stubFullMAC{&kid}, nil
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubKey](macConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*stubKey](macConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	builderWithFullPrimitive := config.NewBuilder()
-	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubKey](), macConstructor, internalapi.Token{}); err != nil {
-		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := builderWithFullPrimitive.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*stubKey](), macConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithFullPrimitive.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	configWithFullPrimitive := builderWithFullPrimitive.Build()
 

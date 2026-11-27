@@ -64,10 +64,10 @@ func init() {
 	if err := protoserialization.RegisterParametersParser(privateKeyTypeURL, &parametersParser{}); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*PublicKey](hybridEncryptConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*PublicKey](hybridEncryptConstructor); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*PrivateKey](hybridDecryptConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*PrivateKey](hybridDecryptConstructor); err != nil {
 		panic(fmt.Sprintf("ecies.init() failed: %v", err))
 	}
 	if err := keygenregistry.RegisterKeyCreator[*Parameters](createPrivateKey); err != nil {
@@ -98,8 +98,8 @@ func init() {
 //
 // It is *NOT* part of the public API.
 func RegisterPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
-	if err := c.RegisterPrimitiveConstructor(reflect.TypeFor[*PrivateKey](), hybridDecryptConstructor, t); err != nil {
+	if err := c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*PrivateKey](), hybridDecryptConstructor, t); err != nil {
 		return err
 	}
-	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*PublicKey](), hybridEncryptConstructor, t)
+	return c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*PublicKey](), hybridEncryptConstructor, t)
 }

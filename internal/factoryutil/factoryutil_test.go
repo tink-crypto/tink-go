@@ -281,10 +281,10 @@ func TestEnabledUnmonitoredEntries_Empty(t *testing.T) {
 func TestLegacyPrimitiveFromKey_Full(t *testing.T) {
 	primitive := "primitive"
 	cb := config.NewBuilder()
-	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*keytest.Key](), func(key key.Key) (any, error) {
+	if err := cb.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*keytest.Key](), func(key key.Key) (any, error) {
 		return primitive, nil
 	}, internalapi.Token{}); err != nil {
-		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("cb.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	config := cb.Build()
 	key := mustCreateKey(t, keytest.VariantTink, 1)
@@ -301,10 +301,10 @@ func TestLegacyPrimitiveFromKey_Full(t *testing.T) {
 func TestLegacyPrimitiveFromKey_WrongType(t *testing.T) {
 	primitive := "primitive"
 	cb := config.NewBuilder()
-	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*keytest.Key](), func(key key.Key) (any, error) {
+	if err := cb.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*keytest.Key](), func(key key.Key) (any, error) {
 		return primitive, nil
 	}, internalapi.Token{}); err != nil {
-		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("cb.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	config := cb.Build()
 	key := mustCreateKey(t, keytest.VariantTink, 1)

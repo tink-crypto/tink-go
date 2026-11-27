@@ -56,7 +56,7 @@ func hmacPRFPrimitiveConstructor(key key.Key) (any, error) {
 //
 // It is *NOT* part of the public API.
 func RegisterAESCMACPRFPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
-	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*aescmacprf.Key](), aesCMACPRFPrimitiveConstructor, t)
+	return c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*aescmacprf.Key](), aesCMACPRFPrimitiveConstructor, t)
 }
 
 // RegisterHKDFPRFPrimitiveConstructor registers the HKDF PRF primitive constructor
@@ -64,7 +64,7 @@ func RegisterAESCMACPRFPrimitiveConstructor(c *config.Builder, t internalapi.Tok
 //
 // It is *NOT* part of the public API.
 func RegisterHKDFPRFPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
-	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*hkdfprf.Key](), hkdfPRFPrimitiveConstructor, t)
+	return c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*hkdfprf.Key](), hkdfPRFPrimitiveConstructor, t)
 }
 
 // RegisterHMACPRFPrimitiveConstructor registers the HMAC PRF primitive constructor
@@ -72,17 +72,17 @@ func RegisterHKDFPRFPrimitiveConstructor(c *config.Builder, t internalapi.Token)
 //
 // It is *NOT* part of the public API.
 func RegisterHMACPRFPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
-	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*hmacprf.Key](), hmacPRFPrimitiveConstructor, t)
+	return c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*hmacprf.Key](), hmacPRFPrimitiveConstructor, t)
 }
 
 func init() {
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*aescmacprf.Key](aesCMACPRFPrimitiveConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*aescmacprf.Key](aesCMACPRFPrimitiveConstructor); err != nil {
 		panic(fmt.Sprintf("prf.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*hkdfprf.Key](hkdfPRFPrimitiveConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*hkdfprf.Key](hkdfPRFPrimitiveConstructor); err != nil {
 		panic(fmt.Sprintf("prf.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*hmacprf.Key](hmacPRFPrimitiveConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*hmacprf.Key](hmacPRFPrimitiveConstructor); err != nil {
 		panic(fmt.Sprintf("prf.init() failed: %v", err))
 	}
 }

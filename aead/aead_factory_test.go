@@ -126,10 +126,10 @@ func (a *stubAEAD) Decrypt(c, _ []byte) ([]byte, error) {
 
 func TestNewWithConfigEmptyOrNilKeySetHandle(t *testing.T) {
 	cb := config.NewBuilder()
-	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*aesgcm.Key](), func(key key.Key) (any, error) {
+	if err := cb.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*aesgcm.Key](), func(key key.Key) (any, error) {
 		return &stubAEAD{prefix: key.(*aesgcm.Key).OutputPrefix()}, nil
 	}, internalapi.Token{}); err != nil {
-		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("cb.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	c := cb.Build()
 	if _, err := aead.NewWithConfig(nil, &c); err == nil {
@@ -147,10 +147,10 @@ func TestNewWithConfig(t *testing.T) {
 	keysetHandleWithPrimaryWithoutPrefix := mustCreateHandle(t, annotations, aead.AES256GCMKeyTemplate(), aead.AES256GCMNoPrefixKeyTemplate())
 
 	cb := config.NewBuilder()
-	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*aesgcm.Key](), func(key key.Key) (any, error) {
+	if err := cb.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*aesgcm.Key](), func(key key.Key) (any, error) {
 		return &stubAEAD{prefix: key.(*aesgcm.Key).OutputPrefix()}, nil
 	}, internalapi.Token{}); err != nil {
-		t.Fatalf("cb.RegisterPrimitiveConstructor() err = %v, want nil", err)
+		t.Fatalf("cb.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	c := cb.Build()
 

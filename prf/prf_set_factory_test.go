@@ -506,8 +506,8 @@ func TestNewWithConfig(t *testing.T) {
 	}
 
 	configBuilder := config.NewBuilder()
-	if err := configBuilder.RegisterPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullPRF{}, nil }, internalapi.Token{}); err != nil {
-		t.Fatalf("configBuilder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := configBuilder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullPRF{}, nil }, internalapi.Token{}); err != nil {
+		t.Fatalf("configBuilder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	config := configBuilder.Build()
 

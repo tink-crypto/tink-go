@@ -48,7 +48,7 @@ func newKeyManager() registry.KeyManager {
 //
 // It is *NOT* part of the public API.
 func RegisterPrimitiveConstructor(b *config.Builder, t internalapi.Token) error {
-	return b.RegisterPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
+	return b.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t)
 }
 
 func init() {
@@ -67,7 +67,7 @@ func init() {
 	if err := protoserialization.RegisterParametersParser(typeURL, &parametersParser{}); err != nil {
 		panic(fmt.Sprintf("aesgcmsiv.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("aesgcmsiv.init() failed: %v", err))
 	}
 	if err := keygenregistry.RegisterKeyCreator[*Parameters](createKey); err != nil {

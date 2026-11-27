@@ -49,16 +49,16 @@ type Builder struct {
 	config Config
 }
 
-// RegisterPrimitiveConstructor registers a primitiveConstructor for the keyType.
+// RegisterLegacyPrimitiveConstructor registers a primitiveConstructor for the keyType.
 // Not thread-safe.
 //
 // Returns an error if a primitiveConstructor for the keyType already
 // registered (no matter whether it's the same object or different, since
 // constructors are of type [Func] and they are never considered equal in Go
 // unless they are nil).
-func (b *Builder) RegisterPrimitiveConstructor(keyType reflect.Type, constructor func(key key.Key) (any, error), _ internalapi.Token) error {
+func (b *Builder) RegisterLegacyPrimitiveConstructor(keyType reflect.Type, constructor func(key key.Key) (any, error), _ internalapi.Token) error {
 	if _, ok := b.config.primitiveConstructors[keyType]; ok {
-		return fmt.Errorf("RegisterPrimitiveConstructor: attempt to register a different primitive constructor for the same key type %v", keyType)
+		return fmt.Errorf("RegisterLegacyPrimitiveConstructor: attempt to register a different primitive constructor for the same key type %v", keyType)
 	}
 	b.config.primitiveConstructors[keyType] = constructor
 	return nil

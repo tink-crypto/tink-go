@@ -731,7 +731,7 @@ func (s *stubKeyParser) ParseKey(serialization *protoserialization.KeySerializat
 }
 
 func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubKey]()
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*stubKey]()
 	defer protoserialization.UnregisterKeyParser(stubKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*stubKey]()
 
@@ -744,8 +744,8 @@ func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 	// Register a primitive constructor to make sure that the factory uses the
 	// full primitive.
 	primitiveConstructor := func(key key.Key) (any, error) { return &stubFullMAC{}, nil }
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubKey](primitiveConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*stubKey](primitiveConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	km := keyset.NewManager()
@@ -881,8 +881,8 @@ func TestPrimitiveFactoryUsesLegacyPrimitive(t *testing.T) {
 
 func TestNewWithConfigEmptyOrNilKeySetHandle(t *testing.T) {
 	configBuilder := config.NewBuilder()
-	if err := configBuilder.RegisterPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullMAC{}, nil }, internalapi.Token{}); err != nil {
-		t.Fatalf("configBuilder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := configBuilder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullMAC{}, nil }, internalapi.Token{}); err != nil {
+		t.Fatalf("configBuilder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	c := configBuilder.Build()
 	if _, err := mac.NewWithConfig(nil, &c); err == nil {
@@ -905,8 +905,8 @@ func TestNewWithConfig(t *testing.T) {
 	}
 
 	configBuilder := config.NewBuilder()
-	if err := configBuilder.RegisterPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullMAC{}, nil }, internalapi.Token{}); err != nil {
-		t.Fatalf("configBuilder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := configBuilder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*stubKey](), func(key key.Key) (any, error) { return &stubFullMAC{}, nil }, internalapi.Token{}); err != nil {
+		t.Fatalf("configBuilder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	config := configBuilder.Build()
 

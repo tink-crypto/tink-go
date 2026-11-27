@@ -778,19 +778,19 @@ func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 
 	// Register primitive constructors to make sure that the factory uses full
 	// primitives.
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubPrivateKey]()
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubPublicKey]()
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*stubPrivateKey]()
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*stubPublicKey]()
 
 	signerConstructor := func(key key.Key) (any, error) {
 		kid := "AQIDBA" // for 0x01020304
 		return &stubFullSigner{&kid}, nil
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubPrivateKey](signerConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*stubPrivateKey](signerConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	verifierConstructor := func(key key.Key) (any, error) { return &stubFullVerifier{}, nil }
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubPublicKey](verifierConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*stubPublicKey](verifierConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	km := keyset.NewManager()
@@ -945,8 +945,8 @@ func TestNewSignerWithConfig(t *testing.T) {
 		return &stubFullSigner{&kid}, nil
 	}
 	builderWithFullPrimitive := config.NewBuilder()
-	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPrivateKey](), signerConstructor, internalapi.Token{}); err != nil {
-		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := builderWithFullPrimitive.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*stubPrivateKey](), signerConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithFullPrimitive.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	configWithFullPrimitive := builderWithFullPrimitive.Build()
 
@@ -1053,8 +1053,8 @@ func TestNewVerifierWithConfig(t *testing.T) {
 		return &stubFullVerifier{}, nil
 	}
 	builderWithFullPrimitive := config.NewBuilder()
-	if err := builderWithFullPrimitive.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPublicKey](), verifierConstructor, internalapi.Token{}); err != nil {
-		t.Fatalf("builderWithFullPrimitive.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := builderWithFullPrimitive.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*stubPublicKey](), verifierConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("builderWithFullPrimitive.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	configWithFullPrimitive := builderWithFullPrimitive.Build()
 

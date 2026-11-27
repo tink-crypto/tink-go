@@ -638,8 +638,8 @@ func (s *stubPrivateKeyParser) ParseKey(serialization *protoserialization.KeySer
 }
 
 func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubPrivateKey]()
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubPublicKey]()
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*stubPrivateKey]()
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*stubPublicKey]()
 	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
 	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*stubPrivateKey]()
@@ -660,12 +660,12 @@ func TestPrimitiveFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 	// Register primitive constructors to make sure that the factory uses full
 	// primitives.
 	signerConstructor := func(key key.Key) (any, error) { return &stubFullSigner{}, nil }
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubPrivateKey](signerConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*stubPrivateKey](signerConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	verifierConstructor := func(key key.Key) (any, error) { return &stubFullVerifier{}, nil }
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubPublicKey](verifierConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*stubPublicKey](verifierConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	km := keyset.NewManager()
@@ -879,11 +879,11 @@ func TestNewWithConfig(t *testing.T) {
 	verifierConstructor := func(key key.Key) (any, error) { return &stubFullVerifier{}, nil }
 
 	configBuilder := config.NewBuilder()
-	if err := configBuilder.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPrivateKey](), signerConstructor, internalapi.Token{}); err != nil {
-		t.Fatalf("configBuilder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := configBuilder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*stubPrivateKey](), signerConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("configBuilder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
-	if err := configBuilder.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPublicKey](), verifierConstructor, internalapi.Token{}); err != nil {
-		t.Fatalf("configBuilder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := configBuilder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*stubPublicKey](), verifierConstructor, internalapi.Token{}); err != nil {
+		t.Fatalf("configBuilder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	config := configBuilder.Build()
 

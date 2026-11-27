@@ -29,9 +29,9 @@ var (
 
 type primitiveConstructor func(key key.Key) (any, error)
 
-// RegisterPrimitiveConstructor registers a function that constructs primitives
+// RegisterLegacyPrimitiveConstructor registers a function that constructs primitives
 // from a given [key.Key] to the global registry.
-func RegisterPrimitiveConstructor[K key.Key](constructor primitiveConstructor) error {
+func RegisterLegacyPrimitiveConstructor[K key.Key](constructor primitiveConstructor) error {
 	keyType := reflect.TypeFor[K]()
 	existing, loaded := primitiveConstructors.LoadOrStore(keyType, constructor)
 	if loaded && reflect.ValueOf(existing).Pointer() != reflect.ValueOf(constructor).Pointer() {
@@ -40,11 +40,11 @@ func RegisterPrimitiveConstructor[K key.Key](constructor primitiveConstructor) e
 	return nil
 }
 
-// UnregisterPrimitiveConstructor removes the primitive constructor for the
+// UnregisterLegacyPrimitiveConstructor removes the primitive constructor for the
 // given key type.
 //
 // This function is intended to be used in tests only.
-func UnregisterPrimitiveConstructor[K key.Key]() {
+func UnregisterLegacyPrimitiveConstructor[K key.Key]() {
 	primitiveConstructors.Delete(reflect.TypeFor[K]())
 }
 

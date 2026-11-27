@@ -67,8 +67,8 @@ func TestConfigLegacyPrimitiveFromKeyWorks(t *testing.T) {
 	builder := config.NewBuilder()
 	token := internalapi.Token{}
 
-	if err := builder.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), primitive0Constructor, token); err != nil {
-		t.Fatalf("builder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := builder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[testKey0](), primitive0Constructor, token); err != nil {
+		t.Fatalf("builder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	config := builder.Build()
@@ -91,11 +91,11 @@ func TestMultiplePrimitiveConstructors(t *testing.T) {
 	builder := config.NewBuilder()
 	token := internalapi.Token{}
 
-	if err := builder.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), primitive0Constructor, token); err != nil {
-		t.Fatalf("builder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := builder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[testKey0](), primitive0Constructor, token); err != nil {
+		t.Fatalf("builder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
-	if err := builder.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), primitive1Constructor, token); err != nil {
-		t.Fatalf("builder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := builder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[testKey1](), primitive1Constructor, token); err != nil {
+		t.Fatalf("builder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	config := builder.Build()
@@ -120,13 +120,13 @@ func TestRegisterDifferentPrimitiveConstructor(t *testing.T) {
 	builder := config.NewBuilder()
 	token := internalapi.Token{}
 
-	if err := builder.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), primitive1Constructor, token); err != nil {
-		t.Fatalf("builder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := builder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[testKey1](), primitive1Constructor, token); err != nil {
+		t.Fatalf("builder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	// Register another primitiveCreator for the same key type fails.
-	if err := builder.RegisterPrimitiveConstructor(reflect.TypeFor[testKey1](), primitive0Constructor, token); err == nil {
-		t.Errorf("builder.RegisterPrimitiveConstructor() err = nil, want error")
+	if err := builder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[testKey1](), primitive0Constructor, token); err == nil {
+		t.Errorf("builder.RegisterLegacyPrimitiveConstructor() err = nil, want error")
 	}
 }
 
@@ -134,8 +134,8 @@ func TestUnregisteredPrimitive(t *testing.T) {
 	builder := config.NewBuilder()
 	token := internalapi.Token{}
 
-	if err := builder.RegisterPrimitiveConstructor(reflect.TypeFor[testKey0](), primitive0Constructor, token); err != nil {
-		t.Fatalf("builder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := builder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[testKey0](), primitive0Constructor, token); err != nil {
+		t.Fatalf("builder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	config := builder.Build()
 
@@ -151,8 +151,8 @@ func TestUnregisteredPrimitive(t *testing.T) {
 func TestConfigV0_ConfigIsDeepcopied(t *testing.T) {
 	builder := config.NewBuilder()
 
-	if err := builder.RegisterPrimitiveConstructor(reflect.TypeFor[*testKey0](), primitive0Constructor, internalapi.Token{}); err != nil {
-		t.Fatalf("builder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := builder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*testKey0](), primitive0Constructor, internalapi.Token{}); err != nil {
+		t.Fatalf("builder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	config := builder.Build()
@@ -163,8 +163,8 @@ func TestConfigV0_ConfigIsDeepcopied(t *testing.T) {
 		t.Fatalf("config.LegacyPrimitiveFromKey() err=nil, want error")
 	}
 
-	if err := builder.RegisterPrimitiveConstructor(reflect.TypeFor[*testKey1](), primitive1Constructor, internalapi.Token{}); err != nil {
-		t.Fatalf("builder.RegisterPrimitiveConstructor() err=%v, want nil", err)
+	if err := builder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*testKey1](), primitive1Constructor, internalapi.Token{}); err != nil {
+		t.Fatalf("builder.RegisterLegacyPrimitiveConstructor() err=%v, want nil", err)
 	}
 	// This is not available in the original config.
 	if _, err := config.LegacyPrimitiveFromKey(&testKey1{}, internalapi.Token{}); err == nil {

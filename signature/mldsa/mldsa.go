@@ -69,10 +69,10 @@ func init() {
 	if err := protoserialization.RegisterParametersParser(signerTypeURL, &parametersParser{}); err != nil {
 		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*PublicKey](verifierConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*PublicKey](verifierConstructor); err != nil {
 		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*PrivateKey](signerConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*PrivateKey](signerConstructor); err != nil {
 		panic(fmt.Sprintf("mldsa.init() failed: %v", err))
 	}
 	if err := keygenregistry.RegisterKeyCreator[*Parameters](createPrivateKey); err != nil {
@@ -85,8 +85,8 @@ func init() {
 //
 // It is *NOT* part of the public API.
 func RegisterPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
-	if err := c.RegisterPrimitiveConstructor(reflect.TypeFor[*PrivateKey](), signerConstructor, t); err != nil {
+	if err := c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*PrivateKey](), signerConstructor, t); err != nil {
 		return err
 	}
-	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*PublicKey](), verifierConstructor, t)
+	return c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*PublicKey](), verifierConstructor, t)
 }

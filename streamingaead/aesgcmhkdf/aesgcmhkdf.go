@@ -36,7 +36,7 @@ import (
 //
 // It is *NOT* part of the public API.
 func RegisterPrimitiveConstructor(b *config.Builder, t internalapi.Token) error {
-	if err := b.RegisterPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t); err != nil {
+	if err := b.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*Key](), primitiveConstructor, t); err != nil {
 		return err
 	}
 	return nil
@@ -55,7 +55,7 @@ func init() {
 	if err := protoserialization.RegisterParametersParser(typeURL, &parametersParser{}); err != nil {
 		panic(fmt.Sprintf("aesgcmhkdf.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("aesgcmhkdf.init() failed: %v", err))
 	}
 	if err := keygenregistry.RegisterKeyCreator[*Parameters](createKey); err != nil {

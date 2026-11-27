@@ -860,8 +860,8 @@ func (s *stubPrivateKeyParser) ParseKey(serialization *protoserialization.KeySer
 }
 
 func TestPrimitivesFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubPublicKey]()
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*stubPrivateKey]()
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*stubPublicKey]()
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*stubPrivateKey]()
 	defer protoserialization.UnregisterKeyParser(stubPublicKeyURL)
 	defer protoserialization.UnregisterKeyParser(stubPrivateKeyURL)
 	defer protoserialization.UnregisterKeySerializer[*stubPublicKey]()
@@ -882,12 +882,12 @@ func TestPrimitivesFactoryUsesFullPrimitiveIfRegistered(t *testing.T) {
 	// Register a primitive constructor to make sure that the factory uses the
 	// full primitive.
 	primitiveConstructor := func(key key.Key) (any, error) { return &stubFullHybridEncrypt{}, nil }
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubPublicKey](primitiveConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*stubPublicKey](primitiveConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	decryptPrimitiveConstructor := func(key key.Key) (any, error) { return &stubFullHybridDecrypt{}, nil }
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*stubPrivateKey](decryptPrimitiveConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*stubPrivateKey](decryptPrimitiveConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 
 	km := keyset.NewManager()
@@ -1127,11 +1127,11 @@ func TestNewWithConfig(t *testing.T) {
 	}
 
 	configBuilder := config.NewBuilder()
-	if err := configBuilder.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPublicKey](), func(key key.Key) (any, error) { return &stubFullHybridEncrypt{}, nil }, internalapi.Token{}); err != nil {
-		t.Fatalf("configBuilder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := configBuilder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*stubPublicKey](), func(key key.Key) (any, error) { return &stubFullHybridEncrypt{}, nil }, internalapi.Token{}); err != nil {
+		t.Fatalf("configBuilder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
-	if err := configBuilder.RegisterPrimitiveConstructor(reflect.TypeFor[*stubPrivateKey](), func(key key.Key) (any, error) { return &stubFullHybridDecrypt{}, nil }, internalapi.Token{}); err != nil {
-		t.Fatalf("configBuilder.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := configBuilder.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*stubPrivateKey](), func(key key.Key) (any, error) { return &stubFullHybridDecrypt{}, nil }, internalapi.Token{}); err != nil {
+		t.Fatalf("configBuilder.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	config := configBuilder.Build()
 

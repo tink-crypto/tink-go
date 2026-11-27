@@ -95,11 +95,11 @@ func testPrimitiveConstructor(k key.Key) (any, error) {
 	return &testPrimitive{ID: id}, nil
 }
 
-func TestRegisterPrimitiveConstructorAndPrimitive_Success(t *testing.T) {
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*testKey](testPrimitiveConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+func TestRegisterLegacyPrimitiveConstructorAndPrimitive_Success(t *testing.T) {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*testKey](testPrimitiveConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*testKey]()
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*testKey]()
 	k := &testKey{params: &testParameters{hasIDRequirement: true}, id: 123}
 	p, err := primitiveregistry.Primitive(k)
 	if err != nil {
@@ -114,26 +114,26 @@ func TestRegisterPrimitiveConstructorAndPrimitive_Success(t *testing.T) {
 	}
 }
 
-func TestRegisterPrimitiveConstructor_SameConstructorTwiceIsNoOp(t *testing.T) {
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*testKey](testPrimitiveConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+func TestRegisterLegacyPrimitiveConstructor_SameConstructorTwiceIsNoOp(t *testing.T) {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*testKey](testPrimitiveConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*testKey]()
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*testKey](testPrimitiveConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*testKey]()
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*testKey](testPrimitiveConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 }
 
-func TestRegisterPrimitiveConstructor_FailsIfDifferentConstructorRegistered(t *testing.T) {
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*testKey](testPrimitiveConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+func TestRegisterLegacyPrimitiveConstructor_FailsIfDifferentConstructorRegistered(t *testing.T) {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*testKey](testPrimitiveConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
-	defer primitiveregistry.UnregisterPrimitiveConstructor[*testKey]()
+	defer primitiveregistry.UnregisterLegacyPrimitiveConstructor[*testKey]()
 	anotherConstructor := func(k key.Key) (any, error) {
 		return nil, nil
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*testKey](anotherConstructor); err == nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = nil, want error")
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*testKey](anotherConstructor); err == nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = nil, want error")
 	}
 }
 
@@ -160,14 +160,14 @@ func TestPrimitive_Fails(t *testing.T) {
 }
 
 func TestUnregisterRemovesConstructor(t *testing.T) {
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*testKey](testPrimitiveConstructor); err != nil {
-		t.Fatalf("primitiveregistry.RegisterPrimitiveConstructor() err = %v, want nil", err)
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*testKey](testPrimitiveConstructor); err != nil {
+		t.Fatalf("primitiveregistry.RegisterLegacyPrimitiveConstructor() err = %v, want nil", err)
 	}
 	k := &testKey{params: &testParameters{hasIDRequirement: true}, id: 123}
 	if _, err := primitiveregistry.Primitive(k); err != nil {
 		t.Fatalf("primitiveregistry.Primitive() err = %v, want nil", err)
 	}
-	primitiveregistry.UnregisterPrimitiveConstructor[*testKey]()
+	primitiveregistry.UnregisterLegacyPrimitiveConstructor[*testKey]()
 	if _, err := primitiveregistry.Primitive(k); err == nil {
 		t.Fatalf("primitiveregistry.Primitive() err = nil, want error")
 	}

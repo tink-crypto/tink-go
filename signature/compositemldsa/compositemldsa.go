@@ -43,10 +43,10 @@ func init() {
 	if err := protoserialization.RegisterParametersParser(signerTypeURL, &parametersParser{}); err != nil {
 		panic(fmt.Sprintf("compositemldsa.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*PublicKey](verifierConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*PublicKey](verifierConstructor); err != nil {
 		panic(fmt.Sprintf("compositemldsa.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*PrivateKey](signerConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*PrivateKey](signerConstructor); err != nil {
 		panic(fmt.Sprintf("compositemldsa.init() failed: %v", err))
 	}
 	if err := keygenregistry.RegisterKeyCreator[*Parameters](createPrivateKey); err != nil {

@@ -30,45 +30,45 @@ import (
 // to the provided config.
 // It is not part of Tink's public API.
 func RegisterJWTHMACPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
-	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*jwthmac.Key](), createJWTHMAC, t)
+	return c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*jwthmac.Key](), createJWTHMAC, t)
 }
 
 // RegisterJWTECDSAPrimitiveConstructor registers the JWT Signature primitive constructors
 // to the provided config.
 // It is not part of Tink's public API.
 func RegisterJWTECDSAPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
-	if err := c.RegisterPrimitiveConstructor(reflect.TypeFor[*jwtecdsa.PublicKey](), createJWTECDSAVerifier, t); err != nil {
+	if err := c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*jwtecdsa.PublicKey](), createJWTECDSAVerifier, t); err != nil {
 		return err
 	}
-	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*jwtecdsa.PrivateKey](), createJWTECDSASigner, t)
+	return c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*jwtecdsa.PrivateKey](), createJWTECDSASigner, t)
 }
 
 // RegisterJWTRSASSAPKCS1PrimitiveConstructor registers the JWT Signature primitive constructors
 // to the provided config.
 // It is not part of Tink's public API.
 func RegisterJWTRSASSAPKCS1PrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
-	if err := c.RegisterPrimitiveConstructor(reflect.TypeFor[*jwtrsassapkcs1.PublicKey](), createJWTRSASSAPKCS1Verifier, t); err != nil {
+	if err := c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*jwtrsassapkcs1.PublicKey](), createJWTRSASSAPKCS1Verifier, t); err != nil {
 		return err
 	}
-	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*jwtrsassapkcs1.PrivateKey](), createJWTRSASSAPKCS1Signer, t)
+	return c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*jwtrsassapkcs1.PrivateKey](), createJWTRSASSAPKCS1Signer, t)
 }
 
 // RegisterJWTRSASSAPSSPrimitiveConstructor registers the JWT Signature primitive constructors
 // to the provided config.
 // It is not part of Tink's public API.
 func RegisterJWTRSASSAPSSPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
-	if err := c.RegisterPrimitiveConstructor(reflect.TypeFor[*jwtrsassapss.PublicKey](), createJWTRSASSAPSSVerifier, t); err != nil {
+	if err := c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*jwtrsassapss.PublicKey](), createJWTRSASSAPSSVerifier, t); err != nil {
 		return err
 	}
-	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*jwtrsassapss.PrivateKey](), createJWTRSASSAPSSSigner, t)
+	return c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*jwtrsassapss.PrivateKey](), createJWTRSASSAPSSSigner, t)
 }
 
 // RegisterJWTMLDSAPrimitiveConstructor registers the JWT Signature primitive constructors
 // to the provided config.
 // It is not part of Tink's public API.
 func RegisterJWTMLDSAPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
-	if err := c.RegisterPrimitiveConstructor(reflect.TypeFor[*jwtmldsa.PublicKey](), createJWTMLDSAVerifier, t); err != nil {
+	if err := c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*jwtmldsa.PublicKey](), createJWTMLDSAVerifier, t); err != nil {
 		return err
 	}
-	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*jwtmldsa.PrivateKey](), createJWTMLDSASigner, t)
+	return c.RegisterLegacyPrimitiveConstructor(reflect.TypeFor[*jwtmldsa.PrivateKey](), createJWTMLDSASigner, t)
 }

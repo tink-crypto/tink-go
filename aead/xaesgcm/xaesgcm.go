@@ -55,7 +55,7 @@ func init() {
 	if err := registry.RegisterKeyManager(newKeyManager()); err != nil {
 		panic(fmt.Sprintf("xaesgcm.init() failed: %v", err))
 	}
-	if err := primitiveregistry.RegisterPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
+	if err := primitiveregistry.RegisterLegacyPrimitiveConstructor[*Key](primitiveConstructor); err != nil {
 		panic(fmt.Sprintf("xaesgcm.init() failed: %v", err))
 	}
 	if err := keygenregistry.RegisterKeyCreator[*Parameters](createKey); err != nil {
