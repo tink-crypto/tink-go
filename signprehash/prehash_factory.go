@@ -26,8 +26,8 @@ import (
 )
 
 // NewPrehashWithConfig returns a [tink.Prehash] primitive from the given
-// [keyset.Handle] and [keyset.Config].
-func NewPrehashWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Prehash, error) {
+// [keyset.Handle] and [keyset.PrimitivesConfig].
+func NewPrehashWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (tink.Prehash, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("signprehash.NewPrehashWithConfig: handle cannot be nil")
 	}

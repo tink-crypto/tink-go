@@ -31,11 +31,11 @@ func NewSigner(handle *keyset.Handle) (Signer, error) {
 }
 
 // NewSignerWithConfig generates a new [jwt.Signer] primitive
-// with the provided [keyset.Config].
+// with the provided [keyset.PrimitivesConfig].
 //
-// NOTE: This is currently not usable in OSS because [keyset.Config]
+// NOTE: This is currently not usable in OSS because [keyset.PrimitivesConfig]
 // is not user-implementable.
-func NewSignerWithConfig(handle *keyset.Handle, config keyset.Config) (Signer, error) {
+func NewSignerWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (Signer, error) {
 	if handle.Len() == 0 {
 		return nil, fmt.Errorf("jwt_signer_factory: empty or nil keyset handle")
 	}

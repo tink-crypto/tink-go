@@ -36,7 +36,7 @@ const (
 )
 
 // NewPrehashSignerWithConfig returns a [tink.PrehashSigner] primitive from the given
-// [keyset.Handle] and [keyset.Config].
+// [keyset.Handle] and [keyset.PrimitivesConfig].
 //
 // The returned primitive signs a prehash value with the enabled key whose ID the
 // prehash value names, which is not necessarily the primary key. Key selection
@@ -44,7 +44,7 @@ const (
 // key, and this side follows that choice. That is what makes a keyset rotatable,
 // as a newly added key can sign as soon as it is enabled everywhere, and the old
 // key keeps signing prehash values that are still in flight until it is disabled.
-func NewPrehashSignerWithConfig(handle *keyset.Handle, config keyset.Config) (tink.PrehashSigner, error) {
+func NewPrehashSignerWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (tink.PrehashSigner, error) {
 	if handle == nil {
 		return nil, fmt.Errorf("signprehash.NewPrehashSignerWithConfig: handle cannot be nil")
 	}

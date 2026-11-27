@@ -33,7 +33,7 @@ type Config struct {
 // PrimitiveFromKey creates a primitive from the given [key.Key]. Returns an
 // error if there is no primitiveConstructor registered for the given key.
 //
-// This implements [keyset.Config].
+// This implements [keyset.PrimitivesConfig].
 func (c *Config) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
 	keyType := reflect.TypeOf(k)
 	creator, ok := c.primitiveConstructors[keyType]

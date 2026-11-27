@@ -127,7 +127,7 @@ func (lb *LoggerFactory) CreateFor(primitive, apiFunction string) (monitoring.Lo
 // primitive.
 //
 // k and config must not be nil.
-func PrimitiveFromKey[T any](k key.Key, config keyset.Config) (T, bool, error) {
+func PrimitiveFromKey[T any](k key.Key, config keyset.PrimitivesConfig) (T, bool, error) {
 	primitive, err := config.PrimitiveFromKey(k, internalapi.Token{})
 	if err != nil {
 		var zero T

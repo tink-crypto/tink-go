@@ -59,11 +59,11 @@ func New(handle *keyset.Handle) (KeysetDeriver, error) {
 }
 
 // NewWithConfig generates a new [keyderivation.KeysetDeriver] primitive
-// with the provided [keyset.Config].
+// with the provided [keyset.PrimitivesConfig].
 //
-// NOTE: This is currently not usable in OSS because [keyset.Config]
+// NOTE: This is currently not usable in OSS because [keyset.PrimitivesConfig]
 // is not user-implementable.
-func NewWithConfig(handle *keyset.Handle, config keyset.Config) (KeysetDeriver, error) {
+func NewWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (KeysetDeriver, error) {
 	if handle.Len() == 0 {
 		return nil, fmt.Errorf("keyset_deriver_factory: empty or nil keyset handle")
 	}

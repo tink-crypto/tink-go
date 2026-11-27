@@ -613,12 +613,6 @@ func (h *Handle) WriteWithNoSecrets(w Writer) error {
 // This is an internal API.
 func (h *Handle) Annotations(_ internalapi.Token) map[string]string { return h.annotations }
 
-// Config provides methods to create primitives from [key.Key]s.
-type Config interface {
-	// PrimitiveFromKey creates a primitive from a [key.Key].
-	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
-}
-
 func decrypt(encryptedKeyset *tinkpb.EncryptedKeyset, keyEncryptionAEAD tink.AEAD, associatedData []byte) (*tinkpb.Keyset, error) {
 	if encryptedKeyset == nil || keyEncryptionAEAD == nil {
 		return nil, fmt.Errorf("keyset.Handle: invalid encrypted keyset")

@@ -32,8 +32,8 @@ import (
 )
 
 // NewVerifierWithConfig returns a [tink.Verifier] primitive from the given
-// [keyset.Handle] and [keyset.Config].
-func NewVerifierWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Verifier, error) {
+// [keyset.Handle] and [keyset.PrimitivesConfig].
+func NewVerifierWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (tink.Verifier, error) {
 	if handle.Len() == 0 {
 		return nil, fmt.Errorf("verifier_factory: empty or nil keyset handle")
 	}

@@ -28,7 +28,7 @@ import (
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 )
 
-// config is a subset of [keyset.Config]. Defined here to avoid potential
+// config is a subset of [keyset.PrimitivesConfig]. Defined here to avoid potential
 // circular dependencies.
 type config interface {
 	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)

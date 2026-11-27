@@ -33,11 +33,11 @@ func NewHybridEncrypt(handle *keyset.Handle) (tink.HybridEncrypt, error) {
 }
 
 // NewHybridEncryptWithConfig returns a [tink.HybridEncrypt] primitive from
-// the given [keyset.Handle] and [keyset.Config].
+// the given [keyset.Handle] and [keyset.PrimitivesConfig].
 //
-// NOTE: [keyset.Config] is currently a type that can only be used internally;
+// NOTE: [keyset.PrimitivesConfig] is currently a type that can only be used internally;
 // thus this function is not part of the public API.
-func NewHybridEncryptWithConfig(handle *keyset.Handle, config keyset.Config) (tink.HybridEncrypt, error) {
+func NewHybridEncryptWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (tink.HybridEncrypt, error) {
 	if handle.Len() == 0 {
 		return nil, fmt.Errorf("hybrid_factory: empty or nil keyset handle")
 	}

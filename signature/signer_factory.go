@@ -31,8 +31,8 @@ import (
 )
 
 // NewSignerWithConfig returns a [tink.Signer] primitive from the given
-// [keyset.Handle] and [keyset.Config].
-func NewSignerWithConfig(handle *keyset.Handle, config keyset.Config) (tink.Signer, error) {
+// [keyset.Handle] and [keyset.PrimitivesConfig].
+func NewSignerWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (tink.Signer, error) {
 	if handle.Len() == 0 {
 		return nil, fmt.Errorf("signer_factory: empty or nil keyset handle")
 	}

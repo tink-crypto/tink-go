@@ -32,8 +32,8 @@ func New(handle *keyset.Handle) (tink.AEAD, error) {
 }
 
 // NewWithConfig creates an AEAD primitive from the given [keyset.Handle] using
-// the provided [Config].
-func NewWithConfig(handle *keyset.Handle, config keyset.Config) (tink.AEAD, error) {
+// the provided [keyset.PrimitivesConfig].
+func NewWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (tink.AEAD, error) {
 	if handle.Len() == 0 {
 		return nil, fmt.Errorf("aead_factory: empty or nil keyset handle")
 	}

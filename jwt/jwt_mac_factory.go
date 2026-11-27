@@ -34,8 +34,8 @@ func NewMAC(handle *keyset.Handle) (MAC, error) {
 }
 
 // NewMACWithConfig generates a new [jwt.MAC] primitive with the provided
-// [keyset.Config].
-func NewMACWithConfig(handle *keyset.Handle, config keyset.Config) (MAC, error) {
+// [keyset.PrimitivesConfig].
+func NewMACWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (MAC, error) {
 	if handle.Len() == 0 {
 		return nil, fmt.Errorf("jwt_mac_factory: empty or nil keyset handle")
 	}

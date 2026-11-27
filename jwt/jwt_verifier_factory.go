@@ -35,11 +35,11 @@ func NewVerifier(handle *keyset.Handle) (Verifier, error) {
 }
 
 // NewVerifierWithConfig generates a new [jwt.Verifier] primitive
-// with the provided [keyset.Config].
+// with the provided [keyset.PrimitivesConfig].
 //
-// NOTE: This is currently not usable in OSS because [keyset.Config]
+// NOTE: This is currently not usable in OSS because [keyset.PrimitivesConfig]
 // is not user-implementable.
-func NewVerifierWithConfig(handle *keyset.Handle, config keyset.Config) (Verifier, error) {
+func NewVerifierWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (Verifier, error) {
 	if handle.Len() == 0 {
 		return nil, fmt.Errorf("jwt_verifier_factory: empty or nil keyset handle")
 	}

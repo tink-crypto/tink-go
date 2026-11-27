@@ -30,8 +30,8 @@ func NewPRFSet(handle *keyset.Handle) (*Set, error) {
 }
 
 // NewPRFSetWithConfig creates a [prf.Set] primitive from the given [keyset.Handle] and
-// [keyset.Config].
-func NewPRFSetWithConfig(handle *keyset.Handle, config keyset.Config) (*Set, error) {
+// [keyset.PrimitivesConfig].
+func NewPRFSetWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (*Set, error) {
 	if handle.Len() == 0 {
 		return nil, fmt.Errorf("prf_set_factory: empty or nil keyset handle")
 	}
