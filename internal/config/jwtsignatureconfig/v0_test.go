@@ -49,8 +49,8 @@ func TestConfigV0JWTSignatureFailsIfKeyNotSignature(t *testing.T) {
 	if err != nil {
 		t.Fatalf(" aessiv.NewKey() err = %v, want nil", err)
 	}
-	if _, err := configV0.PrimitiveFromKey(aesGCMKey, internalapi.Token{}); err == nil {
-		t.Errorf("configV0.PrimitiveFromKey() err = nil, want error")
+	if _, err := configV0.LegacyPrimitiveFromKey(aesGCMKey, internalapi.Token{}); err == nil {
+		t.Errorf("configV0.LegacyPrimitiveFromKey() err = nil, want error")
 	}
 }
 
@@ -263,17 +263,17 @@ func TestConfigV0WithJWTSignatureKey(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			configV0 := jwtsignatureconfig.V0()
-			p1, err := configV0.PrimitiveFromKey(tc.publicKey, internalapi.Token{})
+			p1, err := configV0.LegacyPrimitiveFromKey(tc.publicKey, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("configV0.PrimitiveFromKey() err = %v, want nil", err)
+				t.Fatalf("configV0.LegacyPrimitiveFromKey() err = %v, want nil", err)
 			}
 			verifier, ok := p1.(jwt.Verifier)
 			if !ok {
 				t.Fatalf("primitive is of type %T, want jwt.Verifier", p1)
 			}
-			p2, err := configV0.PrimitiveFromKey(tc.privateKey, internalapi.Token{})
+			p2, err := configV0.LegacyPrimitiveFromKey(tc.privateKey, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("configV0.PrimitiveFromKey() err = %v, want nil", err)
+				t.Fatalf("configV0.LegacyPrimitiveFromKey() err = %v, want nil", err)
 			}
 			signer, ok := p2.(jwt.Signer)
 			if !ok {

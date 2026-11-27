@@ -43,7 +43,7 @@ func NewWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (tink.
 		// We ignore the boolean indicating whether the primitive is a legacy
 		// "non-full" primitive, because Streaming AEAD primitives are always
 		// without output prefix.
-		primitive, _, err := factoryutil.PrimitiveFromKey[tink.StreamingAEAD](entry.Key(), config)
+		primitive, _, err := factoryutil.LegacyPrimitiveFromKey[tink.StreamingAEAD](entry.Key(), config)
 		if err != nil {
 			return nil, err
 		}

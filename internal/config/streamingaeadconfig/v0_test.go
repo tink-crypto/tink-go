@@ -47,8 +47,8 @@ func TestConfigV0StreamingAEADFailsIfKeyNotStreamingAEAD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcm.NewKey() err = %v, want nil", err)
 	}
-	if _, err := configV0.PrimitiveFromKey(aesGCMKey, internalapi.Token{}); err == nil {
-		t.Errorf("configV0.PrimitiveFromKey() err = nil, want error")
+	if _, err := configV0.LegacyPrimitiveFromKey(aesGCMKey, internalapi.Token{}); err == nil {
+		t.Errorf("configV0.LegacyPrimitiveFromKey() err = nil, want error")
 	}
 }
 
@@ -103,9 +103,9 @@ func TestConfigV0StreamingAEAD(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			p, err := configV0.PrimitiveFromKey(test.key, internalapi.Token{})
+			p, err := configV0.LegacyPrimitiveFromKey(test.key, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("configV0.PrimitiveFromKey() err = %v, want nil", err)
+				t.Fatalf("configV0.LegacyPrimitiveFromKey() err = %v, want nil", err)
 			}
 			sa, ok := p.(tink.StreamingAEAD)
 			if !ok {

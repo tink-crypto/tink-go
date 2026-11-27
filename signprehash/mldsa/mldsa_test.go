@@ -56,17 +56,17 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("privKey.PublicKey() err = %v, want nil", err)
 	}
 
-	signerPrimitive, err := c.PrimitiveFromKey(privKey, internalapi.Token{})
+	signerPrimitive, err := c.LegacyPrimitiveFromKey(privKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("c.PrimitiveFromKey(privKey) err = %v, want nil", err)
+		t.Fatalf("c.LegacyPrimitiveFromKey(privKey) err = %v, want nil", err)
 	}
 	if _, ok := signerPrimitive.(tink.PrehashSigner); !ok {
 		t.Errorf("signerPrimitive is %T, want tink.PrehashSigner", signerPrimitive)
 	}
 
-	prehashPrimitive, err := c.PrimitiveFromKey(pubKey, internalapi.Token{})
+	prehashPrimitive, err := c.LegacyPrimitiveFromKey(pubKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("c.PrimitiveFromKey(pubKey) err = %v, want nil", err)
+		t.Fatalf("c.LegacyPrimitiveFromKey(pubKey) err = %v, want nil", err)
 	}
 	if _, ok := prehashPrimitive.(tink.Prehash); !ok {
 		t.Errorf("prehashPrimitive is %T, want tink.Prehash", prehashPrimitive)

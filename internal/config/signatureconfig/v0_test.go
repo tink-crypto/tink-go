@@ -49,8 +49,8 @@ func TestConfigV0MACFailsIfKeyNotSignerOrVerifier(t *testing.T) {
 	if err != nil {
 		t.Fatalf(" aescmac.NewKey() err=%v, want nil", err)
 	}
-	if _, err := configV0.PrimitiveFromKey(aesGCMKey, internalapi.Token{}); err == nil {
-		t.Errorf("configV0.PrimitiveFromKey() err=nil, want error")
+	if _, err := configV0.LegacyPrimitiveFromKey(aesGCMKey, internalapi.Token{}); err == nil {
+		t.Errorf("configV0.LegacyPrimitiveFromKey() err=nil, want error")
 	}
 }
 
@@ -153,9 +153,9 @@ func TestConfigV0Signer(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			primitive, err := configV0.PrimitiveFromKey(test.key, internalapi.Token{})
+			primitive, err := configV0.LegacyPrimitiveFromKey(test.key, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("configV0.PrimitiveFromKey() err = %v, want nil", err)
+				t.Fatalf("configV0.LegacyPrimitiveFromKey() err = %v, want nil", err)
 			}
 			signer, ok := primitive.(tink.Signer)
 			if !ok {
@@ -174,9 +174,9 @@ func TestConfigV0Signer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("privKey.PublicKey() err = %v, want nil", err)
 			}
-			primitive, err = configV0.PrimitiveFromKey(pubKey, internalapi.Token{})
+			primitive, err = configV0.LegacyPrimitiveFromKey(pubKey, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("configV0.PrimitiveFromKey() err = %v, want nil", err)
+				t.Fatalf("configV0.LegacyPrimitiveFromKey() err = %v, want nil", err)
 			}
 			verifier, ok := primitive.(tink.Verifier)
 			if !ok {

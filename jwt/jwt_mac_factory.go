@@ -42,7 +42,7 @@ func NewMACWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (MA
 	var macs []macAndKeyID
 	var primary macAndKeyID
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
-		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[MAC](entry.Key(), config)
+		p, isLegacyPrimitive, err := factoryutil.LegacyPrimitiveFromKey[MAC](entry.Key(), config)
 		if err != nil {
 			return nil, err
 		}

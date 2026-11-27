@@ -165,8 +165,8 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aesgcmsiv.NewKey() err = %v, want nil", err)
 	}
-	if _, err := c.PrimitiveFromKey(key, internalapi.Token{}); err != nil {
-		t.Errorf("c.PrimitiveFromKey(key) err = %v, want nil", err)
+	if _, err := c.LegacyPrimitiveFromKey(key, internalapi.Token{}); err != nil {
+		t.Errorf("c.LegacyPrimitiveFromKey(key) err = %v, want nil", err)
 	}
 }
 

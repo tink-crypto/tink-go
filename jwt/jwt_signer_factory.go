@@ -44,7 +44,7 @@ func NewSignerWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) 
 		return nil, err
 	}
 	entry = entry.ToUnmonitoredEntry(internalapi.Token{})
-	p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[Signer](entry.Key(), config)
+	p, isLegacyPrimitive, err := factoryutil.LegacyPrimitiveFromKey[Signer](entry.Key(), config)
 	if err != nil {
 		return nil, err
 	}

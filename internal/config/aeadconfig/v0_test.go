@@ -205,9 +205,9 @@ func TestConfigV0AEAD(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			aead, err := configV0.PrimitiveFromKey(test.key, internalapi.Token{})
+			aead, err := configV0.LegacyPrimitiveFromKey(test.key, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("configV0.PrimitiveFromKey() err=%v, want nil", err)
+				t.Fatalf("configV0.LegacyPrimitiveFromKey() err=%v, want nil", err)
 			}
 			a, ok := aead.(tink.AEAD)
 			if !ok {

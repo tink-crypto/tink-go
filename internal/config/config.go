@@ -30,15 +30,15 @@ type Config struct {
 	primitiveConstructors map[reflect.Type]func(key key.Key) (any, error)
 }
 
-// PrimitiveFromKey creates a primitive from the given [key.Key]. Returns an
+// LegacyPrimitiveFromKey creates a primitive from the given [key.Key]. Returns an
 // error if there is no primitiveConstructor registered for the given key.
 //
 // This implements [keyset.PrimitivesConfig].
-func (c *Config) PrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
+func (c *Config) LegacyPrimitiveFromKey(k key.Key, _ internalapi.Token) (any, error) {
 	keyType := reflect.TypeOf(k)
 	creator, ok := c.primitiveConstructors[keyType]
 	if !ok {
-		return nil, fmt.Errorf("PrimitiveFromKey: no primitive creator from key %v registered", keyType)
+		return nil, fmt.Errorf("LegacyPrimitiveFromKey: no primitive creator from key %v registered", keyType)
 	}
 	return creator(k)
 }

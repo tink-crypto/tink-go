@@ -43,7 +43,7 @@ func NewPrehashWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig)
 	}
 	// Make sure this access doesn't get logged as key export.
 	primaryEntry = primaryEntry.ToUnmonitoredEntry(internalapi.Token{})
-	primary, _, err := factoryutil.PrimitiveFromKey[tink.Prehash](primaryEntry.Key(), config)
+	primary, _, err := factoryutil.LegacyPrimitiveFromKey[tink.Prehash](primaryEntry.Key(), config)
 	if err != nil {
 		return nil, fmt.Errorf("signprehash.NewPrehashWithConfig: failed to get primitive for primary key: %v", err)
 	}

@@ -40,7 +40,7 @@ func NewWithConfig(handle *keyset.Handle, c keyset.PrimitivesConfig) (tink.MAC, 
 	primitives := prefixmap.New[macAndKeyID]()
 	var primary macAndKeyID
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
-		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.MAC](entry.Key(), c)
+		p, isLegacyPrimitive, err := factoryutil.LegacyPrimitiveFromKey[tink.MAC](entry.Key(), c)
 		if err != nil {
 			return nil, err
 		}

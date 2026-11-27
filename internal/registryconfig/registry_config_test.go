@@ -46,7 +46,7 @@ func mustCreateTestKeysetHandle(t *testing.T) *keyset.Handle {
 	return handle
 }
 
-func TestPrimitiveFromKey(t *testing.T) {
+func TestLegacyPrimitiveFromKey(t *testing.T) {
 	keyset := mustCreateTestKeysetHandle(t)
 	entry, err := keyset.Entry(0)
 	if err != nil {
@@ -54,16 +54,16 @@ func TestPrimitiveFromKey(t *testing.T) {
 	}
 
 	registryConfig := &registryconfig.RegistryConfig{}
-	p, err := registryConfig.PrimitiveFromKey(entry.Key(), internalapi.Token{})
+	p, err := registryConfig.LegacyPrimitiveFromKey(entry.Key(), internalapi.Token{})
 	if err != nil {
-		t.Errorf("registryConfig.PrimitiveFromKey() err = %v, want nil", err)
+		t.Errorf("registryConfig.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	if _, ok := p.(tink.AEAD); !ok {
 		t.Errorf("p is not of type tink.AEAD; got %T", p)
 	}
 }
 
-func TestPrimitiveFromKeyErrors(t *testing.T) {
+func TestLegacyPrimitiveFromKeyErrors(t *testing.T) {
 	registryConfig := &registryconfig.RegistryConfig{}
 	testCases := []struct {
 		name string
@@ -79,8 +79,8 @@ func TestPrimitiveFromKeyErrors(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := registryConfig.PrimitiveFromKey(tc.key, internalapi.Token{}); err == nil {
-				t.Errorf("registryConfig.PrimitiveFromKey() err = nil, want error")
+			if _, err := registryConfig.LegacyPrimitiveFromKey(tc.key, internalapi.Token{}); err == nil {
+				t.Errorf("registryConfig.LegacyPrimitiveFromKey() err = nil, want error")
 			}
 		})
 	}

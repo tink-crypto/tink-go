@@ -213,8 +213,8 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 
 	t.Run("empty config fails", func(t *testing.T) {
 		emptyConfig := config.NewBuilder().Build()
-		if _, err := emptyConfig.PrimitiveFromKey(k, internalapi.Token{}); err == nil {
-			t.Errorf("emptyConfig.PrimitiveFromKey(%v) err = nil, want error", k)
+		if _, err := emptyConfig.LegacyPrimitiveFromKey(k, internalapi.Token{}); err == nil {
+			t.Errorf("emptyConfig.LegacyPrimitiveFromKey(%v) err = nil, want error", k)
 		}
 	})
 
@@ -224,13 +224,13 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 			t.Fatalf("keytest.RegisterPrimitiveConstructor() err = %v, want nil", err)
 		}
 		c := b.Build()
-		p, err := c.PrimitiveFromKey(k, internalapi.Token{})
+		p, err := c.LegacyPrimitiveFromKey(k, internalapi.Token{})
 		if err != nil {
-			t.Fatalf("c.PrimitiveFromKey(%v) err = %v, want nil", k, err)
+			t.Fatalf("c.LegacyPrimitiveFromKey(%v) err = %v, want nil", k, err)
 		}
 		a, ok := p.(tink.AEAD)
 		if !ok {
-			t.Fatalf("c.PrimitiveFromKey(%v) = %T, want tink.AEAD", k, p)
+			t.Fatalf("c.LegacyPrimitiveFromKey(%v) = %T, want tink.AEAD", k, p)
 		}
 		ciphertext, err := a.Encrypt(plaintext, associatedData)
 		if err != nil {
@@ -255,8 +255,8 @@ func TestPrimitiveConstructorFailsWithWrongKeyType(t *testing.T) {
 		t.Fatalf("keytest.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 	c := b.Build()
-	if _, err := c.PrimitiveFromKey(&stubKey{}, internalapi.Token{}); err == nil {
-		t.Errorf("c.PrimitiveFromKey(&stubKey{}) err = nil, want error")
+	if _, err := c.LegacyPrimitiveFromKey(&stubKey{}, internalapi.Token{}); err == nil {
+		t.Errorf("c.LegacyPrimitiveFromKey(&stubKey{}) err = nil, want error")
 	}
 	if _, err := primitiveregistry.Primitive(&stubKey{}); err == nil {
 		t.Errorf("primitiveregistry.Primitive(&stubKey{}) err = nil, want error")

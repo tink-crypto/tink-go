@@ -330,13 +330,13 @@ func TestKeyCreator(t *testing.T) {
 	}
 
 	config := &registryconfig.RegistryConfig{}
-	p, err := config.PrimitiveFromKey(key, internalapi.Token{})
+	p, err := config.LegacyPrimitiveFromKey(key, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("config.PrimitiveFromKey(%v, %v) err = %v, want nil", key, internalapi.Token{}, err)
+		t.Fatalf("config.LegacyPrimitiveFromKey(%v, %v) err = %v, want nil", key, internalapi.Token{}, err)
 	}
 	streamingAEAD, ok := p.(tink.StreamingAEAD)
 	if !ok {
-		t.Errorf("config.PrimitiveFromKey(%v, %v) did not return a AESCTRHMAC primitive", key, internalapi.Token{})
+		t.Errorf("config.LegacyPrimitiveFromKey(%v, %v) did not return a AESCTRHMAC primitive", key, internalapi.Token{})
 	}
 
 	// Encrypt and decrypt some data.

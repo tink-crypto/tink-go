@@ -58,7 +58,7 @@ func NewPrehashSignerWithConfig(handle *keyset.Handle, config keyset.PrimitivesC
 	}
 	signers := make(map[uint32]tink.PrehashSigner)
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
-		signer, _, err := factoryutil.PrimitiveFromKey[tink.PrehashSigner](entry.Key(), config)
+		signer, _, err := factoryutil.LegacyPrimitiveFromKey[tink.PrehashSigner](entry.Key(), config)
 		if err != nil {
 			return nil, fmt.Errorf("signprehash.NewPrehashSignerWithConfig: failed to get primitive for key with ID %d: %v", entry.KeyID(), err)
 		}

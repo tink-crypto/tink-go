@@ -48,8 +48,8 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	configWithoutAESCTRHMAC := b.Build()
 
 	// Should fail because aesctrhmac.RegisterPrimitiveConstructor() was not called.
-	if _, err := configWithoutAESCTRHMAC.PrimitiveFromKey(aesCTRHMACKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutAESCTRHMAC.PrimitiveFromKey() err = nil, want error")
+	if _, err := configWithoutAESCTRHMAC.LegacyPrimitiveFromKey(aesCTRHMACKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutAESCTRHMAC.LegacyPrimitiveFromKey() err = nil, want error")
 	}
 
 	// Register aesctrhmac.RegisterPrimitiveConstructor() and check that it now works.
@@ -57,9 +57,9 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("aesctrhmac.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 	configWithAESCTRHMAC := b.Build()
-	p, err := configWithAESCTRHMAC.PrimitiveFromKey(aesCTRHMACKey, internalapi.Token{})
+	p, err := configWithAESCTRHMAC.LegacyPrimitiveFromKey(aesCTRHMACKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithAESCTRHMAC.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithAESCTRHMAC.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 
 	if _, ok := p.(tink.StreamingAEAD); !ok {

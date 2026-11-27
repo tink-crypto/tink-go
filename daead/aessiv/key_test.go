@@ -438,13 +438,13 @@ func TestKeyCreator(t *testing.T) {
 	// Try to encrypt/decrypt with the key.
 	config := &registryconfig.RegistryConfig{}
 
-	p, err := config.PrimitiveFromKey(key, internalapi.Token{})
+	p, err := config.LegacyPrimitiveFromKey(key, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("config.PrimitiveFromKey(key, internalapi.Token{}) err = %v, want nil", err)
+		t.Fatalf("config.LegacyPrimitiveFromKey(key, internalapi.Token{}) err = %v, want nil", err)
 	}
 	daead, ok := p.(tink.DeterministicAEAD)
 	if !ok {
-		t.Fatalf("config.PrimitiveFromKey(key, internalapi.Token{}) returned primitive of type %T, want %T", p, (tink.DeterministicAEAD)(nil))
+		t.Fatalf("config.LegacyPrimitiveFromKey(key, internalapi.Token{}) returned primitive of type %T, want %T", p, (tink.DeterministicAEAD)(nil))
 	}
 
 	ciphertext, err := daead.EncryptDeterministically([]byte("plaintext"), []byte("associated data"))

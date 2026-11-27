@@ -100,7 +100,7 @@ func (r *DEMHelper) GetAEADOrDAEAD(symmetricKeyValue []byte) (any, error) {
 		return nil, fmt.Errorf("unsupported AEAD DEM key type: %T", r.params)
 	}
 
-	p, err := (&registryconfig.RegistryConfig{}).PrimitiveFromKey(k, internalapi.Token{})
+	p, err := (&registryconfig.RegistryConfig{}).LegacyPrimitiveFromKey(k, internalapi.Token{})
 	if err != nil {
 		return nil, err
 	}

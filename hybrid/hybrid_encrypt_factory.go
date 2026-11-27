@@ -43,7 +43,7 @@ func NewHybridEncryptWithConfig(handle *keyset.Handle, config keyset.PrimitivesC
 	}
 	// Make sure the primitives do not implement tink.AEAD.
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
-		p, _, err := factoryutil.PrimitiveFromKey[tink.HybridEncrypt](entry.Key(), config)
+		p, _, err := factoryutil.LegacyPrimitiveFromKey[tink.HybridEncrypt](entry.Key(), config)
 		if err != nil {
 			return nil, err
 		}
@@ -58,7 +58,7 @@ func NewHybridEncryptWithConfig(handle *keyset.Handle, config keyset.PrimitivesC
 	}
 	// Make sure this access doesn't get logged as key export.
 	primaryEntry = primaryEntry.ToUnmonitoredEntry(internalapi.Token{})
-	primitive, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.HybridEncrypt](primaryEntry.Key(), config)
+	primitive, isLegacyPrimitive, err := factoryutil.LegacyPrimitiveFromKey[tink.HybridEncrypt](primaryEntry.Key(), config)
 	if err != nil {
 		return nil, err
 	}

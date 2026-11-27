@@ -389,13 +389,13 @@ func TestKeyCreator(t *testing.T) {
 	}
 
 	config := &registryconfig.RegistryConfig{}
-	p, err := config.PrimitiveFromKey(key, internalapi.Token{})
+	p, err := config.LegacyPrimitiveFromKey(key, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("config.PrimitiveFromKey(%v, %v) err = %v, want nil", key, internalapi.Token{}, err)
+		t.Fatalf("config.LegacyPrimitiveFromKey(%v, %v) err = %v, want nil", key, internalapi.Token{}, err)
 	}
 	keyDeriverPrimitive, ok := p.(keyderiver.KeyDeriver)
 	if !ok {
-		t.Errorf("config.PrimitiveFromKey(%v, %v) p, _ = %T, want %T", key, internalapi.Token{}, p, (keyderiver.KeyDeriver)(nil))
+		t.Errorf("config.LegacyPrimitiveFromKey(%v, %v) p, _ = %T, want %T", key, internalapi.Token{}, p, (keyderiver.KeyDeriver)(nil))
 	}
 
 	// Derive an AESGCM key.
@@ -409,13 +409,13 @@ func TestKeyCreator(t *testing.T) {
 	}
 
 	// Encrypt/decrypt.
-	aeadPrimitive, err := config.PrimitiveFromKey(generatedKey, internalapi.Token{})
+	aeadPrimitive, err := config.LegacyPrimitiveFromKey(generatedKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("config.PrimitiveFromKey(%v, %v) err = %v, want nil", generatedAESGCMKey, internalapi.Token{}, err)
+		t.Fatalf("config.LegacyPrimitiveFromKey(%v, %v) err = %v, want nil", generatedAESGCMKey, internalapi.Token{}, err)
 	}
 	aead, ok := aeadPrimitive.(tink.AEAD)
 	if !ok {
-		t.Errorf("config.PrimitiveFromKey(%v, %v) p, _ = %T, want %T", generatedAESGCMKey, internalapi.Token{}, p, (tink.AEAD)(nil))
+		t.Errorf("config.LegacyPrimitiveFromKey(%v, %v) p, _ = %T, want %T", generatedAESGCMKey, internalapi.Token{}, p, (tink.AEAD)(nil))
 	}
 	ciphertext, err := aead.Encrypt([]byte("plaintext"), []byte("associated data"))
 	if err != nil {

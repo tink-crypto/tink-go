@@ -477,9 +477,9 @@ func TestPrimitiveCreator(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			p, err := c.PrimitiveFromKey(testCase.key, internalapi.Token{})
+			p, err := c.LegacyPrimitiveFromKey(testCase.key, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("c.PrimitiveFromKey() err = %v, want nil", err)
+				t.Fatalf("c.LegacyPrimitiveFromKey() err = %v, want nil", err)
 			}
 			a, ok := p.(tink.AEAD)
 			if !ok {
@@ -522,8 +522,8 @@ func TestPrimitiveCreatorInvalidParameters(t *testing.T) {
 							idRequirement = 0x11223344
 						}
 						key := mustCreateKey(t, keyData, idRequirement, opts)
-						if _, err := c.PrimitiveFromKey(key, internalapi.Token{}); err == nil {
-							t.Errorf("c.PrimitiveFromKey(testCase.key, internalapi.Token{}) err = nil, want error")
+						if _, err := c.LegacyPrimitiveFromKey(key, internalapi.Token{}); err == nil {
+							t.Errorf("c.LegacyPrimitiveFromKey(testCase.key, internalapi.Token{}) err = nil, want error")
 						}
 					})
 				}

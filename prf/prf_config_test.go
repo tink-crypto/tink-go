@@ -138,17 +138,17 @@ func TestRegisterPrimitiveConstructors(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			configWithout := mustBuildConfig(t)
-			if _, err := configWithout.PrimitiveFromKey(tc.key, internalapi.Token{}); err == nil {
-				t.Fatalf("configWithout.PrimitiveFromKey(%T) err = nil, want error", tc.key)
+			if _, err := configWithout.LegacyPrimitiveFromKey(tc.key, internalapi.Token{}); err == nil {
+				t.Fatalf("configWithout.LegacyPrimitiveFromKey(%T) err = nil, want error", tc.key)
 			}
 			configWith := mustBuildConfig(t, tc.register)
-			primitive, err := configWith.PrimitiveFromKey(tc.key, internalapi.Token{})
+			primitive, err := configWith.LegacyPrimitiveFromKey(tc.key, internalapi.Token{})
 			if err != nil {
-				t.Fatalf("configWith.PrimitiveFromKey(%T) err = %v, want nil", tc.key, err)
+				t.Fatalf("configWith.LegacyPrimitiveFromKey(%T) err = %v, want nil", tc.key, err)
 			}
 			p, ok := primitive.(prf.PRF)
 			if !ok {
-				t.Fatalf("configWith.PrimitiveFromKey(%T) returned type %T, want prf.PRF", tc.key, primitive)
+				t.Fatalf("configWith.LegacyPrimitiveFromKey(%T) returned type %T, want prf.PRF", tc.key, primitive)
 			}
 			got, err := p.ComputePRF(tc.data, uint32(len(tc.want)))
 			if err != nil {

@@ -21,6 +21,6 @@ import (
 
 // PrimitivesConfig provides methods to create primitives from [key.Key]s.
 type PrimitivesConfig interface {
-	// PrimitiveFromKey creates a primitive from a [key.Key].
-	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
+	// LegacyPrimitiveFromKey creates a primitive from a [key.Key].
+	LegacyPrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
 }

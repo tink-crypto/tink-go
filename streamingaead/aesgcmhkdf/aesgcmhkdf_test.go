@@ -46,8 +46,8 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	configWithoutAESGCMHKDF := b.Build()
 
 	// Should fail because aesgcmhkdf.RegisterPrimitiveConstructor() was not called.
-	if _, err := configWithoutAESGCMHKDF.PrimitiveFromKey(aesGCMHKDFKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutAESGCMHKDF.PrimitiveFromKey() err = nil, want error")
+	if _, err := configWithoutAESGCMHKDF.LegacyPrimitiveFromKey(aesGCMHKDFKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutAESGCMHKDF.LegacyPrimitiveFromKey() err = nil, want error")
 	}
 
 	// Register aesgcmhkdf.RegisterPrimitiveConstructor() and check that it now works.
@@ -55,9 +55,9 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("aesgcmhkdf.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 	configWithAESGCMHKDF := b.Build()
-	p, err := configWithAESGCMHKDF.PrimitiveFromKey(aesGCMHKDFKey, internalapi.Token{})
+	p, err := configWithAESGCMHKDF.LegacyPrimitiveFromKey(aesGCMHKDFKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithAESGCMHKDF.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithAESGCMHKDF.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 
 	if _, ok := p.(tink.StreamingAEAD); !ok {

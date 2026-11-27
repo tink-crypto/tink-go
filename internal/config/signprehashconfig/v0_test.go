@@ -30,7 +30,7 @@ const (
 	privKey65SeedHex = "7C9935A0B07694AA0C6D10E4DB6B1ADD2FD81A25CCB148032DCD739936737F2D"
 )
 
-func TestV0ConfigPrimitiveFromKey(t *testing.T) {
+func TestV0ConfigLegacyPrimitiveFromKey(t *testing.T) {
 	c := signprehashconfig.V0()
 
 	params, err := tinkmldsa.NewParameters(tinkmldsa.MLDSA65, tinkmldsa.VariantNoPrefixWithPrehashID)
@@ -53,19 +53,19 @@ func TestV0ConfigPrimitiveFromKey(t *testing.T) {
 		t.Fatalf("privKey.PublicKey() err = %v, want nil", err)
 	}
 
-	// 1. PrimitiveFromKey for PrehashSigner
-	signerPrimitive, err := c.PrimitiveFromKey(privKey, internalapi.Token{})
+	// 1. LegacyPrimitiveFromKey for PrehashSigner
+	signerPrimitive, err := c.LegacyPrimitiveFromKey(privKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("c.PrimitiveFromKey(privKey) err = %v, want nil", err)
+		t.Fatalf("c.LegacyPrimitiveFromKey(privKey) err = %v, want nil", err)
 	}
 	if _, ok := signerPrimitive.(tink.PrehashSigner); !ok {
 		t.Errorf("signerPrimitive is %T, want tink.PrehashSigner", signerPrimitive)
 	}
 
-	// 2. PrimitiveFromKey for Prehash
-	prehashPrimitive, err := c.PrimitiveFromKey(pubKey, internalapi.Token{})
+	// 2. LegacyPrimitiveFromKey for Prehash
+	prehashPrimitive, err := c.LegacyPrimitiveFromKey(pubKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("c.PrimitiveFromKey(pubKey) err = %v, want nil", err)
+		t.Fatalf("c.LegacyPrimitiveFromKey(pubKey) err = %v, want nil", err)
 	}
 	if _, ok := prehashPrimitive.(tink.Prehash); !ok {
 		t.Errorf("prehashPrimitive is %T, want tink.Prehash", prehashPrimitive)

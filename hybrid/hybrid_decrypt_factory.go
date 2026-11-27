@@ -45,7 +45,7 @@ func NewHybridDecryptWithConfig(handle *keyset.Handle, config keyset.PrimitivesC
 	decrypters := prefixmap.New[decrypterAndID]()
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
 		// Make sure this access doesn't get logged as key export.
-		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.HybridDecrypt](entry.Key(), config)
+		p, isLegacyPrimitive, err := factoryutil.LegacyPrimitiveFromKey[tink.HybridDecrypt](entry.Key(), config)
 		if err != nil {
 			return nil, err
 		}

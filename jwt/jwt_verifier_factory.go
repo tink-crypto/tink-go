@@ -49,7 +49,7 @@ func NewVerifierWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig
 	}
 	var verifiers []verifierAndKeyID
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
-		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[Verifier](entry.Key(), config)
+		p, isLegacyPrimitive, err := factoryutil.LegacyPrimitiveFromKey[Verifier](entry.Key(), config)
 		if err != nil {
 			return nil, err
 		}

@@ -40,7 +40,7 @@ func NewWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (tink.
 	primitives := prefixmap.New[daeadAndKeyID]()
 	var primary daeadAndKeyID
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
-		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.DeterministicAEAD](entry.Key(), config)
+		p, isLegacyPrimitive, err := factoryutil.LegacyPrimitiveFromKey[tink.DeterministicAEAD](entry.Key(), config)
 		if err != nil {
 			return nil, err
 		}

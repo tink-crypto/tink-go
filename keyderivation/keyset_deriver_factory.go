@@ -70,7 +70,7 @@ func NewWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) (Keyse
 	var fullKeyDerivers []fullKeyDeriverWithKeyID
 	primaryKeyID := uint32(0)
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
-		p, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[keyderiver.KeyDeriver](entry.Key(), config)
+		p, isLegacyPrimitive, err := factoryutil.LegacyPrimitiveFromKey[keyderiver.KeyDeriver](entry.Key(), config)
 		if err != nil {
 			return nil, err
 		}

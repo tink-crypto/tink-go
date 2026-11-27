@@ -391,16 +391,16 @@ func TestLegacyKeyPrimitiveFromRegistryConfigIsLegacy(t *testing.T) {
 				t.Fatalf("handle.Primary() err = %v, want nil", err)
 			}
 			config := &registryconfig.RegistryConfig{}
-			if _, err := config.PrimitiveFromKey(entry.Key(), internalapi.Token{}); err != nil {
-				t.Fatalf("config.PrimitiveFromKey(entry.Key(), internalapi.Token{}) err = %v, want nil", err)
+			if _, err := config.LegacyPrimitiveFromKey(entry.Key(), internalapi.Token{}); err != nil {
+				t.Fatalf("config.LegacyPrimitiveFromKey(entry.Key(), internalapi.Token{}) err = %v, want nil", err)
 			}
 
-			a, isLegacy, err := factoryutil.PrimitiveFromKey[tink.AEAD](entry.Key(), config)
+			a, isLegacy, err := factoryutil.LegacyPrimitiveFromKey[tink.AEAD](entry.Key(), config)
 			if err != nil {
-				t.Fatalf("factoryutil.PrimitiveFromKey[tink.AEAD](entry.Key(), config) err = %v, want nil", err)
+				t.Fatalf("factoryutil.LegacyPrimitiveFromKey[tink.AEAD](entry.Key(), config) err = %v, want nil", err)
 			}
 			if !isLegacy {
-				t.Errorf("factoryutil.PrimitiveFromKey[tink.AEAD](entry.Key(), config) isLegacy = false, want true")
+				t.Errorf("factoryutil.LegacyPrimitiveFromKey[tink.AEAD](entry.Key(), config) isLegacy = false, want true")
 			}
 
 			// The legacy primitive is the one created by the key manager, without

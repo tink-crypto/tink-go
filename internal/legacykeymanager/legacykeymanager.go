@@ -31,7 +31,7 @@ import (
 // config is a subset of [keyset.PrimitivesConfig]. Defined here to avoid potential
 // circular dependencies.
 type config interface {
-	PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
+	LegacyPrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error)
 }
 
 type primitiveConstructor func(key key.Key) (any, error)

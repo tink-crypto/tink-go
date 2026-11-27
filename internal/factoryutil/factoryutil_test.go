@@ -278,7 +278,7 @@ func TestEnabledUnmonitoredEntries_Empty(t *testing.T) {
 	}
 }
 
-func TestPrimitiveFromKey_Full(t *testing.T) {
+func TestLegacyPrimitiveFromKey_Full(t *testing.T) {
 	primitive := "primitive"
 	cb := config.NewBuilder()
 	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*keytest.Key](), func(key key.Key) (any, error) {
@@ -288,17 +288,17 @@ func TestPrimitiveFromKey_Full(t *testing.T) {
 	}
 	config := cb.Build()
 	key := mustCreateKey(t, keytest.VariantTink, 1)
-	got, isLegacy, err := factoryutil.PrimitiveFromKey[string](key, &config)
+	got, isLegacy, err := factoryutil.LegacyPrimitiveFromKey[string](key, &config)
 	if err != nil {
-		t.Fatalf("PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf("LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	if diff := cmp.Diff(primitive, got); diff != "" || isLegacy {
-		t.Errorf("PrimitiveFromKey() mismatch (-want +got): %s", diff)
+		t.Errorf("LegacyPrimitiveFromKey() mismatch (-want +got): %s", diff)
 	}
 
 }
 
-func TestPrimitiveFromKey_WrongType(t *testing.T) {
+func TestLegacyPrimitiveFromKey_WrongType(t *testing.T) {
 	primitive := "primitive"
 	cb := config.NewBuilder()
 	if err := cb.RegisterPrimitiveConstructor(reflect.TypeFor[*keytest.Key](), func(key key.Key) (any, error) {
@@ -309,43 +309,43 @@ func TestPrimitiveFromKey_WrongType(t *testing.T) {
 	config := cb.Build()
 	key := mustCreateKey(t, keytest.VariantTink, 1)
 
-	_, isLegacy, err := factoryutil.PrimitiveFromKey[int](key, &config)
+	_, isLegacy, err := factoryutil.LegacyPrimitiveFromKey[int](key, &config)
 	if err == nil {
-		t.Fatalf("PrimitiveFromKey() err = nil, want error")
+		t.Fatalf("LegacyPrimitiveFromKey() err = nil, want error")
 	}
 
 	if wantStr := "int"; !strings.HasSuffix(err.Error(), wantStr) {
-		t.Errorf("PrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
+		t.Errorf("LegacyPrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
 	}
 	if isLegacy {
-		t.Errorf("PrimitiveFromKey() isLegacy = true, want false")
+		t.Errorf("LegacyPrimitiveFromKey() isLegacy = true, want false")
 	}
 
-	_, isLegacy, err = factoryutil.PrimitiveFromKey[tink.AEAD](key, &config)
+	_, isLegacy, err = factoryutil.LegacyPrimitiveFromKey[tink.AEAD](key, &config)
 	if err == nil {
-		t.Fatalf("PrimitiveFromKey() err = nil, want error")
+		t.Fatalf("LegacyPrimitiveFromKey() err = nil, want error")
 	}
 
 	if wantStr := "tink.AEAD"; !strings.HasSuffix(err.Error(), wantStr) {
-		t.Errorf("PrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
+		t.Errorf("LegacyPrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
 	}
 	if isLegacy {
-		t.Errorf("PrimitiveFromKey() isLegacy = true, want false")
+		t.Errorf("LegacyPrimitiveFromKey() isLegacy = true, want false")
 	}
 }
 
-func TestPrimitiveFromKey_Legacy(t *testing.T) {
+func TestLegacyPrimitiveFromKey_Legacy(t *testing.T) {
 	// RegistryConfig is the only config that can create legacy primitives.
 	config := registryconfig.RegistryConfig{}
 
 	// Legacy keys have no primitive constructor, which forces the legacy path.
 	key := mustCreateLegacyKey(t)
-	a, isLegacy, err := factoryutil.PrimitiveFromKey[tink.AEAD](key, &config)
+	a, isLegacy, err := factoryutil.LegacyPrimitiveFromKey[tink.AEAD](key, &config)
 	if err != nil {
-		t.Fatalf("PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf("LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	if !isLegacy {
-		t.Errorf("PrimitiveFromKey() isLegacy = false, want true")
+		t.Errorf("LegacyPrimitiveFromKey() isLegacy = false, want true")
 	}
 
 	plaintext := []byte("plaintext")
@@ -363,32 +363,32 @@ func TestPrimitiveFromKey_Legacy(t *testing.T) {
 	}
 }
 
-func TestPrimitiveFromKey_LegacyWrongType(t *testing.T) {
+func TestLegacyPrimitiveFromKey_LegacyWrongType(t *testing.T) {
 	config := registryconfig.RegistryConfig{}
 
 	// Legacy keys have no primitive constructor, which forces the legacy path.
 	key := mustCreateLegacyKey(t)
-	_, isLegacy, err := factoryutil.PrimitiveFromKey[int](key, &config)
+	_, isLegacy, err := factoryutil.LegacyPrimitiveFromKey[int](key, &config)
 	if err == nil {
-		t.Fatalf("PrimitiveFromKey() err = nil, want error")
+		t.Fatalf("LegacyPrimitiveFromKey() err = nil, want error")
 	}
 
 	if wantStr := "int"; !strings.HasSuffix(err.Error(), wantStr) {
-		t.Errorf("PrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
+		t.Errorf("LegacyPrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
 	}
 	if !isLegacy {
-		t.Errorf("PrimitiveFromKey() isLegacy = false, want true")
+		t.Errorf("LegacyPrimitiveFromKey() isLegacy = false, want true")
 	}
 
-	_, isLegacy, err = factoryutil.PrimitiveFromKey[tink.MAC](key, &config)
+	_, isLegacy, err = factoryutil.LegacyPrimitiveFromKey[tink.MAC](key, &config)
 	if err == nil {
-		t.Fatalf("PrimitiveFromKey() err = nil, want error")
+		t.Fatalf("LegacyPrimitiveFromKey() err = nil, want error")
 	}
 	if wantStr := "tink.MAC"; !strings.HasSuffix(err.Error(), wantStr) {
-		t.Errorf("PrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
+		t.Errorf("LegacyPrimitiveFromKey() err = %q, want %q", err.Error(), wantStr)
 	}
 	if !isLegacy {
-		t.Errorf("PrimitiveFromKey() isLegacy = false, want true")
+		t.Errorf("LegacyPrimitiveFromKey() isLegacy = false, want true")
 	}
 }
 

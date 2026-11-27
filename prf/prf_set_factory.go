@@ -42,7 +42,7 @@ func NewPRFSetWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) 
 	prfs := map[uint32]PRF{}
 	primaryKeyID := uint32(0)
 	for entry := range factoryutil.EnabledUnmonitoredEntries(handle) {
-		primitive, _, err := factoryutil.PrimitiveFromKey[PRF](entry.Key(), config)
+		primitive, _, err := factoryutil.LegacyPrimitiveFromKey[PRF](entry.Key(), config)
 		if err != nil {
 			return nil, err
 		}

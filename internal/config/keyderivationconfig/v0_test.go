@@ -65,8 +65,8 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	configWithoutKeyDerivation := b.Build()
 
 	// Should fail because prfbasedkeyderivation.RegisterPrimitiveConstructor() was not called.
-	if _, err := configWithoutKeyDerivation.PrimitiveFromKey(keyDerivationKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutKeyDerivation.PrimitiveFromKey() err = nil, want error")
+	if _, err := configWithoutKeyDerivation.LegacyPrimitiveFromKey(keyDerivationKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutKeyDerivation.LegacyPrimitiveFromKey() err = nil, want error")
 	}
 
 	// Register prfbasedkeyderivation.RegisterPrimitiveConstructor() and check that it now works.
@@ -74,9 +74,9 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("prfbasedkeyderivation.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 	configWithKeyDerivation := b.Build()
-	primitive, err := configWithKeyDerivation.PrimitiveFromKey(keyDerivationKey, internalapi.Token{})
+	primitive, err := configWithKeyDerivation.LegacyPrimitiveFromKey(keyDerivationKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithKeyDerivation.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithKeyDerivation.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	kd, ok := primitive.(keyDeriver)
 	if !ok {

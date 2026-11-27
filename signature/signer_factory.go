@@ -42,7 +42,7 @@ func NewSignerWithConfig(handle *keyset.Handle, config keyset.PrimitivesConfig) 
 	}
 	// Make sure this access doesn't get logged as key export.
 	primaryEntry = primaryEntry.ToUnmonitoredEntry(internalapi.Token{})
-	signer, isLegacyPrimitive, err := factoryutil.PrimitiveFromKey[tink.Signer](primaryEntry.Key(), config)
+	signer, isLegacyPrimitive, err := factoryutil.LegacyPrimitiveFromKey[tink.Signer](primaryEntry.Key(), config)
 	if err != nil {
 		return nil, err
 	}

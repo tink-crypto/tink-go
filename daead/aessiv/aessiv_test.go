@@ -41,8 +41,8 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 	configWithoutAESSIV := b.Build()
 
 	// Should fail because aessiv.RegisterPrimitiveConstructor() was not called.
-	if _, err := configWithoutAESSIV.PrimitiveFromKey(aesSIVKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutAESSIV.PrimitiveFromKey() err = nil, want error")
+	if _, err := configWithoutAESSIV.LegacyPrimitiveFromKey(aesSIVKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutAESSIV.LegacyPrimitiveFromKey() err = nil, want error")
 	}
 
 	// Register aessiv.RegisterPrimitiveConstructor() and check that it now works.
@@ -50,9 +50,9 @@ func TestRegisterPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("aessiv.RegisterPrimitiveConstructor() err = %v, want nil", err)
 	}
 	configWithAESSIV := b.Build()
-	p, err := configWithAESSIV.PrimitiveFromKey(aesSIVKey, internalapi.Token{})
+	p, err := configWithAESSIV.LegacyPrimitiveFromKey(aesSIVKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithAESSIV.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithAESSIV.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	d, ok := p.(tink.DeterministicAEAD)
 	if !ok {

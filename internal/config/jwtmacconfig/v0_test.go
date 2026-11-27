@@ -44,8 +44,8 @@ func TestConfigV0JWTMACFailsIfKeyNotMAC(t *testing.T) {
 	if err != nil {
 		t.Fatalf(" aessiv.NewKey() err = %v, want nil", err)
 	}
-	if _, err := configV0.PrimitiveFromKey(aesGCMKey, internalapi.Token{}); err == nil {
-		t.Errorf("configV0.PrimitiveFromKey() err = nil, want error")
+	if _, err := configV0.LegacyPrimitiveFromKey(aesGCMKey, internalapi.Token{}); err == nil {
+		t.Errorf("configV0.LegacyPrimitiveFromKey() err = nil, want error")
 	}
 }
 
@@ -90,9 +90,9 @@ func TestConfigV0WithJWTHMACKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("jwthmac.NewKey() err = %v, want nil", err)
 	}
-	p, err := configV0.PrimitiveFromKey(key, internalapi.Token{})
+	p, err := configV0.LegacyPrimitiveFromKey(key, internalapi.Token{})
 	if err != nil {
-		t.Fatalf("configV0.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf("configV0.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	m, ok := p.(jwt.MAC)
 	if !ok {

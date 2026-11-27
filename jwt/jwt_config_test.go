@@ -56,8 +56,8 @@ func TestRegisterJWTHMACPrimitiveConstructor(t *testing.T) {
 	configWithoutJWTHMAC := b.Build()
 
 	// Should fail because jwt.RegisterJWTHMACPrimitiveConstructor() was not called.
-	if _, err := configWithoutJWTHMAC.PrimitiveFromKey(jwtHMACKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutJWTHMAC.PrimitiveFromKey() err = nil, want error")
+	if _, err := configWithoutJWTHMAC.LegacyPrimitiveFromKey(jwtHMACKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutJWTHMAC.LegacyPrimitiveFromKey() err = nil, want error")
 	}
 
 	// Register jwt.RegisterJWTHMACPrimitiveConstructor() and check that it now works.
@@ -65,9 +65,9 @@ func TestRegisterJWTHMACPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("jwt.RegisterJWTHMACPrimitiveConstructor() err = %v, want nil", err)
 	}
 	configWithJWTHMAC := b.Build()
-	primitive, err := configWithJWTHMAC.PrimitiveFromKey(jwtHMACKey, internalapi.Token{})
+	primitive, err := configWithJWTHMAC.LegacyPrimitiveFromKey(jwtHMACKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithJWTHMAC.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithJWTHMAC.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	p, ok := primitive.(jwt.MAC)
 	if !ok {
@@ -121,11 +121,11 @@ func TestRegisterJWTECDSAPrimitiveConstructor(t *testing.T) {
 	configWithoutJWTHMAC := b.Build()
 
 	// Should fail because jwt.RegisterJWTECDSAPrimitiveConstructor() was not called.
-	if _, err := configWithoutJWTHMAC.PrimitiveFromKey(publicKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutJWTHMAC.PrimitiveFromKey(publicKey) err = nil, want error")
+	if _, err := configWithoutJWTHMAC.LegacyPrimitiveFromKey(publicKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutJWTHMAC.LegacyPrimitiveFromKey(publicKey) err = nil, want error")
 	}
-	if _, err := configWithoutJWTHMAC.PrimitiveFromKey(privateKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutJWTHMAC.PrimitiveFromKey(privateKey) err = nil, want error")
+	if _, err := configWithoutJWTHMAC.LegacyPrimitiveFromKey(privateKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutJWTHMAC.LegacyPrimitiveFromKey(privateKey) err = nil, want error")
 	}
 
 	// Register jwt.RegisterJWTECDSAPrimitiveConstructor() and check that it now works.
@@ -133,17 +133,17 @@ func TestRegisterJWTECDSAPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("jwt.RegisterJWTECDSAPrimitiveConstructor() err = %v, want nil", err)
 	}
 	configWithJWTHMAC := b.Build()
-	p1, err := configWithJWTHMAC.PrimitiveFromKey(privateKey, internalapi.Token{})
+	p1, err := configWithJWTHMAC.LegacyPrimitiveFromKey(privateKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithJWTHMAC.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithJWTHMAC.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	signer, ok := p1.(jwt.Signer)
 	if !ok {
 		t.Fatalf("p was of type %v, want jwt.Signer", reflect.TypeOf(p1))
 	}
-	p2, err := configWithJWTHMAC.PrimitiveFromKey(publicKey, internalapi.Token{})
+	p2, err := configWithJWTHMAC.LegacyPrimitiveFromKey(publicKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithJWTHMAC.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithJWTHMAC.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	verifier, ok := p2.(jwt.Verifier)
 	if !ok {
@@ -239,11 +239,11 @@ func TestRegisterJWTRSASSAPKCS1PrimitiveConstructor(t *testing.T) {
 	configWithoutJWTHMAC := b.Build()
 
 	// Should fail because jwt.RegisterJWTRSASSAPKCS1PrimitiveConstructor() was not called.
-	if _, err := configWithoutJWTHMAC.PrimitiveFromKey(publicKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutJWTHMAC.PrimitiveFromKey(publicKey) err = nil, want error")
+	if _, err := configWithoutJWTHMAC.LegacyPrimitiveFromKey(publicKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutJWTHMAC.LegacyPrimitiveFromKey(publicKey) err = nil, want error")
 	}
-	if _, err := configWithoutJWTHMAC.PrimitiveFromKey(privateKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutJWTHMAC.PrimitiveFromKey(privateKey) err = nil, want error")
+	if _, err := configWithoutJWTHMAC.LegacyPrimitiveFromKey(privateKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutJWTHMAC.LegacyPrimitiveFromKey(privateKey) err = nil, want error")
 	}
 
 	// Register jwt.RegisterJWTRSASSAPKCS1PrimitiveConstructor() and check that it now works.
@@ -251,17 +251,17 @@ func TestRegisterJWTRSASSAPKCS1PrimitiveConstructor(t *testing.T) {
 		t.Fatalf("jwt.RegisterJWTRSASSAPKCS1PrimitiveConstructor() err = %v, want nil", err)
 	}
 	configWithJWTHMAC := b.Build()
-	p1, err := configWithJWTHMAC.PrimitiveFromKey(privateKey, internalapi.Token{})
+	p1, err := configWithJWTHMAC.LegacyPrimitiveFromKey(privateKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithJWTHMAC.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithJWTHMAC.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	signer, ok := p1.(jwt.Signer)
 	if !ok {
 		t.Fatalf("p was of type %v, want jwt.Signer", reflect.TypeOf(p1))
 	}
-	p2, err := configWithJWTHMAC.PrimitiveFromKey(publicKey, internalapi.Token{})
+	p2, err := configWithJWTHMAC.LegacyPrimitiveFromKey(publicKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithJWTHMAC.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithJWTHMAC.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	verifier, ok := p2.(jwt.Verifier)
 	if !ok {
@@ -351,11 +351,11 @@ func TestRegisterJWTRSASSAPSSPrimitiveConstructor(t *testing.T) {
 	configWithoutJWTHMAC := b.Build()
 
 	// Should fail because jwt.RegisterJWTRSASSAPSSPrimitiveConstructor() was not called.
-	if _, err := configWithoutJWTHMAC.PrimitiveFromKey(publicKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutJWTHMAC.PrimitiveFromKey(publicKey) err = nil, want error")
+	if _, err := configWithoutJWTHMAC.LegacyPrimitiveFromKey(publicKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutJWTHMAC.LegacyPrimitiveFromKey(publicKey) err = nil, want error")
 	}
-	if _, err := configWithoutJWTHMAC.PrimitiveFromKey(privateKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutJWTHMAC.PrimitiveFromKey(privateKey) err = nil, want error")
+	if _, err := configWithoutJWTHMAC.LegacyPrimitiveFromKey(privateKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutJWTHMAC.LegacyPrimitiveFromKey(privateKey) err = nil, want error")
 	}
 
 	// Register jwt.RegisterJWTRSASSAPSSPrimitiveConstructor() and check that it now works.
@@ -363,17 +363,17 @@ func TestRegisterJWTRSASSAPSSPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("jwt.RegisterJWTRSASSAPSSPrimitiveConstructor() err = %v, want nil", err)
 	}
 	configWithJWTHMAC := b.Build()
-	p1, err := configWithJWTHMAC.PrimitiveFromKey(privateKey, internalapi.Token{})
+	p1, err := configWithJWTHMAC.LegacyPrimitiveFromKey(privateKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithJWTHMAC.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithJWTHMAC.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	signer, ok := p1.(jwt.Signer)
 	if !ok {
 		t.Fatalf("p was of type %v, want jwt.Signer", reflect.TypeOf(p1))
 	}
-	p2, err := configWithJWTHMAC.PrimitiveFromKey(publicKey, internalapi.Token{})
+	p2, err := configWithJWTHMAC.LegacyPrimitiveFromKey(publicKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithJWTHMAC.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithJWTHMAC.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	verifier, ok := p2.(jwt.Verifier)
 	if !ok {
@@ -443,11 +443,11 @@ func TestRegisterJWTMLDSAPrimitiveConstructor(t *testing.T) {
 	configWithoutJWTMLDSA := b.Build()
 
 	// Should fail because jwt.RegisterJWTMLDSAPrimitiveConstructor() was not called.
-	if _, err := configWithoutJWTMLDSA.PrimitiveFromKey(publicKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutJWTMLDSA.PrimitiveFromKey(publicKey) err = nil, want error")
+	if _, err := configWithoutJWTMLDSA.LegacyPrimitiveFromKey(publicKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutJWTMLDSA.LegacyPrimitiveFromKey(publicKey) err = nil, want error")
 	}
-	if _, err := configWithoutJWTMLDSA.PrimitiveFromKey(privateKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutJWTMLDSA.PrimitiveFromKey(privateKey) err = nil, want error")
+	if _, err := configWithoutJWTMLDSA.LegacyPrimitiveFromKey(privateKey, internalapi.Token{}); err == nil {
+		t.Fatalf("configWithoutJWTMLDSA.LegacyPrimitiveFromKey(privateKey) err = nil, want error")
 	}
 
 	// Register jwt.RegisterJWTMLDSAPrimitiveConstructor() and check that it now works.
@@ -455,17 +455,17 @@ func TestRegisterJWTMLDSAPrimitiveConstructor(t *testing.T) {
 		t.Fatalf("jwt.RegisterJWTMLDSAPrimitiveConstructor() err = %v, want nil", err)
 	}
 	configWithJWTMLDSA := b.Build()
-	p1, err := configWithJWTMLDSA.PrimitiveFromKey(privateKey, internalapi.Token{})
+	p1, err := configWithJWTMLDSA.LegacyPrimitiveFromKey(privateKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithJWTMLDSA.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithJWTMLDSA.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	signer, ok := p1.(jwt.Signer)
 	if !ok {
 		t.Fatalf("p was of type %v, want jwt.Signer", reflect.TypeOf(p1))
 	}
-	p2, err := configWithJWTMLDSA.PrimitiveFromKey(publicKey, internalapi.Token{})
+	p2, err := configWithJWTMLDSA.LegacyPrimitiveFromKey(publicKey, internalapi.Token{})
 	if err != nil {
-		t.Fatalf(" configWithJWTMLDSA.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf(" configWithJWTMLDSA.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	verifier, ok := p2.(jwt.Verifier)
 	if !ok {

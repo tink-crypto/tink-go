@@ -63,7 +63,7 @@ func (tk testKeyUnregistered) Equal(other key.Key) bool                  { retur
 
 func primitive1Constructor(k key.Key) (any, error) { return testPrimitive1{}, nil }
 
-func TestConfigPrimitiveFromKeyWorks(t *testing.T) {
+func TestConfigLegacyPrimitiveFromKeyWorks(t *testing.T) {
 	builder := config.NewBuilder()
 	token := internalapi.Token{}
 
@@ -73,9 +73,9 @@ func TestConfigPrimitiveFromKeyWorks(t *testing.T) {
 
 	config := builder.Build()
 
-	p0, err := config.PrimitiveFromKey(testKey0{}, token)
+	p0, err := config.LegacyPrimitiveFromKey(testKey0{}, token)
 	if err != nil {
-		t.Fatalf("config.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf("config.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	if reflect.TypeOf(p0) != reflect.TypeFor[testPrimitive0]() {
 		t.Errorf("Wrong primitive returned: got %T, want testPrimitive0", p0)
@@ -100,16 +100,16 @@ func TestMultiplePrimitiveConstructors(t *testing.T) {
 
 	config := builder.Build()
 
-	p0, err := config.PrimitiveFromKey(testKey0{}, token)
+	p0, err := config.LegacyPrimitiveFromKey(testKey0{}, token)
 	if err != nil {
-		t.Fatalf("builder.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf("builder.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	if reflect.TypeOf(p0) != reflect.TypeFor[testPrimitive0]() {
 		t.Errorf("Wrong primitive returned: got %T, want testPrimitive0", p0)
 	}
-	p1, err := config.PrimitiveFromKey(testKey1{}, token)
+	p1, err := config.LegacyPrimitiveFromKey(testKey1{}, token)
 	if err != nil {
-		t.Fatalf("builder.PrimitiveFromKey() err = %v, want nil", err)
+		t.Fatalf("builder.LegacyPrimitiveFromKey() err = %v, want nil", err)
 	}
 	if reflect.TypeOf(p1) != reflect.TypeFor[testPrimitive1]() {
 		t.Errorf("Wrong primitive returned: got %T, want testPrimitive0", p1)
@@ -139,12 +139,12 @@ func TestUnregisteredPrimitive(t *testing.T) {
 	}
 	config := builder.Build()
 
-	res, err := config.PrimitiveFromKey(testKeyUnregistered{}, token)
+	res, err := config.LegacyPrimitiveFromKey(testKeyUnregistered{}, token)
 	if err == nil {
-		t.Errorf("config.PrimitiveFromKey() err = nil, want error")
+		t.Errorf("config.LegacyPrimitiveFromKey() err = nil, want error")
 	}
 	if res != nil {
-		t.Errorf("config.PrimitiveFromKey() return value = %v, want nil", res)
+		t.Errorf("config.LegacyPrimitiveFromKey() return value = %v, want nil", res)
 	}
 }
 
@@ -156,23 +156,23 @@ func TestConfigV0_ConfigIsDeepcopied(t *testing.T) {
 	}
 
 	config := builder.Build()
-	if _, err := config.PrimitiveFromKey(&testKey0{}, internalapi.Token{}); err != nil {
-		t.Fatalf("config.PrimitiveFromKey() err=%v, want nil", err)
+	if _, err := config.LegacyPrimitiveFromKey(&testKey0{}, internalapi.Token{}); err != nil {
+		t.Fatalf("config.LegacyPrimitiveFromKey() err=%v, want nil", err)
 	}
-	if _, err := config.PrimitiveFromKey(&testKey1{}, internalapi.Token{}); err == nil {
-		t.Fatalf("config.PrimitiveFromKey() err=nil, want error")
+	if _, err := config.LegacyPrimitiveFromKey(&testKey1{}, internalapi.Token{}); err == nil {
+		t.Fatalf("config.LegacyPrimitiveFromKey() err=nil, want error")
 	}
 
 	if err := builder.RegisterPrimitiveConstructor(reflect.TypeFor[*testKey1](), primitive1Constructor, internalapi.Token{}); err != nil {
 		t.Fatalf("builder.RegisterPrimitiveConstructor() err=%v, want nil", err)
 	}
 	// This is not available in the original config.
-	if _, err := config.PrimitiveFromKey(&testKey1{}, internalapi.Token{}); err == nil {
-		t.Fatalf("config.PrimitiveFromKey() err=nil, want error")
+	if _, err := config.LegacyPrimitiveFromKey(&testKey1{}, internalapi.Token{}); err == nil {
+		t.Fatalf("config.LegacyPrimitiveFromKey() err=nil, want error")
 	}
 
 	config2 := builder.Build()
-	if _, err := config2.PrimitiveFromKey(&testKey1{}, internalapi.Token{}); err != nil {
-		t.Fatalf("config.PrimitiveFromKey() err=%v, want nil", err)
+	if _, err := config2.LegacyPrimitiveFromKey(&testKey1{}, internalapi.Token{}); err != nil {
+		t.Fatalf("config.LegacyPrimitiveFromKey() err=%v, want nil", err)
 	}
 }

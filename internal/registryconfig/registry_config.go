@@ -30,8 +30,8 @@ import (
 // old global Registry through the new Configuration interface.
 type RegistryConfig struct{}
 
-// PrimitiveFromKey constructs a primitive from a [key.Key] using the registry.
-func (c *RegistryConfig) PrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error) {
+// LegacyPrimitiveFromKey constructs a primitive from a [key.Key] using the registry.
+func (c *RegistryConfig) LegacyPrimitiveFromKey(key key.Key, _ internalapi.Token) (any, error) {
 	p, err := primitiveregistry.Primitive(key)
 	if err == nil {
 		return p, nil

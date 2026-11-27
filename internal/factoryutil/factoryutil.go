@@ -121,14 +121,14 @@ func (lb *LoggerFactory) CreateFor(primitive, apiFunction string) (monitoring.Lo
 	})
 }
 
-// PrimitiveFromKey returns the primitive of type T from the given key and config.
+// LegacyPrimitiveFromKey returns the primitive of type T from the given key and config.
 //
 // On success, it also returns whether the primitive is a legacy "non-full"
 // primitive.
 //
 // k and config must not be nil.
-func PrimitiveFromKey[T any](k key.Key, config keyset.PrimitivesConfig) (T, bool, error) {
-	primitive, err := config.PrimitiveFromKey(k, internalapi.Token{})
+func LegacyPrimitiveFromKey[T any](k key.Key, config keyset.PrimitivesConfig) (T, bool, error) {
+	primitive, err := config.LegacyPrimitiveFromKey(k, internalapi.Token{})
 	if err != nil {
 		var zero T
 		return zero, false, err
