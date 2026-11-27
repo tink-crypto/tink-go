@@ -20,7 +20,6 @@ import (
 
 	"github.com/tink-crypto/tink-go/v2/internal/config"
 	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
-	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
 	"github.com/tink-crypto/tink-go/v2/prf/hmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
 )
@@ -33,7 +32,7 @@ func mustCreateConfigV0() config.Config {
 	if err := prf.RegisterAESCMACPRFPrimitiveConstructor(builder, internalapi.Token{}); err != nil {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register AES-CMAC PRF: %v", err))
 	}
-	if err := hkdfprf.RegisterPrimitiveConstructor(builder, internalapi.Token{}); err != nil {
+	if err := prf.RegisterHKDFPRFPrimitiveConstructor(builder, internalapi.Token{}); err != nil {
 		panic(fmt.Sprintf("mustCreateConfigV0() failed to register HKDF PRF: %v", err))
 	}
 	if err := hmacprf.RegisterPrimitiveConstructor(builder, internalapi.Token{}); err != nil {

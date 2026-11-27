@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/tink-crypto/tink-go/v2/monitoring"
-	_ "github.com/tink-crypto/tink-go/v2/prf/hkdfprf" // To register the HKDF PRF key manager.
 	_ "github.com/tink-crypto/tink-go/v2/prf/hmacprf" // To register the HMAC PRF key manager.
 )
 

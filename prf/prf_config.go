@@ -23,6 +23,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/internal/primitiveregistry"
 	"github.com/tink-crypto/tink-go/v2/key"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf" // Also registers the AES-CMAC PRF key serialization.
+	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"       // Also registers the HKDF PRF key serialization.
 )
 
 func aesCMACPRFPrimitiveConstructor(key key.Key) (any, error) {
@@ -33,6 +34,14 @@ func aesCMACPRFPrimitiveConstructor(key key.Key) (any, error) {
 	return aescmacprf.NewPRF(actualKey, internalapi.Token{})
 }
 
+func hkdfPRFPrimitiveConstructor(key key.Key) (any, error) {
+	actualKey, ok := key.(*hkdfprf.Key)
+	if !ok {
+		return nil, fmt.Errorf("invalid key type: got %T, want %T", key, (*hkdfprf.Key)(nil))
+	}
+	return hkdfprf.NewPRF(actualKey, internalapi.Token{})
+}
+
 // RegisterAESCMACPRFPrimitiveConstructor registers the AES-CMAC PRF primitive constructor
 // to the provided config.
 //
@@ -41,8 +50,19 @@ func RegisterAESCMACPRFPrimitiveConstructor(c *config.Builder, t internalapi.Tok
 	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*aescmacprf.Key](), aesCMACPRFPrimitiveConstructor, t)
 }
 
+// RegisterHKDFPRFPrimitiveConstructor registers the HKDF PRF primitive constructor
+// to the provided config.
+//
+// It is *NOT* part of the public API.
+func RegisterHKDFPRFPrimitiveConstructor(c *config.Builder, t internalapi.Token) error {
+	return c.RegisterPrimitiveConstructor(reflect.TypeFor[*hkdfprf.Key](), hkdfPRFPrimitiveConstructor, t)
+}
+
 func init() {
 	if err := primitiveregistry.RegisterPrimitiveConstructor[*aescmacprf.Key](aesCMACPRFPrimitiveConstructor); err != nil {
+		panic(fmt.Sprintf("prf.init() failed: %v", err))
+	}
+	if err := primitiveregistry.RegisterPrimitiveConstructor[*hkdfprf.Key](hkdfPRFPrimitiveConstructor); err != nil {
 		panic(fmt.Sprintf("prf.init() failed: %v", err))
 	}
 }

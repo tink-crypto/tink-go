@@ -17,12 +17,9 @@ package hkdfprf_test
 import (
 	"bytes"
 	"encoding/hex"
-	"reflect"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
-	"github.com/tink-crypto/tink-go/v2/internal/config"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/prf/hkdfprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
@@ -195,47 +192,5 @@ func TestKeysetGenerationFromKey(t *testing.T) {
 	}
 	if got, want := gotPRFOutput, wantPRFOutput[:32]; !bytes.Equal(got, want) {
 		t.Errorf("gotPRFOutput = %x, want %x", got, want)
-	}
-}
-
-func TestRegisterPrimitiveConstructor(t *testing.T) {
-	hkdfKeyBytes := mustHexDecode(t, hkdfKeyHex)
-	hkdfprfParams, err := hkdfprf.NewParameters(len(hkdfKeyBytes), hkdfprf.SHA256, mustHexDecode(t, hkdfSaltHex))
-	if err != nil {
-		t.Fatalf("hkdfprf.NewParameters() err=%v, want nil", err)
-	}
-	hkdfprfKey, err := hkdfprf.NewKey(secretdata.NewBytesFromData(hkdfKeyBytes, insecuresecretdataaccess.Token{}), hkdfprfParams)
-	if err != nil {
-		t.Fatalf("keygenregistry.CreateKey() err=%v, want nil", err)
-	}
-
-	b := config.NewBuilder()
-	configWithoutHKDFPRF := b.Build()
-
-	// Should fail because hkdfprf.RegisterPrimitiveConstructor() was not called.
-	if _, err := configWithoutHKDFPRF.PrimitiveFromKey(hkdfprfKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutHKDFPRF.PrimitiveFromKey() err = nil, want error")
-	}
-
-	// Register hkdfprf.RegisterPrimitiveConstructor() and check that it now works.
-	if err := hkdfprf.RegisterPrimitiveConstructor(b, internalapi.Token{}); err != nil {
-		t.Fatalf("hkdfprf.RegisterPrimitiveConstructor() err = %v, want nil", err)
-	}
-	configWithHKDFPRF := b.Build()
-	primitive, err := configWithHKDFPRF.PrimitiveFromKey(hkdfprfKey, internalapi.Token{})
-	if err != nil {
-		t.Fatalf(" configWithHKDFPRF.PrimitiveFromKey() err = %v, want nil", err)
-	}
-	p, ok := primitive.(prf.PRF)
-	if !ok {
-		t.Fatalf("p was of type %v, want prf.PRF", reflect.TypeOf(p))
-	}
-	want := mustHexDecode(t, hkdfWantOutputHex)
-	got, err := p.ComputePRF(mustHexDecode(t, hkdfDataHex), uint32(len(want)))
-	if err != nil {
-		t.Fatalf("d.ComputePRF() err = %v, want nil", err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Errorf("d.ComputePRF() = %x, want %x", got, want)
 	}
 }
