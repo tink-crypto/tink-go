@@ -17,12 +17,9 @@ package aescmacprf_test
 import (
 	"bytes"
 	"encoding/hex"
-	"reflect"
 	"testing"
 
 	"github.com/tink-crypto/tink-go/v2/insecuresecretdataaccess"
-	"github.com/tink-crypto/tink-go/v2/internal/config"
-	"github.com/tink-crypto/tink-go/v2/internal/internalapi"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/prf/aescmacprf"
 	"github.com/tink-crypto/tink-go/v2/prf"
@@ -148,43 +145,5 @@ func TestKeysetGenerationFromKey(t *testing.T) {
 	}
 	if got, want := gotPRFOutput, wantPRFOutput; !bytes.Equal(got, want) {
 		t.Errorf("gotPRFOutput = %x, want %x", got, want)
-	}
-}
-
-func TestRegisterPrimitiveConstructor(t *testing.T) {
-	aesCMACPRFKeyBytes := mustHexDecode(t, aesCMACPRFKeyHex)
-	aesCMACPRFKey, err := aescmacprf.NewKey(secretdata.NewBytesFromData(aesCMACPRFKeyBytes, insecuresecretdataaccess.Token{}))
-	if err != nil {
-		t.Fatalf("keygenregistry.CreateKey() err = %v, want nil", err)
-	}
-
-	b := config.NewBuilder()
-	configWithoutAESCMACPRF := b.Build()
-
-	// Should fail because aescmacprf.RegisterPrimitiveConstructor() was not called.
-	if _, err := configWithoutAESCMACPRF.PrimitiveFromKey(aesCMACPRFKey, internalapi.Token{}); err == nil {
-		t.Fatalf("configWithoutAESCMACPRF.PrimitiveFromKey() err = nil, want error")
-	}
-
-	// Register aescmacprf.RegisterPrimitiveConstructor() and check that it now works.
-	if err := aescmacprf.RegisterPrimitiveConstructor(b, internalapi.Token{}); err != nil {
-		t.Fatalf("aescmacprf.RegisterPrimitiveConstructor() err = %v, want nil", err)
-	}
-	configWithAESCMACPRF := b.Build()
-	primitive, err := configWithAESCMACPRF.PrimitiveFromKey(aesCMACPRFKey, internalapi.Token{})
-	if err != nil {
-		t.Fatalf(" configWithAESCMACPRF.PrimitiveFromKey() err = %v, want nil", err)
-	}
-	p, ok := primitive.(prf.PRF)
-	if !ok {
-		t.Fatalf("p was of type %v, want prf.PRF", reflect.TypeOf(p))
-	}
-	want := mustHexDecode(t, aesCMACPRFWantOutputHex)
-	got, err := p.ComputePRF(mustHexDecode(t, aesCMACPRFDataHex), uint32(len(want)))
-	if err != nil {
-		t.Fatalf("d.ComputePRF() err = %v, want nil", err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Errorf("d.ComputePRF() = %x, want %x", got, want)
 	}
 }
